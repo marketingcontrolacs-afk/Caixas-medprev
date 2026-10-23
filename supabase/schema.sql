@@ -107,26 +107,40 @@ alter table public.anexos        enable row level security;
 alter table public.conferencias  enable row level security;
 alter table public.mapeamento_bc enable row level security;
 
+drop policy if exists esc_tudo on public.clientes;
 create policy esc_tudo on public.clientes      for all using (eh_escritorio()) with check (eh_escritorio());
+drop policy if exists esc_tudo on public.perfis;
 create policy esc_tudo on public.perfis        for all using (eh_escritorio()) with check (eh_escritorio());
+drop policy if exists esc_tudo on public.fechamentos;
 create policy esc_tudo on public.fechamentos   for all using (eh_escritorio()) with check (eh_escritorio());
+drop policy if exists esc_tudo on public.saidas;
 create policy esc_tudo on public.saidas        for all using (eh_escritorio()) with check (eh_escritorio());
+drop policy if exists esc_tudo on public.anexos;
 create policy esc_tudo on public.anexos        for all using (eh_escritorio()) with check (eh_escritorio());
+drop policy if exists esc_tudo on public.conferencias;
 create policy esc_tudo on public.conferencias  for all using (eh_escritorio()) with check (eh_escritorio());
+drop policy if exists esc_tudo on public.mapeamento_bc;
 create policy esc_tudo on public.mapeamento_bc for all using (eh_escritorio()) with check (eh_escritorio());
 
+drop policy if exists op_ver on public.perfis;
 create policy op_ver on public.perfis   for select using (user_id = auth.uid());
+drop policy if exists op_ver on public.clientes;
 create policy op_ver on public.clientes for select using (id = meu_cliente());
 
+drop policy if exists op_ver on public.fechamentos;
 create policy op_ver    on public.fechamentos for select using (cliente_id = meu_cliente());
+drop policy if exists op_criar on public.fechamentos;
 create policy op_criar  on public.fechamentos for insert with check (cliente_id = meu_cliente() and not conferido);
+drop policy if exists op_editar on public.fechamentos;
 create policy op_editar on public.fechamentos for update
   using (cliente_id = meu_cliente() and not conferido)
   with check (cliente_id = meu_cliente() and not conferido);
 
+drop policy if exists op_saidas on public.saidas;
 create policy op_saidas on public.saidas for all
   using (exists(select 1 from fechamentos f where f.id = fechamento_id and f.cliente_id = meu_cliente() and not f.conferido))
   with check (exists(select 1 from fechamentos f where f.id = fechamento_id and f.cliente_id = meu_cliente() and not f.conferido));
+drop policy if exists op_anexos on public.anexos;
 create policy op_anexos on public.anexos for all
   using (exists(select 1 from fechamentos f where f.id = fechamento_id and f.cliente_id = meu_cliente() and not f.conferido))
   with check (exists(select 1 from fechamentos f where f.id = fechamento_id and f.cliente_id = meu_cliente() and not f.conferido));
@@ -134,9 +148,11 @@ create policy op_anexos on public.anexos for all
 -- Arquivos anexados (pasta = id do cliente)
 insert into storage.buckets (id, name, public) values ('anexos','anexos', false)
 on conflict (id) do nothing;
+drop policy if exists anexos_esc on storage.objects;
 create policy anexos_esc on storage.objects for all
   using (bucket_id = 'anexos' and public.eh_escritorio())
   with check (bucket_id = 'anexos' and public.eh_escritorio());
+drop policy if exists anexos_op on storage.objects;
 create policy anexos_op on storage.objects for all
   using (bucket_id = 'anexos' and (storage.foldername(name))[1] = public.meu_cliente()::text)
   with check (bucket_id = 'anexos' and (storage.foldername(name))[1] = public.meu_cliente()::text);
@@ -158,9 +174,11 @@ insert into public.mapeamento_bc(lancamento, tipo, conta, forma, categoria, stat
  ('Outras despesas pagas no caixa','Despesa','Caixa','Dinheiro','Outras despesas','Pago')
 on conflict (lancamento) do nothing;
 
-select 'Instalação concluída' as resultado;
 
 -- Permissões da API (projetos novos do Supabase podem não liberar automaticamente)
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant execute on all functions in schema public to authenticated;
+
+notify pgrst, 'reload schema';
+select 'Instalação concluída' as resultado;
