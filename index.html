@@ -371,7 +371,7 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){show('loginForm');return}
   const {data:p,error}=await sb.from('perfis').select('*').eq('user_id',session.user.id).maybeSingle();
-  if(error){fail(error,'Erro ao carregar o seu perfil');show('loginForm');return}
+  if(error){console.error(error);show('loginForm');$('lgErr').textContent='Erro ao carregar o seu perfil: '+[error.code,error.message,error.hint].filter(Boolean).join(' | ');$('lgErr').hidden=false;return}
   ME=p||{papel:'pendente',email:session.user.email};
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
   const cli=CLIENTES.find(c=>c.id===ME.cliente_id);
