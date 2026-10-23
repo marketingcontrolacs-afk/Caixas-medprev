@@ -159,3 +159,8 @@ insert into public.mapeamento_bc(lancamento, tipo, conta, forma, categoria, stat
 on conflict (lancamento) do nothing;
 
 select 'Instalação concluída' as resultado;
+
+-- Permissões da API (projetos novos do Supabase podem não liberar automaticamente)
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant execute on all functions in schema public to authenticated;
