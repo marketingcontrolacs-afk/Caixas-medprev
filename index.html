@@ -96,6 +96,7 @@ th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 th:first-child,td:first-child,td.l,th.l{text-align:left}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover{background:var(--sunk)}
+tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
 tfoot td{font-weight:700;background:var(--sunk)}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
@@ -378,6 +379,8 @@ const anexoHint=t=>t===DEV?'Ex.: foto da guia ou do recibo de devolução.':t===
 const CATS=['Relatório do caixa (sistema)','Relatório da máquina de cartão','Outro comprovante'];
 const ACCEPT='image/*,application/pdf';
 
+// Lançamentos marcados na importação do histórico para o escritório conferir
+const aConferir=r=>!r.conferido&&/precisa ser conferido/i.test(r.obs||'');
 function calc(d){
   const sai=r2((d.saidas||[]).reduce((a,s)=>a+(Number(s.valor)||0),0));
   const esp=r2((Number(d.din_sis)||0)-sai);
@@ -386,10 +389,10 @@ function calc(d){
   const difCred=r2((Number(d.cred_maq)||0)-(Number(d.cred_sis)||0));
   const juros=Math.max(difCred,0);
   const alerta=Math.abs(fs)>=0.01||Math.abs(difDeb)>=0.01||difCred<=-0.01;
-  const status=d.conferido?'conf':!alerta?'ok':((d.obs||'').trim()?'verificar':'justificar');
+  const status=d.conferido?'conf':aConferir(d)?'divergencia':!alerta?'ok':((d.obs||'').trim()?'verificar':'justificar');
   return {sai,esp,fs,difDeb,difCred,juros,alerta,status};
 }
-const CHIP={ok:['c-ok','✔ OK'],verificar:['c-warn','⚠ Verificar'],justificar:['c-bad','⚠ Justificar'],conf:['c-done','✓ Conferido'],none:['c-none','Sem lançamento']};
+const CHIP={divergencia:['c-bad','⚠ Conferir divergência'],ok:['c-ok','✔ OK'],verificar:['c-warn','⚠ Verificar'],justificar:['c-bad','⚠ Justificar'],conf:['c-done','✓ Conferido'],none:['c-none','Sem lançamento']};
 const chip=st=>`<span class="chip ${CHIP[st][0]}">${CHIP[st][1]}</span>`;
 
 // ---------- anexos (arquivos) ----------
@@ -690,7 +693,7 @@ async function renderPainel(){
     const c=calc(f);T.din+=+f.din_sis;T.sai+=c.sai;T.fs+=c.fs;T.deb+=+f.deb_maq;T.difDeb+=c.difDeb;T.cred+=+f.cred_maq;T.juros+=c.juros;
     if(f.conferido)nConf++;else{nPend++;if(c.alerta)nAlert++}
     const clip=(f.anexos||[]).length?` <span class="muted" title="Comprovantes">📎${f.anexos.length}</span>`:'';
-    return `<tr class="click" data-d="${s}" tabindex="0"><td>${dLabel(s)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}</td></tr>`}).join('')
+    return `<tr class="click${aConferir(f)?' pend':''}" data-d="${s}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${dLabel(s)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}</td></tr>`}).join('')
     ||'<tr><td class="l muted" colspan="9">Nenhum dia neste mês até hoje.</td></tr>';
   $('tfDias').innerHTML=MES.length?`<tr><td>Total</td><td>${fm(T.din)}</td><td>${fm(T.sai)}</td><td>${fsign(T.fs)}</td><td>${fm(T.deb)}</td><td>${fsign(T.difDeb)}</td><td>${fm(T.cred)}</td><td>${fm(T.juros)}</td><td></td></tr>`:'';
   $('tiles').innerHTML=`
@@ -917,7 +920,7 @@ async function renderMod(){
   }else{
     let saldo=ANT;
     head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||ent?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
+    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click${aConferir(r)?' pend':''}" data-id="${r.id}" tabindex="0"${aConferir(r)?` title="${esc(r.obs)}"`:''}><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||ent?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':aConferir(r)?'<span class="chip c-bad">⚠ Conferir divergência</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
     const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),S=sum(REGS.filter(r=>r.tipo==='Despesa'));
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(S)}</td><td>${fm(r2(ANT+E-S))}</td><td colspan="2"></td></tr>`:'';
     tiles=[['Saldo anterior',fm(ANT),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Saldo atual',fm(r2(ANT+E-S)),'saldo anterior + entradas − despesas'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
