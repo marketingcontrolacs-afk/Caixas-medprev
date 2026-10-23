@@ -1,4 +1,5 @@
 -- Caixas MedPrev (Controlacs) - instalação do banco de dados v1 (23/10/2026)
+-- Depois de rodar este arquivo, rode também o v2_modulos.sql (acessos e módulos novos).
 -- Operador: lança e corrige o caixa do próprio cliente até ser conferido.
 -- Escritório: vê tudo, confere, cadastra clientes/usuários e exporta para o Bom Controle.
 

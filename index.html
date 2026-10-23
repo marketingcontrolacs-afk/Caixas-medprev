@@ -28,7 +28,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
-.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topin{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
 .logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--ink)}
@@ -114,6 +114,20 @@ dialog::backdrop{background:rgba(10,20,22,.45)}
 .login{max-width:380px;margin:8vh auto 0;padding:26px;display:grid;gap:14px}
 .center{display:grid;place-items:center;padding:60px 0;color:var(--muted)}
 .cfg td{padding:4px 6px}.cfg input,.cfg select{padding:6px 8px;font-size:13px}
+.shell{display:grid;grid-template-columns:210px minmax(0,1fr);gap:24px;align-items:start}
+nav.side{display:grid;gap:3px;position:sticky;top:84px}
+.navgrp{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;padding:14px 10px 4px}
+.navgrp:first-child{padding-top:2px}
+.navbtn{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--ink);font:600 14px var(--body);padding:9px 10px;border-radius:8px;cursor:pointer;text-align:left;width:100%}
+.navbtn:hover{background:var(--sunk)}
+.navbtn[aria-current="page"]{background:var(--brand);color:var(--brand-ink)}
+.navbtn svg{width:18px;height:18px;flex:none}
+.navbtn .soon{margin-left:auto;font-size:10px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 6px;text-transform:uppercase}
+@media (max-width:900px){.shell{grid-template-columns:minmax(0,1fr);gap:12px}nav.side{position:static;display:flex;overflow-x:auto;gap:6px;padding-bottom:4px}.navgrp{display:none}.navbtn{width:auto;white-space:nowrap;border:1px solid var(--line);background:var(--surface)}}
+.ctxbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.ctxbar .f{min-width:220px}
+.docrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fields .wide{grid-column:1/-1}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -147,6 +161,10 @@ dialog::backdrop{background:rgba(10,20,22,.45)}
     <p>Seu usuário foi criado, mas ainda não foi ligado a um cliente. Peça ao escritório da Controlacs para liberar o seu acesso.</p>
   </section>
 
+  <div class="shell" id="app" hidden>
+    <nav class="side" id="nav" aria-label="Módulos"></nav>
+    <div style="min-width:0">
+      <div class="ctxbar" id="ctxbar"><label class="f">Empresa<select id="escCli"></select></label></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -213,20 +231,15 @@ dialog::backdrop{background:rgba(10,20,22,.45)}
     </div>
   </section>
 
-  <!-- ESCRITÓRIO -->
+  <!-- CAIXA: CONFERÊNCIA / CONSULTA -->
   <section id="viewEsc" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Conferência de caixa</h1><p class="sub">Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.</p></div>
-      <div class="row">
-        <label class="f">Cliente<select id="escCli"></select></label>
-        <label class="f">Mês<select id="escMes"></select></label>
-      </div>
+      <div><h1 id="escTitle">Conferência de caixa</h1><p class="sub" id="escSub">Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.</p></div>
+      <label class="f">Mês<select id="escMes"></select></label>
     </div>
-    <div class="tabs" role="tablist">
+    <div class="tabs" role="tablist" id="tabsEsc">
       <button role="tab" aria-selected="true" data-tab="painel">Dias do mês</button>
-      <button role="tab" aria-selected="false" data-tab="export">Exportar Bom Controle</button>
-      <button role="tab" aria-selected="false" data-tab="cadastro">Clientes e usuários</button>
-      <button role="tab" aria-selected="false" data-tab="mapa">Mapeamento</button>
+      <button role="tab" aria-selected="false" data-tab="export" data-esc="1">Exportar Bom Controle</button>
     </div>
 
     <div id="tabPainel">
@@ -238,7 +251,7 @@ dialog::backdrop{background:rgba(10,20,22,.45)}
           <tbody id="tbDias"></tbody><tfoot id="tfDias"></tfoot>
         </table>
       </div>
-      <p class="note">Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.</p>
+      <p class="note" id="painelNote">Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.</p>
     </div>
 
     <div id="tabExport" hidden>
@@ -253,20 +266,50 @@ dialog::backdrop{background:rgba(10,20,22,.45)}
       <p class="note" id="exInfo"></p>
       <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
     </div>
+  </section>
 
-    <div id="tabCadastro" hidden>
+  <!-- CONTAS A PAGAR / CARTÃO / TESOURARIA -->
+  <section id="viewMod" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1 id="mTitle"></h1><p class="sub" id="mSub"></p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="mFiltro"></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
+    </div>
+    <div class="tiles" id="mTiles"></div>
+    <div class="card tablebox"><table><thead id="mHead"></thead><tbody id="mBody"></tbody><tfoot id="mFoot"></tfoot></table></div>
+    <p class="note" id="mNote"></p>
+  </section>
+
+  <!-- CONFIGURAÇÕES (escritório) -->
+  <section id="viewCfg" hidden>
+    <h1>Configurações</h1>
+    <div class="tabs" role="tablist" id="tabsCfg">
+      <button role="tab" aria-selected="true" data-tab="cadastro">Empresas e usuários</button>
+      <button role="tab" aria-selected="false" data-tab="mapa">Mapeamento Bom Controle</button>
+    </div>
+    <div id="tabCadastro">
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
-        <h2>Clientes</h2>
+        <h2>Empresas</h2>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCli"></table></div>
-        <form class="row" id="formCli"><input id="novoCli" placeholder="Nome do novo cliente" style="max-width:280px"><button class="btn small primary" type="submit">Adicionar cliente</button></form>
+        <form class="row" id="formCli"><input id="novoCli" placeholder="Nome da nova empresa" style="max-width:280px"><button class="btn small primary" type="submit">Adicionar empresa</button></form>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Usuários</h2>
-        <p class="note" style="margin:0">Para criar um operador: no Supabase, vá em Authentication › Users › Add user › Create new user, informe e-mail e senha e marque “Auto Confirm User”. Depois ele aparece aqui como “Pendente” e você escolhe o cliente.</p>
+        <p class="note" style="margin:0">Para criar um usuário: no Supabase, vá em Authentication › Users › Add user › Create new user, informe e-mail e senha e marque “Auto Confirm User”. Ele aparece aqui como “Pendente”. Depois libere os módulos dele no quadro abaixo.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
       </div>
+      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
+        <h2>Acessos</h2>
+        <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar.</p>
+        <form class="row" id="formAc" style="align-items:flex-end">
+          <label class="f">Usuário<select id="acUsr"></select></label>
+          <label class="f">Empresa<select id="acCli"></select></label>
+          <label class="f">Módulo<select id="acMod"></select></label>
+          <label class="f">Nível<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
+          <button class="btn primary" type="submit">Liberar</button>
+        </form>
+        <div class="tablebox" style="margin:0"><table class="cfg" id="tbAc"></table></div>
+      </div>
     </div>
-
     <div id="tabMapa" hidden>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Mapeamento para o Bom Controle</h2>
@@ -275,12 +318,26 @@ dialog::backdrop{background:rgba(10,20,22,.45)}
       </div>
     </div>
   </section>
+
+  <section id="viewRH" hidden>
+    <h1>RH</h1>
+    <p class="sub">Em planejamento. Esta área vai seguir o mesmo padrão dos módulos financeiros.</p>
+  </section>
+    </div>
+  </div>
 </main>
 
 <dialog id="dlg">
   <div class="dh"><h2 id="dTitle"></h2><span class="spacer"></span><span id="dChip"></span></div>
   <div class="db" id="dBody"></div>
   <div class="df"><button class="btn ghost" id="dClose">Fechar</button><button class="btn primary" id="dConf">Marcar como conferido</button></div>
+</dialog>
+<dialog id="dlgReg">
+  <form id="rForm" novalidate>
+    <div class="dh"><h2 id="rTitle"></h2><span class="spacer"></span><span id="rChip"></span></div>
+    <div class="db"><div class="fields" id="rFields"></div><div id="rDocs" style="display:grid;gap:8px"></div><div id="rBaixa"></div><p class="err" id="rErr" hidden></p></div>
+    <div class="df"><button type="button" class="btn ghost" id="rDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="rClose">Fechar</button><button type="button" class="btn" id="rConf"></button><button type="submit" class="btn primary" id="rSave">Salvar</button></div>
+  </form>
 </dialog>
 <div class="toast" id="toast" hidden></div>
 
@@ -339,13 +396,13 @@ const chip=st=>`<span class="chip ${CHIP[st][0]}">${CHIP[st][1]}</span>`;
 function shrink(file){return new Promise((ok,no)=>{const img=new Image();const u=URL.createObjectURL(file);
   img.onload=()=>{const k=Math.min(1,1600/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok(b):no(),'image/jpeg',0.75)};img.onerror=no;img.src=u})}
-async function uploadAnexo(file,clienteId,data){
+async function uploadAnexo(file,clienteId,pasta){
   let blob=file,nome=file.name||'arquivo',kind;
   if(file.type==='application/pdf'){if(file.size>10*1024*1024)throw new Error('PDF maior que 10 MB.');kind='pdf'}
   else if(file.type.startsWith('image/')){blob=await shrink(file).catch(()=>{throw new Error('Não consegui abrir essa imagem.')});kind='img';nome=nome.replace(/\.[^.]+$/,'')+'.jpg'}
   else throw new Error('Envie uma foto ou um PDF.');
   const safe=nome.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.-]+/g,'_');
-  const caminho=`${clienteId}/${data}/${crypto.randomUUID()}-${safe}`;
+  const caminho=`${clienteId}/${pasta}/${crypto.randomUUID()}-${safe}`;
   const {error}=await sb.storage.from('anexos').upload(caminho,blob,{contentType:kind==='pdf'?'application/pdf':'image/jpeg'});
   if(error)throw new Error('Falha ao enviar o arquivo.');
   return {caminho,nome_arquivo:nome,kind,preview:kind==='img'?URL.createObjectURL(blob):null};
@@ -362,10 +419,65 @@ function anexoView(a,url,small){
    :`<img class="${small?'thumb':''}" src="${url||''}" alt="${esc(a.nome_arquivo)}">`;
 }
 
-// ---------- sessão ----------
-let ME=null, CLIENTES=[];
+// ---------- sessão, acessos e menu ----------
+let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
+const ehEsc=()=>ME&&ME.papel==='escritorio';
+const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria'};
+const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
+const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
+const podeLancar=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m&&a.nivel==='lancamento');
+const ICO={
+  caixa:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h18M8 4h8v3H8z"/>',
+  pagar:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
+  tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
+  cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
+  cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
+};
+const NAV=[
+  {k:'caixa',t:'Caixa',g:'Financeiro',ok:()=>temAcesso('caixa')},
+  {k:'pagar',t:'Banco',g:'Financeiro',ok:()=>temAcesso('pagar')},
+  {k:'tesouraria',t:'Tesouraria',g:'Financeiro',ok:()=>temAcesso('tesouraria')},
+  {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
+  {k:'rh',t:'RH',g:'Recursos humanos',ok:ehEsc,soon:1},
+  {k:'cfg',t:'Configurações',g:'Escritório',ok:ehEsc},
+];
+function renderNav(){
+  let g=null,h='';
+  NAV.filter(n=>n.ok()).forEach(n=>{
+    if(n.g!==g){g=n.g;h+=`<div class="navgrp">${g}</div>`}
+    h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}</button>`;
+  });
+  $('nav').innerHTML=h;
+}
+$('nav').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)go(b.dataset.v)});
+// empresas que aparecem no seletor para o módulo aberto
+function empresasDe(m){
+  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(m!=='cartao'||c.tem_cartao):podeVer(c.id,m)));
+}
+const escCli=$('escCli');
+function fillClientes(){
+  const m=VIEW,v=escCli.value,lista=empresasDe(m);
+  escCli.innerHTML=lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
+  if(lista.some(c=>c.id===v))escCli.value=v;
+  $('ctxbar').hidden=m==='cfg'||m==='rh';
+  escCli.disabled=lista.length<2;
+}
+escCli.onchange=()=>openView();
+function go(v){VIEW=v;renderNav();fillClientes();openView()}
+const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
+function openView(){
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH'].forEach(x=>$(x).hidden=true);
+  const cli=cliAtual();
+  if(VIEW==='caixa'){
+    if(cli&&!ehEsc()&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
+    else{$('viewEsc').hidden=false;initEsc()}
+  }else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
+  else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
+  else if(VIEW==='rh')$('viewRH').hidden=false;
+}
 function show(view){
-  ['loading','loginForm','viewPend','viewOp','viewEsc'].forEach(v=>$(v).hidden=v!==view);
+  ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);
   const logged=view!=='loginForm'&&view!=='loading';$('btnSair').hidden=!logged;$('who').hidden=!logged;
 }
 async function boot(){
@@ -373,13 +485,17 @@ async function boot(){
   if(!session){show('loginForm');return}
   const {data:p,error}=await sb.from('perfis').select('*').eq('user_id',session.user.id).maybeSingle();
   if(error){console.error(error);show('loginForm');$('lgErr').textContent='Erro ao carregar o seu perfil: '+[error.code,error.message,error.hint].filter(Boolean).join(' | ');$('lgErr').hidden=false;return}
-  ME=p||{papel:'pendente',email:session.user.email};
+  ME=p||{papel:'pendente',email:session.user.email,user_id:session.user.id};
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  const cli=CLIENTES.find(c=>c.id===ME.cliente_id);
-  $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ME.papel==='escritorio'?'Escritório':cli?esc(cli.nome):''}`;
-  if(ME.papel==='escritorio'){show('viewEsc');initEsc()}
-  else if(ME.papel==='operador'&&cli){show('viewOp');initOp(cli)}
-  else show('viewPend');
+  const {data:ac,error:eac}=await sb.from('acessos').select('*').eq('user_id',ME.user_id);
+  // enquanto a atualização v2 do banco não roda, vale o cliente do perfil (só caixa)
+  ACESSOS=eac?(ME.papel==='operador'&&ME.cliente_id?[{cliente_id:ME.cliente_id,modulo:'caixa',nivel:'lancamento'}]:[]):(ac||[]);
+  window.V2=!eac;
+  const nomes=[...new Set(ACESSOS.map(a=>CLIENTES.find(c=>c.id===a.cliente_id)?.nome).filter(Boolean))];
+  $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
+  const first=NAV.find(n=>n.ok()&&!n.soon);
+  if(!first){show('viewPend');return}
+  show('app');go(first.k);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -527,24 +643,35 @@ $('opData').addEventListener('change',()=>{if($('opData').value)loadDay()});
 // =====================================================================
 // ESCRITÓRIO
 // =====================================================================
-let tab='painel', MES=[], MAPA=[];
-const escCli=$('escCli'),escMes=$('escMes');
-function initEsc(){
-  fillClientes();
+let tab='painel', tabCfg='cadastro', MES=[], MAPA=[];
+const escMes=$('escMes');
+function mesesOpts(ate){
   const y=+TODAY.slice(0,4),opts=[];
-  for(const yy of [y,y-1])for(let m=12;m>=1;m--){const k=`${yy}-${pad(m)}`;if(k<=TODAY.slice(0,7))opts.push(`<option value="${k}">${MESES[m-1]} ${yy}</option>`)}
-  escMes.innerHTML=opts.join('');escMes.value=TODAY.slice(0,7);
-  syncExportDates();renderEsc();
+  for(const yy of [y+1,y,y-1])for(let m=12;m>=1;m--){const k=`${yy}-${pad(m)}`;if(k<=ate)opts.push(`<option value="${k}">${MESES[m-1]} ${yy}</option>`)}
+  return opts.slice(0,26).join('');
 }
-function fillClientes(){const v=escCli.value;escCli.innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');if(v)escCli.value=v}
-escCli.onchange=()=>renderEsc();
+function initEsc(){
+  if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7);syncExportDates()}
+  const e=ehEsc();
+  $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
+  $('escSub').textContent=e?'Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
+  $('painelNote').textContent=e?'Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.':'Clique num dia para ver os detalhes e os comprovantes.';
+  document.querySelectorAll('#tabsEsc [data-esc]').forEach(b=>b.hidden=!e);
+  if(!e)tab='painel';
+  $('dConf').hidden=!e;
+  renderEsc();
+}
 escMes.onchange=()=>{syncExportDates();renderEsc()};
-document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));renderEsc()});
+document.querySelectorAll('#tabsEsc button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('#tabsEsc button').forEach(x=>x.setAttribute('aria-selected',x===b));renderEsc()});
+document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
 function renderEsc(){
-  $('tabPainel').hidden=tab!=='painel';$('tabExport').hidden=tab!=='export';$('tabCadastro').hidden=tab!=='cadastro';$('tabMapa').hidden=tab!=='mapa';
-  if(tab==='painel')renderPainel();if(tab==='export')renderExport();if(tab==='cadastro')renderCadastro();if(tab==='mapa')renderMapa();
+  $('tabPainel').hidden=tab!=='painel';$('tabExport').hidden=tab!=='export';
+  if(tab==='painel')renderPainel();if(tab==='export')renderExport();
 }
-const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
+function renderCfg(){
+  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';
+  if(tabCfg==='cadastro')renderCadastro();else renderMapa();
+}
 async function loadPeriodo(ini,fim){
   const {data,error}=await sb.from('fechamentos').select('*, saidas(*), anexos(*), conferencias(*)').eq('cliente_id',escCli.value).gte('data',ini).lte('data',fim).order('data');
   if(error){fail(error,'Erro ao carregar');return []}
@@ -552,14 +679,14 @@ async function loadPeriodo(ini,fim){
 }
 function monthRange(k){const [y,m]=k.split('-').map(Number);const last=new Date(y,m,0).getDate();return [`${k}-01`,`${k}-${pad(last)}`]}
 async function renderPainel(){
-  if(!escCli.value){$('tbDias').innerHTML='<tr><td class="l muted" colspan="9">Cadastre um cliente na aba “Clientes e usuários”.</td></tr>';return}
+  if(!escCli.value){$('tbDias').innerHTML='<tr><td class="l muted" colspan="9">Nenhuma empresa liberada.</td></tr>';$('tiles').innerHTML='';$('tfDias').innerHTML='';return}
   const [ini,fim]=monthRange(escMes.value);MES=await loadPeriodo(ini,fim);
   const by=Object.fromEntries(MES.map(f=>[f.data,f]));const cli=cliAtual();
   const days=[];const d=dObj(ini);while(isoLocal(d)<=fim&&isoLocal(d)<=TODAY){const s=isoLocal(d);if(d.getDay()!==0||cli.abre_domingo||by[s])days.push(s);d.setDate(d.getDate()+1)}
   const T={din:0,sai:0,fs:0,deb:0,difDeb:0,cred:0,juros:0};let nAlert=0,nPend=0,nConf=0,nSem=0;
   const cls=v=>v<-0.004?'neg':v>0.004?'pos':'muted';
   $('tbDias').innerHTML=days.map(s=>{const f=by[s];
-    if(!f){nSem++;return `<tr><td>${dLabel(s)}</td><td colspan="7" class="l muted">Operador ainda não lançou</td><td class="l">${chip('none')}</td></tr>`}
+    if(!f){nSem++;return `<tr><td>${dLabel(s)}</td><td colspan="7" class="l muted">Ainda não lançado</td><td class="l">${chip('none')}</td></tr>`}
     const c=calc(f);T.din+=+f.din_sis;T.sai+=c.sai;T.fs+=c.fs;T.deb+=+f.deb_maq;T.difDeb+=c.difDeb;T.cred+=+f.cred_maq;T.juros+=c.juros;
     if(f.conferido)nConf++;else{nPend++;if(c.alerta)nAlert++}
     const clip=(f.anexos||[]).length?` <span class="muted" title="Comprovantes">📎${f.anexos.length}</span>`:'';
@@ -591,7 +718,7 @@ async function openDay(s){
     <div><h3 style="margin-bottom:6px">Cartões</h3>${L('Débito sistema / máquina',fm(f.deb_sis)+' / '+fm(f.deb_maq))}${L('Diferença débito',fsign(c.difDeb),cls(c.difDeb))}${L('Crédito sistema / máquina',fm(f.cred_sis)+' / '+fm(f.cred_maq))}${L('Juros de parcelamento',fm(c.juros))}</div>
     <div><h3 style="margin-bottom:6px">Comprovantes do dia</h3>${anxDia.length?`<div class="fotos">${anxDia.map(a=>`<div style="display:grid;gap:4px;max-width:100%"><span class="note">${esc(a.categoria)}</span>${anexoView(a,urls[a.caminho])}</div>`).join('')}</div>`:'<p class="neg" style="margin:0">Nenhum relatório anexado.</p>'}</div>
     <div><h3 style="margin-bottom:6px">Observação do operador</h3><p style="margin:0">${f.obs?esc(f.obs):'<span class="muted">Sem observação</span>'}</p></div>
-    <label class="f">Nota da conferência (só o escritório vê)<textarea id="confNota">${esc(f.conf?.nota||'')}</textarea></label>`;
+    ${ehEsc()?`<label class="f">Nota da conferência (só o escritório vê)<textarea id="confNota">${esc(f.conf?.nota||'')}</textarea></label>`:''}`;
   $('dConf').textContent=f.conferido?'Desfazer conferência':'Marcar como conferido';
   dlg.showModal();
 }
@@ -663,22 +790,46 @@ $('btnBaixarBC').onclick=()=>{
 };
 
 // ---------- cadastros ----------
+let USERS=[];
 async function renderCadastro(){
-  const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];fillClientes();
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Cliente</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Ativo</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
-  const {data:us}=await sb.from('perfis').select('*').order('email');
-  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Acesso</th><th class="l">Cliente</th></tr></thead><tbody>${
-    (us||[]).map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
-      <td><select data-k="papel" ${u.user_id===ME.user_id?'disabled':''}>${[['pendente','Pendente (sem acesso)'],['operador','Operador de caixa'],['escritorio','Escritório']].map(([v,t])=>`<option value="${v}"${u.papel===v?' selected':''}>${t}</option>`).join('')}</select></td>
-      <td><select data-k="cliente_id"><option value="">—</option>${CLIENTES.map(c=>`<option value="${c.id}"${u.cliente_id===c.id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></td></tr>`).join('')}</tbody>`;
+  const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  const {data:us}=await sb.from('perfis').select('*').order('email');USERS=us||[];
+  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th></tr></thead><tbody>${
+    USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
+      <td><select data-k="papel" ${u.user_id===ME.user_id?'disabled':''}>${[['pendente','Pendente (sem acesso)'],['operador','Usuário do cliente'],['escritorio','Escritório (vê tudo)']].map(([v,t])=>`<option value="${v}"${u.papel===v?' selected':''}>${t}</option>`).join('')}</select></td></tr>`).join('')}</tbody>`;
+  $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)})</option>`).join('');
+  $('acCli').innerHTML='<option value="*">Todas as empresas</option>'+CLIENTES.filter(c=>c.ativo).map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  $('acMod').innerHTML=Object.entries(MODNOME).map(([k,t])=>`<option value="${k}">${t}</option>`).join('');
+  renderAcessos();
 }
+async function renderAcessos(){
+  if(!window.V2){$('tbAc').innerHTML='<tbody><tr><td class="l neg">Rode a atualização v2 do banco no Supabase para liberar acessos por módulo.</td></tr></tbody>';return}
+  const {data,error}=await sb.from('acessos').select('*');if(error){fail(error,'Erro ao carregar os acessos');return}
+  const nu=id=>{const u=USERS.find(x=>x.user_id===id);return u?esc(u.nome||u.email):'?'},nc=id=>esc(CLIENTES.find(c=>c.id===id)?.nome||'?');
+  const rows=(data||[]).sort((a,b)=>nu(a.user_id).localeCompare(nu(b.user_id))||nc(a.cliente_id).localeCompare(nc(b.cliente_id)));
+  $('tbAc').innerHTML=`<thead><tr><th class="l">Usuário</th><th class="l">Empresa</th><th class="l">Módulo</th><th class="l">Nível</th><th></th></tr></thead><tbody>${
+    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]}</td><td class="l">${a.nivel==='lancamento'?'Lançamento':'Consulta'}</td><td><button type="button" class="btn small ghost">Tirar acesso</button></td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="5">Nenhum acesso liberado ainda.</td></tr>'}</tbody>`;
+}
+$('formAc').addEventListener('submit',async e=>{
+  e.preventDefault();if(!window.V2){toast('Rode primeiro a atualização v2 do banco.');return}
+  const u=$('acUsr').value;if(!u)return;const cs=$('acCli').value==='*'?CLIENTES.filter(c=>c.ativo).map(c=>c.id):[$('acCli').value];
+  const rows=cs.map(c=>({user_id:u,cliente_id:c,modulo:$('acMod').value,nivel:$('acNiv').value}));
+  const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){fail(error);return}
+  const usr=USERS.find(x=>x.user_id===u);
+  if(usr&&usr.papel==='pendente'){await sb.from('perfis').update({papel:'operador'}).eq('user_id',u);usr.papel='operador'}
+  toast('Acesso liberado');renderCadastro();
+});
+$('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-u]');if(!tr||!e.target.closest('button'))return;
+  const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
-  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Cliente salvo');const c=CLIENTES.find(x=>x.id===id);c[k]=v;fillClientes()}});
+  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);c[k]=v}});
 $('tbUsr').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.value||null;
   const {error}=await sb.from('perfis').update({[k]:v}).eq('user_id',id);if(error)fail(error);else toast('Usuário salvo')});
 $('formCli').addEventListener('submit',async e=>{e.preventDefault();const nome=$('novoCli').value.trim();if(!nome)return;
-  const {error}=await sb.from('clientes').insert({nome});if(error)fail(error,'Não foi possível criar (o nome já existe?)');else{$('novoCli').value='';toast('Cliente criado');renderCadastro()}});
+  const {error}=await sb.from('clientes').insert({nome});if(error)fail(error,'Não foi possível criar (o nome já existe?)');else{$('novoCli').value='';toast('Empresa criada');renderCadastro()}});
 async function renderMapa(){
   await loadMapa();const cols=[['lancamento','Lançamento'],['tipo','Tipo'],['conta','Conta bancária'],['forma','Forma de pagamento'],['categoria','Categoria financeira'],['departamento','Departamento'],['nome','Nome cliente/fornecedor'],['status','Status']];
   $('tbCfg').innerHTML=`<thead><tr>${cols.map(c=>`<th class="l">${c[1]}</th>`).join('')}</tr></thead><tbody>${
@@ -688,6 +839,153 @@ async function renderMapa(){
 }
 $('tbCfg').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;
   const {error}=await sb.from('mapeamento_bc').update({[k]:e.target.value.trim()||null}).eq('lancamento',id);if(error)fail(error);else toast('Mapeamento salvo')});
+
+// =====================================================================
+// CONTAS A PAGAR, CARTÃO DE CRÉDITO E TESOURARIA
+// =====================================================================
+const MODCFG={
+  pagar:{titulo:'Banco · Contas a pagar',tabela:'contas_pagar',dataK:'vencimento',
+    sub:'Envie o boleto e a nota fiscal de cada conta. A Controlacs faz o pagamento.',
+    campos:[['fornecedor','Fornecedor','text',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
+    cats:['Boleto','Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe o boleto ou a nota fiscal.',
+    conf:['Marcar como paga','Desfazer pagamento'],okTxt:'Paga',novo:'Nova conta'},
+  cartao:{titulo:'Cartão de crédito',tabela:'cartao_notas',dataK:'data',
+    sub:'Notas fiscais das compras pagas com o cartão de crédito da empresa.',
+    campos:[['data','Data da compra','date',1],['fornecedor','Fornecedor','text',1],['documento','Nº da NF ou cupom','text',1],['valor','Valor total','money',1],['parcelas','Parcelas','parc',1],['obs','Observação','textarea',0]],
+    cats:['Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe a nota fiscal da compra.',
+    conf:['Conferido com a fatura','Desfazer conferência'],okTxt:'Conferido',novo:'Nova nota'},
+  tesouraria:{titulo:'Tesouraria',tabela:'tesouraria',dataK:'data',
+    sub:'Despesas pagas pelo próprio cliente, com o documento anexado.',
+    campos:[['data','Data','date',1],['tipo','Tipo','tipoTes',1],['descricao','Fornecedor ou descrição','text',1],['documento','Nº da NF ou cupom','text',0],['valor','Valor','money',1],['obs','Observação','textarea',0]],
+    cats:['Documento','Outro documento'],precisaDoc:r=>r.tipo==='Despesa'?'Anexe o documento da despesa (nota, cupom ou recibo).':null,
+    conf:['Marcar como conferido','Desfazer conferência'],okTxt:'Conferido',novo:'Novo lançamento'}
+};
+let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
+const mFiltro=$('mFiltro');
+function initMod(m){
+  const cfg=MODCFG[m],cli=cliAtual();
+  if(MOD!==m){
+    MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
+    mFiltro.innerHTML=(m==='pagar'?'<option value="aberto">Em aberto</option>':'')+mesesOpts(m==='pagar'?fut:TODAY.slice(0,7));
+    mFiltro.value=m==='pagar'?'aberto':TODAY.slice(0,7);
+  }
+  $('mTitle').textContent=cfg.titulo;
+  $('mSub').textContent=(cli?cli.nome+(m==='cartao'&&cli.cartao_final?' · cartão final '+cli.cartao_final:'')+' · ':'')+cfg.sub;
+  $('mNovo').textContent='+ '+cfg.novo;
+  $('mNovo').hidden=!(cli&&podeLancar(cli.id,m));
+  renderMod();
+}
+mFiltro.onchange=()=>renderMod();
+async function renderMod(){
+  const cfg=MODCFG[MOD],cli=cliAtual();
+  if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
+  if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
+  let q=sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
+  const f=mFiltro.value;
+  if(f==='aberto')q=q.eq('conferido',false);else{const [a,b]=monthRange(f);q=q.gte(cfg.dataK,a).lte(cfg.dataK,b)}
+  const {data,error}=await q.order(cfg.dataK).order('enviado_em');
+  if(error){fail(error,'Erro ao carregar');return}
+  REGS=data||[];DOCS={};
+  if(REGS.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',REGS.map(r=>r.id));(dd||[]).forEach(d=>(DOCS[d.registro_id]=DOCS[d.registro_id]||[]).push(d))}
+  const nd=r=>(DOCS[r.id]||[]).length, clip=r=>nd(r)?`<span class="muted" title="Documentos">📎${nd(r)}</span>`:'<span class="neg">sem documento</span>';
+  const sum=a=>r2(a.reduce((x,r)=>x+(+r.valor),0));
+  let head,body,foot='',tiles;
+  if(MOD==='pagar'){
+    const st=r=>{if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
+      return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
+    head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}</td><td class="l">${st(r)}</td></tr>`).join('');
+    const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
+    tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
+  }else if(MOD==='cartao'){
+    head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
+    foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
+    tiles=[['Compras do mês',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
+  }else{
+    let saldo=0;
+    head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo do mês</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
+    body=REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||ent?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
+    const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),S=sum(REGS.filter(r=>r.tipo==='Despesa'));
+    foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(S)}</td><td>${fm(E-S)}</td><td colspan="2"></td></tr>`:'';
+    tiles=[['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Saldo do mês',fm(E-S),'entradas menos despesas'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
+  }
+  $('mHead').innerHTML=head;$('mFoot').innerHTML=foot;
+  $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste mês'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
+  $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
+}
+$('mNovo').onclick=()=>openReg(null);
+$('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openReg(REGS.find(r=>r.id===tr.dataset.id))});
+$('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
+const dlgReg=$('dlgReg');
+const regEditavel=()=>{const cli=cliAtual();return !!cli&&podeLancar(cli.id,MOD)&&!(REG&&REG.conferido)};
+async function openReg(r){
+  const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];
+  const ed=regEditavel(),dis=ed?'':' disabled';
+  const v=k=>r?r[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
+  $('rTitle').textContent=r?(MOD==='pagar'?r.fornecedor:MOD==='tesouraria'?r.descricao:r.fornecedor):cfg.novo;
+  $('rChip').innerHTML=r?(r.conferido?`<span class="chip c-done">✓ ${cfg.okTxt}</span>`:'<span class="chip c-none">Aberto</span>'):'';
+  $('rFields').innerHTML=cfg.campos.map(([k,t,tp,req])=>{
+    const lab=t+(req?'':' (opcional)');
+    if(tp==='textarea')return `<label class="f wide">${lab}<textarea data-k="${k}"${dis}>${esc(v(k))}</textarea></label>`;
+    if(tp==='parc')return `<label class="f">${lab}<select data-k="${k}"${dis}>${Array.from({length:12},(_,i)=>`<option value="${i+1}"${+v(k)===i+1?' selected':''}>${i+1}x</option>`).join('')}</select></label>`;
+    if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
+    if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
+    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
+  }).join('');
+  $('rBaixa').innerHTML=ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'';
+  $('rErr').hidden=true;
+  $('rSave').hidden=!ed;$('rDel').hidden=!(ed&&r);
+  $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
+  await renderRDocs();
+  dlgReg.showModal();
+}
+async function renderRDocs(){
+  const cfg=MODCFG[MOD],ed=regEditavel();
+  const urls=await signed(RDOCS.filter(d=>d.caminho&&!d.preview).map(d=>d.caminho));
+  $('rDocs').innerHTML=`<h3>Documentos</h3>`+(RDOCS.map((d,i)=>`<div class="docrow" data-i="${i}">${anexoView(d,d.preview||urls[d.caminho],true)}<span><b>${esc(d.categoria)}</b><br><span class="note">${esc(d.nome_arquivo)}</span></span>${ed?'<button type="button" class="btn small ghost deldoc">Remover</button>':''}</div>`).join('')||'<p class="note" style="margin:0">Nenhum documento anexado.</p>')
+    +(ed?`<div class="row">${cfg.cats.map(c=>`<span class="btn small fotobtn">📎 ${c}<input type="file" accept="${ACCEPT}" data-cat="${c}" aria-label="Anexar ${c}"></span>`).join('')}</div><p class="note" style="margin:0">Foto ou PDF. ${MOD==='pagar'?'Os arquivos vão para a pasta Contas a pagar.':MOD==='tesouraria'?'Os arquivos vão para a pasta Tesouraria.':''}</p>`:'');
+}
+$('rDocs').addEventListener('change',async e=>{if(e.target.type!=='file'||!e.target.files[0])return;const cli=cliAtual();
+  const dt=$('rFields').querySelector('[data-k="'+MODCFG[MOD].dataK+'"]').value||TODAY;
+  toast('Enviando arquivo…');
+  try{RDOCS.push({...await uploadAnexo(e.target.files[0],cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast('Arquivo anexado')}catch(err){toast(err.message)}});
+$('rDocs').addEventListener('click',e=>{if(e.target.classList.contains('deldoc')){RDOCS.splice(+e.target.closest('.docrow').dataset.i,1);renderRDocs()}});
+$('rFields').addEventListener('focusout',e=>{if(e.target.classList.contains('money')){const n=parseMoney(e.target.value);if(n!=null&&!isNaN(n))e.target.value=showMoney(n)}});
+$('rClose').onclick=()=>dlgReg.close();
+$('rForm').addEventListener('submit',async e=>{
+  e.preventDefault();const cfg=MODCFG[MOD],cli=cliAtual(),err=$('rErr');
+  const row={cliente_id:cli.id};
+  $('rFields').querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;row[k]=el.classList.contains('money')?parseMoney(el.value):k==='parcelas'?+el.value:el.value.trim()||null});
+  let m='';
+  const falta=cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
+  if(falta)m='Preencha: '+falta[1]+'.';
+  else if(Number.isNaN(row.valor)||!(row.valor>0))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
+  else if(cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
+  if(m){err.textContent=m;err.hidden=false;return}
+  err.hidden=true;$('rSave').disabled=true;
+  try{
+    row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
+    const {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();if(e1)throw e1;
+    const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
+    if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
+    dlgReg.close();toast(REG?'Correção salva':'Lançamento enviado');renderMod();
+  }catch(ex){fail(ex)}finally{$('rSave').disabled=false}
+});
+$('rDel').onclick=async()=>{
+  if(!REG||!confirm('Apagar este lançamento e os documentos dele?'))return;
+  const {error}=await sb.from(MODCFG[MOD].tabela).delete().eq('id',REG.id);
+  if(error)fail(error,'Não foi possível apagar');else{dlgReg.close();toast('Lançamento apagado');renderMod()}
+};
+$('rConf').onclick=async()=>{
+  const r=REG,novo=!r.conferido,upd={conferido:novo};
+  if(MOD==='pagar'){upd.pago_em=novo?($('rPagoEm').value||TODAY):null;upd.banco=novo?($('rBanco').value.trim()||null):null}
+  $('rConf').disabled=true;
+  const {error}=await sb.from(MODCFG[MOD].tabela).update(upd).eq('id',r.id);
+  $('rConf').disabled=false;
+  if(error)fail(error);else{dlgReg.close();toast(novo?MODCFG[MOD].okTxt:'Desfeito');renderMod()}
+};
 
 boot();
 })();
