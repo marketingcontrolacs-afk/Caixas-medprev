@@ -886,6 +886,18 @@ async function renderMod(){
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
   REGS=data||[];DOCS={};
+  // Tesouraria: saldo acumulado de tudo que foi lançado antes do mês
+  let ANT=0;
+  if(MOD==='tesouraria'&&f!=='aberto'){
+    const [a]=monthRange(f);
+    for(let i=0;;i+=1000){
+      const {data:pa,error:e2}=await sb.from('tesouraria').select('tipo,valor').eq('cliente_id',cli.id).lt('data',a).order('id').range(i,i+999);
+      if(e2){fail(e2,'Erro ao carregar');return}
+      (pa||[]).forEach(r=>ANT+=(r.tipo==='Suprimento'?1:-1)*r.valor);
+      if(!pa||pa.length<1000)break;
+    }
+    ANT=r2(ANT);
+  }
   if(REGS.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',REGS.map(r=>r.id));(dd||[]).forEach(d=>(DOCS[d.registro_id]=DOCS[d.registro_id]||[]).push(d))}
   const nd=r=>(DOCS[r.id]||[]).length, clip=r=>nd(r)?`<span class="muted" title="Documentos">📎${nd(r)}</span>`:'<span class="neg">sem documento</span>';
   const sum=a=>r2(a.reduce((x,r)=>x+(+r.valor),0));
@@ -903,14 +915,15 @@ async function renderMod(){
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
     tiles=[['Compras do mês',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
   }else{
-    let saldo=0;
-    head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo do mês</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||ent?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
+    let saldo=ANT;
+    head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
+    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||ent?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
     const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),S=sum(REGS.filter(r=>r.tipo==='Despesa'));
-    foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(S)}</td><td>${fm(E-S)}</td><td colspan="2"></td></tr>`:'';
-    tiles=[['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Saldo do mês',fm(E-S),'entradas menos despesas'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
+    foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(S)}</td><td>${fm(r2(ANT+E-S))}</td><td colspan="2"></td></tr>`:'';
+    tiles=[['Saldo anterior',fm(ANT),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Saldo atual',fm(r2(ANT+E-S)),'saldo anterior + entradas − despesas'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
   }
   $('mHead').innerHTML=head;$('mFoot').innerHTML=foot;
+  if(MOD==='tesouraria'&&!REGS.length)body='';
   $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste mês'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
