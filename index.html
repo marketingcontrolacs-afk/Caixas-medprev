@@ -320,9 +320,16 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     </div>
   </section>
 
+  <!-- RH · FÉRIAS -->
   <section id="viewRH" hidden>
-    <h1>RH</h1>
-    <p class="sub">Em planejamento. Esta área vai seguir o mesmo padrão dos módulos financeiros.</p>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Férias</h1><p class="sub" id="fSub"></p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="fFiltro"><option value="pend">Pendências</option><option value="todos">Todos os períodos</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
+    </div>
+    <div class="card block" id="fImpRes" hidden style="margin-top:16px"></div>
+    <div class="tiles" id="fTiles"></div>
+    <div class="card tablebox"><table><thead id="fHead"></thead><tbody id="fBody"></tbody></table></div>
+    <p class="note" id="fNote"></p>
   </section>
     </div>
   </div>
@@ -442,7 +449,7 @@ const NAV=[
   {k:'pagar',t:'Banco',g:'Financeiro',ok:()=>temAcesso('pagar')},
   {k:'tesouraria',t:'Tesouraria',g:'Financeiro',ok:()=>temAcesso('tesouraria')},
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
-  {k:'rh',t:'RH',g:'Recursos humanos',ok:ehEsc,soon:1},
+  {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'cfg',t:'Configurações',g:'Escritório',ok:ehEsc},
 ];
 function renderNav(){
@@ -456,14 +463,16 @@ function renderNav(){
 $('nav').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)go(b.dataset.v)});
 // empresas que aparecem no seletor para o módulo aberto
 function empresasDe(m){
-  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(m!=='cartao'||c.tem_cartao):podeVer(c.id,m)));
+  const mod=m==='rh'?'ferias':m;
+  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod!=='ferias'||c.bpo_rh):podeVer(c.id,mod)));
 }
 const escCli=$('escCli');
 function fillClientes(){
   const m=VIEW,v=escCli.value,lista=empresasDe(m);
-  escCli.innerHTML=lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
-  if(lista.some(c=>c.id===v))escCli.value=v;
-  $('ctxbar').hidden=m==='cfg'||m==='rh';
+  const todas=m==='rh'&&lista.length>1?'<option value="*">Todas as empresas</option>':'';
+  escCli.innerHTML=todas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
+  if(lista.some(c=>c.id===v)||(todas&&v==='*'))escCli.value=v;
+  $('ctxbar').hidden=m==='cfg';
   escCli.disabled=lista.length<2;
 }
 escCli.onchange=()=>openView();
@@ -477,7 +486,7 @@ function openView(){
     else{$('viewEsc').hidden=false;initEsc()}
   }else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
   else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
-  else if(VIEW==='rh')$('viewRH').hidden=false;
+  else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
 }
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);
@@ -796,8 +805,8 @@ $('btnBaixarBC').onclick=()=>{
 let USERS=[];
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const {data:us}=await sb.from('perfis').select('*').order('email');USERS=us||[];
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
@@ -1002,6 +1011,95 @@ $('rConf').onclick=async()=>{
   $('rConf').disabled=false;
   if(error)fail(error);else{dlgReg.close();toast(novo?MODCFG[MOD].okTxt:'Desfeito');renderMod()}
 };
+
+// =====================================================================
+// RH · FÉRIAS
+// =====================================================================
+// Situação e prazos vêm da visão v_ferias (supabase/v3_rh_ferias.sql), com as regras da planilha de controle.
+const FSIT={'Vencida':'c-bad','Prazo estourado':'c-bad','Vence em 60 dias':'c-warn','Disponível':'c-ok','Em aquisição':'c-none',
+  'Programada':'c-done','Quitada':'c-done','Afastado':'c-none','Desligado':'c-none'};
+const FORDEM=['Vencida','Prazo estourado','Vence em 60 dias','Disponível','Programada','Em aquisição','Quitada','Afastado','Desligado'];
+const FPEND=FORDEM.slice(0,4), FFORA=['Afastado','Desligado'];
+const dCurto=s=>s?dBR(s):'', dAno2=s=>s?dBR(s).slice(0,6)+s.slice(2,4):'';
+let FER=[];
+$('fFiltro').onchange=()=>renderRH();
+async function renderRH(){
+  const lista=empresasDe('rh'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[];
+  const e=ehEsc(),vazio=t=>{$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
+  $('fImport').hidden=!e;
+  $('fSub').textContent=e?'Períodos aquisitivos, saldos e prazos de cada colaborador. O cliente informa a programação e o escritório confere.'
+    :'Veja as férias que estão para vencer e informe a programação de cada colaborador.';
+  if(!ids.length){vazio([e?'Nenhuma empresa com BPO de RH. Marque o RH no cadastro da empresa.':'Nenhuma empresa liberada para férias.']);return}
+  const {data,error}=await sb.from('v_ferias').select('*').in('cliente_id',ids);
+  if(error){console.error(error);vazio(error.code==='42P01'||/v_ferias/.test(error.message||'')?['Este módulo precisa da atualização v3 do banco. Rode o SQL no Supabase.','neg']:['Erro ao carregar. Verifique a internet e tente de novo.','neg']);return}
+  FER=(data||[]).sort((a,b)=>FORDEM.indexOf(a.situacao)-FORDEM.indexOf(b.situacao)||String(a.iniciar_ate||'9').localeCompare(String(b.iniciar_ate||'9'))||a.nome.localeCompare(b.nome));
+  const f=$('fFiltro').value,nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  const rows=FER.filter(r=>f==='todos'||(f==='fora'?FFORA.includes(r.situacao):FPEND.includes(r.situacao)||r.status_programacao==='Proposta'));
+  const prog=r=>!r.status_programacao?'<span class="muted">—</span>':r.status_programacao==='Proposta'?'<span class="chip c-warn">A conferir</span>'
+    :`<span class="chip c-done">${esc(r.status_programacao)}</span>`;
+  $('fHead').innerHTML=`<tr><th class="l">Matrícula</th><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Período aquisitivo</th><th>Limite para gozo</th><th>Direito</th><th>Saldo</th><th>Iniciar até</th><th class="l">Situação</th><th class="l">Programação</th></tr>`;
+  $('fBody').innerHTML=rows.map(r=>`<tr><td class="l">${esc(r.matricula)}</td><td class="l">${esc(r.nome)}</td>${todas?`<td class="l">${esc(nomeCli(r.cliente_id))}</td>`:''}<td class="l">${dAno2(r.inicio_aquisitivo)} a ${dAno2(r.fim_aquisitivo)}</td><td>${dCurto(r.limite_concessivo)}</td><td>${r.direito}</td><td>${r.saldo}</td><td>${dCurto(r.iniciar_ate)}</td><td class="l"><span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span></td><td class="l">${prog(r)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="10">${f==='pend'?'Nenhuma pendência de férias.':'Nenhum período neste filtro.'}${e&&!FER.length?' Use “Importar planilha” para começar.':''}</td></tr>`;
+  const n=s=>FER.filter(r=>r.situacao===s).length,dias=s=>FER.filter(r=>r.situacao===s).reduce((x,r)=>x+r.saldo,0);
+  const conf=FER.filter(r=>r.status_programacao==='Proposta').length;
+  $('fTiles').innerHTML=[['Vencidas',n('Vencida'),dias('Vencida')+' dias de saldo · pagamento em dobro'],['Prazo estourado',n('Prazo estourado'),'já não dá para gozar o saldo todo no prazo'],
+    ['Vencem em 60 dias',n('Vence em 60 dias'),'programe o início até a data indicada'],['Disponíveis',n('Disponível'),'podem ser programadas'],
+    [e?'Programações a conferir':'Aguardando o escritório',conf,e?'informadas pelo cliente':'programações enviadas']]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('fNote').textContent='“Iniciar até” é o último dia para começar as férias e gozar o saldo todo antes do limite. Afastados e desligados ficam fora das pendências.';
+}
+
+// Importação da planilha de controle de férias (abas Funcionários e Controle). Pode rodar de novo: atualiza o que já existe.
+const semAcento=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+function empresaDoTexto(t){
+  const n=semAcento(t);if(!n)return null;
+  return CLIENTES.find(c=>semAcento(c.nome)===n)||CLIENTES.find(c=>c.municipio&&n.includes(semAcento(c.municipio)))||null;
+}
+const xlsData=v=>{if(v==null||v==='')return null;if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?`${d.y}-${pad(d.m)}-${pad(d.d)}`:null}
+  const m=String(v).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return m?`${m[3]}-${m[2]}-${m[1]}`:null};
+const xlsInt=v=>v==null||v===''||isNaN(+v)?0:Math.round(+v);
+$('fImportFile').addEventListener('change',async e=>{
+  const file=e.target.files[0];e.target.value='';if(!file)return;
+  const res=$('fImpRes');res.hidden=false;res.innerHTML='<p class="note" style="margin:0">Importando a planilha…</p>';
+  try{
+    const wb=XLSX.read(await file.arrayBuffer());
+    const aba=n=>wb.Sheets[wb.SheetNames.find(x=>semAcento(x)===semAcento(n))];
+    if(!aba('Funcionários')||!aba('Controle'))throw new Error('A planilha precisa ter as abas Funcionários e Controle.');
+    const linhas=n=>XLSX.utils.sheet_to_json(aba(n),{header:1,raw:true,defval:null});
+    const semEmpresa=[],func=[];
+    linhas('Funcionários').slice(1).forEach(r=>{
+      if(r[0]==null||r[0]==='')return;
+      const c=empresaDoTexto(r[2]);if(!c){semEmpresa.push(`${r[0]} ${r[1]||''} (${r[2]||'sem empresa'})`);return}
+      const sit=['Ativo','Afastado','Desligado'].find(x=>semAcento(x)===semAcento(r[4]))||'Ativo';
+      func.push({cliente_id:c.id,matricula:String(r[0]).trim(),nome:String(r[1]||'').trim(),admissao:xlsData(r[3]),situacao:sit,obs:r[5]||null});
+    });
+    const {data:fs,error:e1}=await sb.from('funcionarios').upsert(func,{onConflict:'cliente_id,matricula'}).select('id,matricula');if(e1)throw e1;
+    const porMat=Object.fromEntries((fs||[]).map(x=>[x.matricula,x.id]));
+    // Controle: cabeçalho na linha 4. A matrícula, E início aquisitivo, H faltas, J já gozados, K venda legal, L venda por fora, M–R parcelas, Z observações
+    const ctl=linhas('Controle').slice(4).filter(r=>r[0]!=null&&r[0]!==''&&porMat[String(r[0]).trim()]&&xlsData(r[4]));
+    const per=ctl.map(r=>({funcionario_id:porMat[String(r[0]).trim()],inicio_aquisitivo:xlsData(r[4]),faltas_injustificadas:xlsInt(r[7]),ja_gozados:xlsInt(r[9]),obs:r[25]||null}));
+    const {data:ps,error:e2}=await sb.from('ferias_periodos').upsert(per,{onConflict:'funcionario_id,inicio_aquisitivo'}).select('id,funcionario_id,inicio_aquisitivo');if(e2)throw e2;
+    const idPer=(fid,ini)=>(ps||[]).find(p=>p.funcionario_id===fid&&p.inicio_aquisitivo===ini)?.id;
+    const {data:jaTem}=await sb.from('ferias_programacoes').select('periodo_id');const comProg=new Set((jaTem||[]).map(x=>x.periodo_id));
+    let nProg=0;const recusadas=[];
+    for(const r of ctl){
+      const pid=idPer(porMat[String(r[0]).trim()],xlsData(r[4]));
+      const parc=[[12,13],[14,15],[16,17]].map(([a,b],i)=>({ordem:i+1,inicio:xlsData(r[a]),dias:xlsInt(r[b])})).filter(x=>x.inicio&&x.dias>0);
+      const venda=xlsInt(r[10])+xlsInt(r[11]);
+      if(!pid||comProg.has(pid)||(!parc.length&&!venda))continue;
+      const {data:pg,error:e3}=await sb.from('ferias_programacoes').insert({periodo_id:pid,venda_total:venda,status:'Proposta',obs:'Importada da planilha de controle'}).select('id').single();if(e3)throw e3;
+      nProg++;
+      for(const x of parc){
+        const {error:e4}=await sb.from('ferias_parcelas').insert({programacao_id:pg.id,ordem:x.ordem,inicio:x.inicio,dias:x.dias,soma_por_fora:x.ordem===1&&xlsInt(r[11])>0});
+        if(e4)recusadas.push(`${r[0]} · início ${dBR(x.inicio)}: ${e4.message}`);
+      }
+    }
+    res.innerHTML=`<h3>Importação concluída</h3><p style="margin:0">${fs.length} colaboradores, ${ps.length} períodos aquisitivos e ${nProg} programações (como “a conferir”).</p>`
+      +(semEmpresa.length?`<p class="note" style="margin:0"><b>Sem empresa cadastrada, não importados:</b> ${semEmpresa.map(esc).join('; ')}. Defina a empresa na planilha e importe de novo.</p>`:'')
+      +(recusadas.length?`<p class="note" style="margin:0"><b>Parcelas recusadas pela regra de início:</b><br>${recusadas.map(esc).join('<br>')}</p>`:'');
+    renderRH();
+  }catch(ex){console.error(ex);res.innerHTML=`<p class="err" style="margin:0">Não foi possível importar: ${esc(ex.message||ex)}</p>`}
+});
 
 boot();
 })();
