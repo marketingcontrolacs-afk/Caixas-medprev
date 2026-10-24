@@ -78,6 +78,9 @@ textarea{min-height:64px;resize:vertical}
 .sline:last-of-type{border-bottom:0}
 .verdict{border-radius:8px;padding:10px 12px;font-weight:600;font-size:14px}
 .v-ok{background:var(--ok-soft);color:var(--ok)}.v-warn{background:var(--warn-soft);color:var(--warn)}.v-bad{background:var(--bad-soft);color:var(--bad)}
+.lk{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:grid;gap:3px;max-width:280px}
+.lk .ob{font-size:12.5px;color:var(--brand);text-decoration:underline;text-underline-offset:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk .al{font-size:12px;font-weight:600;color:var(--warn)}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .c-ok{background:var(--ok-soft);color:var(--ok)}.c-warn{background:var(--warn-soft);color:var(--warn)}.c-bad{background:var(--bad-soft);color:var(--bad)}
 .c-done{background:var(--brand-soft);color:var(--brand)}.c-none{background:var(--sunk);color:var(--muted)}
@@ -103,6 +106,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
+#dlgFer{width:min(860px,calc(100vw - 32px))} #dlgFer .db>*{min-width:0} #dlgFer td,#dlgFer th{white-space:nowrap}
 .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .fotos{display:flex;gap:10px;flex-wrap:wrap}
 .fotos img{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in}
@@ -324,7 +328,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewRH" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Férias</h1><p class="sub" id="fSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="fFiltro"><option value="pend">Pendências</option><option value="todos">Todos os períodos</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
     </div>
     <div class="card block" id="fImpRes" hidden style="margin-top:16px"></div>
     <div class="tiles" id="fTiles"></div>
@@ -346,6 +350,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="db"><div class="fields" id="rFields"></div><div id="rDocs" style="display:grid;gap:8px"></div><div id="rBaixa"></div><p class="err" id="rErr" hidden></p></div>
     <div class="df"><button type="button" class="btn ghost" id="rDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="rClose">Fechar</button><button type="button" class="btn" id="rConf"></button><button type="submit" class="btn primary" id="rSave">Salvar</button></div>
   </form>
+</dialog>
+<dialog id="dlgFer">
+  <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
+  <div class="db" id="feBody"></div>
+  <div class="df"><button class="btn ghost" id="feDev" hidden>Devolver ao cliente</button><span class="spacer"></span><button class="btn ghost" id="feClose">Fechar</button><button class="btn" id="feSave" hidden>Salvar observações</button><button class="btn primary" id="feOk" hidden>Aprovar</button></div>
 </dialog>
 <div class="toast" id="toast" hidden></div>
 
@@ -1022,8 +1031,21 @@ const FSIT={'Vencida':'c-bad','Prazo estourado':'c-bad','Vence em 60 dias':'c-wa
 const FORDEM=['Vencida','Prazo estourado','Vence em 60 dias','Disponível','Programada','Em aquisição','Quitada','Afastado','Desligado'];
 const FPEND=FORDEM.slice(0,4), FFORA=['Afastado','Desligado'];
 const dCurto=s=>s?dBR(s):'', dAno2=s=>s?dBR(s).slice(0,6)+s.slice(2,4):'';
-let FER=[];
+let FER=[],FPROG={},FPARC={},FGEROU=false;
 $('fFiltro').onchange=()=>renderRH();
+// Pendências que o escritório precisa conferir em cada período (mesmas da coluna Alertas da planilha)
+function ferAlertas(r){
+  const p=FPROG[r.id],ps=FPARC[p?.id]||[],a=[];
+  if(p?.status==='Devolvida')a.push('Devolvida ao cliente para correção');
+  ps.filter(x=>!x.inicio_valido).forEach(x=>a.push(`Início em ${dBR(x.inicio)} não é permitido (folga ou feriado logo depois)`));
+  if(ps.length&&!ps.some(x=>x.dias>=14))a.push('Nenhuma parcela com 14 dias ou mais');
+  if(ps.some(x=>x.dias<5))a.push('Parcela com menos de 5 dias');
+  if(p&&['Proposta','Devolvida'].includes(p.status))ps.filter(x=>x.aviso_ate<TODAY).forEach(x=>a.push(`Aviso de 30 dias venceu em ${dBR(x.aviso_ate)}`));
+  if(p&&p.status!=='Devolvida'&&r.saldo>0&&!FFORA.includes(r.situacao))a.push(`Faltam ${r.saldo} dias sem data`);
+  if(r.saldo<0)a.push(`Programado ${-r.saldo} dias além do direito`);
+  if(['Vencida','Prazo estourado'].includes(r.situacao))a.push(r.situacao==='Vencida'?'Período vencido: pagamento em dobro':'Não dá mais para gozar o saldo todo no prazo');
+  return a;
+}
 async function renderRH(){
   const lista=empresasDe('rh'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[];
   const e=ehEsc(),vazio=t=>{$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
@@ -1031,24 +1053,77 @@ async function renderRH(){
   $('fSub').textContent=e?'Períodos aquisitivos, saldos e prazos de cada colaborador. O cliente informa a programação e o escritório confere.'
     :'Veja as férias que estão para vencer e informe a programação de cada colaborador.';
   if(!ids.length){vazio([e?'Nenhuma empresa com BPO de RH. Marque o RH no cadastro da empresa.':'Nenhuma empresa liberada para férias.']);return}
-  const {data,error}=await sb.from('v_ferias').select('*').in('cliente_id',ids);
+  // Abre os novos períodos aquisitivos que completaram 1 ano (uma vez por acesso; sem a v5 apenas não faz nada)
+  if(!FGEROU){FGEROU=true;const {error:eg}=await sb.rpc('ferias_gerar_periodos');if(eg)console.warn(eg)}
+  const [{data,error},{data:pgs},{data:pcs}]=await Promise.all([sb.from('v_ferias').select('*').in('cliente_id',ids),
+    sb.from('ferias_programacoes').select('*'),sb.from('v_ferias_parcelas').select('*').in('cliente_id',ids).order('ordem')]);
   if(error){console.error(error);vazio(error.code==='42P01'||/v_ferias/.test(error.message||'')?['Este módulo precisa da atualização v3 do banco. Rode o SQL no Supabase.','neg']:['Erro ao carregar. Verifique a internet e tente de novo.','neg']);return}
+  FPROG=Object.fromEntries((pgs||[]).map(p=>[p.periodo_id,p]));FPARC={};(pcs||[]).forEach(x=>(FPARC[x.programacao_id]||=[]).push(x));
   FER=(data||[]).sort((a,b)=>FORDEM.indexOf(a.situacao)-FORDEM.indexOf(b.situacao)||String(a.iniciar_ate||'9').localeCompare(String(b.iniciar_ate||'9'))||a.nome.localeCompare(b.nome));
   const f=$('fFiltro').value,nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
-  const rows=FER.filter(r=>f==='todos'||(f==='fora'?FFORA.includes(r.situacao):FPEND.includes(r.situacao)||r.status_programacao==='Proposta'));
-  const prog=r=>!r.status_programacao?'<span class="muted">—</span>':r.status_programacao==='Proposta'?'<span class="chip c-warn">A conferir</span>'
-    :`<span class="chip c-done">${esc(r.status_programacao)}</span>`;
+  const conferir=r=>['Proposta','Devolvida'].includes(FPROG[r.id]?.status);
+  const rows=FER.filter(r=>f==='todos'?r.situacao!=='Desligado':f==='fora'?FFORA.includes(r.situacao):FPEND.includes(r.situacao)||conferir(r));
+  const prog=r=>{
+    const p=FPROG[r.id],al=ferAlertas(r),ob=r.obs||p?.nota_escritorio||'';
+    const ch=!p?'<span class="chip c-none">Sem programação</span>':p.status==='Proposta'?'<span class="chip c-warn">A conferir</span>'
+      :p.status==='Devolvida'?'<span class="chip c-bad">Devolvida</span>':`<span class="chip c-done">${esc(p.status)}</span>`;
+    return `<button class="lk" data-per="${r.id}" title="Ver detalhes e conferir">${ch}${al.length?`<span class="al">${al.length===1?esc(al[0]):al.length+' pendências'}</span>`:''}<span class="ob">${ob?esc(ob):'ver detalhes'}</span></button>`;
+  };
   $('fHead').innerHTML=`<tr><th class="l">Matrícula</th><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Período aquisitivo</th><th>Limite para gozo</th><th>Direito</th><th>Saldo</th><th>Iniciar até</th><th class="l">Situação</th><th class="l">Programação</th></tr>`;
   $('fBody').innerHTML=rows.map(r=>`<tr><td class="l">${esc(r.matricula)}</td><td class="l">${esc(r.nome)}</td>${todas?`<td class="l">${esc(nomeCli(r.cliente_id))}</td>`:''}<td class="l">${dAno2(r.inicio_aquisitivo)} a ${dAno2(r.fim_aquisitivo)}</td><td>${dCurto(r.limite_concessivo)}</td><td>${r.direito}</td><td>${r.saldo}</td><td>${dCurto(r.iniciar_ate)}</td><td class="l"><span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span></td><td class="l">${prog(r)}</td></tr>`).join('')
     ||`<tr><td class="l muted" colspan="10">${f==='pend'?'Nenhuma pendência de férias.':'Nenhum período neste filtro.'}${e&&!FER.length?' Use “Importar planilha” para começar.':''}</td></tr>`;
   const n=s=>FER.filter(r=>r.situacao===s).length,dias=s=>FER.filter(r=>r.situacao===s).reduce((x,r)=>x+r.saldo,0);
-  const conf=FER.filter(r=>r.status_programacao==='Proposta').length;
+  const conf=FER.filter(conferir).length;
   $('fTiles').innerHTML=[['Vencidas',n('Vencida'),dias('Vencida')+' dias de saldo · pagamento em dobro'],['Prazo estourado',n('Prazo estourado'),'já não dá para gozar o saldo todo no prazo'],
     ['Vencem em 60 dias',n('Vence em 60 dias'),'programe o início até a data indicada'],['Disponíveis',n('Disponível'),'podem ser programadas'],
     [e?'Programações a conferir':'Aguardando o escritório',conf,e?'informadas pelo cliente':'programações enviadas']]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  $('fNote').textContent='“Iniciar até” é o último dia para começar as férias e gozar o saldo todo antes do limite. Afastados e desligados ficam fora das pendências.';
+  $('fNote').textContent='Tudo é recalculado com a data de hoje, e o novo período aquisitivo abre sozinho quando o anterior completa 1 ano. “Iniciar até” é o último dia para começar as férias e gozar o saldo todo antes do limite. Clique na programação para ver os detalhes e as pendências.';
 }
+$('fBody').addEventListener('click',ev=>{const b=ev.target.closest('.lk');if(b)abrirFerias(b.dataset.per)});
+
+// Detalhe de um período: programação, datas para a contabilidade, pendências e observações
+let FERDLG=null;
+function abrirFerias(per){
+  const r=FER.find(x=>x.id===per);if(!r)return;
+  const p=FPROG[per],ps=FPARC[p?.id]||[],al=ferAlertas(r),e=ehEsc();FERDLG={r,p};
+  const L=(a,b,cl)=>`<div class="sline"><span>${a}</span><b class="${cl||''}">${b}</b></div>`;
+  $('feTitle').textContent=`${r.nome} · ${r.matricula}`;$('feChip').innerHTML=`<span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span>`;
+  const legal=p?Math.min(p.venda_total,Math.floor(r.direito/3)):0,fora=p?p.venda_total-legal:0;
+  $('feBody').innerHTML=`
+    <div><h3 style="margin-bottom:6px">Período aquisitivo</h3>${L('Aquisitivo',`${dBR(r.inicio_aquisitivo)} a ${dBR(r.fim_aquisitivo)}`)}${L('Limite para gozo',dBR(r.limite_concessivo))}
+      ${L('Direito',`${r.direito} dias${r.faltas_injustificadas?` (${r.faltas_injustificadas} faltas)`:''}`)}${r.ja_gozados?L('Já gozados (sem data)',r.ja_gozados+' dias'):''}${L('Saldo',r.saldo+' dias',r.saldo<0?'neg':'')}${r.iniciar_ate?L('Iniciar até',dBR(r.iniciar_ate)):''}</div>
+    <div><h3 style="margin-bottom:6px">Pendências</h3>${al.length?al.map(x=>`<p class="neg" style="margin:0 0 4px">• ${esc(x)}</p>`).join(''):'<p class="pos" style="margin:0">Nenhuma pendência.</p>'}</div>
+    <div><h3 style="margin-bottom:6px">Programação</h3>${!p?'<p class="muted" style="margin:0">O cliente ainda não informou a programação deste período.</p>':`
+      ${L('Situação',esc(p.status))}${L('Venda total',p.venda_total+' dias')}${p.venda_total?L('Venda legal (contabilidade) / por fora',`${legal} / ${fora} dias`):''}
+      ${ps.length?`<div class="tablebox" style="margin-top:8px"><table><thead><tr><th class="l">Parcela</th><th>Gozo real</th><th>Dias</th><th>Para a contabilidade</th><th>Aviso até</th><th>Pagar até</th></tr></thead><tbody>
+        ${ps.map(x=>`<tr><td class="l">${x.ordem}ª${x.inicio_valido?'':' <span class="chip c-bad">data inválida</span>'}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_real)}</td><td>${x.dias}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_contabilidade)} (${x.dias_contabilidade} dias)</td><td>${dCurto(x.aviso_ate)}</td><td>${dCurto(x.pagar_ate)}</td></tr>`).join('')}
+      </tbody></table></div>`:'<p class="muted" style="margin:6px 0 0">Sem datas de gozo informadas.</p>'}`}</div>
+    ${e?`<label class="f">Observação do período${'<textarea id="feObs" rows="3">'+esc(r.obs||'')+'</textarea>'}</label>
+      ${p?`<label class="f">Nota para o cliente (aparece para ele)<textarea id="feNota" rows="2">${esc(p.nota_escritorio||'')}</textarea></label>`:''}`
+      :`<div><h3 style="margin-bottom:6px">Observações</h3><p style="margin:0">${r.obs?esc(r.obs):'<span class="muted">Sem observação</span>'}</p>
+        ${p?.nota_escritorio?`<p style="margin:6px 0 0"><b>Escritório:</b> ${esc(p.nota_escritorio)}</p>`:''}</div>`}`;
+  const aberta=p&&['Proposta','Devolvida'].includes(p.status);
+  $('feSave').hidden=!e;$('feOk').hidden=!(e&&aberta);$('feDev').hidden=!(e&&p?.status==='Proposta');
+  dlgFer.showModal();
+}
+async function salvarFerias(status){
+  const {r,p}=FERDLG,bts=['feSave','feOk','feDev'];bts.forEach(b=>$(b).disabled=true);
+  try{
+    const {error:e1}=await sb.from('ferias_periodos').update({obs:$('feObs').value.trim()||null}).eq('id',r.id);if(e1)throw e1;
+    if(p){
+      const upd={nota_escritorio:$('feNota').value.trim()||null};
+      if(status==='Aprovada')Object.assign(upd,{status,aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()});
+      if(status==='Devolvida')upd.status=status;
+      const {error:e2}=await sb.from('ferias_programacoes').update(upd).eq('id',p.id);if(e2)throw e2;
+    }
+    dlgFer.close();toast(status==='Aprovada'?'Programação aprovada':status==='Devolvida'?'Programação devolvida ao cliente':'Observações salvas');renderRH();
+  }catch(ex){fail(ex)}finally{bts.forEach(b=>$(b).disabled=false)}
+}
+$('feClose').onclick=()=>dlgFer.close();
+$('feSave').onclick=()=>salvarFerias();
+$('feOk').onclick=()=>salvarFerias('Aprovada');
+$('feDev').onclick=()=>{if(!$('feNota').value.trim()){toast('Escreva na nota o que o cliente precisa corrigir');$('feNota').focus();return}salvarFerias('Devolvida')};
 
 // Importação da planilha de controle de férias (abas Funcionários e Controle). Pode rodar de novo: atualiza o que já existe.
 const semAcento=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
