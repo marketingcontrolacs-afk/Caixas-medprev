@@ -1,0 +1,98 @@
+-- Portal do Cliente (Controlacs) - atualização v9: plano de contas e rateio entre filiais (24/10/2026)
+-- Rodar depois do v8_categorias.sql. Pode rodar mais de uma vez.
+-- 1) Plano de contas tirado da DRE do Bom Controle (08/2026), sem as categorias mãe e sem "Hospedagem".
+--    As categorias por filial (INSS Filial 0002, IRRF FOLHA MATRIZ 0001 etc.) viraram uma categoria padrão
+--    (INSS, IRRF Folha, DAS - Simples Nacional, 3208 - IRRF Aluguel); a filial vai no rateio.
+-- 2) Rateio: cada empresa informa as filiais (Configurações > Empresas, ex.: Matriz 0001, Filial 0002, Filial 0003).
+--    Ao lançar uma despesa nas contas a pagar ou na tesouraria, quem lança diz se tem rateio e quanto vai para
+--    cada filial (em R$ ou %). Na exportação do Bom Controle sai uma linha por filial, com a filial em Departamento.
+
+insert into public.plano_contas(categoria, tipo) values
+ ('Sobra de Caixa','Receita'),
+ ('Falta de Caixa','Despesa'),
+ ('Antecipação de Recebíveis','Despesa'),
+ ('Consórcios','Despesa'),
+ ('Empréstimos e Financiamentos','Despesa'),
+ ('Manutenção de conta','Despesa'),
+ ('Seguro Empresarial','Despesa'),
+ ('Seguros de Bens','Despesa'),
+ ('Tarifas Bancárias','Despesa'),
+ ('Tarifas de Cartões','Despesa'),
+ ('Aluguel de imóveis','Despesa'),
+ ('Assessoria - Medicina Ocupacional','Despesa'),
+ ('Condomínios','Despesa'),
+ ('Honorários Contábeis','Despesa'),
+ ('Licença ou Aluguel de Softwares','Despesa'),
+ ('Locação de Máquinas e Equipamentos','Despesa'),
+ ('Pró Labore','Despesa'),
+ ('Segurança e Vigilância','Despesa'),
+ ('Serviço de Apoio Adm','Despesa'),
+ ('Serviços Financeiros e Comerciais','Despesa'),
+ ('Telefonia/ Internet/ TV a cabo','Despesa'),
+ ('Adiantamento de Fornecedor','Despesa'),
+ ('Bens de Pequeno Valor','Despesa'),
+ ('Brindes','Despesa'),
+ ('Cartão de Crédito (Fatura)','Despesa'),
+ ('Cartório','Despesa'),
+ ('Certificado Digital','Despesa'),
+ ('Combustíveis e Lubrificantes','Despesa'),
+ ('Confraternizações','Despesa'),
+ ('Consultoria Financeira','Despesa'),
+ ('Consultoria de Equipe','Despesa'),
+ ('Consultoria em T.I.','Despesa'),
+ ('Correio','Despesa'),
+ ('Debito Indevido','Despesa'),
+ ('Despesas com Viagens','Despesa'),
+ ('Distribuição de Lucros','Despesa'),
+ ('Energia','Despesa'),
+ ('Estacionamentos','Despesa'),
+ ('Honorários advocatícios','Despesa'),
+ ('Lanches, Refeições, Copa e Cozinha','Despesa'),
+ ('Limpeza e Conservação','Despesa'),
+ ('Manutenção de Veículos','Despesa'),
+ ('Manutenção e Reparos','Despesa'),
+ ('Material de Expediente/ Escritorio','Despesa'),
+ ('Material de Informática/Telefonia e Manutenção','Despesa'),
+ ('Outras despesas','Despesa'),
+ ('Pendência - Verificar','Despesa'),
+ ('Royalties','Despesa'),
+ ('Serviço de Transporte','Despesa'),
+ ('13 Salário','Despesa'),
+ ('Adto. de Salário','Despesa'),
+ ('Benefícios do Trabalhador','Despesa'),
+ ('Cursos e Treinamentos','Despesa'),
+ ('Exames pré e demissionais','Despesa'),
+ ('Férias','Despesa'),
+ ('Outras despesas c/ Funcionário (Uniformes...)','Despesa'),
+ ('Plano de Saúde','Despesa'),
+ ('Premiação','Despesa'),
+ ('Prevenção de Riscos Laborais','Despesa'),
+ ('Rescisões Trabalhistas','Despesa'),
+ ('Salário','Despesa'),
+ ('Ações de Marketing e Publicidade','Despesa'),
+ ('Imobilizado','Despesa'),
+ ('Investimento','Despesa'),
+ ('Investimento Chopinzinho','Despesa'),
+ ('Investimento Coronel Vivida','Despesa'),
+ ('Plano de Integralização Sicredi','Despesa'),
+ ('Reformas','Despesa'),
+ ('1708 - IR Retenção','Despesa'),
+ ('3208 - IRRF Aluguel','Despesa'),
+ ('5952 - PIS / Cofins / CSLL Retenção','Despesa'),
+ ('DAS - Simples Nacional','Despesa'),
+ ('FGTS','Despesa'),
+ ('INSS + IR Folha + IR Aluguel','Despesa'),
+ ('INSS','Despesa'),
+ ('IRRF Folha','Despesa'),
+ ('ISS - Retido','Despesa'),
+ ('PIS','Despesa'),
+ ('Taxa Detran (Despachante/ Transferência/ Emplacamento)','Despesa'),
+ ('Taxas Municipais (IPTU, Vigilância, Bombeiros, Alvará, Lixo)','Despesa'),
+ ('Tributos diversos','Despesa')
+on conflict (categoria) do nothing;
+
+alter table public.clientes     add column if not exists filiais_rateio text;   -- separadas por vírgula
+alter table public.contas_pagar add column if not exists rateio jsonb;          -- [{"filial":"Filial 0002","valor":100.00}, ...]
+alter table public.tesouraria   add column if not exists rateio jsonb;
+
+select 'Atualização v9 (plano de contas e rateio) concluída' as resultado;
