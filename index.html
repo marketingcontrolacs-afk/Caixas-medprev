@@ -858,7 +858,7 @@ const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf'),exMes=$('exMes'),exOr
 // origens da importação: o texto da caixinha de filtro e o aviso de cada uma
 const EXORIG={
   caixa:{so:'Só dias conferidos',nota:'Débito e crédito ficam fora por enquanto'},
-  tesouraria:{so:'Só lançamentos conferidos',nota:'Só as despesas: os suprimentos vêm do caixa e já entram na exportação do caixa'},
+  tesouraria:{so:'Só lançamentos conferidos',nota:'Despesas e depósitos (cada depósito sai em 2 linhas: saída da Tesouraria e entrada no banco). Os suprimentos vêm do caixa'},
   pagar:{so:'Só contas pagas',nota:'Contas pelo vencimento. A conta bancária é o banco informado no pagamento'},
   cartao:{so:'Só notas conferidas com a fatura',nota:'Uma linha por nota, pela data da compra. As parcelas vão na observação'}
 };
@@ -913,8 +913,14 @@ async function exportRows(){
       d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,{conta:contaTes,obs:`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),doc:s.tipo==='Repasse'?'':s.guia,nome:s.tipo==='Repasse'?s.parceiro:''}));
     });
   }else if(orig==='tesouraria'){
-    (await loadMod('tesouraria','data')).filter(r=>r.tipo==='Despesa'&&conf(r)).forEach(r=>
+    const tes=await loadMod('tesouraria','data');
+    tes.filter(r=>r.tipo==='Despesa'&&conf(r)).forEach(r=>
       pushRat('Tesouraria - Despesa',r.data,r,{tipo:'Despesa',cat:catDe(r),conta:contaTes,nome:r.descricao,...fb(r),doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
+    // depósito: categoria fixa, sem confirmação; sai da Tesouraria e entra no banco de destino
+    const catDep=PCAT.plano.find(c=>chave(c.categoria)==='deposito bancario')?.categoria||'Depósito Bancário';
+    tes.filter(r=>r.tipo==='Depósito bancário').forEach(r=>{const banco=r.conta_destino||cli?.conta_deposito_bc||'',o=`Depósito bancário ${dBR(r.data)} - Tesouraria para ${banco||'banco não informado'}`+(r.obs?' | '+r.obs:'');
+      push('Depósito bancário - saída',r.data,r.valor,{tipo:'Despesa',cat:catDep,conta:contaTes,doc:r.documento,obs:o});
+      push('Depósito bancário - entrada',r.data,r.valor,{tipo:'Receita',cat:catDep,conta:banco,doc:r.documento,obs:o})});
   }else if(orig==='pagar'){
     (await loadMod('contas_pagar','vencimento')).filter(conf).forEach(r=>
       pushRat('Contas a pagar',r.vencimento,r,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,...fb(r),doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
@@ -940,7 +946,7 @@ async function renderExport(){
     const rec=lastRows.filter(r=>r[0]==='Receita').reduce((a,r)=>a+r[10],0),des=lastRows.filter(r=>r[0]==='Despesa').reduce((a,r)=>a+r[10],0);
     const sem=lastRows.filter(r=>!r[0]||!r[1]||!r[5]).length;
     const semConta=(orig==='caixa'||orig==='tesouraria')&&escCli.value&&!cliAtual()?.conta_tesouraria_bc;
-    $('exInfo').innerHTML=`${esc(cliAtual()?.nome||'')} · ${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · ${EXORIG[orig].nota}`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete em Configurações › Mapeamento Bom Controle${orig==='pagar'?' ou informe o banco no pagamento':''}</span>`:'');
+    $('exInfo').innerHTML=`${esc(cliAtual()?.nome||'')} · ${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · ${EXORIG[orig].nota}`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete em Configurações › Mapeamento Bom Controle${orig==='pagar'?' ou informe o banco no pagamento':orig==='tesouraria'?' ou informe o banco dos depósitos em Configurações › Empresas':''}</span>`:'');
   }
   renderExConf();renderPendAviso();
   $('tbExp').innerHTML=`<thead><tr>${HEAD.map(h=>`<th class="l">${h}</th>`).join('')}</tr></thead><tbody>${
@@ -1068,7 +1074,7 @@ $('rRat').addEventListener('input',atualizaRateio);$('rRat').addEventListener('c
   if(e.target.name==='ratPor'){const total=totalReg(),pct=e.target.value==='pct';document.querySelectorAll('#rRat tbody input').forEach(i=>{const n=parseMoney(i.value)||0;if(n&&total)i.value=showMoney(r2(pct?n/total*100:total*n/100))})}
   atualizaRateio()});
 $('rFields').addEventListener('input',atualizaRateio);
-$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp')renderRateio(REG,true);else atualizaRateio()});
+$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp')renderRateio(REG,true);else{ajustaDeposito();atualizaRateio()}});
 
 // ---------- categorias automáticas (contas a pagar, cartão e despesas da tesouraria) ----------
 const MODCAT=['pagar','cartao','tesouraria'];
@@ -1276,8 +1282,8 @@ $('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr')
 let USERS=[];
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const {data:us}=await sb.from('perfis').select('*').order('email');USERS=us||[];
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
@@ -1342,7 +1348,7 @@ const MODCFG={
     conf:['Conferido com a fatura','Desfazer conferência'],okTxt:'Conferido',novo:'Nova nota'},
   tesouraria:{titulo:'Tesouraria',tabela:'tesouraria',dataK:'data',
     sub:'Despesas pagas pelo próprio cliente, com o documento anexado.',
-    campos:[['data','Data','date',1],['tipo','Tipo','tipoTes',1],['descricao','Fornecedor ou descrição','text',1],['documento','Nº da NF ou cupom','text',0],['valor','Valor','money',1],['obs','Observação','textarea',0]],
+    campos:[['data','Data','date',1],['tipo','Tipo','tipoTes',1],['descricao','Fornecedor ou descrição','text',1],['conta_destino','Banco de destino (conta no Bom Controle)','contaDest',0],['documento','Nº da NF ou cupom','text',0],['valor','Valor','money',1],['obs','Observação','textarea',0]],
     cats:['Documento','Outro documento'],precisaDoc:r=>r.tipo==='Despesa'?'Anexe o documento da despesa (nota, cupom ou recibo).':null,
     conf:['Marcar como conferido','Desfazer conferência'],okTxt:'Conferido',novo:'Novo lançamento'}
 };
@@ -1403,10 +1409,10 @@ async function renderMod(){
   }else{
     let saldo=ANT;
     head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click${aConferir(r)?' pend':''}" data-id="${r.id}" tabindex="0"${aConferir(r)?` title="${esc(r.obs)}"`:''}><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||ent?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':aConferir(r)?'<span class="chip c-bad">⚠ Conferir divergência</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
-    const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),S=sum(REGS.filter(r=>r.tipo==='Despesa'));
-    foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(S)}</td><td>${fm(r2(ANT+E-S))}</td><td colspan="2"></td></tr>`:'';
-    tiles=[['Saldo anterior',fm(ANT),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Saldo atual',fm(r2(ANT+E-S)),'saldo anterior + entradas − despesas'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
+    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click${aConferir(r)?' pend':''}" data-id="${r.id}" tabindex="0"${aConferir(r)?` title="${esc(r.obs)}"`:''}><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||r.tipo!=='Despesa'?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':aConferir(r)?'<span class="chip c-bad">⚠ Conferir divergência</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
+    const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),D=sum(REGS.filter(r=>r.tipo==='Depósito bancário')),S=r2(sum(REGS.filter(r=>r.tipo==='Despesa'))),SD=r2(S+D);
+    foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(SD)}</td><td>${fm(r2(ANT+E-SD))}</td><td colspan="2"></td></tr>`:'';
+    tiles=[['Saldo anterior',fm(ANT),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Depósitos no banco',fm(D),(n=>n+(n===1?' depósito':' depósitos'))(REGS.filter(r=>r.tipo==='Depósito bancário').length)],['Saldo atual',fm(r2(ANT+E-SD)),'saldo anterior + entradas − despesas − depósitos'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
   }
   $('mHead').innerHTML=head;$('mFoot').innerHTML=foot;
   if(MOD==='tesouraria'&&!REGS.length)body='';
@@ -1419,7 +1425,14 @@ $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if
 $('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
 const dlgReg=$('dlgReg');
 const regEditavel=()=>{const cli=cliAtual();return !!cli&&podeLancar(cli.id,MOD)&&!(REG&&REG.conferido)};
+// depósito bancário: só data, valor, banco de destino e comprovante; a descrição é automática
+function ajustaDeposito(){
+  const t=$('rFields').querySelector('[data-k="tipo"]'),dep=t&&t.value==='Depósito bancário';
+  $('rFields').querySelectorAll('[data-dep]').forEach(el=>el.hidden=!dep);
+  const d=$('rFields').querySelector('[data-k="descricao"]');if(d)d.closest('label').hidden=dep;
+}
 async function openReg(r){
+  if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
   const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];
   const ed=regEditavel(),dis=ed?'':' disabled';
   const v=k=>r?r[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
@@ -1429,8 +1442,9 @@ async function openReg(r){
     const lab=t+(req?'':' (opcional)');
     if(tp==='textarea')return `<label class="f wide">${lab}<textarea data-k="${k}"${dis}>${esc(v(k))}</textarea></label>`;
     if(tp==='parc')return `<label class="f">${lab}<select data-k="${k}"${dis}>${Array.from({length:12},(_,i)=>`<option value="${i+1}"${+v(k)===i+1?' selected':''}>${i+1}x</option>`).join('')}</select></label>`;
-    if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
+    if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento','Depósito bancário'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
+    if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
     if(tp==='sobre')return `<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
   }).join('');
@@ -1439,7 +1453,7 @@ async function openReg(r){
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
   $('rBaixa').innerHTML=(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
-  renderRateio(r,ed);
+  renderRateio(r,ed);ajustaDeposito();
   $('rErr').hidden=true;
   $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||ehEsc()));
   $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
@@ -1464,7 +1478,8 @@ $('rForm').addEventListener('submit',async e=>{
   const row={cliente_id:cli.id};
   $('rFields').querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;row[k]=el.classList.contains('money')?parseMoney(el.value):k==='parcelas'?+el.value:el.value.trim()||null});
   let m='';
-  const falta=cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
+  if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else row.conta_destino=null}
+  const falta=!m&&cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
   if(falta)m='Preencha: '+falta[1]+'.';
   else if(Number.isNaN(row.valor)||!(row.valor>0))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
   else if(cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
