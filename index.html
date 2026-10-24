@@ -1182,7 +1182,60 @@ function sugerirCat(fornecedor,texto){
   const k=chave(fornecedor);if(k&&PCAT.forn[k])return PCAT.forn[k].categoria;
   const t=' '+chave(fornecedor+' '+(texto||''))+' ';
   const r=PCAT.regras.find(x=>chave(x.palavra)&&t.includes(chave(x.palavra)));
-  return r?r.categoria:'';
+  if(r)return r.categoria;
+  return sugerirPorTexto(t);
+}
+// Sem fornecedor aprendido nem regra: procura no texto palavras ligadas a cada categoria do plano.
+// A palavra vale também no plural (até 2 letras a mais). Ganha a mais longa encontrada (mais específica). Vale só para categorias que existem no plano.
+const PALAVRAS={
+  'Energia':['luz','energia','celesc','copel','conta de luz','eletrica'],
+  'Telefonia/ Internet/ TV a cabo':['telefone','telefonia','internet','celular','fibra','tv a cabo'],
+  'Aluguel de imóveis':['aluguel','aluguel da sala','aluguel do imovel'],
+  'Condomínios':['condominio'],
+  'Limpeza e Conservação':['limpeza','faxina','detergente','desinfetante','alcool','papel higienico','papel toalha','sabonete','vassoura','saco de lixo','produtos de limpeza'],
+  'Material de Expediente/ Escritorio':['papel a4','papel sulfite','caneta','lapis','papelaria','escritorio','expediente','grampo','envelope','pasta','etiqueta','bobina'],
+  'Material de Informática/Telefonia e Manutenção':['cartucho','toner','impressora','computador','notebook','mouse','teclado','informatica','monitor','pen drive','roteador','cabo de rede'],
+  'Lanches, Refeições, Copa e Cozinha':['lanche','cafe','agua mineral','galao de agua','refeicao','almoco','janta','copa','cozinha','mercado','supermercado','padaria','acucar','bolacha','biscoito','leite','copo descartavel'],
+  'Combustíveis e Lubrificantes':['combustivel','gasolina','diesel','etanol','posto de combustivel','abastecimento'],
+  'Manutenção de Veículos':['pneu','mecanico','oficina','revisao do carro','veiculo','carro','moto','troca de oleo'],
+  'Manutenção e Reparos':['conserto','reparo','manutencao','ar condicionado','ar-condicionado','encanador','eletricista','pintura','chaveiro','lampada','vidraceiro'],
+  'Correio':['correio','correios','sedex','postagem'],
+  'Cartório':['cartorio','autenticacao','reconhecimento de firma'],
+  'Estacionamentos':['estacionamento'],
+  'Honorários Contábeis':['contabilidade','contador','honorarios contabeis'],
+  'Honorários advocatícios':['advogado','advocacia','advocaticio'],
+  'Segurança e Vigilância':['alarme','monitoramento','vigilancia','seguranca'],
+  'Licença ou Aluguel de Softwares':['software','licenca','mensalidade do sistema','assinatura'],
+  'Serviço de Transporte':['frete','uber','taxi','transporte','motoboy'],
+  'Despesas com Viagens':['viagem','hotel','passagem','pedagio'],
+  'Brindes':['brinde'],
+  'Confraternizações':['confraternizacao','festa'],
+  'Certificado Digital':['certificado digital'],
+  'Ações de Marketing e Publicidade':['marketing','publicidade','anuncio','panfleto','impulsionamento','grafica','banner','cartao de visita'],
+  'Exames pré e demissionais':['exame admissional','exame demissional','admissional','demissional','aso'],
+  'Cursos e Treinamentos':['curso','treinamento','capacitacao'],
+  'Outras despesas c/ Funcionário (Uniformes...)':['uniforme','jaleco'],
+  'Plano de Saúde':['plano de saude','unimed'],
+  'Tarifas Bancárias':['tarifa bancaria','tarifa do banco'],
+  'Seguro Empresarial':['seguro'],
+  'Taxas Municipais (IPTU, Vigilância, Bombeiros, Alvará, Lixo)':['iptu','alvara','bombeiro','taxa de lixo','vigilancia sanitaria'],
+  'Taxa Detran (Despachante/ Transferência/ Emplacamento)':['detran','ipva','emplacamento','licenciamento','despachante'],
+  'Locação de Máquinas e Equipamentos':['locacao de maquina','aluguel de maquina','aluguel de equipamento','locacao de equipamento'],
+  'Reformas':['reforma','obra'],
+  'FGTS':['fgts'],'INSS':['inss'],'DAS - Simples Nacional':['simples nacional','guia do das']
+};
+function sugerirPorTexto(t){
+  const lim=x=>' '+chave(x).replace(/[^a-z0-9]+/g,' ').trim()+' ';t=lim(t);
+  const tem=c=>PCAT.plano.find(x=>chave(x.categoria)===chave(c));
+  let best='',tam=0;
+  for(const [c,ps] of Object.entries(PALAVRAS)){const pc=tem(c);if(!pc)continue;
+    for(const w of ps){const k=lim(w).trim();if(k.length>tam&&new RegExp(' '+k+'[a-z]{0,2} ').test(t))best=pc.categoria,tam=k.length}}
+  if(best)return best;
+  // por último, uma palavra do nome da categoria que aparece no texto (ex.: "cartório", "correio")
+  const pare=new Set(['de','do','da','e','com','para','outras','despesas','despesa','servico','servicos','taxa','taxas','material','manutencao']);
+  for(const x of PCAT.plano){const ws=chave(x.categoria).split(/[^a-z0-9]+/).filter(w=>w.length>=5&&!pare.has(w));
+    for(const w of ws)if(t.includes(' '+w.slice(0,Math.max(5,w.length-2)))&&w.length>tam)best=x.categoria,tam=w.length}
+  return best;
 }
 async function aprenderCat(fornecedor,categoria,fbc){
   const k=chave(fornecedor);if(!k||!categoria||!PCAT.ok)return;
