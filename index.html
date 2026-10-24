@@ -1336,10 +1336,10 @@ async function renderRep(){
   PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
   const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
   const f=$('pFiltro').value,q=$('pBusca').value.trim().toLowerCase();
-  const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||(p.nome+' '+(p.especialidade||'')).toLowerCase().includes(q)))
+  const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||p.nome.toLowerCase().includes(q)))
     .sort((a,b)=>(pAlertas(b).length>0)-(pAlertas(a).length>0)||a.nome.localeCompare(b.nome));
   $('pHead').innerHTML=`<tr><th class="l">Parceiro</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Pix</th><th class="l">Banco · agência · conta</th><th class="l">Titular</th><th class="l">Alertas</th></tr>`;
-  $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b>${p.especialidade?`<br><span class="muted">${esc(p.especialidade)}</span>`:''}</td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
+  $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b></td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="6">${f==='alerta'?'Nenhum parceiro com alerta.':PARC.length?'Nenhum parceiro neste filtro.':'Nenhum parceiro cadastrado.'+($('pNovo').hidden?'':' Use “Novo parceiro” para começar.')}</td></tr>`;
   const ativos=PARC.filter(p=>p.ativo),nAlt=Object.keys(PALT).length,nNovo=ativos.filter(p=>!p.conferido).length;
   const descs=Object.values(PDESC).flat(),vDesc=r2(descs.reduce((x,d)=>x+(+d.valor),0)),semConta=ativos.filter(p=>!p.pix_chave&&!(p.banco&&p.conta)).length;
@@ -1361,7 +1361,7 @@ function pCampos(pre,p,dis,soConta){
   const d=dis?' disabled':'',v=k=>esc(p?.[k]||'');
   const sel=(k,t,ops)=>`<label class="f">${t}<select id="${pre}_${k}"${d}><option value=""></option>${ops.map(o=>`<option${p?.[k]===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
   const inp=(k,t,ph)=>`<label class="f">${t}<input id="${pre}_${k}" value="${v(k)}"${ph?` placeholder="${ph}"`:''}${d}></label>`;
-  return `<div class="fields">${soConta?'':inp('nome','Nome do parceiro *')+inp('especialidade','Especialidade','Ex.: Cardiologia')}
+  return `<div class="fields">${soConta?'':inp('nome','Nome do parceiro *')}
     ${sel('pix_tipo','Tipo da chave Pix',PIXTIPOS)}${inp('pix_chave','Chave Pix')}
     ${inp('banco','Banco','Ex.: Sicredi')}${inp('agencia','Agência')}${inp('conta','Conta','com o dígito')}${sel('tipo_conta','Tipo de conta',TIPOSCONTA)}
     ${inp('titular','Titular da conta','se não for o próprio parceiro')}${inp('cpf_cnpj','CPF/CNPJ do titular')}
@@ -1435,7 +1435,7 @@ async function rpAcao(act,el){
     if(act==='copDesc')return copiar(descTxt(d),'Texto do desconto copiado');
     el.disabled=true;
     if(act==='salvar'){
-      const o=lerCampos('pc',['nome','especialidade','obs',...CONTAK]);
+      const o=lerCampos('pc',['nome','obs',...CONTAK]);
       if(!o.nome)return rpErr('Informe o nome do parceiro.');
       if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta.');
       if(p){if(e&&$('pc_ativo'))o.ativo=$('pc_ativo').checked;o.atualizado_em=new Date().toISOString();
