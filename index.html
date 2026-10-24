@@ -2113,27 +2113,61 @@ FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
 // o sistema liga os nomes aos colaboradores e lança faltas (dia com DSR, horas sem DSR) e horas extras.
 // Importar de novo no mesmo mês troca a importação anterior (lançamentos com a descrição PONTO).
 const PONTO='Espelho de ponto';
-const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras/],
-  ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
+const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras|^h\.? ?f$/],
+  ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)|^h\.? ?e$/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
 const normNome=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean);
+// O sistema de ponto costuma ter o nome completo e o cadastro, às vezes, outro sobrenome ou outra grafia
+// (Fellyphe/Fellype): o primeiro nome precisa bater (aceita 1 letra de diferença) e ganha quem tem mais nomes em comum.
+const PREP=new Set(['de','da','do','das','dos','e']);
+const quase=(a,b)=>{if(a===b)return true;if(Math.abs(a.length-b.length)>1||a.length<4)return false;let i=0,j=0,d=0;
+  while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue}if(++d>1)return false;if(a.length>b.length)i++;else if(b.length>a.length)j++;else{i++;j++}}
+  return d+(a.length-i)+(b.length-j)<=1};
 function achaFunc(nome,fs){
-  const t=normNome(nome);if(!t.length)return null;
+  const t=normNome(nome).filter(x=>!PREP.has(x));if(!t.length)return null;
   const cobre=(a,b)=>a.every(x=>b.some(y=>y.startsWith(x)));
   let c=fs.filter(f=>{const w=normNome(f.nome);return cobre(t,w)||cobre(w,t)});
   if(c.length>1)c=c.filter(f=>normNome(f.nome)[0]===t[0]);
-  return c.length===1?c[0]:null;
+  if(c.length===1)return c[0];
+  const pts=fs.map(f=>{const w=normNome(f.nome).filter(x=>!PREP.has(x));if(!quase(w[0]||'',t[0]))return [f,0];
+    return [f,w.filter(x=>t.some(y=>x===y||(x.length>2&&y.length>2&&(x.startsWith(y)||y.startsWith(x))))).length+1]}).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
+  return pts.length&&(pts.length===1||pts[0][1]>pts[1][1])?pts[0][0]:null;
 }
 let PNT=null;
 $('folPonto').onclick=()=>{
   PNT={cols:PONTO_COLS.filter(x=>colsDe(FOL.cli).includes(x[0]))};
   folDlg(`Importar espelho de ponto · ${MESES[+folMes.value.slice(5)-1]} ${folMes.value.slice(0,4)}`,
-    `<p class="note" style="margin-top:0">Exporte o espelho do sistema de ponto em Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
-    <label class="f">Arquivo<input type="file" id="pnArq" accept=".xlsx,.xls,.csv"></label><div id="pnMap"></div><div id="pnPrev"></div>`,
+    `<p class="note" style="margin-top:0">Envie o resumo do espelho de ponto em PDF (gerado pelo sistema de ponto, não escaneado), Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
+    <label class="f">Arquivo<input type="file" id="pnArq" accept=".pdf,.xlsx,.xls,.csv"></label><div id="pnMap"></div><div id="pnPrev"></div>`,
     '<button type="button" class="btn primary" data-fo="pontoLanca" id="pnOk" hidden>Lançar na folha</button>');
   $('pnArq').onchange=async()=>{const f=$('pnArq').files[0];if(!f)return;
-    try{PNT.wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});pontoAba(PNT.wb.SheetNames[0])}
-    catch(ex){console.error(ex);foErro('Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
+    try{const buf=await f.arrayBuffer();
+      if(/\.pdf$/i.test(f.name)){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(await pdfTabela(buf)),'PDF');PNT.wb=wb}
+      else PNT.wb=XLSX.read(buf,{type:'array',cellDates:true});
+      pontoAba(PNT.wb.SheetNames[0])}
+    catch(ex){console.error(ex);foErro(/\.pdf$/i.test(f.name)?'Não consegui ler este PDF. Ele precisa ser gerado pelo sistema de ponto (não escaneado).':'Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
 };
+// PDF: lê o texto com o pdf.js e monta a tabela pelas posições das colunas do cabeçalho (a linha com "Colaborador").
+// Nome quebrado em duas linhas: a linha só com o começo do nome junta com a linha de baixo.
+const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+const carregaJs=src=>new Promise((ok,ko)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>ko(new Error('script '+src));document.head.appendChild(e)});
+async function pdfTabela(buf){
+  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise,linhas=[];let cols=null,iNome=0;
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p),vp=pg.getViewport({scale:1}),its=(await pg.getTextContent()).items.filter(i=>i.str.trim()).map(i=>{
+      const t=pdfjsLib.Util.transform(vp.transform,i.transform);return {s:i.str.trim(),x:t[4],y:t[5],cx:t[4]+i.width/2}}).sort((a,b)=>a.y-b.y||a.x-b.x);
+    const ls=[];its.forEach(i=>{const l=ls[ls.length-1];if(l&&Math.abs(l.y-i.y)<=3)l.its.push(i);else ls.push({y:i.y,its:[i]})});
+    let ini=0;const h=ls.findIndex(l=>l.its.length>=3&&l.its.some(i=>/colab|nome|funcion|empreg/i.test(i.s)));
+    if(h>=0){ini=h+1;if(!cols){cols=ls[h].its.map(i=>i.cx);iNome=ls[h].its.findIndex(i=>/colab|nome|funcion|empreg/i.test(i.s));linhas.push(ls[h].its.map(i=>i.s))}}
+    if(!cols)continue;let resto='';
+    for(const l of ls.slice(ini)){
+      const r=cols.map(()=>'');l.its.forEach(i=>{let k=0;cols.forEach((c,j)=>{if(Math.abs(c-i.cx)<Math.abs(cols[k]-i.cx))k=j});r[k]=r[k]?r[k]+' '+i.s:i.s});
+      if(r.every((v,j)=>j===iNome||!v)){resto=resto?resto+' '+r[iNome]:r[iNome];continue}
+      if(resto){r[iNome]=resto+' '+r[iNome];resto=''}linhas.push(r)}
+  }
+  if(!cols)throw new Error('cabeçalho não encontrado no PDF');
+  return linhas;
+}
 function pontoAba(aba){
   const ws=PNT.wb.Sheets[aba];PNT.aba=aba;
   PNT.raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});PNT.txt=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
@@ -2144,10 +2178,15 @@ function pontoAba(aba){
   const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
+  // resumo com "H.E 100%" igual ao "H.E" em todas as linhas: é a mesma hora contada duas vezes, fica só a HE normal
+  const iHe=sel.find(x=>x[0]==='he65'),iCem=sel.find(x=>x[0]==='he100');
+  if(iHe&&iCem&&iHe[2]>=0&&iCem[2]>=0&&PNT.txt.slice(h+1).every(r=>String(r[iHe[2]]).trim()===String(r[iCem[2]]).trim()))iCem[2]=-1;
+  const temDia=sel.some(x=>x[0]==='faltas_dias'),temHora=sel.some(x=>x[0]==='faltas_horas');
   $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
-    <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>`;
+    <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>
+    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="8:00" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
   if($('pnAba'))$('pnAba').onchange=()=>pontoAba($('pnAba').value);
-  $('pnMap').querySelectorAll('[data-pn]').forEach(s=>s.onchange=pontoPrev);pontoPrev();
+  $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH').forEach(s=>s.onchange=pontoPrev);pontoPrev();
 }
 const pontoData=v=>{if(v instanceof Date)return isoLocal(v);const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(!m)return null;const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${pad(m[2])}-${pad(m[1])}`};
 const pontoDias=v=>{const s=String(v||'').trim();if(!s||/^0+([.,]0+)?$|^0?0:00$/.test(s))return 0;if(/^\d+([.,]\d+)?$/.test(s))return +s.replace(',','.');return /:/.test(s)?0:1};
@@ -2158,13 +2197,16 @@ function pontoPrev(){
   for(let r=PNT.h+1;r<PNT.txt.length;r++){
     const tx=PNT.txt[r],rw=PNT.raw[r];let nome=String(tx[m.nome]||'').trim();
     // espelho por dia costuma trazer o nome só na primeira linha do colaborador
-    if(!nome&&m.data>=0&&pontoData(rw[m.data]))nome=ultimo;if(!nome||/^total/i.test(nome))continue;ultimo=nome;
+    if(!nome&&m.data>=0&&pontoData(rw[m.data]))nome=ultimo;if(!nome||/^tota(l|is)\b/i.test(nome))continue;ultimo=nome;
     const g=por.get(nome)||{nome,f:achaFunc(nome,fs),v:{},dias:[]};
     PNT.cols.forEach(([k])=>{if(m[k]<0)return;
       if(k==='faltas_dias'){const n=pontoDias(tx[m.faltas_dias]);if(n)g.dias.push({n,data:m.data>=0?pontoData(rw[m.data]):null})}
       else{const mi=lerHoras(String(tx[m[k]]||'').replace(/^-/,''));if(isFinite(mi)&&mi>0)g.v[k]=(g.v[k]||0)+mi}});
     por.set(nome,g);
   }
+  // o sistema de ponto já põe a jornada do dia faltado nas horas de falta: tira para não descontar duas vezes
+  const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0;
+  if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;const r=g.v.faltas_horas-jor*g.dias.reduce((s,d)=>s+d.n,0);if(r>0)g.v.faltas_horas=r;else delete g.v.faltas_horas});
   PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length);
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>${
