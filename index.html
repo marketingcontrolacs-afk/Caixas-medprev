@@ -1910,6 +1910,11 @@ async function renderFolha(){
   const er=[rf,rm,rl,ra,rr].find(x=>x.error)?.error;
   if(er){console.error(er);vazio(er.code==='42P01'||/folha_/.test(er.message||'')?['Este módulo precisa da atualização v14 do banco. Rode o SQL no Supabase.','neg']:['Erro ao carregar. Verifique a internet e tente de novo.','neg']);return}
   FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:Object.fromEntries((ra.data||[]).map(a=>[a.funcionario_id+'|'+a.coluna,a.valor]))};
+  // cada empresa tem a sua planilha de folha: sem o modelo configurado, não usa um modelo genérico
+  if(!cli.folha_colunas?.length){
+    vazio([e?'Esta empresa ainda não tem o modelo da planilha de folha. Envie a planilha da empresa para configurarmos, ou marque as colunas em “Colunas da planilha desta empresa”, abaixo.':'A folha desta empresa ainda está sendo configurada pelo escritório.']);
+    $('folAdd').hidden=$('folRescAdd').hidden=true;$('folRescBaixar').hidden=true;if(e){renderFolCad();renderFolCols()}return;
+  }
   const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
   $('folAdd').hidden=$('folRescAdd').hidden=!lanca;
   // barra de situação do mês
@@ -2104,7 +2109,7 @@ $('folCadSalvar').onclick=async ev=>{
 };
 // Colunas da planilha da empresa (escritório)
 function renderFolCols(){
-  const sel=new Set(colsDe(FOL.cli));
+  const sel=new Set(FOL.cli.folha_colunas||[]);
   $('folCols').innerHTML=Object.keys(FCOL).map(c=>`<label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" value="${c}" ${sel.has(c)?'checked':''} style="width:auto"> ${esc(FNOME(c))}</label>`).join('');
 }
 $('folColsSalvar').onclick=async ev=>{
