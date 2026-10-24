@@ -13,3 +13,5 @@ insert into public.mapeamento_bc(lancamento, tipo, status) values
  ('Contas a pagar','Despesa','Pago'),
  ('Cartão de crédito','Despesa','Pago')
 on conflict (lancamento) do nothing;
+
+select 'Atualização v6 (Exportação Bom Controle) concluída' as resultado;
