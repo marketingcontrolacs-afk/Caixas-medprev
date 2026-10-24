@@ -312,6 +312,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <button class="btn" id="btnCopiar">Copiar linhas</button>
       <button class="btn primary" id="btnBaixarBC">Baixar planilha do Bom Controle</button>
     </div>
+    <div id="exPendAviso"></div>
     <div id="exConf"></div>
     <p class="note" id="exInfo"></p>
     <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
@@ -921,6 +922,12 @@ async function exportRows(){
     (await loadMod('cartao_notas','data')).filter(conf).forEach(r=>
       push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,...fb(r),doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
   }
+  // o que falta confirmar aparece sempre, de qualquer data e mesmo sem estar conferido/pago
+  if(MODCAT.includes(orig)){
+    let q=sb.from(TABCAT[orig]).select('*').eq('cliente_id',escCli.value).eq('categoria_ok',false);if(orig==='tesouraria')q=q.eq('tipo','Despesa');
+    const {data:np}=await q.order(orig==='pagar'?'vencimento':'data').limit(1000);
+    (np||[]).forEach(r=>{if(!pend.some(x=>x.id===r.id))pend.push(r)});
+  }
   EXPEND=pend;
   return out;
 }
@@ -935,7 +942,7 @@ async function renderExport(){
     const semConta=(orig==='caixa'||orig==='tesouraria')&&escCli.value&&!cliAtual()?.conta_tesouraria_bc;
     $('exInfo').innerHTML=`${esc(cliAtual()?.nome||'')} · ${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · ${EXORIG[orig].nota}`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete em Configurações › Mapeamento Bom Controle${orig==='pagar'?' ou informe o banco no pagamento':''}</span>`:'');
   }
-  renderExConf();
+  renderExConf();renderPendAviso();
   $('tbExp').innerHTML=`<thead><tr>${HEAD.map(h=>`<th class="l">${h}</th>`).join('')}</tr></thead><tbody>${
     lastRows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===10?'':'l'}">${i===10?showMoney(v):[8,9,13].includes(i)&&v?dBR(v):esc(v)}</td>`).join('')}</tr>`).join('')||'<tr><td class="l muted" colspan="16">Nenhum lançamento no período.</td></tr>'}</tbody>`;
   $('btnCopiar').disabled=$('btnBaixarBC').disabled=!lastRows.length;
@@ -1082,6 +1089,21 @@ async function renderExConf(){
     <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
+// resumo do que aguarda o escritório em todas as empresas, para não depender da empresa, origem e mês escolhidos
+async function renderPendAviso(){
+  const box=$('exPendAviso'),cont={};
+  for(const o of MODCAT){
+    let q=sb.from(TABCAT[o]).select('cliente_id').eq('categoria_ok',false);if(o==='tesouraria')q=q.eq('tipo','Despesa');
+    const {data,error}=await q.limit(5000);if(error){box.innerHTML='';return}
+    (data||[]).forEach(r=>{const k=r.cliente_id+'|'+o;cont[k]=(cont[k]||0)+1});
+  }
+  const itens=Object.entries(cont).map(([k,n])=>{const [c,o]=k.split('|');return {c,o,n,nome:CLIENTES.find(x=>x.id===c)?.nome||'?'}}).sort((a,b)=>a.nome.localeCompare(b.nome));
+  if(!itens.length){box.innerHTML='';return}
+  const tot=itens.reduce((a,x)=>a+x.n,0);
+  box.innerHTML=`<div class="alerta"><b>${tot} ${tot===1?'lançamento aguarda':'lançamentos aguardam'} a conferência do escritório</b><span class="note">Clique para abrir:</span><div class="row" style="gap:8px">${itens.map(x=>`<button type="button" class="btn small" data-pc="${x.c}" data-po="${x.o}"${x.c===escCli.value&&x.o===exOrig.value?' aria-current="true" disabled':''}>${esc(x.nome)} · ${MODNOME[x.o]}: ${x.n}</button>`).join('')}</div></div>`;
+}
+$('exPendAviso').addEventListener('click',e=>{const b=e.target.closest('[data-pc]');if(!b)return;
+  if(escCli.querySelector(`option[value="${b.dataset.pc}"]`))escCli.value=b.dataset.pc;exOrig.value=b.dataset.po;$('exSoTxt').textContent=EXORIG[exOrig.value].so;renderExport()});
 // Conferência completa de um lançamento: documento ao lado de todos os dados, para o escritório
 // corrigir o que precisar antes de confirmar (qualquer erro trava a importação no Bom Controle)
 const dlgCC=$('dlgCC');let CCI=-1;
