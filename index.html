@@ -308,6 +308,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <button class="btn" id="btnCopiar">Copiar linhas</button>
       <button class="btn primary" id="btnBaixarBC">Baixar planilha do Bom Controle</button>
     </div>
+    <div id="exConf"></div>
     <p class="note" id="exInfo"></p>
     <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
   </section>
@@ -867,8 +868,10 @@ async function exportRows(){
   if(!escCli.value)return [];
   const mp=Object.fromEntries((await loadMapa()).map(m=>[m.lancamento,m]));
   const cli=cliAtual(),orig=exOrig.value,out=[];
-  if(orig==='pagar'||orig==='cartao')await loadCats();
-  const catDe=r=>r.categoria||sugerirCat(r.fornecedor,r.obs);
+  if(MODCAT.includes(orig))await loadCats();
+  // só entra o que o escritório já confirmou a categoria; o resto vai para o quadro de confirmação
+  const pend=[],conf=r=>{if(r.categoria_ok)return true;pend.push(r);return false};
+  const catDe=r=>r.categoria;
   // com rateio sai uma linha por filial, com a filial no Departamento
   const pushRat=(lanc,data,r,f)=>{if(!Array.isArray(r.rateio)||!r.rateio.length)return push(lanc,data,r.valor,f);
     r.rateio.forEach(x=>push(lanc,data,x.valor,{...f,dep:x.filial,obs:(f.obs||'')+` | Rateio ${x.filial}`}))};
@@ -888,19 +891,21 @@ async function exportRows(){
       d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,{conta:contaTes,obs:`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),doc:s.tipo==='Repasse'?'':s.guia,nome:s.tipo==='Repasse'?s.parceiro:''}));
     });
   }else if(orig==='tesouraria'){
-    (await loadMod('tesouraria','data')).filter(r=>r.tipo==='Despesa').forEach(r=>
-      pushRat('Tesouraria - Despesa',r.data,r,{tipo:'Despesa',conta:contaTes,nome:r.descricao,doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
+    (await loadMod('tesouraria','data')).filter(r=>r.tipo==='Despesa'&&conf(r)).forEach(r=>
+      pushRat('Tesouraria - Despesa',r.data,r,{tipo:'Despesa',cat:catDe(r),conta:contaTes,nome:r.descricao,doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='pagar'){
-    (await loadMod('contas_pagar','vencimento')).forEach(r=>
+    (await loadMod('contas_pagar','vencimento')).filter(conf).forEach(r=>
       pushRat('Contas a pagar',r.vencimento,r,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='cartao'){
-    (await loadMod('cartao_notas','data')).forEach(r=>
+    (await loadMod('cartao_notas','data')).filter(conf).forEach(r=>
       push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
   }
+  EXPEND=pend;
   return out;
 }
 async function renderExport(){
   const orig=exOrig.value;
+  EXPEND=[];
   if(orig!=='caixa'&&!window.V2){lastRows=[];$('exInfo').innerHTML='<span class="neg">Esta origem precisa da atualização v2 do banco. Rode o SQL no Supabase.</span>'}
   else{
     lastRows=await exportRows();
@@ -909,6 +914,7 @@ async function renderExport(){
     const semConta=(orig==='caixa'||orig==='tesouraria')&&escCli.value&&!cliAtual()?.conta_tesouraria_bc;
     $('exInfo').innerHTML=`${esc(cliAtual()?.nome||'')} · ${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · ${EXORIG[orig].nota}`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete em Configurações › Mapeamento Bom Controle${orig==='pagar'?' ou informe o banco no pagamento':''}</span>`:'');
   }
+  renderExConf();
   $('tbExp').innerHTML=`<thead><tr>${HEAD.map(h=>`<th class="l">${h}</th>`).join('')}</tr></thead><tbody>${
     lastRows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===10?'':'l'}">${i===10?showMoney(v):[8,9,13].includes(i)&&v?dBR(v):esc(v)}</td>`).join('')}</tr>`).join('')||'<tr><td class="l muted" colspan="16">Nenhum lançamento no período.</td></tr>'}</tbody>`;
   $('btnCopiar').disabled=$('btnBaixarBC').disabled=!lastRows.length;
@@ -971,9 +977,41 @@ $('rRat').addEventListener('input',atualizaRateio);$('rRat').addEventListener('c
   // ao trocar R$ por %, converte o que já foi digitado
   if(e.target.name==='ratPor'){const total=totalReg(),pct=e.target.value==='pct';document.querySelectorAll('#rRat tbody input').forEach(i=>{const n=parseMoney(i.value)||0;if(n&&total)i.value=showMoney(r2(pct?n/total*100:total*n/100))})}
   atualizaRateio()});
-$('rFields').addEventListener('input',atualizaRateio);$('rFields').addEventListener('change',atualizaRateio);
+$('rFields').addEventListener('input',atualizaRateio);
+// lançamento digitado pelo escritório: sugere a categoria assim que fornecedor ou descrição são preenchidos
+$('rFields').addEventListener('change',()=>{if(!$('rCat')||$('rCat').value)return;
+  const g=k=>$('rFields').querySelector(`[data-k="${k}"]`)?.value||'';const s2=sugerirCat(g('fornecedor')||g('descricao'),[g('sobre'),g('descricao'),g('obs')].join(' '));if(s2)$('rCat').value=s2});$('rFields').addEventListener('change',atualizaRateio);
 
-// ---------- categorias automáticas (contas a pagar e cartão) ----------
+// ---------- categorias automáticas (contas a pagar, cartão e despesas da tesouraria) ----------
+const MODCAT=['pagar','cartao','tesouraria'];
+const TABCAT={pagar:'contas_pagar',cartao:'cartao_notas',tesouraria:'tesouraria'};
+const fornDe=r=>r.fornecedor||r.descricao||'';
+const textoDe=r=>[r.sobre,r.descricao,r.obs].filter(Boolean).join(' ');
+const catOpts=()=>PCAT.plano.map(c=>`<option value="${esc(c.categoria)}"${c.codigo?` label="${esc(c.codigo)} · ${esc(c.categoria)}"`:''}>`).join('');
+// quadro da exportação: lançamentos do período aguardando o escritório confirmar a categoria
+let EXPEND=[];
+function renderExConf(){
+  const box=$('exConf');
+  if(!EXPEND.length){box.innerHTML='';return}
+  const dk=exOrig.value==='pagar'?'vencimento':'data';
+  box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
+    <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
+      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
+    <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button></div>
+    <datalist id="catsListEx">${catOpts()}</datalist></div>`;
+}
+async function confirmarCat(tr){
+  const r=EXPEND.find(x=>x.id===tr.dataset.id),cat=tr.querySelector('input').value.trim();
+  if(!cat){toast('Escolha a categoria de '+fornDe(r)+'.');return false}
+  const {error}=await sb.from(TABCAT[exOrig.value]).update({categoria:cat,categoria_ok:true}).eq('id',r.id);
+  if(error){fail(error);return false}
+  await aprenderCat(fornDe(r),cat);return true;
+}
+$('exConf').addEventListener('click',async e=>{
+  if(e.target.closest('[data-ok]')){const b=e.target.closest('[data-ok]');b.disabled=true;if(await confirmarCat(b.closest('tr'))){toast('Categoria confirmada');renderExport()}else b.disabled=false}
+  if(e.target.id==='exConfTodas'){e.target.disabled=true;let n=0;for(const tr of $('exConf').querySelectorAll('tbody tr'))if(tr.querySelector('input').value.trim()&&await confirmarCat(tr))n++;toast(n+' categorias confirmadas');renderExport()}
+});
+
 // Ordem: categoria salva no lançamento > fornecedor aprendido > regra por palavra
 let PCAT={ok:false,plano:[],regras:[],forn:{}};
 const chave=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -997,8 +1035,8 @@ async function renderCats(){
   await loadCats();
   $('catAviso').innerHTML=PCAT.ok?'':'<span class="neg">Rode a atualização v8 do banco no Supabase para usar as categorias.</span>';
   $('catTotal').textContent=PCAT.plano.length+(PCAT.plano.length===1?' categoria':' categorias');
-  $('catsList').innerHTML=PCAT.plano.map(c=>`<option value="${esc(c.categoria)}">`).join('');
-  $('tbPlano').innerHTML=`<thead><tr><th class="l">Categoria</th><th class="l">Tipo</th><th></th></tr></thead><tbody>${PCAT.plano.map(c=>`<tr data-cat="${esc(c.categoria)}"><td class="l">${esc(c.categoria)}</td><td><select data-k="tipo"><option${c.tipo==='Despesa'?' selected':''}>Despesa</option><option${c.tipo==='Receita'?' selected':''}>Receita</option></select></td><td><button type="button" class="btn small ghost" data-del="plano">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">Nenhuma categoria ainda.</td></tr>'}</tbody>`;
+  $('catsList').innerHTML=catOpts();
+  $('tbPlano').innerHTML=`<thead><tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Tipo</th><th></th></tr></thead><tbody>${PCAT.plano.map(c=>`<tr data-cat="${esc(c.categoria)}"><td><input data-k="codigo" value="${esc(c.codigo)}" placeholder="Código" style="max-width:110px"></td><td class="l">${esc(c.categoria)}</td><td><select data-k="tipo"><option${c.tipo==='Despesa'?' selected':''}>Despesa</option><option${c.tipo==='Receita'?' selected':''}>Receita</option></select></td><td><button type="button" class="btn small ghost" data-del="plano">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="4">Nenhuma categoria ainda.</td></tr>'}</tbody>`;
   $('tbRegras').innerHTML=`<thead><tr><th class="l">Palavra</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${PCAT.regras.map(r=>`<tr data-id="${r.id}"><td class="l">${esc(r.palavra)}</td><td class="l">${esc(r.categoria)}</td><td><button type="button" class="btn small ghost" data-del="regra">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">Nenhuma regra ainda.</td></tr>'}</tbody>`;
   const fs=Object.values(PCAT.forn);
   $('tbForn').innerHTML=`<thead><tr><th class="l">Fornecedor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${fs.map(f=>`<tr data-k="${esc(f.fornecedor_chave)}"><td class="l">${esc(f.fornecedor)}</td><td><input data-k="categoria" list="catsList" value="${esc(f.categoria)}"></td><td><button type="button" class="btn small ghost" data-del="forn">Esquecer</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">O sistema ainda não aprendeu nenhum fornecedor.</td></tr>'}</tbody>`;
@@ -1019,7 +1057,7 @@ $('tabCats').addEventListener('click',async e=>{const b=e.target.closest('[data-
   const q=b.dataset.del==='plano'?sb.from('plano_contas').delete().eq('categoria',tr.dataset.cat):b.dataset.del==='regra'?sb.from('categoria_regras').delete().eq('id',tr.dataset.id):sb.from('fornecedor_categoria').delete().eq('fornecedor_chave',tr.dataset.k);
   const {error}=await q;if(error)fail(error);else renderCats()});
 $('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr');if(!tr||!e.target.dataset.k)return;
-  const q=tr.dataset.cat!=null?sb.from('plano_contas').update({tipo:e.target.value}).eq('categoria',tr.dataset.cat):tr.dataset.k!=null&&e.target.dataset.k==='categoria'?sb.from('fornecedor_categoria').update({categoria:e.target.value.trim(),atualizado_em:new Date().toISOString()}).eq('fornecedor_chave',tr.dataset.k):null;
+  const q=tr.dataset.cat!=null?sb.from('plano_contas').update({[e.target.dataset.k]:e.target.value.trim()||null}).eq('categoria',tr.dataset.cat):tr.dataset.k!=null&&e.target.dataset.k==='categoria'?sb.from('fornecedor_categoria').update({categoria:e.target.value.trim(),atualizado_em:new Date().toISOString()}).eq('fornecedor_chave',tr.dataset.k):null;
   if(!q)return;const {error}=await q;if(error)fail(error);else toast('Salvo')});
 
 // ---------- cadastros ----------
@@ -1079,12 +1117,12 @@ $('tbCfg').addEventListener('change',async e=>{const id=e.target.closest('tr').d
 const MODCFG={
   pagar:{titulo:'Contas a pagar',tabela:'contas_pagar',dataK:'vencimento',
     sub:'Envie o boleto e a nota fiscal de cada conta. A Controlacs faz o pagamento.',
-    campos:[['fornecedor','Fornecedor','text',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
+    campos:[['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
     cats:['Boleto','Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe o boleto ou a nota fiscal.',
     conf:['Marcar como paga','Desfazer pagamento'],okTxt:'Paga',novo:'Nova conta'},
   cartao:{titulo:'Cartão de crédito',tabela:'cartao_notas',dataK:'data',
     sub:'Notas fiscais das compras pagas com o cartão de crédito da empresa.',
-    campos:[['data','Data da compra','date',1],['fornecedor','Fornecedor','text',1],['documento','Nº da NF ou cupom','text',1],['valor','Valor total','money',1],['parcelas','Parcelas','parc',1],['obs','Observação','textarea',0]],
+    campos:[['data','Data da compra','date',1],['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou cupom','text',1],['valor','Valor total','money',1],['parcelas','Parcelas','parc',1],['obs','Observação','textarea',0]],
     cats:['Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe a nota fiscal da compra.',
     conf:['Conferido com a fatura','Desfazer conferência'],okTxt:'Conferido',novo:'Nova nota'},
   tesouraria:{titulo:'Tesouraria',tabela:'tesouraria',dataK:'data',
@@ -1178,15 +1216,16 @@ async function openReg(r){
     if(tp==='parc')return `<label class="f">${lab}<select data-k="${k}"${dis}>${Array.from({length:12},(_,i)=>`<option value="${i+1}"${+v(k)===i+1?' selected':''}>${i+1}x</option>`).join('')}</select></label>`;
     if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
+    if(tp==='sobre')return `<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
   }).join('');
-  if(ehEsc()&&(MOD==='pagar'||MOD==='cartao'))await loadCats();
-  const sug=r&&!r.categoria?sugerirCat(r.fornecedor,r.obs):'';
-  const catHtml=ehEsc()&&(MOD==='pagar'||MOD==='cartao')?`<div class="fields"><label class="f wide"><span>Categoria no Bom Controle${sug?' <span class="chip c-warn">sugerida</span>':''}</span><input id="rCat" list="catsListReg" value="${esc(r?.categoria||sug)}" placeholder="${PCAT.ok?'Escolha do plano de contas':'Rode a atualização v8 do banco'}"${r&&r.conferido&&MOD==='pagar'?'':''}></label></div><datalist id="catsListReg">${PCAT.plano.map(c=>`<option value="${esc(c.categoria)}">`).join('')}</datalist>`:'';
+  // categoria: só o escritório vê; o cliente informa do que se trata e o escritório confirma
+  const temCat=ehEsc()&&MODCAT.includes(MOD)&&!(MOD==='tesouraria'&&r&&r.tipo!=='Despesa');
+  if(temCat)await loadCats();
+  const sug=r&&!r.categoria_ok?sugerirCat(fornDe(r),textoDe(r)):'';
+  const catHtml=temCat?`<div class="fields"><label class="f wide"><span>Categoria no Bom Controle ${r?.categoria_ok?'<span class="chip c-ok">✔ confirmada</span>':sug?'<span class="chip c-warn">sugerida, confirme ao salvar</span>':'<span class="chip c-none">a definir</span>'}</span><input id="rCat" list="catsListReg" value="${esc(r?.categoria_ok?r.categoria:(sug||r?.categoria||''))}" placeholder="${PCAT.ok?'Escolha do plano de contas':'Rode a atualização do banco'}"></label></div><datalist id="catsListReg">${catOpts()}</datalist>`:'';
   $('rBaixa').innerHTML=catHtml+(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
   // nova conta digitada pelo escritório: sugere a categoria assim que o fornecedor é preenchido
-  const fIn=$('rFields').querySelector('[data-k="fornecedor"]');
-  if(fIn&&$('rCat'))fIn.onchange=()=>{if(!$('rCat').value){const s2=sugerirCat(fIn.value,'');if(s2)$('rCat').value=s2}};
   renderRateio(r,ed);
   $('rErr').hidden=true;
   $('rSave').hidden=!ed;$('rDel').hidden=!(ed&&r);
@@ -1221,11 +1260,11 @@ $('rForm').addEventListener('submit',async e=>{
   err.hidden=true;$('rSave').disabled=true;
   try{
     row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
-    if($('rCat'))row.categoria=$('rCat').value.trim()||null;
+    if($('rCat')){row.categoria=$('rCat').value.trim()||null;row.categoria_ok=!!row.categoria}
     const {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
     if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
-    if(row.categoria)await aprenderCat(row.fornecedor,row.categoria);
+    if(row.categoria)await aprenderCat(fornDe(row),row.categoria);
     dlgReg.close();toast(REG?'Correção salva':'Lançamento enviado');renderMod();
   }catch(ex){fail(ex)}finally{$('rSave').disabled=false}
 });
@@ -1237,10 +1276,10 @@ $('rDel').onclick=async()=>{
 $('rConf').onclick=async()=>{
   const r=REG,novo=!r.conferido,upd={conferido:novo};
   if(MOD==='pagar'){upd.pago_em=novo?($('rPagoEm').value||TODAY):null;upd.banco=novo?($('rBanco').value.trim()||null):null}
-  if($('rCat')&&$('rCat').value.trim())upd.categoria=$('rCat').value.trim();
+  if($('rCat')&&$('rCat').value.trim()){upd.categoria=$('rCat').value.trim();upd.categoria_ok=true}
   $('rConf').disabled=true;
   const {error}=await sb.from(MODCFG[MOD].tabela).update(upd).eq('id',r.id);
-  if(!error&&upd.categoria)await aprenderCat(r.fornecedor,upd.categoria);
+  if(!error&&upd.categoria)await aprenderCat(fornDe(r),upd.categoria);
   $('rConf').disabled=false;
   if(error)fail(error);else{dlgReg.close();toast(novo?MODCFG[MOD].okTxt:'Desfeito');renderMod()}
 };
