@@ -1478,7 +1478,7 @@ $('rForm').addEventListener('submit',async e=>{
   const row={cliente_id:cli.id};
   $('rFields').querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;row[k]=el.classList.contains('money')?parseMoney(el.value):k==='parcelas'?+el.value:el.value.trim()||null});
   let m='';
-  if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else row.conta_destino=null}
+  if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else delete row.conta_destino}
   const falta=!m&&cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
   if(falta)m='Preencha: '+falta[1]+'.';
   else if(Number.isNaN(row.valor)||!(row.valor>0))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
