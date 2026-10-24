@@ -404,6 +404,17 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="card tablebox"><table><thead id="fHead"></thead><tbody id="fBody"></tbody></table></div>
     <p class="note" id="fNote"></p>
   </section>
+  <!-- RH · PREMIAÇÃO (o cliente informa) -->
+  <section id="viewPremio" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Premiação</h1><p class="sub">Informe a premiação do mês de cada colaborador. Os valores entram direto na folha de pagamento.</p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="prMes"></select></label></div>
+    </div>
+    <div class="card block" style="margin-top:16px" id="prBar"></div>
+    <div class="card tablebox"><table id="prTab"></table></div>
+    <div class="row"><span class="spacer"></span><button class="btn primary" id="prSalvar">Salvar premiação</button></div>
+    <p class="note">Deixe em branco quem não tem premiação no mês. Depois que o escritório confere a folha, os valores ficam travados.</p>
+  </section>
   <!-- RH · COLABORADORES E PRAZOS -->
   <section id="viewColab" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -578,6 +589,7 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   folha:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
+  premio:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>',
   colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
   confcaixa:'<path d="M9 4h6v3H9z"/><path d="M15 5h3v16H6V5h3"/><path d="M9 13l2 2 4-4"/>',
@@ -592,6 +604,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
+  {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('folha')||temAcesso('ferias')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'confcaixa',t:'Conferência de caixa',g:'Escritório',ok:ehEsc},
@@ -613,7 +626,9 @@ $('nav').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)
 // empresas que aparecem no seletor para o módulo aberto
 function empresasDe(m){
   if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:podeVer(c.id,'folha')||podeVer(c.id,'ferias')));
-  const mod=m==='rh'?'ferias':m;
+  // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
+  if(m==='premio')return empresasDe('folha').filter(c=>c.folha_modelo?.premiacao?.length);
+  const mod=m==='rh'?'ferias':m==='premio'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):podeVer(c.id,mod)));
 }
@@ -633,7 +648,7 @@ function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -645,6 +660,7 @@ function openView(){
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
+  else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
 }
@@ -1840,6 +1856,7 @@ const FCOL={
   faltas_data:{t:'Faltas',g:'D',k:'datas',lanca:'datas',nome:'Faltas (data do dia)'},
   outros:{t:'Outros descontos',g:'D',k:'money',lanca:'money'},
   gratificacoes:{t:'Gratificações',g:'P',k:'money',lanca:'livre',dica:'Ex.: 140, Função, Pagar 3 dias',fixo:f=>ff(f,'gratificacoes'),fx:[['ff.gratificacoes','Gratificação fixa','livre']]},
+  premio:{t:'Prêmio',g:'P',k:'money',lanca:'money'},
   premio_whats:{t:'Whatsapp',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Whatsapp'},
   // a assiduidade zera no mês em que há falta lançada; afastado não recebe
   assiduidade:{t:'Assiduidade',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Assiduidade',fx:[['ff.assiduidade','Assiduidade R$','money']],
@@ -2107,6 +2124,51 @@ $('folGrid').addEventListener('click',async ev=>{
   delete FOL.aj[f.id+'|'+c];const td=b.closest('td');td.classList.remove('fadj');td.querySelector('input').value=folCelula(f,c).txt;b.remove();toast('Voltou ao valor calculado');
 });
 $('folGrid').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('.fin input'))ev.target.blur()});
+
+// RH › Premiação: o cliente preenche o valor do mês por colaborador; vira um lançamento da folha
+// (um por colaborador e coluna, trocado a cada salvamento). As colunas ficam em folha_modelo.premiacao,
+// como "coluna" ou ["coluna","nome na tela"] (ex.: ["adiantamento","Desconto"] na BJ).
+let PRM={cli:null,comp:null,func:[],lanc:[],aberta:true};
+function initPremio(){
+  if(!$('prMes').options.length){$('prMes').innerHTML=mesesOpts(addDias(TODAY,31).slice(0,7));$('prMes').value=TODAY.slice(0,7)}
+  renderPremio();
+}
+$('prMes').onchange=()=>renderPremio();
+async function renderPremio(){
+  const cli=cliAtual();PRM.cli=cli;
+  if(!cli){$('prTab').innerHTML='<tbody><tr><td class="l muted">Nenhuma empresa com premiação.</td></tr></tbody>';$('prBar').innerHTML='';$('prSalvar').hidden=true;return}
+  const comp=PRM.comp=$('prMes').value+'-01',defs=cli.folha_modelo.premiacao.map(x=>Array.isArray(x)?x:[x]).filter(x=>FCOL[x[0]]),cols=defs.map(x=>x[0]);
+  const rotulo=c=>defs.find(x=>x[0]===c)[1]||FCOL[c].nome||FCOL[c].t;
+  const [rf,rm,rl]=await Promise.all([sb.from('funcionarios').select('id,nome,situacao,desligado_em').eq('cliente_id',cli.id).order('nome'),
+    sb.from('folha_meses').select('status').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
+    sb.from('folha_lancamentos').select('*').eq('cliente_id',cli.id).eq('competencia',comp).in('coluna',cols)]);
+  const er=[rf,rm,rl].find(x=>x.error)?.error;
+  if(er){console.error(er);$('prTab').innerHTML='<tbody><tr><td class="l neg">Erro ao carregar. Verifique a internet e tente de novo.</td></tr></tbody>';return}
+  const st=rm.data?.status||'Aberta',pode=podeLancar(cli.id,'folha')&&(ehEsc()?st!=='Enviada':st==='Aberta');
+  PRM={...PRM,lanc:rl.data||[],aberta:pode,cols,func:(rf.data||[]).filter(f=>f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp)};
+  $('prBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':'Folha '+st.toLowerCase()}</span>${pode?'':'<span class="note">Os valores deste mês não podem mais ser alterados. Fale com o escritório se precisar mudar algo.</span>'}`;
+  const val=(f,c)=>{const ls=PRM.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c&&l.quantidade!=null);return ls.length?r2(ls.reduce((s,l)=>s+ +l.quantidade,0)):null};
+  $('prTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${cols.map(c=>`<th class="l">${esc(rotulo(c))} (R$)</th>`).join('')}</tr></thead><tbody>${
+    PRM.func.map(f=>`<tr><td class="l"><b>${esc(f.nome)}</b></td>${cols.map(c=>`<td><input class="money" data-pf="${f.id}" data-pc="${c}" value="${showMoney(val(f,c))}" data-ant="${showMoney(val(f,c))}" placeholder="0,00" style="max-width:140px"${pode?'':' disabled'}></td>`).join('')}</tr>`).join('')
+    ||`<tr><td class="l muted" colspan="${cols.length+1}">Nenhum colaborador cadastrado.</td></tr>`}</tbody>
+    <tfoot><tr><td class="l"><b>Total</b></td>${cols.map(c=>`<td><b data-pt="${c}"></b></td>`).join('')}</tr></tfoot>`;
+  prTotais();$('prSalvar').hidden=!pode;
+}
+function prTotais(){PRM.cols.forEach(c=>{const t=[...document.querySelectorAll(`#prTab [data-pc="${c}"]`)].reduce((s,i)=>s+(parseMoney(i.value)||0),0);const el=document.querySelector(`#prTab [data-pt="${c}"]`);if(el)el.textContent=fm(t)})}
+$('prTab').addEventListener('input',prTotais);
+$('prSalvar').onclick=async ev=>{
+  const mud=[...document.querySelectorAll('#prTab [data-pf]')].filter(i=>i.value.trim()!==i.dataset.ant);
+  for(const i of mud){const n=parseMoney(i.value);if(Number.isNaN(n)||n<0){toast('Valor inválido: '+i.value);i.focus();return}}
+  if(!mud.length){toast('Nada alterado');return}
+  const b=ev.target;b.disabled=true;
+  try{
+    for(const i of mud){const f=i.dataset.pf,c=i.dataset.pc,n=parseMoney(i.value);
+      const {error:e1}=await sb.from('folha_lancamentos').delete().eq('cliente_id',PRM.cli.id).eq('competencia',PRM.comp).eq('funcionario_id',f).eq('coluna',c);if(e1)throw e1;
+      if(n>0){const {error:e2}=await sb.from('folha_lancamentos').insert({cliente_id:PRM.cli.id,competencia:PRM.comp,funcionario_id:f,coluna:c,quantidade:n});if(e2)throw e2}}
+    toast('Premiação salva');renderPremio();
+  }catch(ex){console.error(ex);toast(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível salvar. Verifique a internet e tente de novo.')}
+  finally{b.disabled=false}
+};
 
 // Descontos parcelados (vale de atendimentos, adiantamento): cada parcela tem o mês e o valor
 const ymTxt=ym=>`${MESES[+ym.slice(5,7)-1].slice(0,3).toLowerCase()}/${ym.slice(2,4)}`;
