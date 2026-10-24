@@ -323,6 +323,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <button role="tab" aria-selected="true" data-tab="cadastro">Empresas e usuários</button>
       <button role="tab" aria-selected="false" data-tab="mapa">Mapeamento Bom Controle</button>
       <button role="tab" aria-selected="false" data-tab="cats">Categorias</button>
+      <button role="tab" aria-selected="false" data-tab="fbc">Fornecedores</button>
     </div>
     <div id="tabCadastro">
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -353,6 +354,15 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
         <h2>Mapeamento para o Bom Controle</h2>
         <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para o caixa e a tesouraria. Nas contas a pagar vale o banco informado no pagamento.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCfg"></table></div>
+      </div>
+    </div>
+    <div id="tabFbc" hidden>
+      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
+        <h2>Fornecedores do Bom Controle</h2>
+        <p class="note" style="margin:0">Importe a planilha de fornecedores exportada do Bom Controle. Na conferência, cada lançamento é ligado a um fornecedor daqui, e a exportação usa o nome e o CNPJ/CPF exatamente como estão no Bom Controle. Importar de novo atualiza a lista.</p>
+        <div class="row"><span class="btn small primary fotobtn">Importar planilha de fornecedores<input type="file" id="fbcFile" accept=".xls,.xlsx,.csv" aria-label="Importar planilha de fornecedores"></span><span class="note" id="fbcTotal"></span></div>
+        <input id="fbcBusca" placeholder="Buscar por nome ou CNPJ/CPF" style="max-width:360px">
+        <div class="tablebox" style="margin:0;max-height:420px;overflow:auto"><table class="cfg" id="tbFbc"></table></div>
       </div>
     </div>
     <div id="tabCats" hidden>
@@ -764,8 +774,8 @@ function initEsc(){
 escMes.onchange=()=>renderPainel();
 document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
 function renderCfg(){
-  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';
-  if(tabCfg==='cadastro')renderCadastro();else if(tabCfg==='cats')renderCats();else renderMapa();
+  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';$('tabFbc').hidden=tabCfg!=='fbc';
+  if(tabCfg==='cadastro')renderCadastro();else if(tabCfg==='cats')renderCats();else if(tabCfg==='fbc')renderFbc();else renderMapa();
 }
 async function loadPeriodo(ini,fim){
   const {data,error}=await sb.from('fechamentos').select('*, saidas(*), anexos(*), conferencias(*)').eq('cliente_id',escCli.value).gte('data',ini).lte('data',fim).order('data');
@@ -878,7 +888,9 @@ async function exportRows(){
   const cli=cliAtual(),orig=exOrig.value,out=[];
   if(MODCAT.includes(orig))await loadCats();
   // só entra o que o escritório já confirmou a categoria; o resto vai para o quadro de confirmação
-  const pend=[],conf=r=>{if(r.categoria_ok)return true;pend.push(r);return false};
+  await loadFbc();
+  const pend=[],conf=r=>{if(r.categoria_ok&&(!FBC.lista.length||FBC.map[r.fornecedor_bc]))return true;pend.push(r);return false};
+  const fb=r=>{const x=FBC.map[r.fornecedor_bc];return x?{nome:x.razao_social,cnpj:x.documento||''}:{}};
   const catDe=r=>r.categoria;
   // com rateio sai uma linha por filial, com a filial no Departamento
   const pushRat=(lanc,data,r,f)=>{if(!Array.isArray(r.rateio)||!r.rateio.length)return push(lanc,data,r.valor,f);
@@ -887,7 +899,7 @@ async function exportRows(){
   // f: campos que mudam por lançamento (tipo, conta, nome, status, pagamento, documento, observação)
   const push=(lanc,data,valor,f)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
     const tipo=m.tipo||f.tipo||'',status=f.status||m.status||'';
-    out.push([tipo,f.conta||m.conta||'',m.cnpj||'',f.nome||m.nome||'',m.forma||'',f.cat||m.categoria||'',f.dep||m.departamento||'',status,data,f.pag!==undefined?f.pag:status==='Pago'?data:'',valor,tipo==='Receita'?'':f.obs||'',f.doc||'',data,'',m.etiqueta||'']);};
+    out.push([tipo,f.conta||m.conta||'',f.cnpj||m.cnpj||'',f.nome||m.nome||'',m.forma||'',f.cat||m.categoria||'',f.dep||m.departamento||'',status,data,f.pag!==undefined?f.pag:status==='Pago'?data:'',valor,tipo==='Receita'?'':f.obs||'',f.doc||'',data,'',m.etiqueta||'']);};
   if(orig==='caixa'){
     const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
     // tudo do caixa é dinheiro e vai na conta Tesouraria da empresa; nas receitas a observação fica em branco
@@ -900,13 +912,13 @@ async function exportRows(){
     });
   }else if(orig==='tesouraria'){
     (await loadMod('tesouraria','data')).filter(r=>r.tipo==='Despesa'&&conf(r)).forEach(r=>
-      pushRat('Tesouraria - Despesa',r.data,r,{tipo:'Despesa',cat:catDe(r),conta:contaTes,nome:r.descricao,doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
+      pushRat('Tesouraria - Despesa',r.data,r,{tipo:'Despesa',cat:catDe(r),conta:contaTes,nome:r.descricao,...fb(r),doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='pagar'){
     (await loadMod('contas_pagar','vencimento')).filter(conf).forEach(r=>
-      pushRat('Contas a pagar',r.vencimento,r,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
+      pushRat('Contas a pagar',r.vencimento,r,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,...fb(r),doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='cartao'){
     (await loadMod('cartao_notas','data')).filter(conf).forEach(r=>
-      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
+      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,...fb(r),doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
   }
   EXPEND=pend;
   return out;
@@ -936,6 +948,55 @@ $('btnBaixarBC').onclick=()=>{
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=HEAD.map(()=>({wch:18}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Importação');
   XLSX.writeFile(wb,`Bom Controle ${({caixa:'Caixa',tesouraria:'Tesouraria',pagar:'Contas a pagar',cartao:'Cartão'})[exOrig.value]} ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
+};
+
+// ---------- fornecedores do Bom Controle ----------
+// Cadastro importado do BC; cada lançamento confirmado guarda a chave (CNPJ/CPF só números, ou nome:razão)
+let FBC={lista:[],map:{},porNome:{},porRotulo:{},ok:false,carregado:false};
+const soNum=t=>String(t||'').replace(/\D/g,'');
+const fbcRotulo=x=>x.razao_social+(x.documento?' · '+x.documento:'')+(x.fantasia&&chave(x.fantasia)!==chave(x.razao_social)?' · '+x.fantasia:'');
+async function loadFbc(forca){
+  if(FBC.carregado&&!forca)return FBC;
+  const lista=[];let ok=true;
+  for(let i=0;;i+=1000){const {data,error}=await sb.from('fornecedores_bc').select('*').order('razao_social').range(i,i+999);if(error){ok=false;break}lista.push(...data);if(data.length<1000)break}
+  FBC={lista,map:{},porNome:{},porRotulo:{},ok,carregado:true};
+  lista.forEach(x=>{FBC.map[x.chave]=x;FBC.porRotulo[fbcRotulo(x)]=x.chave;
+    [x.razao_social,x.fantasia].filter(Boolean).forEach(n=>{const k=chave(n);(FBC.porNome[k]||=new Set()).add(x.chave)})});
+  const dl=$('fbcList');if(dl)dl.innerHTML=lista.map(x=>`<option value="${esc(fbcRotulo(x))}">`).join('');
+  return FBC;
+}
+// sugestão: o que o escritório já escolheu para esse fornecedor; senão o nome igual (só se for único)
+function sugerirFbc(r){
+  const k=chave(fornDe(r)),apr=PCAT.forn[k]?.fornecedor_bc;if(apr&&FBC.map[apr])return apr;
+  const doc=soNum(r.cnpj||'');if(doc&&FBC.map[doc])return doc;
+  const s=FBC.porNome[k];if(s)return s.size===1?[...s][0]:null;
+  // nome parecido: o que o cliente digitou está dentro do nome de um único fornecedor
+  if(k.length<4)return null;
+  const achou=new Set();for(const n in FBC.porNome)if(n.includes(k))FBC.porNome[n].forEach(x=>achou.add(x));
+  return achou.size===1?[...achou][0]:null;
+}
+async function renderFbc(){
+  await loadFbc(true);
+  $('fbcTotal').innerHTML=FBC.ok?`${FBC.lista.length} fornecedores cadastrados`:'<span class="neg">Rode a atualização v11 do banco no Supabase.</span>';
+  const q=chave($('fbcBusca').value),qd=soNum($('fbcBusca').value);
+  const rows=FBC.lista.filter(x=>!q||chave(x.razao_social+' '+(x.fantasia||'')).includes(q)||(qd&&soNum(x.documento).includes(qd)));
+  $('tbFbc').innerHTML=`<thead><tr><th class="l">Razão social</th><th class="l">Nome fantasia</th><th class="l">CNPJ/CPF</th><th class="l">Tipo</th><th class="l">Situação</th></tr></thead><tbody>${rows.slice(0,200).map(x=>`<tr><td class="l">${esc(x.razao_social)}</td><td class="l">${esc(x.fantasia||'')}</td><td class="l">${esc(x.documento||'—')}</td><td class="l">${esc(x.tipo||'')}</td><td class="l">${x.bloqueado?'<span class="chip c-bad">Bloqueado</span>':''}</td></tr>`).join('')||'<tr><td class="l muted" colspan="5">Nenhum fornecedor.</td></tr>'}</tbody>`+(rows.length>200?`<tfoot><tr><td colspan="5" class="l muted">Mostrando 200 de ${rows.length}. Use a busca.</td></tr></tfoot>`:'');
+}
+$('fbcBusca').oninput=()=>{clearTimeout(renderFbc.t);renderFbc.t=setTimeout(renderFbc,250)};
+$('fbcFile').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+    const col=(o,...ns)=>{for(const n of ns){const k=Object.keys(o).find(x=>chave(x).replace(/\s/g,'')===chave(n).replace(/\s/g,''));if(k&&String(o[k]).trim())return String(o[k]).trim()}return ''};
+    const out={};
+    rows.forEach(o=>{const razao=col(o,'Razão Social','Razao Social','Nome');if(!razao)return;const doc=col(o,'CNPJ /CPF','CNPJ/CPF','CNPJ','CPF');
+      const k=soNum(doc)||'nome:'+chave(razao);if(out[k])return;
+      out[k]={chave:k,documento:doc||null,razao_social:razao,fantasia:col(o,'Nome Fantasia')||null,tipo:col(o,'Tipo Pessoa (PJ/PF)','Tipo Pessoa')||null,bloqueado:/^sim$/i.test(col(o,'Bloqueado')),atualizado_em:new Date().toISOString()}});
+    const lista=Object.values(out);if(!lista.length){toast('Não achei a coluna Razão Social na planilha.');return}
+    $('fbcTotal').textContent=`Importando ${lista.length} fornecedores...`;
+    for(let i=0;i<lista.length;i+=500){const {error}=await sb.from('fornecedores_bc').upsert(lista.slice(i,i+500));if(error)throw error}
+    toast(lista.length+' fornecedores importados');renderFbc();
+  }catch(ex){fail(ex,'Não foi possível importar')}
 };
 
 // ---------- rateio entre filiais (contas a pagar e despesas da tesouraria) ----------
@@ -1004,8 +1065,8 @@ async function renderExConf(){
   EXDOCS={};const {data:dd}=await sb.from('documentos').select('*').in('registro_id',EXPEND.map(r=>r.id));(dd||[]).forEach(d=>(EXDOCS[d.registro_id]||=[]).push(d));
   const dk=exOrig.value==='pagar'?'vencimento':'data';
   box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
-    <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
-      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
+    <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">No Bom Controle</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
+      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
     <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
@@ -1027,9 +1088,13 @@ async function abrirCC(i){
       return `<label class="f${tp==='sobre'?' wide':''}">${t}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v||'')}"></label>`}).join('')}</div>
     ${Array.isArray(r.rateio)&&r.rateio.length?`<p class="note" style="margin:0"><b>Rateio:</b> ${r.rateio.map(x=>esc(x.filial)+' '+fm(x.valor)).join(' · ')}</p>`:''}
     ${orig==='pagar'?`<p class="note" style="margin:0">${r.conferido?`Paga em ${dBR(r.pago_em||r.vencimento)}${r.banco?' pelo '+esc(r.banco):''}`:'Ainda não paga'}</p>`:''}
+    ${FBC.lista.length?(()=>{const k=r.fornecedor_bc&&FBC.map[r.fornecedor_bc]?r.fornecedor_bc:sugerirFbc(r),x=FBC.map[k];
+      return `<label class="f"><span>Fornecedor no Bom Controle ${x&&!r.fornecedor_bc?'<span class="chip c-warn">sugerido</span>':''}${x?.bloqueado?' <span class="chip c-bad">bloqueado no BC</span>':''}</span><input id="ccFbc" list="fbcList" value="${x?esc(fbcRotulo(x)):''}" placeholder="Digite o nome ou o CNPJ/CPF"></label>`})():''}
     <label class="f"><span>Categoria no Bom Controle ${sg&&!r.categoria?'<span class="chip c-warn">sugerida</span>':''}</span><input id="ccCat" list="catsListCC" value="${esc(sg)}" placeholder="Escolha do plano de contas"></label><datalist id="catsListCC">${catOpts()}</datalist>`;
   if(!dlgCC.open)dlgCC.showModal();
 }
+// lista de fornecedores do BC para escolher (uma só, reaproveitada em toda conferência)
+document.body.insertAdjacentHTML('beforeend','<datalist id="fbcList"></datalist>');
 $('ccFechar').onclick=()=>{dlgCC.close();renderExport()};
 $('ccPular').onclick=()=>abrirCC(CCI+1);
 $('ccOk').onclick=async()=>{
@@ -1039,20 +1104,24 @@ $('ccOk').onclick=async()=>{
   let m=!cat?'Escolha a categoria.':falta?'Preencha: '+falta[1]+'.':!(upd.valor>0)?'O valor precisa ser maior que zero.':'';
   if(!m&&Array.isArray(r.rateio)&&r.rateio.length&&Math.abs(r2(upd.valor)-r2(r.rateio.reduce((a,x)=>a+x.valor,0)))>=0.005)m='O valor mudou e não bate mais com o rateio. Ajuste o rateio no lançamento.';
   if(m){err.textContent=m;err.hidden=false;return}
+  let fbc=null;
+  if(FBC.lista.length){fbc=FBC.porRotulo[$('ccFbc').value.trim()];if(!fbc){err.textContent='Escolha o fornecedor na lista do Bom Controle. Se ele não existir, cadastre no Bom Controle e importe a lista de novo.';err.hidden=false;return}upd.fornecedor_bc=fbc}
   upd.valor=r2(upd.valor);upd.categoria=cat;upd.categoria_ok=true;
   $('ccOk').disabled=true;
   const {error}=await sb.from(TABCAT[orig]).update(upd).eq('id',r.id);
   $('ccOk').disabled=false;
   if(error){fail(error);return}
-  await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat);toast('Confirmado');
+  await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat,fbc);toast('Confirmado');
   EXPEND.splice(CCI,1);abrirCC(CCI);
 };
 async function confirmarCat(tr){
   const r=EXPEND.find(x=>x.id===tr.dataset.id),cat=tr.querySelector('input').value.trim();
   if(!cat){toast('Escolha a categoria de '+fornDe(r)+'.');return false}
-  const {error}=await sb.from(TABCAT[exOrig.value]).update({categoria:cat,categoria_ok:true}).eq('id',r.id);
+  const fbc=r.fornecedor_bc&&FBC.map[r.fornecedor_bc]?r.fornecedor_bc:sugerirFbc(r);
+  if(FBC.lista.length&&!fbc){toast('Use “Conferir” para escolher o fornecedor do Bom Controle de '+fornDe(r)+'.');return false}
+  const {error}=await sb.from(TABCAT[exOrig.value]).update({categoria:cat,categoria_ok:true,fornecedor_bc:fbc||null}).eq('id',r.id);
   if(error){fail(error);return false}
-  await aprenderCat(fornDe(r),cat);return true;
+  await aprenderCat(fornDe(r),cat,fbc);return true;
 }
 $('exConf').addEventListener('click',async e=>{
   if(e.target.closest('[data-cc]'))return abrirCC(EXPEND.findIndex(r=>r.id===e.target.closest('tr').dataset.id));
@@ -1074,10 +1143,11 @@ function sugerirCat(fornecedor,texto){
   const r=PCAT.regras.find(x=>chave(x.palavra)&&t.includes(chave(x.palavra)));
   return r?r.categoria:'';
 }
-async function aprenderCat(fornecedor,categoria){
+async function aprenderCat(fornecedor,categoria,fbc){
   const k=chave(fornecedor);if(!k||!categoria||!PCAT.ok)return;
-  const {error}=await sb.from('fornecedor_categoria').upsert({fornecedor_chave:k,fornecedor:fornecedor.trim(),categoria,atualizado_em:new Date().toISOString()});
-  if(error)console.warn(error);else PCAT.forn[k]={fornecedor_chave:k,fornecedor,categoria};
+  const row={fornecedor_chave:k,fornecedor:fornecedor.trim(),categoria,atualizado_em:new Date().toISOString()};if(fbc)row.fornecedor_bc=fbc;
+  const {error}=await sb.from('fornecedor_categoria').upsert(row);
+  if(error)console.warn(error);else PCAT.forn[k]={...PCAT.forn[k],...row};
 }
 async function renderCats(){
   await loadCats();
