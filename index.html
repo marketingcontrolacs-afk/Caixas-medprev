@@ -429,7 +429,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewFolha" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Folha de pagamento</h1><p class="sub" id="folSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folPonto">Importar espelho de ponto</button><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
@@ -2008,10 +2008,11 @@ async function renderFolha(){
   // cada empresa tem a sua planilha de folha: sem o modelo configurado, não usa um modelo genérico
   if(!cli.folha_colunas?.length){
     vazio([e?'Esta empresa ainda não tem o modelo da planilha de folha. Envie a planilha da empresa para configurarmos, ou marque as colunas em “Colunas da planilha desta empresa”, abaixo.':'A folha desta empresa ainda está sendo configurada pelo escritório.']);
-    $('folAdd').hidden=$('folRescAdd').hidden=true;$('folRescBaixar').hidden=true;$('folParcBox').hidden=true;if(e){renderFolCad();renderFolCols()}return;
+    $('folAdd').hidden=$('folRescAdd').hidden=$('folPonto').hidden=true;$('folRescBaixar').hidden=true;$('folParcBox').hidden=true;if(e){renderFolCad();renderFolCols()}return;
   }
   const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
   $('folAdd').hidden=$('folRescAdd').hidden=!lanca;
+  $('folPonto').hidden=!lanca||!cols.some(c=>PONTO_COLS.some(x=>x[0]===c));
   // barra de situação do mês
   $('folBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':st}</span>`
     +(FOL.mes?.conferido_em?`<span class="note">Conferida em ${dBR(FOL.mes.conferido_em.slice(0,10))}</span>`:'')
@@ -2107,6 +2108,86 @@ async function salvarLanc(b,outro){
   renderFolha();
 }
 FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
+
+// Importar espelho de ponto (Excel ou CSV de qualquer sistema de ponto): o usuário diz qual coluna é o quê,
+// o sistema liga os nomes aos colaboradores e lança faltas (dia com DSR, horas sem DSR) e horas extras.
+// Importar de novo no mesmo mês troca a importação anterior (lançamentos com a descrição PONTO).
+const PONTO='Espelho de ponto';
+const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras/],
+  ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
+const normNome=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean);
+function achaFunc(nome,fs){
+  const t=normNome(nome);if(!t.length)return null;
+  const cobre=(a,b)=>a.every(x=>b.some(y=>y.startsWith(x)));
+  let c=fs.filter(f=>{const w=normNome(f.nome);return cobre(t,w)||cobre(w,t)});
+  if(c.length>1)c=c.filter(f=>normNome(f.nome)[0]===t[0]);
+  return c.length===1?c[0]:null;
+}
+let PNT=null;
+$('folPonto').onclick=()=>{
+  PNT={cols:PONTO_COLS.filter(x=>colsDe(FOL.cli).includes(x[0]))};
+  folDlg(`Importar espelho de ponto · ${MESES[+folMes.value.slice(5)-1]} ${folMes.value.slice(0,4)}`,
+    `<p class="note" style="margin-top:0">Exporte o espelho do sistema de ponto em Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
+    <label class="f">Arquivo<input type="file" id="pnArq" accept=".xlsx,.xls,.csv"></label><div id="pnMap"></div><div id="pnPrev"></div>`,
+    '<button type="button" class="btn primary" data-fo="pontoLanca" id="pnOk" hidden>Lançar na folha</button>');
+  $('pnArq').onchange=async()=>{const f=$('pnArq').files[0];if(!f)return;
+    try{PNT.wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});pontoAba(PNT.wb.SheetNames[0])}
+    catch(ex){console.error(ex);foErro('Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
+};
+function pontoAba(aba){
+  const ws=PNT.wb.Sheets[aba];PNT.aba=aba;
+  PNT.raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});PNT.txt=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+  // cabeçalho: a primeira linha com o nome do colaborador, ou a primeira com 3 textos
+  const txt=r=>r.filter(v=>typeof v==='string'&&v.trim()).length;
+  let h=PNT.txt.findIndex(r=>txt(r)>=2&&r.some(v=>/nome|funcion|colab|empreg/i.test(v)));if(h<0)h=PNT.txt.findIndex(r=>txt(r)>=3);if(h<0)h=0;
+  PNT.h=h;const cab=PNT.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`);
+  const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],...PNT.cols];
+  const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
+  const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
+  $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
+    <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>`;
+  if($('pnAba'))$('pnAba').onchange=()=>pontoAba($('pnAba').value);
+  $('pnMap').querySelectorAll('[data-pn]').forEach(s=>s.onchange=pontoPrev);pontoPrev();
+}
+const pontoData=v=>{if(v instanceof Date)return isoLocal(v);const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(!m)return null;const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${pad(m[2])}-${pad(m[1])}`};
+const pontoDias=v=>{const s=String(v||'').trim();if(!s||/^0+([.,]0+)?$|^0?0:00$/.test(s))return 0;if(/^\d+([.,]\d+)?$/.test(s))return +s.replace(',','.');return /:/.test(s)?0:1};
+function pontoPrev(){
+  const m={};$('pnMap').querySelectorAll('[data-pn]').forEach(s=>m[s.dataset.pn]=+s.value);PNT.m=m;
+  if(m.nome<0){$('pnPrev').innerHTML='<p class="note">Escolha a coluna com o nome do colaborador.</p>';$('pnOk').hidden=true;return}
+  const fs=folDoMes(),por=new Map();let ultimo='';
+  for(let r=PNT.h+1;r<PNT.txt.length;r++){
+    const tx=PNT.txt[r],rw=PNT.raw[r];let nome=String(tx[m.nome]||'').trim();
+    // espelho por dia costuma trazer o nome só na primeira linha do colaborador
+    if(!nome&&m.data>=0&&pontoData(rw[m.data]))nome=ultimo;if(!nome||/^total/i.test(nome))continue;ultimo=nome;
+    const g=por.get(nome)||{nome,f:achaFunc(nome,fs),v:{},dias:[]};
+    PNT.cols.forEach(([k])=>{if(m[k]<0)return;
+      if(k==='faltas_dias'){const n=pontoDias(tx[m.faltas_dias]);if(n)g.dias.push({n,data:m.data>=0?pontoData(rw[m.data]):null})}
+      else{const mi=lerHoras(String(tx[m[k]]||'').replace(/^-/,''));if(isFinite(mi)&&mi>0)g.v[k]=(g.v[k]||0)+mi}});
+    por.set(nome,g);
+  }
+  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length);
+  const usa=PNT.cols.filter(([k])=>m[k]>=0);
+  $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>${
+    PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
+      usa.map(([k])=>`<td>${k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}</tr>`).join('')
+    ||`<tr><td class="l muted" colspan="${usa.length+2}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
+    <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
+  $('pnOk').hidden=!PNT.g.length;
+}
+FOLACAO.pontoLanca=async b=>{
+  const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO};
+  document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
+    g.dias.forEach(d=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:d.data&&d.data.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d.data<=fimMes(FOL.comp)?d.data:null,texto:'dsr'}));
+    Object.entries(g.v).forEach(([k,mi])=>regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)}))});
+  if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
+  b.disabled=true;
+  try{
+    const {error:e1}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);if(e1)throw e1;
+    const {error:e2}=await sb.from('folha_lancamentos').insert(regs);if(e2)throw e2;
+    dlgFol.close();toast(`Espelho de ponto lançado: ${regs.length} lançamentos`);renderFolha();
+  }catch(ex){console.error(ex);foErro(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
+  finally{b.disabled=false}
+};
 
 // Edição direta das células (escritório): o valor vale só para este mês e fica guardado como ajuste.
 // Os fixos do cadastro continuam iguais; para mudar de vez, use “Colaboradores e valores fixos”.
@@ -2368,7 +2449,7 @@ function baixarFolha(){
   fs.forEach((f,i)=>{put(d0+i,0,txt(f.nome));if(comCargo)put(d0+i,1,celXL(f.cargo));cols.forEach((c,j)=>{const x=folCelula(f,c),cel=celXL(x.v,x.z);if(cel&&x.f&&!x.aj)cel.f=x.f;put(d0+i,L+j,cel)})});
   let r=d0+fs.length;
   // notas: o que foi descrito nos lançamentos (ex.: motivo dos descontos diversos)
-  const notas=FOL.lanc.filter(l=>l.descricao&&cols.includes(l.coluna)&&fs.some(f=>f.id===l.funcionario_id))
+  const notas=FOL.lanc.filter(l=>l.descricao&&l.descricao!==PONTO&&cols.includes(l.coluna)&&fs.some(f=>f.id===l.funcionario_id))
     .map(l=>`*${FCOL[l.coluna].t} · ${FOL.func.find(f=>f.id===l.funcionario_id).nome}: ${l.descricao}`);
   if(notas.length){r+=2;notas.forEach(t=>put(r++,1,txt(t)))}
   // férias que começam no mês (como no fim da planilha da empresa)
