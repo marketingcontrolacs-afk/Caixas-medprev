@@ -239,14 +239,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <!-- CAIXA: CONFERÊNCIA / CONSULTA -->
   <section id="viewEsc" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1 id="escTitle">Conferência de caixa</h1><p class="sub" id="escSub">Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.</p></div>
+      <div><h1 id="escTitle">Conferência de caixa</h1><p class="sub" id="escSub">Acompanhe os fechamentos e confira os dias.</p></div>
       <label class="f">Mês<select id="escMes"></select></label>
     </div>
-    <div class="tabs" role="tablist" id="tabsEsc">
-      <button role="tab" aria-selected="true" data-tab="painel">Dias do mês</button>
-      <button role="tab" aria-selected="false" data-tab="export" data-esc="1">Exportar Bom Controle</button>
-    </div>
-
     <div id="tabPainel">
       <div class="tiles" id="tiles"></div>
       <div class="toolbar"><span class="spacer"></span><button class="btn" id="btnPlanMes">Baixar planilha do mês</button></div>
@@ -259,18 +254,6 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <p class="note" id="painelNote">Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.</p>
     </div>
 
-    <div id="tabExport" hidden>
-      <div class="toolbar">
-        <label class="f">De<input type="date" id="exIni"></label>
-        <label class="f">Até<input type="date" id="exFim"></label>
-        <label style="display:flex;align-items:center;gap:8px;padding-bottom:10px;font-weight:600;font-size:14px"><input type="checkbox" id="exSoConf" style="width:auto"> Só dias conferidos</label>
-        <span class="spacer"></span>
-        <button class="btn" id="btnCopiar">Copiar linhas</button>
-        <button class="btn primary" id="btnBaixarBC">Baixar planilha do Bom Controle</button>
-      </div>
-      <p class="note" id="exInfo"></p>
-      <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
-    </div>
   </section>
 
   <!-- CONTAS A PAGAR / CARTÃO / TESOURARIA -->
@@ -282,6 +265,30 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="tiles" id="mTiles"></div>
     <div class="card tablebox"><table><thead id="mHead"></thead><tbody id="mBody"></tbody><tfoot id="mFoot"></tfoot></table></div>
     <p class="note" id="mNote"></p>
+  </section>
+
+  <!-- EXPORTAÇÃO BOM CONTROLE (escritório) -->
+  <section id="viewBC" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Exportação Bom Controle</h1><p class="sub" id="exSub">Escolha a origem e o período e baixe a planilha de importação do Bom Controle.</p></div>
+      <label class="f">Mês<select id="exMes"></select></label>
+    </div>
+    <div class="toolbar">
+      <label class="f">Origem<select id="exOrig">
+        <option value="caixa">Caixa</option>
+        <option value="tesouraria">Tesouraria</option>
+        <option value="pagar">Banco · Contas a pagar</option>
+        <option value="cartao">Cartão de crédito</option>
+      </select></label>
+      <label class="f">De<input type="date" id="exIni"></label>
+      <label class="f">Até<input type="date" id="exFim"></label>
+      <label style="display:flex;align-items:center;gap:8px;padding-bottom:10px;font-weight:600;font-size:14px"><input type="checkbox" id="exSoConf" style="width:auto"> <span id="exSoTxt">Só conferidos</span></label>
+      <span class="spacer"></span>
+      <button class="btn" id="btnCopiar">Copiar linhas</button>
+      <button class="btn primary" id="btnBaixarBC">Baixar planilha do Bom Controle</button>
+    </div>
+    <p class="note" id="exInfo"></p>
+    <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
   </section>
 
   <!-- CONFIGURAÇÕES (escritório) -->
@@ -318,7 +325,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div id="tabMapa" hidden>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Mapeamento para o Bom Controle</h2>
-        <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para todos os lançamentos do caixa.</p>
+        <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para o caixa e a tesouraria. Nas contas a pagar vale o banco informado no pagamento.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCfg"></table></div>
       </div>
     </div>
@@ -451,6 +458,7 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
+  bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
@@ -459,6 +467,7 @@ const NAV=[
   {k:'tesouraria',t:'Tesouraria',g:'Financeiro',ok:()=>temAcesso('tesouraria')},
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
+  {k:'bc',t:'Exportação Bom Controle',g:'Escritório',ok:ehEsc},
   {k:'cfg',t:'Configurações',g:'Escritório',ok:ehEsc},
 ];
 function renderNav(){
@@ -488,7 +497,7 @@ escCli.onchange=()=>openView();
 function go(v){VIEW=v;renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewBC'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   if(VIEW==='caixa'){
     if(cli&&!ehEsc()&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
@@ -496,6 +505,7 @@ function openView(){
   }else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
   else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
+  else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
 }
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);
@@ -664,7 +674,7 @@ $('opData').addEventListener('change',()=>{if($('opData').value)loadDay()});
 // =====================================================================
 // ESCRITÓRIO
 // =====================================================================
-let tab='painel', tabCfg='cadastro', MES=[], MAPA=[];
+let tabCfg='cadastro', MES=[], MAPA=[];
 const escMes=$('escMes');
 function mesesOpts(ate){
   const y=+TODAY.slice(0,4),opts=[];
@@ -672,23 +682,16 @@ function mesesOpts(ate){
   return opts.slice(0,26).join('');
 }
 function initEsc(){
-  if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7);syncExportDates()}
+  if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7)}
   const e=ehEsc();
   $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
-  $('escSub').textContent=e?'Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
+  $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. A importação do Bom Controle fica em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
   $('painelNote').textContent=e?'Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.':'Clique num dia para ver os detalhes e os comprovantes.';
-  document.querySelectorAll('#tabsEsc [data-esc]').forEach(b=>b.hidden=!e);
-  if(!e)tab='painel';
   $('dConf').hidden=!e;
-  renderEsc();
+  renderPainel();
 }
-escMes.onchange=()=>{syncExportDates();renderEsc()};
-document.querySelectorAll('#tabsEsc button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('#tabsEsc button').forEach(x=>x.setAttribute('aria-selected',x===b));renderEsc()});
+escMes.onchange=()=>renderPainel();
 document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
-function renderEsc(){
-  $('tabPainel').hidden=tab!=='painel';$('tabExport').hidden=tab!=='export';
-  if(tab==='painel')renderPainel();if(tab==='export')renderExport();
-}
 function renderCfg(){
   $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';
   if(tabCfg==='cadastro')renderCadastro();else renderMapa();
@@ -768,34 +771,77 @@ $('btnPlanMes').onclick=()=>{
 
 // ---------- exportação Bom Controle ----------
 const HEAD=["Tipo(Despesa/Receita)","Conta Bancária","CNPJ/CPF","Nome do Cliente/Fornecedor","Forma de Pagamento","Categoria Financeira","Departamento","Status Movimentação(Em aberto/Pago)","Data Vencimento","Data Pagamento","Valor (R$)","Observação","Nº Documento","Data Competência","Valor Conciliado (R$)","Etiqueta"];
-const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf');
-function syncExportDates(){const [a,b]=monthRange(escMes.value);exIni.value=a;exFim.value=b}
+const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf'),exMes=$('exMes'),exOrig=$('exOrig');
+// origens da importação: o texto da caixinha de filtro e o aviso de cada uma
+const EXORIG={
+  caixa:{so:'Só dias conferidos',nota:'Débito e crédito ficam fora por enquanto'},
+  tesouraria:{so:'Só lançamentos conferidos',nota:'Só as despesas: os suprimentos vêm do caixa e já entram na exportação do caixa'},
+  pagar:{so:'Só contas pagas',nota:'Contas pelo vencimento. A conta bancária é o banco informado no pagamento'},
+  cartao:{so:'Só notas conferidas com a fatura',nota:'Uma linha por nota, pela data da compra. As parcelas vão na observação'}
+};
+function syncExportDates(){const [a,b]=monthRange(exMes.value);exIni.value=a;exFim.value=b}
+function initExport(){
+  if(!exMes.options.length){exMes.innerHTML=mesesOpts(TODAY.slice(0,7));exMes.value=TODAY.slice(0,7);syncExportDates()}
+  renderExport();
+}
+exMes.onchange=()=>{syncExportDates();renderExport()};
+exOrig.onchange=()=>{$('exSoTxt').textContent=EXORIG[exOrig.value].so;renderExport()};
 [exIni,exFim,exSo].forEach(el=>el.onchange=renderExport);
 async function loadMapa(){const {data}=await sb.from('mapeamento_bc').select('*');MAPA=data||[];return MAPA}
 let lastRows=[];
-async function exportRows(){
-  const mp=Object.fromEntries((await loadMapa()).map(m=>[m.lancamento,m]));
-  const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
+// registros de tesouraria, contas a pagar ou cartão da empresa no período
+async function loadMod(tabela,dataK){
   const out=[];
-  const push=(lanc,data,valor,obs,doc,nome)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
+  for(let i=0;;i+=1000){
+    let q=sb.from(tabela).select('*').eq('cliente_id',escCli.value).gte(dataK,exIni.value).lte(dataK,exFim.value);
+    if(exSo.checked)q=q.eq('conferido',true);
+    const {data,error}=await q.order(dataK).order('id').range(i,i+999);
+    if(error){fail(error,'Erro ao carregar');break}
+    out.push(...data);if(data.length<1000)break;
+  }
+  return out;
+}
+async function exportRows(){
+  if(!escCli.value)return [];
+  const mp=Object.fromEntries((await loadMapa()).map(m=>[m.lancamento,m]));
+  const cli=cliAtual(),orig=exOrig.value,out=[];
+  const contaTes=cli?.conta_tesouraria_bc||'';
+  // f: campos que mudam por lançamento (tipo, conta, nome, status, pagamento, documento, observação)
+  const push=(lanc,data,valor,f)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
+    const tipo=m.tipo||f.tipo||'',status=f.status||m.status||'';
+    out.push([tipo,f.conta||m.conta||'',m.cnpj||'',f.nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',status,data,f.pag!==undefined?f.pag:status==='Pago'?data:'',valor,tipo==='Receita'?'':f.obs||'',f.doc||'',data,'',m.etiqueta||'']);};
+  if(orig==='caixa'){
+    const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
     // tudo do caixa é dinheiro e vai na conta Tesouraria da empresa; nas receitas a observação fica em branco
-    out.push([m.tipo||'',conta||m.conta||'',m.cnpj||'',nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',m.status||'',data,m.status==='Pago'?data:'',valor,m.tipo==='Receita'?'':obs,doc||'',data,'',m.etiqueta||'']);};
-  const conta=cliAtual()?.conta_tesouraria_bc||'';
-  dias.forEach(d=>{const c=calc(d);const br=dBR(d.data);const o=x=>`Caixa ${br} - ${x}`+(d.obs?' | '+d.obs:'');
-    push('Venda em dinheiro',d.data,d.din_sis,o('Venda em dinheiro'));
-    // débito e crédito ficam fora por enquanto: na Tesouraria só entra dinheiro (falta conciliar com o relatório da adquirente)
-    push('Falta de caixa',d.data,Math.max(-c.fs,0),o('Falta de caixa'));
-    push('Sobra de caixa',d.data,Math.max(c.fs,0),o('Sobra de caixa'));
-    d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),s.tipo==='Repasse'?'':s.guia,s.tipo==='Repasse'?s.parceiro:''));
-  });
+    dias.forEach(d=>{const c=calc(d);const br=dBR(d.data);const o=x=>`Caixa ${br} - ${x}`+(d.obs?' | '+d.obs:'');
+      push('Venda em dinheiro',d.data,d.din_sis,{conta:contaTes,obs:o('Venda em dinheiro')});
+      // débito e crédito ficam fora por enquanto: na Tesouraria só entra dinheiro (falta conciliar com o relatório da adquirente)
+      push('Falta de caixa',d.data,Math.max(-c.fs,0),{conta:contaTes,obs:o('Falta de caixa')});
+      push('Sobra de caixa',d.data,Math.max(c.fs,0),{conta:contaTes,obs:o('Sobra de caixa')});
+      d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,{conta:contaTes,obs:`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),doc:s.tipo==='Repasse'?'':s.guia,nome:s.tipo==='Repasse'?s.parceiro:''}));
+    });
+  }else if(orig==='tesouraria'){
+    (await loadMod('tesouraria','data')).filter(r=>r.tipo==='Despesa').forEach(r=>
+      push('Tesouraria - Despesa',r.data,r.valor,{tipo:'Despesa',conta:contaTes,nome:r.descricao,doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
+  }else if(orig==='pagar'){
+    (await loadMod('contas_pagar','vencimento')).forEach(r=>
+      push('Contas a pagar',r.vencimento,r.valor,{tipo:'Despesa',conta:r.banco,nome:r.fornecedor,doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
+  }else if(orig==='cartao'){
+    (await loadMod('cartao_notas','data')).forEach(r=>
+      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',nome:r.fornecedor,doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
+  }
   return out;
 }
 async function renderExport(){
-  lastRows=await exportRows();
-  const rec=lastRows.filter(r=>r[0]==='Receita').reduce((a,r)=>a+r[10],0),des=lastRows.filter(r=>r[0]==='Despesa').reduce((a,r)=>a+r[10],0);
-  const sem=lastRows.filter(r=>!r[0]||!r[1]||!r[5]).length;
-  const semConta=!cliAtual()?.conta_tesouraria_bc;
-  $('exInfo').innerHTML=`${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · Débito e crédito ficam fora por enquanto`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete a aba Mapeamento</span>`:'');
+  const orig=exOrig.value;
+  if(orig!=='caixa'&&!window.V2){lastRows=[];$('exInfo').innerHTML='<span class="neg">Esta origem precisa da atualização v2 do banco. Rode o SQL no Supabase.</span>'}
+  else{
+    lastRows=await exportRows();
+    const rec=lastRows.filter(r=>r[0]==='Receita').reduce((a,r)=>a+r[10],0),des=lastRows.filter(r=>r[0]==='Despesa').reduce((a,r)=>a+r[10],0);
+    const sem=lastRows.filter(r=>!r[0]||!r[1]||!r[5]).length;
+    const semConta=(orig==='caixa'||orig==='tesouraria')&&escCli.value&&!cliAtual()?.conta_tesouraria_bc;
+    $('exInfo').innerHTML=`${esc(cliAtual()?.nome||'')} · ${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · ${EXORIG[orig].nota}`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete em Configurações › Mapeamento Bom Controle${orig==='pagar'?' ou informe o banco no pagamento':''}</span>`:'');
+  }
   $('tbExp').innerHTML=`<thead><tr>${HEAD.map(h=>`<th class="l">${h}</th>`).join('')}</tr></thead><tbody>${
     lastRows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===10?'':'l'}">${i===10?showMoney(v):[8,9,13].includes(i)&&v?dBR(v):esc(v)}</td>`).join('')}</tr>`).join('')||'<tr><td class="l muted" colspan="16">Nenhum lançamento no período.</td></tr>'}</tbody>`;
   $('btnCopiar').disabled=$('btnBaixarBC').disabled=!lastRows.length;
@@ -808,7 +854,7 @@ $('btnBaixarBC').onclick=()=>{
   const aoa=[HEAD,...lastRows.map(r=>r.map((v,i)=>[8,9,13].includes(i)&&v?dObj(v):v))];
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=HEAD.map(()=>({wch:18}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Importação');
-  XLSX.writeFile(wb,`Bom Controle ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
+  XLSX.writeFile(wb,`Bom Controle ${({caixa:'Caixa',tesouraria:'Tesouraria',pagar:'Contas a pagar',cartao:'Cartão'})[exOrig.value]} ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
 };
 
 // ---------- cadastros ----------
