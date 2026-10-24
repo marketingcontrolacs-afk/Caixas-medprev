@@ -315,6 +315,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="tabs" role="tablist" id="tabsCfg">
       <button role="tab" aria-selected="true" data-tab="cadastro">Empresas e usuários</button>
       <button role="tab" aria-selected="false" data-tab="mapa">Mapeamento Bom Controle</button>
+      <button role="tab" aria-selected="false" data-tab="cats">Categorias</button>
     </div>
     <div id="tabCadastro">
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -346,6 +347,28 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
         <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para o caixa e a tesouraria. Nas contas a pagar vale o banco informado no pagamento.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCfg"></table></div>
       </div>
+    </div>
+    <div id="tabCats" hidden>
+      <p class="note" id="catAviso" style="margin:16px 0 0"></p>
+      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
+        <h2>Plano de contas</h2>
+        <p class="note" style="margin:0">Categorias do Bom Controle, com os nomes exatamente iguais. Cole uma categoria por linha (pode copiar a coluna do Excel). As que já existem são mantidas.</p>
+        <textarea id="catCola" rows="4" placeholder="Energia elétrica&#10;Aluguel&#10;Material de escritório"></textarea>
+        <div class="row"><button class="btn small primary" id="catImport">Adicionar categorias</button><span class="note" id="catTotal"></span></div>
+        <div class="tablebox" style="margin:0;max-height:260px;overflow:auto"><table class="cfg" id="tbPlano"></table></div>
+      </div>
+      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
+        <h2>Regras por palavra</h2>
+        <p class="note" style="margin:0">Se o fornecedor ou a observação da conta tiver a palavra, a categoria é sugerida. O fornecedor já aprendido vale antes das regras.</p>
+        <form class="row" id="formRegra" style="align-items:flex-end"><label class="f">Palavra<input id="rgPalavra" placeholder="Ex.: celesc"></label><label class="f">Categoria<input id="rgCat" list="catsList"></label><button class="btn small primary" type="submit">Adicionar regra</button></form>
+        <div class="tablebox" style="margin:0"><table class="cfg" id="tbRegras"></table></div>
+      </div>
+      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
+        <h2>Fornecedores aprendidos</h2>
+        <p class="note" style="margin:0">Cada vez que o escritório salva uma conta a pagar ou nota do cartão com categoria, o sistema guarda a categoria daquele fornecedor e usa nas próximas.</p>
+        <div class="tablebox" style="margin:0;max-height:320px;overflow:auto"><table class="cfg" id="tbForn"></table></div>
+      </div>
+      <datalist id="catsList"></datalist>
     </div>
   </section>
 
@@ -729,8 +752,8 @@ function initEsc(){
 escMes.onchange=()=>renderPainel();
 document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
 function renderCfg(){
-  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';
-  if(tabCfg==='cadastro')renderCadastro();else renderMapa();
+  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';
+  if(tabCfg==='cadastro')renderCadastro();else if(tabCfg==='cats')renderCats();else renderMapa();
 }
 async function loadPeriodo(ini,fim){
   const {data,error}=await sb.from('fechamentos').select('*, saidas(*), anexos(*), conferencias(*)').eq('cliente_id',escCli.value).gte('data',ini).lte('data',fim).order('data');
@@ -841,11 +864,13 @@ async function exportRows(){
   if(!escCli.value)return [];
   const mp=Object.fromEntries((await loadMapa()).map(m=>[m.lancamento,m]));
   const cli=cliAtual(),orig=exOrig.value,out=[];
+  if(orig==='pagar'||orig==='cartao')await loadCats();
+  const catDe=r=>r.categoria||sugerirCat(r.fornecedor,r.obs);
   const contaTes=cli?.conta_tesouraria_bc||'';
   // f: campos que mudam por lançamento (tipo, conta, nome, status, pagamento, documento, observação)
   const push=(lanc,data,valor,f)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
     const tipo=m.tipo||f.tipo||'',status=f.status||m.status||'';
-    out.push([tipo,f.conta||m.conta||'',m.cnpj||'',f.nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',status,data,f.pag!==undefined?f.pag:status==='Pago'?data:'',valor,tipo==='Receita'?'':f.obs||'',f.doc||'',data,'',m.etiqueta||'']);};
+    out.push([tipo,f.conta||m.conta||'',m.cnpj||'',f.nome||m.nome||'',m.forma||'',f.cat||m.categoria||'',m.departamento||'',status,data,f.pag!==undefined?f.pag:status==='Pago'?data:'',valor,tipo==='Receita'?'':f.obs||'',f.doc||'',data,'',m.etiqueta||'']);};
   if(orig==='caixa'){
     const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
     // tudo do caixa é dinheiro e vai na conta Tesouraria da empresa; nas receitas a observação fica em branco
@@ -861,10 +886,10 @@ async function exportRows(){
       push('Tesouraria - Despesa',r.data,r.valor,{tipo:'Despesa',conta:contaTes,nome:r.descricao,doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='pagar'){
     (await loadMod('contas_pagar','vencimento')).forEach(r=>
-      push('Contas a pagar',r.vencimento,r.valor,{tipo:'Despesa',conta:r.banco,nome:r.fornecedor,doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
+      push('Contas a pagar',r.vencimento,r.valor,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='cartao'){
     (await loadMod('cartao_notas','data')).forEach(r=>
-      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',nome:r.fornecedor,doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
+      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
   }
   return out;
 }
@@ -892,6 +917,55 @@ $('btnBaixarBC').onclick=()=>{
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Importação');
   XLSX.writeFile(wb,`Bom Controle ${({caixa:'Caixa',tesouraria:'Tesouraria',pagar:'Contas a pagar',cartao:'Cartão'})[exOrig.value]} ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
 };
+
+// ---------- categorias automáticas (contas a pagar e cartão) ----------
+// Ordem: categoria salva no lançamento > fornecedor aprendido > regra por palavra
+let PCAT={ok:false,plano:[],regras:[],forn:{}};
+const chave=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+async function loadCats(){
+  const [a,b,c]=await Promise.all([sb.from('plano_contas').select('*').order('categoria'),sb.from('categoria_regras').select('*').order('palavra'),sb.from('fornecedor_categoria').select('*').order('fornecedor')]);
+  PCAT={ok:!(a.error||b.error||c.error),plano:a.data||[],regras:b.data||[],forn:Object.fromEntries((c.data||[]).map(x=>[x.fornecedor_chave,x]))};
+  return PCAT;
+}
+function sugerirCat(fornecedor,texto){
+  const k=chave(fornecedor);if(k&&PCAT.forn[k])return PCAT.forn[k].categoria;
+  const t=' '+chave(fornecedor+' '+(texto||''))+' ';
+  const r=PCAT.regras.find(x=>chave(x.palavra)&&t.includes(chave(x.palavra)));
+  return r?r.categoria:'';
+}
+async function aprenderCat(fornecedor,categoria){
+  const k=chave(fornecedor);if(!k||!categoria||!PCAT.ok)return;
+  const {error}=await sb.from('fornecedor_categoria').upsert({fornecedor_chave:k,fornecedor:fornecedor.trim(),categoria,atualizado_em:new Date().toISOString()});
+  if(error)console.warn(error);else PCAT.forn[k]={fornecedor_chave:k,fornecedor,categoria};
+}
+async function renderCats(){
+  await loadCats();
+  $('catAviso').innerHTML=PCAT.ok?'':'<span class="neg">Rode a atualização v8 do banco no Supabase para usar as categorias.</span>';
+  $('catTotal').textContent=PCAT.plano.length+(PCAT.plano.length===1?' categoria':' categorias');
+  $('catsList').innerHTML=PCAT.plano.map(c=>`<option value="${esc(c.categoria)}">`).join('');
+  $('tbPlano').innerHTML=`<thead><tr><th class="l">Categoria</th><th class="l">Tipo</th><th></th></tr></thead><tbody>${PCAT.plano.map(c=>`<tr data-cat="${esc(c.categoria)}"><td class="l">${esc(c.categoria)}</td><td><select data-k="tipo"><option${c.tipo==='Despesa'?' selected':''}>Despesa</option><option${c.tipo==='Receita'?' selected':''}>Receita</option></select></td><td><button type="button" class="btn small ghost" data-del="plano">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">Nenhuma categoria ainda.</td></tr>'}</tbody>`;
+  $('tbRegras').innerHTML=`<thead><tr><th class="l">Palavra</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${PCAT.regras.map(r=>`<tr data-id="${r.id}"><td class="l">${esc(r.palavra)}</td><td class="l">${esc(r.categoria)}</td><td><button type="button" class="btn small ghost" data-del="regra">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">Nenhuma regra ainda.</td></tr>'}</tbody>`;
+  const fs=Object.values(PCAT.forn);
+  $('tbForn').innerHTML=`<thead><tr><th class="l">Fornecedor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${fs.map(f=>`<tr data-k="${esc(f.fornecedor_chave)}"><td class="l">${esc(f.fornecedor)}</td><td><input data-k="categoria" list="catsList" value="${esc(f.categoria)}"></td><td><button type="button" class="btn small ghost" data-del="forn">Esquecer</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">O sistema ainda não aprendeu nenhum fornecedor.</td></tr>'}</tbody>`;
+}
+$('catImport').onclick=async()=>{
+  const linhas=[...new Set($('catCola').value.split(/\r?\n/).map(l=>l.split('\t')[0].trim()).filter(Boolean))];
+  if(!linhas.length){toast('Cole as categorias, uma por linha.');return}
+  const {error}=await sb.from('plano_contas').upsert(linhas.map(c=>({categoria:c})),{onConflict:'categoria',ignoreDuplicates:true});
+  if(error){fail(error);return}
+  $('catCola').value='';toast(linhas.length+' categorias adicionadas');renderCats();
+};
+$('formRegra').addEventListener('submit',async e=>{e.preventDefault();
+  const palavra=$('rgPalavra').value.trim(),categoria=$('rgCat').value.trim();
+  if(!palavra||!categoria){toast('Informe a palavra e a categoria.');return}
+  const {error}=await sb.from('categoria_regras').insert({palavra,categoria});if(error){fail(error);return}
+  $('rgPalavra').value=$('rgCat').value='';toast('Regra adicionada');renderCats()});
+$('tabCats').addEventListener('click',async e=>{const b=e.target.closest('[data-del]');if(!b)return;const tr=b.closest('tr');
+  const q=b.dataset.del==='plano'?sb.from('plano_contas').delete().eq('categoria',tr.dataset.cat):b.dataset.del==='regra'?sb.from('categoria_regras').delete().eq('id',tr.dataset.id):sb.from('fornecedor_categoria').delete().eq('fornecedor_chave',tr.dataset.k);
+  const {error}=await q;if(error)fail(error);else renderCats()});
+$('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr');if(!tr||!e.target.dataset.k)return;
+  const q=tr.dataset.cat!=null?sb.from('plano_contas').update({tipo:e.target.value}).eq('categoria',tr.dataset.cat):tr.dataset.k!=null&&e.target.dataset.k==='categoria'?sb.from('fornecedor_categoria').update({categoria:e.target.value.trim(),atualizado_em:new Date().toISOString()}).eq('fornecedor_chave',tr.dataset.k):null;
+  if(!q)return;const {error}=await q;if(error)fail(error);else toast('Salvo')});
 
 // ---------- cadastros ----------
 let USERS=[];
@@ -1051,7 +1125,13 @@ async function openReg(r){
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
   }).join('');
-  $('rBaixa').innerHTML=ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'';
+  if(ehEsc()&&(MOD==='pagar'||MOD==='cartao'))await loadCats();
+  const sug=r&&!r.categoria?sugerirCat(r.fornecedor,r.obs):'';
+  const catHtml=ehEsc()&&(MOD==='pagar'||MOD==='cartao')?`<div class="fields"><label class="f wide">Categoria no Bom Controle${sug?' <span class="chip c-warn">sugerida</span>':''}<input id="rCat" list="catsListReg" value="${esc(r?.categoria||sug)}" placeholder="${PCAT.ok?'Escolha do plano de contas':'Rode a atualização v8 do banco'}"${r&&r.conferido&&MOD==='pagar'?'':''}></label></div><datalist id="catsListReg">${PCAT.plano.map(c=>`<option value="${esc(c.categoria)}">`).join('')}</datalist>`:'';
+  $('rBaixa').innerHTML=catHtml+(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
+  // nova conta digitada pelo escritório: sugere a categoria assim que o fornecedor é preenchido
+  const fIn=$('rFields').querySelector('[data-k="fornecedor"]');
+  if(fIn&&$('rCat'))fIn.onchange=()=>{if(!$('rCat').value){const s2=sugerirCat(fIn.value,'');if(s2)$('rCat').value=s2}};
   $('rErr').hidden=true;
   $('rSave').hidden=!ed;$('rDel').hidden=!(ed&&r);
   $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
@@ -1084,9 +1164,11 @@ $('rForm').addEventListener('submit',async e=>{
   err.hidden=true;$('rSave').disabled=true;
   try{
     row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
+    if($('rCat'))row.categoria=$('rCat').value.trim()||null;
     const {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
     if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
+    if(row.categoria)await aprenderCat(row.fornecedor,row.categoria);
     dlgReg.close();toast(REG?'Correção salva':'Lançamento enviado');renderMod();
   }catch(ex){fail(ex)}finally{$('rSave').disabled=false}
 });
@@ -1098,8 +1180,10 @@ $('rDel').onclick=async()=>{
 $('rConf').onclick=async()=>{
   const r=REG,novo=!r.conferido,upd={conferido:novo};
   if(MOD==='pagar'){upd.pago_em=novo?($('rPagoEm').value||TODAY):null;upd.banco=novo?($('rBanco').value.trim()||null):null}
+  if($('rCat')&&$('rCat').value.trim())upd.categoria=$('rCat').value.trim();
   $('rConf').disabled=true;
   const {error}=await sb.from(MODCFG[MOD].tabela).update(upd).eq('id',r.id);
+  if(!error&&upd.categoria)await aprenderCat(r.fornecedor,upd.categoria);
   $('rConf').disabled=false;
   if(error)fail(error);else{dlgReg.close();toast(novo?MODCFG[MOD].okTxt:'Desfeito');renderMod()}
 };
