@@ -2185,9 +2185,9 @@ function pontoAba(aba){
   const temDia=sel.some(x=>x[0]==='faltas_dias'),temHora=sel.some(x=>x[0]==='faltas_horas');
   $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>
-    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="8:00" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
+    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="8:00" style="width:70px" inputmode="numeric"> por dia de falta (sábado <input id="pnJorS" value="4:00" style="width:70px" inputmode="numeric">)</label>`:''}`;
   if($('pnAba'))$('pnAba').onchange=()=>pontoAba($('pnAba').value);
-  $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH').forEach(s=>s.onchange=pontoPrev);pontoPrev();
+  $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH,#pnJorS').forEach(s=>s.onchange=pontoPrev);pontoPrev();
 }
 const pontoData=v=>{if(v instanceof Date)return isoLocal(v);const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(!m)return null;const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${pad(m[2])}-${pad(m[1])}`};
 const pontoDias=v=>{const s=String(v||'').trim();if(!s||/^0+([.,]0+)?$|^0?0:00$/.test(s))return 0;if(/^\d+([.,]\d+)?$/.test(s))return +s.replace(',','.');return /:/.test(s)?0:1};
@@ -2206,8 +2206,13 @@ function pontoPrev(){
     por.set(nome,g);
   }
   // o sistema de ponto já põe a jornada do dia faltado nas horas de falta: tira para não descontar duas vezes
-  const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0;
-  if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;const r=g.v.faltas_horas-jor*g.dias.reduce((s,d)=>s+d.n,0);if(r>0)g.v.faltas_horas=r;else delete g.v.faltas_horas});
+  // 44h semanais: 8h de segunda a sexta e 4h no sábado. Na falta com data usa o dia da semana; sem data (resumo),
+  // conta como dia de semana, a não ser que as horas de falta não cheguem a isso (aí foi sábado).
+  const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0,sab=$('pnJor')?.checked?lerHoras($('pnJorS').value)||jor:0;
+  if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;let hf=g.v.faltas_horas,semData=0;
+    g.dias.forEach(d=>{if(d.data)hf-=d.n*(new Date(d.data+'T12:00').getDay()===6?sab:jor);else semData+=d.n});
+    let k=semData;while(k>0&&jor*k+sab*(semData-k)>hf)k--;hf-=jor*k+sab*(semData-k);
+    if(hf>0)g.v.faltas_horas=hf;else delete g.v.faltas_horas});
   PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length);
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>${
