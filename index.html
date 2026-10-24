@@ -144,6 +144,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .ctxbar .f{min-width:220px}
 .docrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fields .wide{grid-column:1/-1}
+.chk{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:400;color:var(--ink)}.chk label{display:flex;gap:6px;align-items:center}.chk input{width:auto;margin:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -341,8 +342,8 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
         <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar.</p>
         <form class="row" id="formAc" style="align-items:flex-end">
           <label class="f">Usuário<select id="acUsr"></select></label>
-          <label class="f">Empresa<select id="acCli"></select></label>
-          <label class="f">Módulo<select id="acMod"></select></label>
+          <div class="f" style="flex:1 1 100%"><span>Empresas que ele representa <button type="button" class="btn small ghost" id="acTodas">Marcar todas</button></span><div class="chk" id="acCli"></div></div>
+          <div class="f" style="flex:1 1 100%"><span>Módulos</span><div class="chk" id="acMod"></div></div>
           <label class="f">Nível<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
           <button class="btn primary" type="submit">Liberar</button>
         </form>
@@ -424,7 +425,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 <dialog id="dlgCC">
   <div class="dh"><h2 id="ccTitle"></h2><span class="spacer"></span><span class="note" id="ccPos"></span></div>
   <div class="db"><div class="ccgrid"><div id="ccDoc"></div><div id="ccDados" style="display:grid;gap:12px;align-content:start"></div></div><p class="err" id="ccErr" hidden></p></div>
-  <div class="df"><button type="button" class="btn ghost" id="ccFechar">Fechar</button><span class="spacer"></span><button type="button" class="btn" id="ccPular">Pular</button><button type="button" class="btn primary" id="ccOk">Confirmar e ir para o próximo</button></div>
+  <div class="df"><button type="button" class="btn ghost" id="ccFechar">Fechar</button><button type="button" class="btn ghost" id="ccDel">Excluir lançamento</button><span class="spacer"></span><button type="button" class="btn" id="ccPular">Pular</button><button type="button" class="btn primary" id="ccOk">Confirmar e ir para o próximo</button></div>
 </dialog>
 <dialog id="dlgRep">
   <div class="dh"><h2 id="rpTitle"></h2><span class="spacer"></span><span id="rpChip" class="chips"></span></div>
@@ -1001,8 +1002,21 @@ $('fbcFile').onchange=async e=>{
 
 // ---------- rateio entre filiais (contas a pagar e despesas da tesouraria) ----------
 const filiaisDe=c=>String(c?.filiais_rateio||'').split(',').map(x=>x.trim()).filter(Boolean);
+// empresa do lançamento aberto: a escolhida no próprio formulário (quem lança em mais de uma) ou a do topo
+const regCli=()=>CLIENTES.find(c=>c.id===($('rEmp')?.value||REG?.cliente_id||escCli.value));
+// lançamento que trocou de empresa: os arquivos passam para a pasta da empresa nova
+// (o escritório move; o cliente copia, porque só pode enviar arquivos, não apagar)
+async function moverDocs(docs,cliId){
+  const st=sb.storage.from('anexos');
+  for(const d of docs){
+    if(!d.caminho||d.caminho.split('/')[0]===cliId)continue;
+    const novo=cliId+d.caminho.slice(d.caminho.indexOf('/'));
+    const {error}=ehEsc()?await st.move(d.caminho,novo):await st.copy(d.caminho,novo);
+    if(!error)d.caminho=novo;
+  }
+}
 function renderRateio(r,ed){
-  const fs=filiaisDe(cliAtual());
+  const fs=filiaisDe(regCli());
   if(!(MOD==='pagar'||MOD==='tesouraria')||!fs.length){$('rRat').innerHTML='';return}
   const rt=Array.isArray(r?.rateio)?r.rateio:[],dis=ed?'':' disabled',por=r?.rateio_por||'valor';
   const val=f=>{const x=rt.find(y=>y.filial===f);return x?showMoney(x.valor):''};
@@ -1047,7 +1061,7 @@ $('rRat').addEventListener('input',atualizaRateio);$('rRat').addEventListener('c
   if(e.target.name==='ratPor'){const total=totalReg(),pct=e.target.value==='pct';document.querySelectorAll('#rRat tbody input').forEach(i=>{const n=parseMoney(i.value)||0;if(n&&total)i.value=showMoney(r2(pct?n/total*100:total*n/100))})}
   atualizaRateio()});
 $('rFields').addEventListener('input',atualizaRateio);
-$('rFields').addEventListener('change',atualizaRateio);
+$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp')renderRateio(REG,true);else atualizaRateio()});
 
 // ---------- categorias automáticas (contas a pagar, cartão e despesas da tesouraria) ----------
 const MODCAT=['pagar','cartao','tesouraria'];
@@ -1079,7 +1093,8 @@ async function abrirCC(i){
   $('ccDoc').innerHTML=docs.length?docs.map(d=>{const u=urls[d.caminho]||'';return `<div style="display:grid;gap:6px;margin-bottom:12px"><div class="row" style="justify-content:space-between"><b>${esc(d.categoria)}</b><a href="${u}" target="_blank" rel="noopener" class="note">Abrir em outra aba</a></div>${kindOf(d)==='pdf'?`<iframe src="${u}" title="${esc(d.nome_arquivo)}"></iframe>`:`<img src="${u}" alt="${esc(d.nome_arquivo)}">`}</div>`}).join('')
     :'<div class="alerta" style="margin:0"><b>Nenhum documento anexado</b><span>Peça o documento ao cliente antes de confirmar.</span></div>';
   const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));
-  $('ccDados').innerHTML=`<div class="fields">${cfg.campos.filter(([k])=>k!=='tipo').map(([k,t,tp])=>{const v=r[k];
+  const emps=empresasDe(orig);
+  $('ccDados').innerHTML=`<label class="f">Empresa<select id="ccEmp">${emps.map(c=>`<option value="${c.id}"${c.id===r.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label><div class="fields">${cfg.campos.filter(([k])=>k!=='tipo').map(([k,t,tp])=>{const v=r[k];
       if(tp==='textarea')return `<label class="f wide">${t}<textarea data-k="${k}" rows="2">${esc(v||'')}</textarea></label>`;
       if(tp==='parc')return `<label class="f">${t}<input value="${v}x" disabled></label>`;
       if(tp==='money')return `<label class="f">${t}<input class="money" data-k="${k}" inputmode="decimal" value="${showMoney(v)}"></label>`;
@@ -1095,20 +1110,26 @@ async function abrirCC(i){
 document.body.insertAdjacentHTML('beforeend','<datalist id="fbcList"></datalist>');
 $('ccFechar').onclick=()=>{dlgCC.close();renderExport()};
 $('ccPular').onclick=()=>abrirCC(CCI+1);
+$('ccDel').onclick=async()=>{const r=EXPEND[CCI];if(r&&await excluirLanc(exOrig.value,r,EXDOCS[r.id]||[])){EXPEND.splice(CCI,1);abrirCC(CCI)}};
 $('ccOk').onclick=async()=>{
   const r=EXPEND[CCI],orig=exOrig.value,upd={},err=$('ccErr');err.hidden=true;
   $('ccDados').querySelectorAll('[data-k]').forEach(el=>{upd[el.dataset.k]=el.classList.contains('money')?parseMoney(el.value):el.value.trim()||null});
   const cat=$('ccCat').value.trim(),falta=MODCFG[orig].campos.find(([k,,tp,req])=>req&&k in upd&&(upd[k]==null||upd[k]===''));
   let m=!cat?'Escolha a categoria.':falta?'Preencha: '+falta[1]+'.':!(upd.valor>0)?'O valor precisa ser maior que zero.':'';
+  const emp=$('ccEmp').value,trocou=emp!==r.cliente_id;
+  if(!m&&trocou&&Array.isArray(r.rateio)&&r.rateio.length)m='Este lançamento tem rateio entre as filiais da empresa. Para trocar a empresa, abra o lançamento e tire o rateio primeiro.';
   if(!m&&Array.isArray(r.rateio)&&r.rateio.length&&Math.abs(r2(upd.valor)-r2(r.rateio.reduce((a,x)=>a+x.valor,0)))>=0.005)m='O valor mudou e não bate mais com o rateio. Ajuste o rateio no lançamento.';
   if(m){err.textContent=m;err.hidden=false;return}
   let fbc=null;
   if(FBC.lista.length){fbc=FBC.porRotulo[$('ccFbc').value.trim()];if(!fbc){err.textContent='Escolha o fornecedor na lista do Bom Controle. Se ele não existir, cadastre no Bom Controle e importe a lista de novo.';err.hidden=false;return}upd.fornecedor_bc=fbc}
-  upd.valor=r2(upd.valor);upd.categoria=cat;upd.categoria_ok=true;
+  upd.valor=r2(upd.valor);upd.categoria=cat;upd.categoria_ok=true;if(trocou)upd.cliente_id=emp;
   $('ccOk').disabled=true;
-  const {error}=await sb.from(TABCAT[orig]).update(upd).eq('id',r.id);
+  let {error}=await sb.from(TABCAT[orig]).update(upd).eq('id',r.id);
+  if(!error&&trocou){const docs=EXDOCS[r.id]||[];await moverDocs(docs,emp);
+    for(const d of docs){const {error:e2}=await sb.from('documentos').update({cliente_id:emp,caminho:d.caminho}).eq('id',d.id);if(e2){error=e2;break}}}
   $('ccOk').disabled=false;
   if(error){fail(error);return}
+  if(trocou)toast('Lançamento passado para '+(CLIENTES.find(c=>c.id===emp)?.nome||'a outra empresa'));
   await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat,fbc);toast('Confirmado');
   EXPEND.splice(CCI,1);abrirCC(CCI);
 };
@@ -1187,8 +1208,8 @@ async function renderCadastro(){
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
       <td><select data-k="papel" ${u.user_id===ME.user_id?'disabled':''}>${[['pendente','Pendente (sem acesso)'],['operador','Usuário do cliente'],['escritorio','Escritório (vê tudo)']].map(([v,t])=>`<option value="${v}"${u.papel===v?' selected':''}>${t}</option>`).join('')}</select></td></tr>`).join('')}</tbody>`;
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)})</option>`).join('');
-  $('acCli').innerHTML='<option value="*">Todas as empresas</option>'+CLIENTES.filter(c=>c.ativo).map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
-  $('acMod').innerHTML=Object.entries(MODNOME).map(([k,t])=>`<option value="${k}">${t}</option>`).join('');
+  $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
+  $('acMod').innerHTML=Object.entries(MODNOME).map(([k,t])=>`<label><input type="checkbox" value="${k}"> ${t}</label>`).join('');
   renderAcessos();
 }
 async function renderAcessos(){
@@ -1202,13 +1223,16 @@ async function renderAcessos(){
 }
 $('formAc').addEventListener('submit',async e=>{
   e.preventDefault();if(!window.V2){toast('Rode primeiro a atualização v2 do banco.');return}
-  const u=$('acUsr').value;if(!u)return;const cs=$('acCli').value==='*'?CLIENTES.filter(c=>c.ativo).map(c=>c.id):[$('acCli').value];
-  const rows=cs.map(c=>({user_id:u,cliente_id:c,modulo:$('acMod').value,nivel:$('acNiv').value}));
+  const u=$('acUsr').value;if(!u)return;
+  const marc=id=>[...$(id).querySelectorAll('input:checked')].map(x=>x.value),cs=marc('acCli'),ms=marc('acMod');
+  if(!cs.length||!ms.length){toast('Marque pelo menos uma empresa e um módulo.');return}
+  const rows=cs.flatMap(c=>ms.map(m=>({user_id:u,cliente_id:c,modulo:m,nivel:$('acNiv').value})));
   const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){fail(error);return}
   const usr=USERS.find(x=>x.user_id===u);
   if(usr&&usr.papel==='pendente'){await sb.from('perfis').update({papel:'operador'}).eq('user_id',u);usr.papel='operador'}
   toast('Acesso liberado');renderCadastro();
 });
+$('acTodas').onclick=()=>{const bs=[...$('acCli').querySelectorAll('input')],v=bs.some(b=>!b.checked);bs.forEach(b=>b.checked=v)};
 $('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-u]');if(!tr||!e.target.closest('button'))return;
   const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
@@ -1335,11 +1359,14 @@ async function openReg(r){
     if(tp==='sobre')return `<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
   }).join('');
+  // quem lança em mais de uma empresa escolhe a empresa aqui mesmo; o escritório também usa para corrigir a empresa errada
+  const emps=empresasDe(MOD).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
+  if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
   $('rBaixa').innerHTML=(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
   renderRateio(r,ed);
   $('rErr').hidden=true;
-  $('rSave').hidden=!ed;$('rDel').hidden=!(ed&&r);
+  $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||ehEsc()));
   $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
   await renderRDocs();
   dlgReg.showModal();
@@ -1350,7 +1377,7 @@ async function renderRDocs(){
   $('rDocs').innerHTML=`<h3>Documentos</h3>`+(RDOCS.map((d,i)=>`<div class="docrow" data-i="${i}">${anexoView(d,d.preview||urls[d.caminho],true)}<span><b>${esc(d.categoria)}</b><br><span class="note">${esc(d.nome_arquivo)}</span></span>${ed?'<button type="button" class="btn small ghost deldoc">Remover</button>':''}</div>`).join('')||'<p class="note" style="margin:0">Nenhum documento anexado.</p>')
     +(ed?`<div class="row">${cfg.cats.map(c=>`<span class="btn small fotobtn">📎 ${c}<input type="file" accept="${ACCEPT}" data-cat="${c}" aria-label="Anexar ${c}"></span>`).join('')}</div><p class="note" style="margin:0">Foto ou PDF. ${MOD==='pagar'?'Os arquivos vão para a pasta Contas a pagar.':MOD==='tesouraria'?'Os arquivos vão para a pasta Tesouraria.':''}</p>`:'');
 }
-$('rDocs').addEventListener('change',async e=>{if(e.target.type!=='file'||!e.target.files[0])return;const cli=cliAtual();
+$('rDocs').addEventListener('change',async e=>{if(e.target.type!=='file'||!e.target.files[0])return;const cli=regCli();
   const dt=$('rFields').querySelector('[data-k="'+MODCFG[MOD].dataK+'"]').value||TODAY;
   toast('Enviando arquivo…');
   try{RDOCS.push({...await uploadAnexo(e.target.files[0],cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast('Arquivo anexado')}catch(err){toast(err.message)}});
@@ -1358,7 +1385,7 @@ $('rDocs').addEventListener('click',e=>{if(e.target.classList.contains('deldoc')
 $('rFields').addEventListener('focusout',e=>{if(e.target.classList.contains('money')){const n=parseMoney(e.target.value);if(n!=null&&!isNaN(n))e.target.value=showMoney(n)}});
 $('rClose').onclick=()=>dlgReg.close();
 $('rForm').addEventListener('submit',async e=>{
-  e.preventDefault();const cfg=MODCFG[MOD],cli=cliAtual(),err=$('rErr');
+  e.preventDefault();const cfg=MODCFG[MOD],cli=regCli(),err=$('rErr');
   const row={cliente_id:cli.id};
   $('rFields').querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;row[k]=el.classList.contains('money')?parseMoney(el.value):k==='parcelas'?+el.value:el.value.trim()||null});
   let m='';
@@ -1371,17 +1398,24 @@ $('rForm').addEventListener('submit',async e=>{
   err.hidden=true;$('rSave').disabled=true;
   try{
     row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
+    await moverDocs(RDOCS,cli.id);
     const {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
     if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
-    dlgReg.close();toast(REG?'Correção salva':'Lançamento enviado');renderMod();
+    const outra=cli.id!==escCli.value;
+    dlgReg.close();toast((REG?'Correção salva':'Lançamento enviado')+(outra?' em '+cli.nome:''));renderMod();
   }catch(ex){fail(ex)}finally{$('rSave').disabled=false}
 });
-$('rDel').onclick=async()=>{
-  if(!REG||!confirm('Apagar este lançamento e os documentos dele?'))return;
-  const {error}=await sb.from(MODCFG[MOD].tabela).delete().eq('id',REG.id);
-  if(error)fail(error,'Não foi possível apagar');else{dlgReg.close();toast('Lançamento apagado');renderMod()}
-};
+// o cliente apaga enquanto está aberto; o escritório apaga sempre (lançamento errado ou que não devia existir)
+async function excluirLanc(mod,r,docs){
+  if(!confirm((r.conferido?'Este lançamento já foi '+MODCFG[mod].okTxt.toLowerCase()+'. ':'')+'Excluir este lançamento e os documentos dele? Não dá para desfazer.'))return false;
+  const {error:e1}=await sb.from('documentos').delete().eq('registro_id',r.id);
+  const {error}=e1?{error:e1}:await sb.from(MODCFG[mod].tabela).delete().eq('id',r.id);
+  if(error){fail(error,'Não foi possível excluir');return false}
+  if(ehEsc()&&docs.length)await sb.storage.from('anexos').remove(docs.map(d=>d.caminho).filter(Boolean));
+  toast('Lançamento excluído');return true;
+}
+$('rDel').onclick=async()=>{if(REG&&await excluirLanc(MOD,REG,DOCS[REG.id]||[])){dlgReg.close();renderMod()}};
 $('rConf').onclick=async()=>{
   const r=REG,novo=!r.conferido,upd={conferido:novo};
   if(MOD==='pagar'){upd.pago_em=novo?($('rPagoEm').value||TODAY):null;upd.banco=novo?($('rBanco').value.trim()||null):null}
