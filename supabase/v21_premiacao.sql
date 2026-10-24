@@ -5,7 +5,7 @@
 --  1. Liga a tela RH › Premiação para as 3 Oliveira (coluna Premiação Whatsapp da folha).
 --  2. Lança a premiação de outubro/2026 da lista que a Oliveira mandou (bônus call center),
 --     ligando o nome da lista ao colaborador ativo do sistema. Quem já tem premiação lançada
---     em outubro não é mexido.
+--     em outubro não é mexido. A Eliete (Biguaçu) é sem registro e não entra na folha.
 
 update public.clientes
    set folha_modelo = coalesce(folha_modelo,'{}'::jsonb) || '{"premiacao":["premio_whats"]}'::jsonb
@@ -47,7 +47,6 @@ insert into premio_out values
   ('Oliveira Palhoça','Gabriela T',450),
   ('Oliveira Palhoça','Gislaine',515),
   ('Oliveira Biguaçu','Luana',220),
-  ('Oliveira Biguaçu','Eliete',200),
   ('Oliveira Biguaçu','Silmara',350);
 
 insert into public.folha_lancamentos(cliente_id, competencia, funcionario_id, coluna, quantidade)
