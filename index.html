@@ -2153,13 +2153,17 @@ async function renderPremio(){
   $('prBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':'Folha '+st.toLowerCase()}</span>${pode?'':'<span class="note">Os valores deste mês não podem mais ser alterados. Fale com o escritório se precisar mudar algo.</span>'}`;
   const val=(f,c)=>{const ls=PRM.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c&&l.quantidade!=null);return ls.length?r2(ls.reduce((s,l)=>s+ +l.quantidade,0)):null};
   $('prTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${cols.map(c=>`<th class="l">${esc(rotulo(c))} (R$)</th>`).join('')}</tr></thead><tbody>${
-    PRM.func.map(f=>`<tr><td class="l"><b>${esc(f.nome)}</b></td>${cols.map(c=>{const fx=ffNum(f,c);return `<td><input class="money" data-pf="${f.id}" data-pc="${c}" value="${showMoney(val(f,c))}" data-ant="${showMoney(val(f,c))}" placeholder="0,00" style="max-width:140px"${pode?'':' disabled'}>${fx?` <span class="note">fixo ${fm(fx)}, já está na folha</span>`:''}</td>`}).join('')}</tr>`).join('')
+    PRM.func.map(f=>`<tr><td class="l"><b>${esc(f.nome)}</b></td>${cols.map(c=>{const fx=ffNum(f,c),inp=v=>`<input class="money" data-pf="${f.id}" data-pc="${c}"${fx?` data-fx="${fx}" hidden`:''} value="${showMoney(v)}" data-ant="${showMoney(v)}" placeholder="0,00" style="max-width:140px"${pode?'':' disabled'}>`;
+      // quem tem premiação fixa: só mostra o valor (o lápis abre o campo, para não preencher por engano)
+      if(!fx)return `<td>${inp(val(f,c))}</td>`;const tot=r2(fx+(val(f,c)||0));
+      return `<td><span class="prfx"><b>${fm(tot)}</b> <span class="note">${tot===fx?'fixo':'fixo '+fm(fx)+', alterado neste mês'}</span>${pode?' <button type="button" class="btn small ghost" data-pedit title="Alterar só neste mês" aria-label="Alterar">✎</button>':''}</span>${inp(tot)}</td>`}).join('')}</tr>`).join('')
     ||`<tr><td class="l muted" colspan="${cols.length+1}">Nenhum colaborador cadastrado.</td></tr>`}</tbody>
     <tfoot><tr><td class="l"><b>Total</b></td>${cols.map(c=>`<td><b data-pt="${c}"></b></td>`).join('')}</tr></tfoot>`;
   prTotais();$('prSalvar').hidden=!pode;
 }
 function prTotais(){PRM.cols.forEach(c=>{const t=[...document.querySelectorAll(`#prTab [data-pc="${c}"]`)].reduce((s,i)=>s+(parseMoney(i.value)||0),0);const el=document.querySelector(`#prTab [data-pt="${c}"]`);if(el)el.textContent=fm(t)})}
 $('prTab').addEventListener('input',prTotais);
+$('prTab').addEventListener('click',ev=>{const b=ev.target.closest('[data-pedit]');if(!b)return;const td=b.closest('td');td.querySelector('.prfx').hidden=true;const i=td.querySelector('input');i.hidden=false;i.focus();i.select()});
 $('prSalvar').onclick=async ev=>{
   const mud=[...document.querySelectorAll('#prTab [data-pf]')].filter(i=>i.value.trim()!==i.dataset.ant);
   for(const i of mud){const n=parseMoney(i.value);if(Number.isNaN(n)||n<0){toast('Valor inválido: '+i.value);i.focus();return}}
@@ -2168,6 +2172,8 @@ $('prSalvar').onclick=async ev=>{
   try{
     for(const i of mud){const f=i.dataset.pf,c=i.dataset.pc,n=parseMoney(i.value);
       const {error:e1}=await sb.from('folha_lancamentos').delete().eq('cliente_id',PRM.cli.id).eq('competencia',PRM.comp).eq('funcionario_id',f).eq('coluna',c);if(e1)throw e1;
+      // com fixo, o lançamento guarda só a diferença para o fixo (a folha soma fixo + lançamento)
+      if(i.dataset.fx){const d=r2((n||0)-+i.dataset.fx);if(d){const {error:e2}=await sb.from('folha_lancamentos').insert({cliente_id:PRM.cli.id,competencia:PRM.comp,funcionario_id:f,coluna:c,quantidade:d});if(e2)throw e2}continue}
       if(n>0){const {error:e2}=await sb.from('folha_lancamentos').insert({cliente_id:PRM.cli.id,competencia:PRM.comp,funcionario_id:f,coluna:c,quantidade:n});if(e2)throw e2}}
     toast('Premiação salva');renderPremio();
   }catch(ex){console.error(ex);toast(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível salvar. Verifique a internet e tente de novo.')}
