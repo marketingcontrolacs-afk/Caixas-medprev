@@ -178,7 +178,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Fechamento do caixa</h1><p class="sub" id="opSub"></p></div>
+      <div><h1>Fechamento do caixa</h1><p class="sub" id="opSub"></p><p class="note" id="opEscAviso" hidden style="margin:4px 0 0">Você está na mesma tela que o operador usa. O que salvar aqui vale como lançamento da empresa. Para conferir, use Escritório › Conferência de caixa.</p></div>
       <label class="f" style="min-width:170px">Dia do fechamento<input type="date" id="opData"></label>
     </div>
     <div class="grid-op">
@@ -295,7 +295,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label class="f">Origem<select id="exOrig">
         <option value="caixa">Caixa</option>
         <option value="tesouraria">Tesouraria</option>
-        <option value="pagar">Banco · Contas a pagar</option>
+        <option value="pagar">Contas a pagar</option>
         <option value="cartao">Cartão de crédito</option>
       </select></label>
       <label class="f">De<input type="date" id="exIni"></label>
@@ -481,17 +481,19 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
+  confcaixa:'<path d="M9 4h6v3H9z"/><path d="M15 5h3v16H6V5h3"/><path d="M9 13l2 2 4-4"/>',
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
   {k:'caixa',t:'Caixa',g:'Financeiro',ok:()=>temAcesso('caixa')},
-  {k:'pagar',t:'Banco',g:'Financeiro',ok:()=>temAcesso('pagar')},
+  {k:'pagar',t:'Contas a pagar',g:'Financeiro',ok:()=>temAcesso('pagar')},
   {k:'tesouraria',t:'Tesouraria',g:'Financeiro',ok:()=>temAcesso('tesouraria')},
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
+  {k:'confcaixa',t:'Conferência de caixa',g:'Escritório',ok:ehEsc},
   {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Escritório':'Financeiro',ok:()=>temAcesso('repasse')},
   {k:'bc',t:'Exportação Bom Controle',g:'Escritório',ok:ehEsc},
   {k:'cfg',t:'Configurações',g:'Escritório',ok:ehEsc},
@@ -530,10 +532,12 @@ const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
   ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewBC','viewRep'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
+  // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
+  // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
   if(VIEW==='caixa'){
-    if(cli&&!ehEsc()&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
+    if(cli&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
     else{$('viewEsc').hidden=false;initEsc()}
-  }else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
+  }else if(VIEW==='confcaixa'){$('viewEsc').hidden=false;initEsc()}else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
   else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
@@ -575,7 +579,7 @@ $('btnSair').onclick=async()=>{await sb.auth.signOut();location.reload()};
 let OPCLI=null, cur=null, draftSaidas=[], draftAnexos=[], previews={};
 const NUM=['din_sis','din_cont','deb_sis','deb_maq','cred_sis','cred_maq'];
 function initOp(cli){
-  OPCLI=cli;$('opData').max=TODAY;
+  OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!ehEsc();
   if(!$('opData').value)$('opData').value=TODAY;
   loadDay();renderHist();
 }
@@ -717,7 +721,7 @@ function initEsc(){
   if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7)}
   const e=ehEsc();
   $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
-  $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. A importação do Bom Controle fica em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
+  $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. Os lançamentos ficam em Financeiro › Caixa e a importação em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
   $('painelNote').textContent=e?'Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.':'Clique num dia para ver os detalhes e os comprovantes.';
   $('dConf').hidden=!e;
   renderPainel();
@@ -944,7 +948,7 @@ $('tbCfg').addEventListener('change',async e=>{const id=e.target.closest('tr').d
 // CONTAS A PAGAR, CARTÃO DE CRÉDITO E TESOURARIA
 // =====================================================================
 const MODCFG={
-  pagar:{titulo:'Banco · Contas a pagar',tabela:'contas_pagar',dataK:'vencimento',
+  pagar:{titulo:'Contas a pagar',tabela:'contas_pagar',dataK:'vencimento',
     sub:'Envie o boleto e a nota fiscal de cada conta. A Controlacs faz o pagamento.',
     campos:[['fornecedor','Fornecedor','text',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
     cats:['Boleto','Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe o boleto ou a nota fiscal.',
