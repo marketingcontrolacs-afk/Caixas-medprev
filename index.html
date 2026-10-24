@@ -559,7 +559,8 @@ $('nav').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)
 // empresas que aparecem no seletor para o módulo aberto
 function empresasDe(m){
   const mod=m==='rh'?'ferias':m;
-  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod!=='ferias'||c.bpo_rh):podeVer(c.id,mod)));
+  // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
+  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'?c.bpo_rh:c.bpo_financeiro!==false):podeVer(c.id,mod)));
 }
 const escCli=$('escCli');
 function fillClientes(){
