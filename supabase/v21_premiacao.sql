@@ -45,7 +45,7 @@ insert into premio_out values
   ('Oliveira SJ','Maria Cristina',450),
   ('Oliveira Palhoça','Bianca',1070),
   ('Oliveira Palhoça','Gabriela T',450),
-  ('Oliveira Palhoça','Gislaine',515),
+  ('Oliveira Palhoça','Cryslaine',515),
   ('Oliveira Biguaçu','Luana',220),
   ('Oliveira Biguaçu','Silmara',350);
 
