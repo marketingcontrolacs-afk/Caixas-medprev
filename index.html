@@ -108,7 +108,7 @@ td .fcell{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:p
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
-#dlgFer,#dlgRep,#dlgFol{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
+#dlgFer,#dlgRep,#dlgFol,#dlgColab{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
 .ccgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}.ccgrid>*{min-width:0}
 @media (max-width:900px){.ccgrid{grid-template-columns:minmax(0,1fr)}}
 #ccDoc img{max-width:100%;border:1px solid var(--line);border-radius:8px}#ccDoc iframe{width:100%;height:68vh;border:1px solid var(--line);border-radius:8px;background:#fff} #dlgRep .db>*{min-width:0}
@@ -404,6 +404,16 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="card tablebox"><table><thead id="fHead"></thead><tbody id="fBody"></tbody></table></div>
     <p class="note" id="fNote"></p>
   </section>
+  <!-- RH · COLABORADORES E PRAZOS -->
+  <section id="viewColab" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Colaboradores e prazos</h1><p class="sub">Cadastro dos colaboradores e o controle do contrato de experiência: o aviso aparece 10 dias antes de cada vencimento.</p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="cbFiltro"><option value="todos">Todos os ativos</option><option value="exp">Em experiência</option><option value="aniv">Aniversariantes do mês</option><option value="desl">Desligados</option></select></label><button class="btn primary" id="cbNovo">+ Colaborador</button></div>
+    </div>
+    <div class="tiles" id="cbTiles"></div>
+    <div class="card tablebox"><table id="cbTab"></table></div>
+    <p class="note">Clique no colaborador para ver ou alterar os dados. O 1º período vence com 45 dias (prorrogar ou desligar) e a prorrogação com 90 dias (efetivar ou desligar).</p>
+  </section>
   <!-- RH · FOLHA DE PAGAMENTO -->
   <section id="viewFolha" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -457,6 +467,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="dh"><h2 id="rpTitle"></h2><span class="spacer"></span><span id="rpChip" class="chips"></span></div>
   <div class="db" id="rpBody"></div>
   <div class="df" id="rpFoot"></div>
+</dialog>
+<dialog id="dlgColab">
+  <div class="dh"><h2 id="cbTitle"></h2><span class="spacer"></span><span id="cbChip"></span></div>
+  <div class="db" id="cbBody"></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="cbClose">Fechar</button><button type="button" class="btn primary" id="cbSave">Salvar</button></div>
 </dialog>
 <dialog id="dlgFol">
   <div class="dh"><h2 id="foTitle"></h2></div>
@@ -558,6 +573,7 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   folha:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
+  colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
   confcaixa:'<path d="M9 4h6v3H9z"/><path d="M15 5h3v16H6V5h3"/><path d="M9 13l2 2 4-4"/>',
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
@@ -571,6 +587,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
+  {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('folha')||temAcesso('ferias')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'confcaixa',t:'Conferência de caixa',g:'Escritório',ok:ehEsc},
   {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Escritório':'Financeiro',ok:()=>temAcesso('repasse')},
@@ -590,6 +607,7 @@ function renderNav(){
 $('nav').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)go(b.dataset.v)});
 // empresas que aparecem no seletor para o módulo aberto
 function empresasDe(m){
+  if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:podeVer(c.id,'folha')||podeVer(c.id,'ferias')));
   const mod=m==='rh'?'ferias':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):podeVer(c.id,mod)));
@@ -597,7 +615,7 @@ function empresasDe(m){
 const escCli=$('escCli');
 function fillClientes(){
   const m=VIEW,v=escCli.value,lista=empresasDe(m);
-  const todas=(m==='rh'||m==='repasse')&&lista.length>1?'<option value="*">Todas as empresas</option>':'';
+  const todas=(m==='rh'||m==='repasse'||m==='colab')&&lista.length>1?'<option value="*">Todas as empresas</option>':'';
   escCli.innerHTML=todas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*'))escCli.value=v;
   $('ctxbar').hidden=m==='cfg';
@@ -610,7 +628,7 @@ function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewBC','viewRep'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -621,6 +639,7 @@ function openView(){
   else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
+  else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
 }
@@ -2128,6 +2147,89 @@ $('folRescBaixar').onclick=()=>{
   ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r,c:7}});ws['!merges']=merges;ws['!cols']=[{wch:24},...Array(7).fill({wch:17})];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Rescisão');
   XLSX.writeFile(wb,`Rescisao ${m}.${y} - ${cli.nome}.xlsx`);
+};
+
+// =====================================================================
+// RH · COLABORADORES E PRAZOS DE EXPERIÊNCIA
+// =====================================================================
+// Cadastro dos colaboradores (supabase/v15_rh_prazos.sql) e o controle do contrato de experiência:
+// fim do 1º período (prorrogar ou desligar) e fim da prorrogação (efetivar ou desligar).
+const EXP_AVISO=10; // dias de antecedência para o alerta
+let COLAB=[], COLABDLG=null;
+const diasAte=s=>Math.round((dObj(s)-dObj(TODAY))/864e5);
+function expSit(f){
+  if(f.situacao==='Desligado')return {t:'Desligado',c:'c-none',ord:9};
+  const a=f.fim_experiencia1,b=f.fim_experiencia2;
+  if(!a&&!b)return {t:'Sem contrato de experiência',c:'c-none',ord:8};
+  if(a&&TODAY<=a){const d=diasAte(a);return {t:`1º período até ${dBR(a)}`,c:d<=EXP_AVISO?'c-warn':'c-ok',ord:d<=EXP_AVISO?1:3,prazo:a,
+    alerta:d<=EXP_AVISO?`Prorrogar ou desligar até ${dBR(a)} (${d===0?'hoje':d===1?'amanhã':d+' dias'})`:null}}
+  if(b&&TODAY<=b){const d=diasAte(b);return {t:`Prorrogado até ${dBR(b)}`,c:d<=EXP_AVISO?'c-warn':'c-done',ord:d<=EXP_AVISO?1:4,prazo:b,
+    alerta:d<=EXP_AVISO?`Efetivar ou desligar até ${dBR(b)} (${d===0?'hoje':d===1?'amanhã':d+' dias'})`:null}}
+  return {t:'Efetivado',c:'c-done',ord:7};
+}
+const idade=s=>{if(!s)return '';const n=dObj(s),h=dObj(TODAY);let a=h.getFullYear()-n.getFullYear();if(h.getMonth()<n.getMonth()||h.getMonth()===n.getMonth()&&h.getDate()<n.getDate())a--;return a};
+$('cbFiltro').onchange=()=>renderColab();
+async function renderColab(){
+  const lista=empresasDe('colab'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[],e=ehEsc();
+  $('cbNovo').hidden=!e||todas;
+  if(!ids.length){$('cbTab').innerHTML=`<tbody><tr><td class="l muted">${e?'Nenhuma empresa com BPO de RH.':'Nenhuma empresa liberada.'}</td></tr></tbody>`;$('cbTiles').innerHTML='';return}
+  const {data,error}=await sb.from('funcionarios').select('*').in('cliente_id',ids);
+  if(error){console.error(error);$('cbTab').innerHTML=`<tbody><tr><td class="l neg">${/fim_experiencia|nascimento/.test(error.message||'')?'Esta tela precisa da atualização v15 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.'}</td></tr></tbody>`;return}
+  COLAB=(data||[]).map(f=>({...f,exp:expSit(f)}));
+  const fl=$('cbFiltro').value,mes=TODAY.slice(5,7),nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  const rows=COLAB.filter(f=>fl==='todos'?f.situacao!=='Desligado':fl==='exp'?[1,3,4].includes(f.exp.ord):fl==='aniv'?f.nascimento?.slice(5,7)===mes&&f.situacao!=='Desligado':f.situacao==='Desligado')
+    .sort((a,b)=>fl==='aniv'?a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)):a.exp.ord-b.exp.ord||String(a.exp.prazo||'').localeCompare(String(b.exp.prazo||''))||a.nome.localeCompare(b.nome));
+  $('cbTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Cargo</th><th>Nascimento</th><th>Admissão</th><th>Fim 1º período</th><th>Fim prorrogação</th><th class="l">Experiência</th><th class="l">Observação</th></tr></thead><tbody>${
+    rows.map(f=>`<tr class="click" data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${esc(f.cargo||'')}</td>
+      <td>${f.nascimento?`${dBR(f.nascimento)} <span class="muted">(${idade(f.nascimento)})</span>`:''}</td><td>${dCurto(f.admissao)}</td><td>${dCurto(f.fim_experiencia1)}</td><td>${dCurto(f.fim_experiencia2)}</td>
+      <td class="l"><span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>${f.exp.alerta?`<div class="note neg" style="margin-top:3px">${esc(f.exp.alerta)}</div>`:''}</td><td class="l" style="white-space:normal;min-width:180px">${esc(f.prazos_obs||'')}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="9">Ninguém neste filtro.</td></tr>`}</tbody>`;
+  const ativos=COLAB.filter(f=>f.situacao!=='Desligado');
+  $('cbTiles').innerHTML=[['Decidir em até '+EXP_AVISO+' dias',ativos.filter(f=>f.exp.alerta).length,'prorrogação, efetivação ou desligamento'],
+    ['Em experiência',ativos.filter(f=>[1,3,4].includes(f.exp.ord)).length,'1º período ou prorrogação'],
+    ['Colaboradores ativos',ativos.length,ativos.filter(f=>f.situacao==='Afastado').length+' afastados'],
+    ['Aniversariantes de '+MESES[+mes-1].toLowerCase(),ativos.filter(f=>f.nascimento?.slice(5,7)===mes).length,'veja no filtro “Aniversariantes do mês”']]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+}
+$('cbTab').addEventListener('click',ev=>{const tr=ev.target.closest('[data-cb]');if(tr)abrirColab(COLAB.find(f=>f.id===tr.dataset.cb))});
+$('cbNovo').onclick=()=>abrirColab(null);
+function abrirColab(f){
+  const e=ehEsc(),dis=e?'':' disabled',v=f||{situacao:'Ativo',folha_va:true};COLABDLG=f;
+  const I=(k,t,tipo='text',extra='')=>`<label class="f">${t}<input data-ck="${k}" type="${tipo}" value="${esc(tipo==='date'?v[k]||'':k==='va_valor'||k==='vt_valor_dia'?showMoney(v[k]):v[k]||'')}"${dis}${extra}></label>`;
+  $('cbTitle').textContent=f?f.nome:'Novo colaborador';$('cbChip').innerHTML=f?`<span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>`:'';
+  $('cbBody').innerHTML=`<div class="fields"><label class="f wide">Nome completo<input data-ck="nome" value="${esc(v.nome||'')}"${dis}></label>${I('cargo','Cargo')}
+      <label class="f">Situação<select data-ck="situacao"${dis}>${['Ativo','Afastado','Desligado'].map(s=>`<option${v.situacao===s?' selected':''}>${s}</option>`).join('')}</select></label>
+      ${I('nascimento','Nascimento','date')}${I('telefone','WhatsApp')}${I('matricula','Matrícula')}</div>
+    <h3>Contrato de experiência</h3>
+    <div class="fields">${I('admissao','Admissão','date')}${I('fim_experiencia1','Fim do 1º período','date')}${I('fim_experiencia2','Fim da prorrogação','date')}${I('ultimo_dia_aviso','Último dia do aviso','date')}</div>
+    ${e?'<div class="row"><button type="button" class="btn small" id="cb4545">Calcular 45 + 45 dias pela admissão</button><span class="note">O 1º período termina no 45º dia e a prorrogação no 90º.</span></div>':''}
+    <label class="f">Observação dos prazos<textarea data-ck="prazos_obs" rows="2"${dis}>${esc(v.prazos_obs||'')}</textarea></label>
+    <h3>Benefícios</h3>
+    <div class="fields">${I('va_valor','VA por mês (R$)','text',' class="money"')}${I('vt_valor_dia','VT por dia, ida e volta (R$)','text',' class="money"')}${I('vt_empresa','Empresa do VT')}</div>
+    ${v.situacao==='Afastado'||!f?I('motivo_afastamento','Motivo do afastamento'):''}
+    <p class="note" style="margin:0">Ajuda de custo, percentuais e VA/VT da folha ficam em Folha de pagamento › Colaboradores e valores fixos.</p>
+    <p class="err" id="cbErr" hidden></p>`;
+  if(e)$('cb4545').onclick=()=>{const a=document.querySelector('[data-ck="admissao"]').value;if(!a){toast('Informe a admissão');return}
+    document.querySelector('[data-ck="fim_experiencia1"]').value=addDias(a,44);document.querySelector('[data-ck="fim_experiencia2"]').value=addDias(a,89)};
+  $('cbSave').hidden=!e;dlgColab.showModal();
+}
+$('cbClose').onclick=()=>dlgColab.close();
+$('cbSave').onclick=async()=>{
+  const err=$('cbErr'),o={};err.hidden=true;
+  document.querySelectorAll('#cbBody [data-ck]').forEach(i=>{const k=i.dataset.ck,s=i.value.trim();
+    o[k]=k==='va_valor'||k==='vt_valor_dia'?(s?parseMoney(s):null):s||null});
+  if(!o.nome){err.textContent='Informe o nome.';err.hidden=false;return}
+  if(Number.isNaN(o.va_valor)||Number.isNaN(o.vt_valor_dia)){err.textContent='Valor de VA ou VT inválido.';err.hidden=false;return}
+  if(o.fim_experiencia1&&o.fim_experiencia2&&o.fim_experiencia2<o.fim_experiencia1){err.textContent='A prorrogação não pode terminar antes do 1º período.';err.hidden=false;return}
+  if(o.admissao&&o.fim_experiencia2&&diasAte(o.fim_experiencia2)-diasAte(o.admissao)>89){err.textContent='O contrato de experiência não pode passar de 90 dias.';err.hidden=false;return}
+  const f=COLABDLG;o.situacao=o.situacao||'Ativo';
+  if(o.situacao==='Desligado'&&!f?.desligado_em)o.desligado_em=o.ultimo_dia_aviso||TODAY;if(o.situacao!=='Desligado')o.desligado_em=null;
+  if(o.situacao==='Afastado'&&!f?.afastado_desde)o.afastado_desde=TODAY;
+  $('cbSave').disabled=true;
+  const {error}=f?await sb.from('funcionarios').update(o).eq('id',f.id):await sb.from('funcionarios').insert({...o,cliente_id:escCli.value,folha_va:true});
+  $('cbSave').disabled=false;
+  if(error){console.error(error);err.textContent=/duplicate|unique/i.test(error.message||'')?'Matrícula repetida nesta empresa.':'Não foi possível salvar. Verifique a internet e tente de novo.';err.hidden=false;return}
+  dlgColab.close();toast('Colaborador salvo');renderColab();
 };
 
 // =====================================================================
