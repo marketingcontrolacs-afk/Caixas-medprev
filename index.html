@@ -1862,13 +1862,15 @@ const FCOL={
   assiduidade:{t:'Assiduidade',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Assiduidade',fx:[['ff.assiduidade','Assiduidade R$','money']],
     fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='faltas_data')?0:v}},
   // valor por dia × dias úteis do mês, mais os sábados trabalhados (lançados no mês) × valor do sábado
-  ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
+  ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
   he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas'},
   he100:{t:'HE 100%',g:'P',k:'horas',lanca:'horas'},
   observacoes:{t:'Observações',g:'O',k:'texto',lanca:'texto',fixo:f=>ff(f,'observacoes'),fx:[['ff.observacoes','Observação fixa','texto']]},
 };
 const FPADRAO=['ajuda_custo','gratificacao','horas_extras','dif_salario','quebra_cx','insalubridade','va','vt','descontos_diversos','quebra_cx_desc','faltas_horas','faltas_dias','dsr','adiantamento','observacoes'];
 const FNOME=c=>FCOL[c].nome||FCOL[c].t;
+// título da coluna e nome da aba como na planilha da empresa (folha_modelo.titulos / .abas)
+const colT=c=>folModelo().titulos?.[c]||FCOL[c].t;
 // Rescisão: mesmos blocos da planilha de rescisão
 const RPROV=[['va_prov','VA'],['vt_prov','VT'],['ajuda_custo','Ajuda de Custo'],['gratificacao','Gratificação'],['quebra_cx','Quebra de CX'],['insalubridade','Insalubridade'],['he50','HE 50% até 20H'],['he75','HE 75% acima 20H']];
 const RDESC=[['va_desc','VA'],['vt_desc','VT'],['quebra_cx_desc','Quebra de CX'],['faltas_horas','Faltas/ Horas'],['faltas_dias','Faltas/ Dias'],['dsr','DSR'],['adiantamento','Adiantamento'],['outros','Outros']];
@@ -1916,11 +1918,11 @@ function folCelula(f,c){
 }
 // Ajuda de custo por dia: dias úteis × valor do dia + sábados lançados × valor do sábado (vai com a fórmula, como na planilha)
 function ajudaDia(f,ls){
-  const dia=ffNum(f,'ajuda_dia'),sab=ls.reduce((s,l)=>s+(+l.quantidade||0),0),vs=ffNum(f,'ajuda_sabado')||0;
-  if(!dia&&!sab)return {v:null,txt:''};
-  const a=dia?r2(FOL.du*dia):0,b=r2(sab*vs),tot=r2(a+b),pt=[dia?`${FOL.du}*${dia}`:'',b?String(b):''].filter(Boolean);
+  const dia=ffNum(f,'ajuda_dia'),mes=ffNum(f,'ajuda_mes'),sab=ls.reduce((s,l)=>s+(+l.quantidade||0),0),vs=ffNum(f,'ajuda_sabado')||0;
+  if(!dia&&!mes&&!sab)return {v:null,txt:''};
+  const a=dia?r2(FOL.du*dia):mes||0,b=r2(sab*vs),tot=r2(a+b),pt=[dia?`${FOL.du}*${dia}`:mes?String(mes):'',b?String(b):''].filter(Boolean);
   return {v:tot,z:'"R$" #,##0.00',f:pt.length>1?`(${pt[0]})+${pt[1]}`:pt[0],txt:fm(tot),
-    dica:[dia?`${FOL.du} dias úteis × ${fm(dia)}`:'',sab?`${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)}`:''].filter(Boolean).join(' + ')};
+    dica:[dia?`${FOL.du} dias úteis × ${fm(dia)}`:mes?`${fm(mes)} fixo no mês`:'',sab?`${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)}`:''].filter(Boolean).join(' + ')};
 }
 // Faltas pela data do dia (uma falta: a data; mais de uma: as datas separadas por vírgula)
 const xlsDia=s=>(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))-Date.UTC(1899,11,30))/864e5;
@@ -1966,11 +1968,11 @@ function folCab(cols){
   const rot=g=>(M.grupos||{})[g]??{P:'PROVENTOS',D:'DESCONTOS'}[g]??'';
   if(M.mesclar)lead.forEach((t,i)=>put(0,i,t,1,nh));else{put(0,0,'',L);lead.forEach((t,i)=>put(1,i,t,1,nh-1))}
   for(let i=0;i<cols.length;){let j=i;while(j<cols.length&&FCOL[cols[j]].g===FCOL[cols[i]].g)j++;const t=rot(FCOL[cols[i]].g);
-    if(t)put(0,L+i,t,j-i);else if(M.mesclar)for(let k=i;k<j;k++){put(0,L+k,FCOL[cols[k]].t,1,nh);topo.add(k)}else put(0,L+i,'',j-i);
+    if(t)put(0,L+i,t,j-i);else if(M.mesclar)for(let k=i;k<j;k++){put(0,L+k,colT(cols[k]),1,nh);topo.add(k)}else put(0,L+i,'',j-i);
     i=j}
   for(let i=0;i<cols.length;){const d=FCOL[cols[i]];if(topo.has(i)){i++;continue}
-    if(d.sub){let j=i;while(j<cols.length&&FCOL[cols[j]].sub===d.sub)j++;put(1,L+i,d.sub,j-i);for(let k=i;k<j;k++)put(2,L+k,FCOL[cols[k]].t);i=j}
-    else{put(1,L+i,d.t,1,nh-1);i++}}
+    if(d.sub){let j=i;while(j<cols.length&&FCOL[cols[j]].sub===d.sub)j++;put(1,L+i,d.sub,j-i);for(let k=i;k<j;k++)put(2,L+k,colT(cols[k]));i=j}
+    else{put(1,L+i,colT(cols[i]),1,nh-1);i++}}
   return {cel:out,nh,L};
 }
 function initFolha(){
@@ -2387,7 +2389,7 @@ function baixarFolha(){
     const w=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true});
     Object.keys(w).forEach(k=>{if(k[0]==='!')return;const cel=w[k];if(cel.t==='d')cel.z='dd/mm/yyyy';else if(cel.t==='n'&&XLSX.utils.decode_cell(k).c>=6||XLSX.utils.decode_cell(k).c===4&&cel.t==='n')cel.z='#,##0.00'});
     w['!cols']=[{wch:11},{wch:11},{wch:24},{wch:28},{wch:11},{wch:8},...ms.map(()=>({wch:10}))];
-    XLSX.utils.book_append_sheet(wb,w,abaNome(FCOL[c].aba||FCOL[c].t));
+    XLSX.utils.book_append_sheet(wb,w,abaNome(folModelo().abas?.[c]||FCOL[c].aba||FCOL[c].t));
   });
   const arq=(M.arquivo||'Planilha Folha {mes}.{ano} - {empresa}').replace('{mes}',m).replace('{ano}',y).replace('{empresa}',cli.nome);
   XLSX.writeFile(wb,arq+'.xlsx');
