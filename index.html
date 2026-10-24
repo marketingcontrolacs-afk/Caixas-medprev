@@ -425,9 +425,14 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <p class="note">Valores fixos vêm do cadastro do colaborador e o resto vem dos lançamentos do mês. O escritório pode alterar qualquer célula direto na tabela, inclusive os fixos: a mudança vale só para este mês e a célula fica em amarelo (↺ volta ao valor calculado). Para mudar um fixo de vez, use “Colaboradores e valores fixos”.</p>
     <h2 style="margin-top:22px">Lançamentos do mês</h2>
     <div class="card tablebox"><table id="folLanc"></table></div>
+    <div id="folParcBox" hidden>
+      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Descontos parcelados</h2><div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folParcTodos" style="width:auto"> Mostrar quitados</label><button class="btn" id="folParcAdd">+ Desconto parcelado</button></div></div>
+      <div class="card tablebox"><table id="folParc"></table></div>
+      <p class="note">Vales de atendimentos e adiantamentos divididos em parcelas. A parcela de cada mês entra sozinha na coluna da folha; não precisa lançar de novo.</p>
+    </div>
     <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Rescisões do mês</h2><button class="btn" id="folRescBaixar" hidden>Baixar planilha de rescisão</button></div>
     <div class="card tablebox"><table id="folResc"></table></div>
-    <details class="card fdet" id="folCadBox" style="margin-top:22px"><summary><b>Colaboradores e valores fixos</b> <span class="note">cargo, ajuda de custo, gratificação, quebra de caixa, insalubridade, VA e VT, que entram todo mês</span></summary>
+    <details class="card fdet" id="folCadBox" style="margin-top:22px"><summary><b>Colaboradores e valores fixos</b> <span class="note" id="folCadNota"></span></summary>
       <div class="tablebox" style="margin-top:0"><table id="folCad"></table></div>
       <div class="row"><button class="btn" id="folCadAdd">+ Colaborador</button><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folCadTodos" style="width:auto"> Mostrar desligados</label><span class="spacer"></span><button class="btn primary" id="folCadSalvar">Salvar colaboradores</button></div>
       <p class="note" style="margin:0">Percentuais em número (20 = 20%). A matrícula é opcional e serve para ligar com a planilha de férias.</p>
@@ -1809,26 +1814,41 @@ $('fImportFile').addEventListener('change',async e=>{
 // =====================================================================
 // Durante o mês lançam-se as informações de cada colaborador. O escritório confere, ajusta e baixa a
 // planilha no modelo da contabilidade (supabase/v14_rh_folha.sql). Os valores fixos vêm do cadastro.
-// k: money (R$), pct (0,2 = 20%), horas (minutos), dias, simnao, texto. lanca: como se lança no mês.
+// k: money (R$), pct (0,2 = 20%), horas (minutos), dias, datas, simnao, texto. lanca: como se lança no mês
+// (livre: valor ou texto). fx: campos fixos do cadastro ('ff.x' fica em funcionarios.folha_fixos).
+// parc: recebe as parcelas dos descontos parcelados. sub: subtítulo que agrupa colunas (ex.: Premiação).
+const ff=(f,k)=>{const v=f.folha_fixos?.[k];return v==null||v===''?null:v};
+const ffNum=(f,k)=>{const v=ff(f,k);if(v==null)return null;const n=typeof v==='number'?v:parseMoney(String(v));return isFinite(n)?n:null};
 const FCOL={
-  ajuda_custo:{t:'Ajuda de Custo',g:'P',k:'money',fixo:f=>+f.folha_ajuda_custo||null,nao:true},
-  gratificacao:{t:'Gratificação',g:'P',k:'pct',fixo:f=>+f.folha_gratificacao||null,lanca:'texto',dica:'Ex.: 5 dias, 11h, 100'},
+  ajuda_custo:{t:'Ajuda de Custo',g:'P',k:'money',fixo:f=>+f.folha_ajuda_custo||null,nao:true,fx:[['folha_ajuda_custo','Ajuda de custo R$','money']]},
+  gratificacao:{t:'Gratificação',g:'P',k:'pct',fixo:f=>+f.folha_gratificacao||null,lanca:'texto',dica:'Ex.: 5 dias, 11h, 100',fx:[['folha_gratificacao','Gratif. %','pct']]},
   horas_extras:{t:'Horas Extras',g:'P',k:'horas',lanca:'horas'},
   he50:{t:'HE 50% até 20H',g:'P',k:'horas',lanca:'horas'},
   he75:{t:'HE 75% acima 20H',g:'P',k:'horas',lanca:'horas'},
   dif_salario:{t:'Dif de salário',g:'P',k:'money',lanca:'money'},
-  quebra_cx:{t:'Quebra de CX',g:'P',k:'pct',fixo:f=>+f.folha_quebra_cx||null},
-  insalubridade:{t:'Insalubridade',g:'P',k:'pct',fixo:f=>+f.folha_insalubridade||null},
-  va:{t:'VA',g:'D',k:'simnao',fixo:f=>f.folha_va},
-  vt:{t:'VT',g:'D',k:'simnao',fixo:f=>f.folha_vt},
+  quebra_cx:{t:'Quebra de CX',g:'P',k:'pct',fixo:f=>+f.folha_quebra_cx||null,fx:[['folha_quebra_cx','Quebra CX %','pct']]},
+  insalubridade:{t:'Insalubridade',g:'P',k:'pct',fixo:f=>+f.folha_insalubridade||null,fx:[['folha_insalubridade','Insalub. %','pct']]},
+  va:{t:'VA',g:'D',k:'simnao',fixo:f=>f.folha_va,fx:[['folha_va','VA','bool']]},
+  vt:{t:'VT',g:'D',k:'simnao',fixo:f=>f.folha_vt,fx:[['folha_vt','VT','bool']]},
   descontos_diversos:{t:'Descontos Diversos',g:'D',k:'money',lanca:'money'},
   quebra_cx_desc:{t:'Quebra de CX',g:'D',k:'money',lanca:'money',nome:'Quebra de CX (desconto)'},
   faltas_horas:{t:'Faltas/ Horas',g:'D',k:'horas',lanca:'horas',dsr:true},
   faltas_dias:{t:'Faltas/ Dias',g:'D',k:'dias',lanca:'dias',dsr:true},
   dsr:{t:'DSR',g:'D',k:'texto',lanca:'texto',dica:'Ex.: Sim'},
-  adiantamento:{t:'Adiantamento',g:'D',k:'money',lanca:'money'},
+  vale_mp:{t:'Vale (Atendimentos MP)',g:'D',k:'money',lanca:'money',parc:true},
+  adiantamento:{t:'Adiantamento',g:'D',k:'money',lanca:'money',parc:true,aba:'Adiantamentos'},
+  faltas_data:{t:'Faltas',g:'D',k:'datas',lanca:'datas',nome:'Faltas (data do dia)'},
   outros:{t:'Outros descontos',g:'D',k:'money',lanca:'money'},
-  observacoes:{t:'Observações',g:'O',k:'texto',lanca:'texto'},
+  gratificacoes:{t:'Gratificações',g:'P',k:'money',lanca:'livre',dica:'Ex.: 140, Função, Pagar 3 dias',fixo:f=>ff(f,'gratificacoes'),fx:[['ff.gratificacoes','Gratificação fixa','livre']]},
+  premio_whats:{t:'Whatsapp',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Whatsapp'},
+  // a assiduidade zera no mês em que há falta lançada; afastado não recebe
+  assiduidade:{t:'Assiduidade',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Assiduidade',fx:[['ff.assiduidade','Assiduidade R$','money']],
+    fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='faltas_data')?0:v}},
+  // valor por dia × dias úteis do mês, mais os sábados trabalhados (lançados no mês) × valor do sábado
+  ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
+  he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas'},
+  he100:{t:'HE 100%',g:'P',k:'horas',lanca:'horas'},
+  observacoes:{t:'Observações',g:'O',k:'texto',lanca:'texto',fixo:f=>ff(f,'observacoes'),fx:[['ff.observacoes','Observação fixa','texto']]},
 };
 const FPADRAO=['ajuda_custo','gratificacao','horas_extras','dif_salario','quebra_cx','insalubridade','va','vt','descontos_diversos','quebra_cx_desc','faltas_horas','faltas_dias','dsr','adiantamento','observacoes'];
 const FNOME=c=>FCOL[c].nome||FCOL[c].t;
@@ -1837,12 +1857,14 @@ const RPROV=[['va_prov','VA'],['vt_prov','VT'],['ajuda_custo','Ajuda de Custo'],
 const RDESC=[['va_desc','VA'],['vt_desc','VT'],['quebra_cx_desc','Quebra de CX'],['faltas_horas','Faltas/ Horas'],['faltas_dias','Faltas/ Dias'],['dsr','DSR'],['adiantamento','Adiantamento'],['outros','Outros']];
 const RTIPOS=['Pedido de demissão por parte do colaborador','Demissão Termino de experiência','Demissão sem justa causa','Demissão por justa causa','Acordo entre as partes','Término de contrato'];
 const FSTAT={Aberta:'c-warn',Conferida:'c-ok',Enviada:'c-done'};
-let FOL={cli:null,comp:null,mes:null,func:[],lanc:[],aj:{},resc:[]};
+let FOL={cli:null,comp:null,mes:null,func:[],lanc:[],aj:{},resc:[],parc:[],fer:[],du:0};
+const folModelo=()=>FOL.cli?.folha_modelo||{};
 const folMes=$('folMes');
 const hhmm=min=>{min=Math.round(min||0);const s=min<0?'-':'';min=Math.abs(min);return `${s}${Math.floor(min/60)}:${pad(min%60)}`};
 const lerHoras=s=>{s=String(s||'').trim().replace(/h$/i,'');if(!s)return null;let m=s.match(/^(\d+)\s*[:hH]\s*(\d{1,2})$/);if(m)return +m[1]*60+ +m[2];
   m=s.replace(',','.').match(/^\d+(\.\d+)?$/);return m?Math.round(+m[0]*60):NaN};
 const pctTxt=v=>Math.round(v*1000)/10+'%';
+const addMes=(comp,n)=>{const d=new Date(comp.slice(0,7)+'-01T12:00');d.setMonth(d.getMonth()+n);return isoLocal(d)};
 const fimMes=comp=>{const d=new Date(comp+'T12:00');d.setMonth(d.getMonth()+1,0);return isoLocal(d)};
 const colsDe=cli=>(cli.folha_colunas&&cli.folha_colunas.length?cli.folha_colunas:FPADRAO).filter(c=>FCOL[c]);
 // Valor da célula: ajuste do escritório, ou fixo do cadastro somado ao que foi lançado no mês.
@@ -1850,24 +1872,54 @@ const colsDe=cli=>(cli.folha_colunas&&cli.folha_colunas.length?cli.folha_colunas
 function folCelula(f,c){
   const d=FCOL[c],aj=FOL.aj[f.id+'|'+c];
   if(aj!==undefined)return {...folTexto(aj,d.k),aj:true};
-  const ls=FOL.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c),fx=d.fixo?d.fixo(f):null;
+  const ls=FOL.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c);let fx=d.fixo?d.fixo(f):null;
   const textos=ls.filter(l=>l.texto).map(l=>l.texto);
+  if(c==='ajuda_dia')return ajudaDia(f,ls);
+  if(d.k==='datas')return folDatas(ls);
+  // fixo em texto (ex.: gratificação "Função") vai junto com os textos do mês
+  if(typeof fx==='string'){const n=/^[\d.,\s]+$/.test(fx)?parseMoney(fx):NaN;if(isFinite(n)&&d.k==='money')fx=n;else{textos.unshift(fx);fx=null}}
   if(c==='dsr'&&FOL.lanc.some(l=>l.funcionario_id===f.id&&FCOL[l.coluna]?.dsr&&l.texto==='dsr'))textos.unshift('Sim');
   if(c==='observacoes'&&f.situacao==='Afastado'&&f.motivo_afastamento)textos.unshift(f.motivo_afastamento);
   if(c==='dif_salario'){const n=diasSemRegistro(f);if(n)textos.unshift(`${n} ${n===1?'dia':'dias'}`)}
   if(d.k==='simnao')return fx?{v:'Sim',txt:'Sim'}:{v:'Não',txt:'Não'};
+  // parcelas dos descontos parcelados que caem neste mês
+  const nums=ls.filter(l=>l.quantidade!=null).map(l=>+l.quantidade);
+  if(d.parc)FOL.parc.forEach(p=>{if(p.funcionario_id===f.id&&p.coluna===c){const v=parcDoMes(p);if(v)nums.push(v)}});
   if(d.k==='texto'){const t=[...new Set(textos)].join('; ');return {v:t||null,txt:t}}
   if(d.k==='pct'){const p=[fx?pctTxt(fx):null,...textos].filter(Boolean);
     if(p.length===1&&fx)return {v:fx,z:'0%',txt:pctTxt(fx)};return {v:p.join(' + ')||null,txt:p.join(' + ')}}
-  const nums=ls.filter(l=>l.quantidade!=null);
-  if(d.k==='horas'){if(!nums.length)return {v:null,txt:''};const m=nums.reduce((s,l)=>s+ +l.quantidade,0);return {v:m/1440,z:'[h]:mm',txt:hhmm(m)}}
-  if(d.k==='dias'){if(!nums.length)return {v:null,txt:''};const n=nums.reduce((s,l)=>s+ +l.quantidade,0),ds=nums.filter(l=>l.data).map(l=>dBR(l.data).slice(0,5));
+  if(d.k==='horas'){if(!nums.length)return {v:null,txt:''};const m=nums.reduce((s,v)=>s+v,0);return {v:m/1440,z:'[h]:mm',txt:hhmm(m)}}
+  if(d.k==='dias'){if(!nums.length)return {v:null,txt:''};const n=nums.reduce((s,v)=>s+v,0),ds=ls.filter(l=>l.quantidade!=null&&l.data).map(l=>dBR(l.data).slice(0,5));
     const t=ds.length?`${n} (${ds.join(', ')})`:String(n);return {v:ds.length?t:n,txt:t}}
   // money (com texto, como os dias trabalhados sem registro, a célula vai como texto)
-  if(!nums.length&&!fx){if(textos.length){const t=textos.join(' + ');return {v:t,txt:t}}return d.nao?{v:'Não',txt:'Não'}:{v:null,txt:''}}
-  const tot=r2((fx||0)+nums.reduce((s,l)=>s+ +l.quantidade,0));
+  if(!nums.length&&fx==null){if(textos.length){const t=textos.join(' + ');return {v:t,txt:t}}return d.nao?{v:'Não',txt:'Não'}:{v:null,txt:''}}
+  const tot=r2((fx||0)+nums.reduce((s,v)=>s+v,0));
   if(textos.length){const t=[...textos,fm(tot)].join(' + ');return {v:t,txt:t}}
   return {v:tot,z:'"R$" #,##0.00',txt:fm(tot)};
+}
+// Ajuda de custo por dia: dias úteis × valor do dia + sábados lançados × valor do sábado (vai com a fórmula, como na planilha)
+function ajudaDia(f,ls){
+  const dia=ffNum(f,'ajuda_dia'),sab=ls.reduce((s,l)=>s+(+l.quantidade||0),0),vs=ffNum(f,'ajuda_sabado')||0;
+  if(!dia&&!sab)return {v:null,txt:''};
+  const a=dia?r2(FOL.du*dia):0,b=r2(sab*vs),tot=r2(a+b),pt=[dia?`${FOL.du}*${dia}`:'',b?String(b):''].filter(Boolean);
+  return {v:tot,z:'"R$" #,##0.00',f:pt.length>1?`(${pt[0]})+${pt[1]}`:pt[0],txt:fm(tot),
+    dica:[dia?`${FOL.du} dias úteis × ${fm(dia)}`:'',sab?`${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)}`:''].filter(Boolean).join(' + ')};
+}
+// Faltas pela data do dia (uma falta: a data; mais de uma: as datas separadas por vírgula)
+const xlsDia=s=>(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))-Date.UTC(1899,11,30))/864e5;
+function folDatas(ls){
+  const ds=ls.filter(l=>l.data).sort((a,b)=>a.data.localeCompare(b.data)),sem=ls.filter(l=>!l.data&&l.texto).map(l=>l.texto);
+  if(ds.length===1&&+ds[0].quantidade===1&&!sem.length)return {v:xlsDia(ds[0].data),z:'dd/mm/yyyy',txt:dBR(ds[0].data)};
+  const t=[...ds.map(l=>dBR(l.data)+(+l.quantidade>1?` (${+l.quantidade} dias)`:'')),...sem].join(', ');
+  return {v:t||null,txt:t};
+}
+// Parcela de um desconto parcelado na competência aberta
+const parcDoMes=p=>{const x=(p.parcelas||[]).find(x=>x.c===FOL.comp.slice(0,7));return x?+x.v:0};
+// Dias úteis do mês: segunda a sexta, menos os feriados da empresa (o escritório pode mudar no mês)
+function diasUteis(comp,fer){
+  const d=new Date(comp+'T12:00'),m=d.getMonth(),fs=new Set(fer);let n=0;
+  for(;d.getMonth()===m;d.setDate(d.getDate()+1)){const w=d.getDay();if(w>0&&w<6&&!fs.has(isoLocal(d)))n++}
+  return n;
 }
 // Dias trabalhados antes da admissão (sem registro): entram na folha do mês em que a pessoa começou
 function diasSemRegistro(f){
@@ -1885,9 +1937,24 @@ function folTexto(s,k){
 }
 // Colaboradores da folha do mês: ativos e afastados, e quem só sai depois do fim do mês
 function folDoMes(){
-  const fim=fimMes(FOL.comp),comLanc=new Set(FOL.lanc.map(l=>l.funcionario_id)),comResc=new Set(FOL.resc.map(r=>r.funcionario_id));
+  const fim=fimMes(FOL.comp),comLanc=new Set(FOL.lanc.map(l=>l.funcionario_id)),comResc=new Set(FOL.resc.map(r=>r.funcionario_id)),porCargo=folModelo().cargo!==false;
   return FOL.func.filter(f=>f.situacao!=='Desligado'||(f.desligado_em&&f.desligado_em>fim)||(comLanc.has(f.id)&&!comResc.has(f.id)))
-    .sort((a,b)=>String(a.cargo||'').localeCompare(String(b.cargo||''))||a.nome.localeCompare(b.nome));
+    .sort((a,b)=>(porCargo?String(a.cargo||'').localeCompare(String(b.cargo||'')):0)||a.nome.localeCompare(b.nome));
+}
+// Cabeçalho no formato da planilha da empresa: grupos (Proventos/Descontos), subtítulos (ex.: Premiação) e colunas.
+// Devolve as células com linha, coluna e mesclagem, para a tela e para o Excel.
+function folCab(cols){
+  const M=folModelo(),lead=[M.rotulo_nome||'Colaboradores',...(M.cargo===false?[]:['Cargo'])],L=lead.length;
+  const nh=cols.some(c=>FCOL[c].sub)?3:2,out=[],put=(r,c,t,cs=1,rs=1)=>out.push({r,c,t,cs,rs}),topo=new Set();
+  const rot=g=>(M.grupos||{})[g]??{P:'PROVENTOS',D:'DESCONTOS'}[g]??'';
+  if(M.mesclar)lead.forEach((t,i)=>put(0,i,t,1,nh));else{put(0,0,'',L);lead.forEach((t,i)=>put(1,i,t,1,nh-1))}
+  for(let i=0;i<cols.length;){let j=i;while(j<cols.length&&FCOL[cols[j]].g===FCOL[cols[i]].g)j++;const t=rot(FCOL[cols[i]].g);
+    if(t)put(0,L+i,t,j-i);else if(M.mesclar)for(let k=i;k<j;k++){put(0,L+k,FCOL[cols[k]].t,1,nh);topo.add(k)}else put(0,L+i,'',j-i);
+    i=j}
+  for(let i=0;i<cols.length;){const d=FCOL[cols[i]];if(topo.has(i)){i++;continue}
+    if(d.sub){let j=i;while(j<cols.length&&FCOL[cols[j]].sub===d.sub)j++;put(1,L+i,d.sub,j-i);for(let k=i;k<j;k++)put(2,L+k,FCOL[cols[k]].t);i=j}
+    else{put(1,L+i,d.t,1,nh-1);i++}}
+  return {cel:out,nh,L};
 }
 function initFolha(){
   if(!folMes.options.length){folMes.innerHTML=mesesOpts(addDias(TODAY,31).slice(0,7));folMes.value=TODAY.slice(0,7)}
@@ -1908,12 +1975,21 @@ async function renderFolha(){
     sb.from('folha_ajustes').select('*').eq('cliente_id',cli.id).eq('competencia',comp),
     sb.from('folha_rescisoes').select('*').eq('cliente_id',cli.id).gte('data_demissao',comp).lte('data_demissao',fim).order('data_demissao')]);
   const er=[rf,rm,rl,ra,rr].find(x=>x.error)?.error;
+  // descontos parcelados (v19), feriados do mês e férias que começam no mês: sem eles a folha abre do mesmo jeito
+  const [rp,rh,rv]=await Promise.all([sb.from('folha_parcelamentos').select('*').eq('cliente_id',cli.id).order('emissao'),
+    sb.from('feriados').select('data,uf,municipio').gte('data',comp).lte('data',fim),
+    sb.from('v_ferias_parcelas').select('*').eq('cliente_id',cli.id).gte('inicio',comp).lte('inicio',fim).order('inicio')]);
   if(er){console.error(er);vazio(er.code==='42P01'||/folha_/.test(er.message||'')?['Este módulo precisa da atualização v14 do banco. Rode o SQL no Supabase.','neg']:['Erro ao carregar. Verifique a internet e tente de novo.','neg']);return}
-  FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:Object.fromEntries((ra.data||[]).map(a=>[a.funcionario_id+'|'+a.coluna,a.valor]))};
+  FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:Object.fromEntries((ra.data||[]).map(a=>[a.funcionario_id+'|'+a.coluna,a.valor])),
+    parc:rp.error?[]:rp.data||[],semParc:!!rp.error,fer:rv.error?[]:(rv.data||[]).filter(x=>x.status!=='Devolvida')};
+  const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
+  FOL.du=FOL.mes?.dias_uteis??diasUteis(comp,fer);
+  if(FOL.fer.length&&cli.folha_modelo?.ferias){const {data:pg}=await sb.from('ferias_programacoes').select('id,venda_total').in('id',[...new Set(FOL.fer.map(x=>x.programacao_id))]);
+    FOL.fer.forEach(x=>x.venda=x.ordem===1?(pg||[]).find(p=>p.id===x.programacao_id)?.venda_total||0:0)}
   // cada empresa tem a sua planilha de folha: sem o modelo configurado, não usa um modelo genérico
   if(!cli.folha_colunas?.length){
     vazio([e?'Esta empresa ainda não tem o modelo da planilha de folha. Envie a planilha da empresa para configurarmos, ou marque as colunas em “Colunas da planilha desta empresa”, abaixo.':'A folha desta empresa ainda está sendo configurada pelo escritório.']);
-    $('folAdd').hidden=$('folRescAdd').hidden=true;$('folRescBaixar').hidden=true;if(e){renderFolCad();renderFolCols()}return;
+    $('folAdd').hidden=$('folRescAdd').hidden=true;$('folRescBaixar').hidden=true;$('folParcBox').hidden=true;if(e){renderFolCad();renderFolCols()}return;
   }
   const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
   $('folAdd').hidden=$('folRescAdd').hidden=!lanca;
@@ -1921,17 +1997,18 @@ async function renderFolha(){
   $('folBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':st}</span>`
     +(FOL.mes?.conferido_em?`<span class="note">Conferida em ${dBR(FOL.mes.conferido_em.slice(0,10))}</span>`:'')
     +(e?`<span class="spacer"></span>${st==='Aberta'?'<button class="btn" data-fst="Conferida">Marcar como conferida</button>':st==='Conferida'?'<button class="btn ghost" data-fst="Aberta">Reabrir</button><button class="btn" data-fst="Enviada">Marcar como enviada</button>':'<button class="btn ghost" data-fst="Aberta">Reabrir</button>'}
-      <button class="btn primary" id="folBaixar">Baixar planilha da folha</button>`:'');
+      <button class="btn primary" id="folBaixar">Baixar planilha da folha</button>`:'')
+    +(cols.includes('ajuda_dia')?`<label class="f" style="margin-left:8px" title="Segunda a sexta, menos feriados. Usado na ajuda de custo por dia.">Dias úteis do mês<input id="folDU" type="number" min="0" max="31" value="${FOL.du}" style="max-width:80px"${edGrid?'':' disabled'}></label>`:'');
   // grade no formato da planilha
-  const gP=cols.filter(c=>FCOL[c].g==='P'),gD=cols.filter(c=>FCOL[c].g==='D'),gO=cols.filter(c=>FCOL[c].g==='O');
-  $('folGrid').innerHTML=`<thead><tr><th class="l" colspan="2"></th>${gP.length?`<th class="l" colspan="${gP.length}">Proventos</th>`:''}${gD.length?`<th class="l" colspan="${gD.length}">Descontos</th>`:''}${gO.length?`<th colspan="${gO.length}"></th>`:''}</tr>
-    <tr><th class="l">Colaborador</th><th class="l">Cargo</th>${cols.map(c=>`<th class="l">${esc(FCOL[c].t)}</th>`).join('')}</tr></thead><tbody>${
-    fs.map(f=>`<tr><td class="l"><b>${esc(f.nome)}</b>${f.situacao!=='Ativo'?` <span class="chip c-none">${esc(f.situacao)}</span>`:''}</td><td class="l">${esc(f.cargo||'')}</td>${cols.map(c=>{const x=folCelula(f,c);
-      return `<td class="l${x.aj?' fadj':''}">${edGrid?folInput(f,c,x):esc(x.txt)}</td>`}).join('')}</tr>`).join('')
-    ||`<tr><td class="l muted" colspan="${cols.length+2}">Nenhum colaborador cadastrado nesta empresa.${e?' Cadastre em “Colaboradores e valores fixos”, abaixo.':''}</td></tr>`}</tbody>`;
+  const cab=folCab(cols),M=folModelo(),comCargo=M.cargo!==false;
+  $('folGrid').innerHTML=`<thead>${M.titulo?`<tr><th class="l" colspan="${cols.length+cab.L}">${esc(M.titulo)}</th></tr>`:''}${[...Array(cab.nh).keys()].map(r=>`<tr>${cab.cel.filter(x=>x.r===r).sort((a,b)=>a.c-b.c)
+      .map(x=>`<th class="l"${x.cs>1?` colspan="${x.cs}"`:''}${x.rs>1?` rowspan="${x.rs}"`:''}>${esc(x.t)}</th>`).join('')}</tr>`).join('')}</thead><tbody>${
+    fs.map(f=>`<tr><td class="l"><b>${esc(f.nome)}</b>${f.situacao!=='Ativo'?` <span class="chip c-none">${esc(f.situacao)}</span>`:''}</td>${comCargo?`<td class="l">${esc(f.cargo||'')}</td>`:''}${cols.map(c=>{const x=folCelula(f,c);
+      return `<td class="l${x.aj?' fadj':''}"${x.dica?` title="${esc(x.dica)}"`:''}>${edGrid?folInput(f,c,x):esc(x.txt)}</td>`}).join('')}</tr>`).join('')
+    ||`<tr><td class="l muted" colspan="${cols.length+cab.L}">Nenhum colaborador cadastrado nesta empresa.${e?' Cadastre em “Colaboradores e valores fixos”, abaixo.':''}</td></tr>`}</tbody>`;
   // lançamentos do mês
   const nome=id=>FOL.func.find(f=>f.id===id)?.nome||'';
-  const valTxt=l=>{const k=FCOL[l.coluna]?.lanca;return l.quantidade==null?esc(l.texto||''):k==='horas'?hhmm(l.quantidade):k==='dias'?`${+l.quantidade} ${+l.quantidade===1?'dia':'dias'}`:fm(l.quantidade)};
+  const valTxt=l=>{const k=FCOL[l.coluna]?.lanca;return l.quantidade==null?esc(l.texto||''):k==='horas'?hhmm(l.quantidade):k==='dias'||k==='datas'?`${+l.quantidade} ${+l.quantidade===1?'dia':'dias'}`:fm(l.quantidade)};
   const apaga=lanca&&st==='Aberta'||e;
   $('folLanc').innerHTML=FOL.lanc.length?`<thead><tr><th class="l">Data</th><th class="l">Colaborador</th><th class="l">Informação</th><th>Valor</th><th class="l">Descrição</th><th></th></tr></thead><tbody>${
     FOL.lanc.map(l=>`<tr><td class="l">${l.data?dBR(l.data):''}</td><td class="l">${esc(nome(l.funcionario_id))}</td><td class="l">${esc(FCOL[l.coluna]?FNOME(l.coluna):l.coluna)}${l.texto==='dsr'?' <span class="chip c-none">desconta DSR</span>':''}</td><td>${l.texto==='dsr'?valTxt({...l,texto:''}):valTxt(l)}</td><td class="l">${esc(l.descricao||'')}</td><td>${apaga?`<button class="btn small ghost" data-flx="${l.id}">Apagar</button>`:''}</td></tr>`).join('')}</tbody>`
@@ -1940,7 +2017,8 @@ async function renderFolha(){
   $('folResc').innerHTML=FOL.resc.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Tipo</th><th>Demissão</th><th>Último dia</th><th class="l">Situação</th><th></th></tr></thead><tbody>${
     FOL.resc.map(r=>`<tr><td class="l">${esc(nome(r.funcionario_id))}</td><td class="l">${esc(r.tipo)}</td><td>${dBR(r.data_demissao)}</td><td>${r.ultimo_dia?dBR(r.ultimo_dia):''}</td><td class="l"><span class="chip ${FSTAT[r.status]}">${esc(r.status)}</span></td><td><button class="btn small" data-frs="${r.id}">Abrir</button></td></tr>`).join('')}</tbody>`
     :'<tbody><tr><td class="l muted">Nenhuma rescisão com demissão neste mês.</td></tr></tbody>';
-  $('folRescBaixar').hidden=!(e&&FOL.resc.length);
+  $('folRescBaixar').hidden=!(e&&FOL.resc.length)||!!M.resc_itens;
+  renderFolParc(cols,lanca);
   if(e){renderFolCad();renderFolCols()}
 }
 $('folBar').addEventListener('click',async ev=>{
@@ -1952,6 +2030,11 @@ $('folBar').addEventListener('click',async ev=>{
   const {error:e2}=error?{}:await sb.from('folha_rescisoes').update({status:st}).eq('cliente_id',FOL.cli.id).gte('data_demissao',FOL.comp).lte('data_demissao',fimMes(FOL.comp));
   if(error||e2)fail(error||e2);else toast(st==='Conferida'?'Folha conferida':st==='Enviada'?'Folha marcada como enviada':'Folha reaberta');
   renderFolha();
+});
+$('folBar').addEventListener('change',async ev=>{
+  if(ev.target.id!=='folDU')return;const n=parseInt(ev.target.value,10);if(!(n>=0&&n<=31)){toast('Dias úteis entre 0 e 31');return}
+  const {error}=await sb.from('folha_meses').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,dias_uteis:n},{onConflict:'cliente_id,competencia'});
+  if(error){fail(error);return}toast('Dias úteis do mês salvos');renderFolha();
 });
 $('folLanc').addEventListener('click',async ev=>{const b=ev.target.closest('[data-flx]');if(!b||!confirm('Apagar este lançamento?'))return;
   const {error}=await sb.from('folha_lancamentos').delete().eq('id',b.dataset.flx);if(error)fail(error,'Não foi possível apagar');else{toast('Lançamento apagado');renderFolha()}});
@@ -1977,18 +2060,22 @@ $('folAdd').onclick=()=>{
     <label class="f wide">Descrição (opcional)<input id="flObs" placeholder="Ex.: motivo do desconto, atestado, plantão extra"></label></div>`,
     '<button type="button" class="btn" data-fo="lancOutro">Salvar e lançar outro</button><button type="button" class="btn primary" data-fo="lanc">Salvar</button>');
   const ajusta=()=>{const c=$('flC').value,k=FCOL[c].lanca;
-    $('flVT').textContent=k==='horas'?'Horas (h:mm)':k==='dias'?'Dias':k==='money'?'Valor (R$)':'Texto';
-    $('flV').placeholder=k==='horas'?'Ex.: 2:30':k==='dias'?'1':k==='money'?'0,00':FCOL[c].dica||'';
-    $('flV').className=k==='money'?'money':'';$('flV').inputMode=k==='texto'?'text':'decimal';
-    if(k==='dias'&&!$('flV').value)$('flV').value='1';$('flDsrL').hidden=!FCOL[c].dsr};
+    $('flVT').textContent=FCOL[c].rotulo||(k==='horas'?'Horas (h:mm)':k==='dias'||k==='datas'?'Dias':k==='money'?'Valor (R$)':k==='livre'?'Valor (R$) ou texto':'Texto');
+    $('flV').placeholder=k==='horas'?'Ex.: 2:30':k==='dias'||k==='datas'?'1':k==='money'?'0,00':FCOL[c].dica||'';
+    $('flV').className=k==='money'?'money':'';$('flV').inputMode=k==='texto'||k==='livre'?'text':'decimal';
+    // falta pela data: pode ser do mês anterior (o fechamento da folha não é no dia 1º)
+    $('flD').min=k==='datas'?addMes(FOL.comp,-1):FOL.comp;
+    if((k==='dias'||k==='datas')&&!$('flV').value)$('flV').value='1';$('flDsrL').hidden=!FCOL[c].dsr};
   $('flC').onchange=()=>{$('flV').value='';ajusta()};ajusta();
 };
 async function salvarLanc(b,outro){
   const c=$('flC').value,k=FCOL[c].lanca,s=$('flV').value.trim(),reg={cliente_id:FOL.cli.id,competencia:FOL.comp,funcionario_id:$('flF').value,coluna:c,data:$('flD').value||null,descricao:$('flObs').value.trim()||null};
   if(!s)return foErro('Informe o valor.');
-  if(reg.data&&reg.data.slice(0,7)!==folMes.value)return foErro('A data precisa ser deste mês.');
+  if(k==='datas'){if(!reg.data)return foErro('Informe a data da falta.');if(reg.data<addMes(FOL.comp,-1)||reg.data>fimMes(FOL.comp))return foErro('A data precisa ser deste mês ou do anterior.')}
+  else if(reg.data&&reg.data.slice(0,7)!==folMes.value)return foErro('A data precisa ser deste mês.');
   if(k==='horas'){const m=lerHoras(s);if(!isFinite(m)||m<=0)return foErro('Horas no formato h:mm, por exemplo 2:30.');reg.quantidade=m}
-  else if(k==='dias'){const n=+s.replace(',','.');if(!(n>0))return foErro('Informe quantos dias.');reg.quantidade=n}
+  else if(k==='dias'||k==='datas'){const n=+s.replace(',','.');if(!(n>0))return foErro('Informe quantos dias.');reg.quantidade=n}
+  else if(k==='livre'){const n=/^[R$\s\d.,-]+$/.test(s)?parseMoney(s):NaN;if(isFinite(n)&&n)reg.quantidade=n;else reg.texto=s}
   else if(k==='money'){const n=parseMoney(s);if(!isFinite(n)||!n)return foErro('Valor inválido.');reg.quantidade=n}
   else reg.texto=s;
   if(FCOL[c].dsr&&$('flDsr').checked)reg.texto='dsr';
@@ -2021,6 +2108,66 @@ $('folGrid').addEventListener('click',async ev=>{
 });
 $('folGrid').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('.fin input'))ev.target.blur()});
 
+// Descontos parcelados (vale de atendimentos, adiantamento): cada parcela tem o mês e o valor
+const ymTxt=ym=>`${MESES[+ym.slice(5,7)-1].slice(0,3).toLowerCase()}/${ym.slice(2,4)}`;
+const parcRest=p=>r2((p.parcelas||[]).filter(x=>x.c>FOL.comp.slice(0,7)).reduce((s,x)=>s+ +x.v,0));
+function renderFolParc(cols,lanca){
+  const pc=cols.filter(c=>FCOL[c].parc);
+  $('folParcBox').hidden=!pc.length;if(!pc.length)return;
+  FOL.parcCols=pc;$('folParcAdd').hidden=!lanca||FOL.semParc;
+  if(FOL.semParc){$('folParc').innerHTML='<tbody><tr><td class="l neg">Os descontos parcelados precisam da atualização v19 do banco. Rode o SQL no Supabase.</td></tr></tbody>';return}
+  const ym=FOL.comp.slice(0,7),todos=$('folParcTodos').checked,nome=id=>FOL.func.find(f=>f.id===id)?.nome||'',sit=id=>FOL.func.find(f=>f.id===id)?.situacao;
+  const ls=FOL.parc.filter(p=>todos||(p.parcelas||[]).some(x=>x.c>=ym)).sort((a,b)=>nome(a.funcionario_id).localeCompare(nome(b.funcionario_id))||String(a.emissao||'').localeCompare(String(b.emissao||'')));
+  $('folParc').innerHTML=ls.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Desconta em</th><th>Emissão</th><th class="l">Guia</th><th class="l">Usuário</th><th>Total</th><th>Parcelas</th><th>Neste mês</th><th>Falta depois</th><th></th></tr></thead><tbody>${
+    ls.map(p=>{const ps=p.parcelas||[],i=ps.findIndex(x=>x.c===ym),rest=parcRest(p);
+      return `<tr><td class="l">${esc(nome(p.funcionario_id))}${sit(p.funcionario_id)==='Desligado'&&rest>0?' <span class="chip c-warn">Desligado: descontar na rescisão</span>':''}</td><td class="l">${esc(FCOL[p.coluna]?.t||p.coluna)}</td><td>${p.emissao?dBR(p.emissao):''}</td><td class="l">${esc(p.guia||'')}</td><td class="l">${esc(p.usuario||'')}</td>
+        <td>${fm(p.valor_total)}</td><td>${ps.length}x ${ps.length?`<span class="muted">(${ymTxt(ps[0].c)} a ${ymTxt(ps[ps.length-1].c)})</span>`:''}</td><td>${i>=0?`<b>${fm(ps[i].v)}</b> <span class="muted">${i+1}/${ps.length}</span>`:'<span class="muted">–</span>'}</td><td>${rest?fm(rest):'<span class="muted">quitado</span>'}</td>
+        <td><button class="btn small" data-fpc="${p.id}">Abrir</button></td></tr>`}).join('')}</tbody>`
+    :`<tbody><tr><td class="l muted">Nenhum desconto parcelado em aberto.${lanca?' Use “+ Desconto parcelado” para lançar um vale ou adiantamento em parcelas.':''}</td></tr></tbody>`;
+}
+$('folParcTodos').onchange=()=>renderFolParc(colsDe(FOL.cli),podeLancar(FOL.cli.id,'folha'));
+$('folParcAdd').onclick=()=>abrirParc(null);
+$('folParc').addEventListener('click',ev=>{const b=ev.target.closest('[data-fpc]');if(b)abrirParc(FOL.parc.find(p=>p.id===b.dataset.fpc))});
+// 1º desconto: emissão até o dia de corte entra no mesmo mês; depois, no mês seguinte
+const parcInicio=em=>{const c=folModelo().corte||20;return em?(+em.slice(8,10)>c?addMes(em,1):em.slice(0,7)+'-01').slice(0,7):FOL.comp.slice(0,7)};
+function parcGerar(total,n,ini){const v=r2(total/n),ps=[];for(let i=0;i<n;i++)ps.push({c:addMes(ini+'-01',i).slice(0,7),v:i<n-1?v:r2(total-v*(n-1))});return ps}
+function abrirParc(p){
+  const edita=podeLancar(FOL.cli.id,'folha'),dis=edita?'':' disabled',fs=FOL.func.filter(f=>f.situacao!=='Desligado'||p&&f.id===p.funcionario_id).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const v=p||{coluna:FOL.parcCols[0],emissao:TODAY,parcelas:[]};FOLACAO.parcCtx=p;
+  const mopts=sel=>{const o=[];for(let i=-12;i<=12;i++){const ym=addMes(FOL.comp,i).slice(0,7);o.push(`<option value="${ym}"${ym===sel?' selected':''}>${MESES[+ym.slice(5)-1]} ${ym.slice(0,4)}</option>`)}return o.join('')};
+  folDlg(p?'Desconto parcelado':'Novo desconto parcelado',`<div class="fields">
+      <label class="f wide">Colaborador<select id="fpF"${dis}>${p?'':'<option value="">Escolha</option>'}${fs.map(f=>`<option value="${f.id}"${v.funcionario_id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></label>
+      <label class="f">Desconta em<select id="fpC"${dis}>${FOL.parcCols.map(c=>`<option value="${c}"${v.coluna===c?' selected':''}>${esc(FCOL[c].t)}</option>`).join('')}</select></label>
+      <label class="f">Emissão<input type="date" id="fpE" value="${v.emissao||''}"${dis}></label>
+      <label class="f">Guia<input id="fpG" value="${esc(v.guia||'')}"${dis}></label>
+      <label class="f">Usuário (quem usou)<input id="fpU" value="${esc(v.usuario||'')}"${dis}></label>
+      <label class="f">Valor total (R$)<input id="fpV" class="money" value="${showMoney(v.valor_total)}"${dis}></label>
+      <label class="f">Parcelas<input id="fpN" type="number" min="1" max="36" value="${(v.parcelas||[]).length||1}"${dis}></label>
+      <label class="f">1º desconto em<select id="fpI"${dis}>${mopts(v.parcelas?.[0]?.c||parcInicio(v.emissao))}</select></label>
+      <label class="f wide">Descrição (opcional)<input id="fpO" value="${esc(v.descricao||'')}"${dis}></label></div>
+    <h3>Parcelas</h3><div id="fpPs" class="fields"></div><p class="note" id="fpSoma" style="margin:0"></p>`,
+    (p&&edita?'<button type="button" class="btn ghost" data-fo="parcDel">Apagar</button>':'')+(edita?'<button type="button" class="btn primary" data-fo="parcSalva">Salvar</button>':''));
+  const mostra=ps=>{$('fpPs').innerHTML=ps.map((x,i)=>`<label class="f">${i+1}ª · ${MESES[+x.c.slice(5)-1]} ${x.c.slice(0,4)}<input class="money" data-pc="${x.c}" value="${showMoney(x.v)}"${dis}></label>`).join('');soma()};
+  const soma=()=>{const t=parseMoney($('fpV').value)||0,sm=r2([...document.querySelectorAll('[data-pc]')].reduce((s,i)=>s+(parseMoney(i.value)||0),0));
+    $('fpSoma').textContent=`Soma das parcelas: ${fm(sm)}`+(Math.abs(sm-t)>0.009?` · diferença de ${fm(r2(t-sm))} para o total`:'')};
+  const gera=()=>{const t=parseMoney($('fpV').value),n=parseInt($('fpN').value,10);if(t>0&&n>0)mostra(parcGerar(t,n,$('fpI').value))};
+  mostra(v.parcelas||[]);if(!p)gera();
+  if(edita){['fpV','fpN','fpI'].forEach(x=>$(x).onchange=gera);$('fpE').onchange=()=>{$('fpI').value=parcInicio($('fpE').value);gera()};$('fpPs').oninput=soma}
+}
+FOLACAO.parcSalva=async b=>{
+  const p=FOLACAO.parcCtx,parcelas=[...document.querySelectorAll('[data-pc]')].map(i=>({c:i.dataset.pc,v:r2(parseMoney(i.value))}));
+  const reg={cliente_id:FOL.cli.id,funcionario_id:$('fpF').value,coluna:$('fpC').value,emissao:$('fpE').value||null,guia:$('fpG').value.trim()||null,usuario:$('fpU').value.trim()||null,
+    valor_total:parseMoney($('fpV').value),descricao:$('fpO').value.trim()||null,parcelas};
+  if(!reg.funcionario_id)return foErro('Escolha o colaborador.');if(!(reg.valor_total>0))return foErro('Informe o valor total.');
+  if(!parcelas.length||parcelas.some(x=>!isFinite(x.v)||x.v<0))return foErro('Confira o valor das parcelas.');
+  b.disabled=true;const {error}=p?await sb.from('folha_parcelamentos').update(reg).eq('id',p.id):await sb.from('folha_parcelamentos').insert(reg);b.disabled=false;
+  if(error){console.error(error);return foErro('Não foi possível salvar. Verifique a internet e tente de novo.')}
+  dlgFol.close();toast('Desconto parcelado salvo');renderFolha();
+};
+FOLACAO.parcDel=async b=>{if(!confirm('Apagar este desconto parcelado e todas as parcelas?'))return;
+  b.disabled=true;const {error}=await sb.from('folha_parcelamentos').delete().eq('id',FOLACAO.parcCtx.id);b.disabled=false;
+  if(error){console.error(error);return foErro('Não foi possível apagar.')}dlgFol.close();toast('Desconto parcelado apagado');renderFolha()};
+
 // Rescisão
 $('folRescAdd').onclick=()=>abrirResc(null);
 $('folResc').addEventListener('click',ev=>{const b=ev.target.closest('[data-frs]');if(b)abrirResc(FOL.resc.find(r=>r.id===b.dataset.frs))});
@@ -2031,13 +2178,21 @@ function rescSugestao(f){
   v.he50=soma(['horas_extras','he50'],'horas');v.he75=soma(['he75'],'horas');v.faltas_horas=soma(['faltas_horas'],'horas');v.faltas_dias=soma(['faltas_dias'],'dias');
   v.adiantamento=soma(['adiantamento'],'money');v.outros=soma(['descontos_diversos','outros'],'money');
   if(ls.some(l=>FCOL[l.coluna]?.dsr&&l.texto==='dsr'))v.dsr='Sim';
+  // parcelas que ainda faltam (deste mês em diante) são descontadas na rescisão
+  const ym=FOL.comp.slice(0,7),resta=c=>r2(FOL.parc.filter(p=>p.funcionario_id===f.id&&p.coluna===c).reduce((s,p)=>s+(p.parcelas||[]).filter(x=>x.c>=ym).reduce((t,x)=>t+ +x.v,0),0));
+  const mais=(a,b)=>{const n=r2((parseMoney(a)||0)+b);return n?showMoney(n):''};
+  if(folModelo().resc_itens){const w={};
+    w.adiantamento_d=mais(v.adiantamento,resta('adiantamento'));w.vale_mp_d=mais(soma(['vale_mp'],'money'),resta('vale_mp'));
+    w.premiacao_p=soma(['premio_whats','assiduidade'],'money');w.horas_extras_p=soma(['he50','he65','horas_extras'],'horas');
+    return w}
+  v.adiantamento=mais(v.adiantamento,resta('adiantamento'));v.outros=mais(v.outros,resta('vale_mp'));
   return v;
 }
 function abrirResc(r){
   const e=ehEsc(),edita=e||podeLancar(FOL.cli.id,'folha')&&(!r||r.status==='Aberta');
   const fim=fimMes(FOL.comp),fs=FOL.func.filter(f=>f.situacao!=='Desligado'||(r&&f.id===r.funcionario_id)||(f.desligado_em&&f.desligado_em>=FOL.comp))
     .sort((a,b)=>a.nome.localeCompare(b.nome));
-  const v=r?r.valores||{}:{},dis=edita?'':' disabled';
+  const v=r?r.valores||{}:{},dis=edita?'':' disabled',M=folModelo();
   const campos=lista=>`<div class="fields">${lista.map(([k,t])=>`<label class="f">${t}<input data-rv="${k}" value="${esc(v[k]||'')}"${dis}></label>`).join('')}</div>`;
   FOLACAO.rescCtx=r;
   folDlg(r?'Rescisão':'Nova rescisão',`<div class="fields">
@@ -2046,7 +2201,8 @@ function abrirResc(r){
       <label class="f">Data da demissão<input type="date" id="frD" value="${r?.data_demissao||''}"${dis}></label>
       <label class="f">Último dia trabalhado<input type="date" id="frU" value="${r?.ultimo_dia||''}"${dis}></label>
       <label class="f">Aviso / multa<input id="frA" list="frAL" value="${esc(r?.aviso_multa||'')}"${dis}><datalist id="frAL"><option value="Não"><option value="Sim, descontar"><option value="Sim, indenizar"></datalist></label></div>
-    <h3>Proventos</h3>${campos(RPROV)}<h3>Descontos</h3>${campos(RDESC)}
+    ${M.resc_itens?`<div class="tablebox" style="margin-top:12px"><table><thead><tr><th class="l"></th><th class="l">Proventos</th><th class="l">Descontos</th></tr></thead><tbody>${M.resc_itens.map(([k,t])=>`<tr><td class="l">${esc(t)}</td>${['p','d'].map(x=>`<td><input data-rv="${k}_${x}" value="${esc(v[k+'_'+x]||'')}"${dis}></td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+      :`<h3>Proventos</h3>${campos(RPROV)}<h3>Descontos</h3>${campos(RDESC)}`}
     <label class="f">Observação<textarea id="frO" rows="2"${dis}>${esc(r?.obs||'')}</textarea></label>
     ${!r&&edita?'<p class="note" style="margin:0">Ao escolher o colaborador, o sistema já preenche o que está no cadastro e o que foi lançado no mês. Horas em h:mm.</p>':''}`,
     (r&&e?'<button type="button" class="btn ghost" data-fo="rescDel">Apagar</button>':'')+(edita?'<button type="button" class="btn primary" data-fo="rescSalva">Salvar</button>':''));
@@ -2070,18 +2226,22 @@ FOLACAO.rescDel=async b=>{if(!confirm('Apagar esta rescisão? O colaborador cont
 // Cadastro de colaboradores e valores fixos (escritório)
 const pctIn=v=>v==null||v===''?'':String(Math.round(+v*1000)/10).replace('.',',');
 const lerPct=s=>{s=String(s||'').replace('%','').trim();if(!s)return null;const n=+s.replace(',','.');return isFinite(n)?n/100:NaN};
-const cadRow=f=>`<tr data-id="${f.id||''}"><td><input data-k="nome" value="${esc(f.nome||'')}" style="min-width:200px"></td><td><input data-k="cargo" value="${esc(f.cargo||'')}" style="min-width:150px"></td>
-  <td><input data-k="folha_ajuda_custo" class="money" value="${showMoney(f.folha_ajuda_custo)}" style="max-width:110px"></td><td><input data-k="folha_gratificacao" value="${pctIn(f.folha_gratificacao)}" style="max-width:70px"></td>
-  <td><input data-k="folha_quebra_cx" value="${pctIn(f.folha_quebra_cx)}" style="max-width:70px"></td><td><input data-k="folha_insalubridade" value="${pctIn(f.folha_insalubridade)}" style="max-width:70px"></td>
-  <td><input type="checkbox" data-k="folha_va" ${f.folha_va!==false?'checked':''} style="width:auto"></td><td><input type="checkbox" data-k="folha_vt" ${f.folha_vt?'checked':''} style="width:auto"></td>
+// campos fixos das colunas desta empresa (cada planilha tem os seus)
+const cadCampos=()=>{const v=new Set(),o=[];colsDe(FOL.cli).forEach(c=>(FCOL[c].fx||[]).forEach(x=>{if(!v.has(x[0])){v.add(x[0]);o.push(x)}}));return o};
+const fxLer=(f,k)=>k.startsWith('ff.')?ff(f,k.slice(3)):f[k];
+const cadRow=(f,cs)=>`<tr data-id="${f.id||''}"><td><input data-k="nome" value="${esc(f.nome||'')}" style="min-width:200px"></td><td><input data-k="cargo" value="${esc(f.cargo||'')}" style="min-width:150px"></td>
+  ${cs.map(([k,,tp])=>{const v=fxLer(f,k);return `<td>${tp==='bool'?`<input type="checkbox" data-k="${k}" ${(k==='folha_va'?v!==false:v)?'checked':''} style="width:auto">`
+    :tp==='money'?`<input data-k="${k}" class="money" value="${showMoney(v)}" style="max-width:110px">`:tp==='pct'?`<input data-k="${k}" value="${pctIn(v)}" style="max-width:70px">`
+    :`<input data-k="${k}" value="${esc(v??'')}" style="min-width:${tp==='texto'?220:120}px">`}</td>`}).join('')}
   <td><select data-k="situacao" style="min-width:110px">${['Ativo','Afastado','Desligado'].map(s=>`<option${(f.situacao||'Ativo')===s?' selected':''}>${s}</option>`).join('')}</select></td>
   <td><input data-k="motivo_afastamento" value="${esc(f.motivo_afastamento||'')}" placeholder="Ex.: Licença Maternidade" style="min-width:150px"></td><td><input data-k="matricula" value="${esc(f.matricula||'')}" style="max-width:90px"></td></tr>`;
 function renderFolCad(){
-  const mostra=$('folCadTodos').checked,fs=FOL.func.filter(f=>mostra||f.situacao!=='Desligado');
-  $('folCad').innerHTML=`<thead><tr><th class="l">Colaborador</th><th class="l">Cargo</th><th class="l">Ajuda de custo R$</th><th class="l">Gratif. %</th><th class="l">Quebra CX %</th><th class="l">Insalub. %</th><th class="l">VA</th><th class="l">VT</th><th class="l">Situação</th><th class="l">Motivo do afastamento</th><th class="l">Matrícula</th></tr></thead><tbody>${fs.map(cadRow).join('')}</tbody>`;
+  const mostra=$('folCadTodos').checked,fs=FOL.func.filter(f=>mostra||f.situacao!=='Desligado'),cs=cadCampos();
+  $('folCadNota').textContent=['cargo',...cs.map(x=>x[1].replace(/ (R\$|%)$/,'').toLowerCase())].join(', ')+', que entram todo mês';
+  $('folCad').innerHTML=`<thead><tr><th class="l">Colaborador</th><th class="l">Cargo</th>${cs.map(x=>`<th class="l">${esc(x[1])}</th>`).join('')}<th class="l">Situação</th><th class="l">Motivo do afastamento</th><th class="l">Matrícula</th></tr></thead><tbody>${fs.map(f=>cadRow(f,cs)).join('')}</tbody>`;
 }
 $('folCadTodos').onchange=renderFolCad;
-$('folCadAdd').onclick=()=>{$('folCad').querySelector('tbody').insertAdjacentHTML('beforeend',cadRow({}));$('folCad').querySelector('tbody tr:last-child input').focus()};
+$('folCadAdd').onclick=()=>{$('folCad').querySelector('tbody').insertAdjacentHTML('beforeend',cadRow({},cadCampos()));$('folCad').querySelector('tbody tr:last-child input').focus()};
 $('folCadSalvar').onclick=async ev=>{
   const rows=[],erros=[];
   $('folCad').querySelectorAll('tbody tr').forEach(tr=>{
@@ -2089,10 +2249,13 @@ $('folCadSalvar').onclick=async ev=>{
     o.nome=g('nome').value.trim();if(!o.nome){if(tr.dataset.id)erros.push('Nome em branco');return}
     o.cargo=g('cargo').value.trim()||null;o.matricula=g('matricula').value.trim()||null;o.situacao=g('situacao').value;
     o.motivo_afastamento=g('motivo_afastamento').value.trim()||null;
-    const aj=parseMoney(g('folha_ajuda_custo').value);o.folha_ajuda_custo=aj||null;if(Number.isNaN(aj))erros.push(o.nome+': ajuda de custo');
-    ['folha_gratificacao','folha_quebra_cx','folha_insalubridade'].forEach(k=>{const p=lerPct(g(k).value);if(Number.isNaN(p))erros.push(o.nome+': percentual');o[k]=p||null});
-    o.folha_va=g('folha_va').checked;o.folha_vt=g('folha_vt').checked;
-    const ant=FOL.func.find(f=>f.id===tr.dataset.id);
+    const ant=FOL.func.find(f=>f.id===tr.dataset.id),fx={...(ant?.folha_fixos||{})};let usaFx=false;
+    cadCampos().forEach(([k,t,tp])=>{const el=g(k),sv=el.value.trim();let v;
+      if(tp==='bool')v=el.checked;else if(tp==='money'){v=parseMoney(sv);if(Number.isNaN(v))erros.push(o.nome+': '+t);v=v||null}
+      else if(tp==='pct'){v=lerPct(sv);if(Number.isNaN(v))erros.push(o.nome+': percentual');v=v||null}
+      else if(tp==='livre'){const n=/^[\d.,\s]+$/.test(sv)?parseMoney(sv):NaN;v=sv?(isFinite(n)?n:sv):null}else v=sv||null;
+      if(k.startsWith('ff.')){usaFx=true;if(v==null)delete fx[k.slice(3)];else fx[k.slice(3)]=v}else o[k]=v});
+    if(usaFx)o.folha_fixos=fx;
     if(o.situacao==='Desligado'&&!ant?.desligado_em)o.desligado_em=TODAY;if(o.situacao!=='Desligado')o.desligado_em=null;
     if(o.situacao==='Afastado'&&!ant?.afastado_desde)o.afastado_desde=TODAY;
     if(tr.dataset.id)o.id=tr.dataset.id;rows.push(o);
@@ -2113,7 +2276,9 @@ function renderFolCols(){
   $('folCols').innerHTML=Object.keys(FCOL).map(c=>`<label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" value="${c}" ${sel.has(c)?'checked':''} style="width:auto"> ${esc(FNOME(c))}</label>`).join('');
 }
 $('folColsSalvar').onclick=async ev=>{
-  const cols=[...$('folCols').querySelectorAll('input:checked')].map(i=>i.value);if(!cols.length){toast('Escolha ao menos uma coluna');return}
+  // mantém a ordem da planilha da empresa; as novas entram no fim
+  const marc=[...$('folCols').querySelectorAll('input:checked')].map(i=>i.value),ant=FOL.cli.folha_colunas||[];
+  const cols=[...ant.filter(c=>marc.includes(c)),...marc.filter(c=>!ant.includes(c))];if(!cols.length){toast('Escolha ao menos uma coluna');return}
   ev.target.disabled=true;const {error}=await sb.from('clientes').update({folha_colunas:cols}).eq('id',FOL.cli.id);ev.target.disabled=false;
   if(error){fail(error);return}FOL.cli.folha_colunas=cols;toast('Colunas salvas');renderFolha();
 };
@@ -2122,31 +2287,59 @@ $('folColsSalvar').onclick=async ev=>{
 const abaNome=s=>String(s).replace(/^Cl[ií]nica\s+/i,'').replace(/[\\/?*[\]:]/g,' ').slice(0,31);
 const celXL=(v,z)=>v==null||v===''?null:typeof v==='number'?(z?{t:'n',v,z}:{t:'n',v}):{t:'s',v:String(v)};
 function baixarFolha(){
-  const cli=FOL.cli,cols=colsDe(cli),fs=folDoMes(),[y,m]=folMes.value.split('-');
-  const gP=cols.filter(c=>FCOL[c].g==='P').length,gD=cols.filter(c=>FCOL[c].g==='D').length;
-  const ws={},put=(r,c,cel)=>{if(cel)ws[XLSX.utils.encode_cell({r,c})]=cel};
-  if(gP)put(0,2,{t:'s',v:'PROVENTOS'});if(gD)put(0,2+gP,{t:'s',v:'DESCONTOS'});
-  ['Colaboradores','Cargo',...cols.map(c=>FCOL[c].t)].forEach((t,i)=>put(1,i,{t:'s',v:t}));
-  fs.forEach((f,i)=>{put(i+2,0,{t:'s',v:f.nome});put(i+2,1,celXL(f.cargo));cols.forEach((c,j)=>{const x=folCelula(f,c);put(i+2,j+2,celXL(x.v,x.z))})});
+  const cli=FOL.cli,cols=colsDe(cli),fs=folDoMes(),[y,m]=folMes.value.split('-'),M=folModelo(),cab=folCab(cols),L=cab.L,comCargo=M.cargo!==false;
+  const ws={},merges=[],put=(r,c,cel)=>{if(cel)ws[XLSX.utils.encode_cell({r,c})]=cel},txt=v=>({t:'s',v});
+  const mescla=(r,c,cs,rs)=>{if(cs>1||rs>1)merges.push({s:{r,c},e:{r:r+rs-1,c:c+cs-1}})};
+  let r0=0;if(M.titulo){put(0,0,txt(M.titulo));mescla(0,0,cols.length+L,1);r0=1}
+  cab.cel.forEach(x=>{if(x.t){put(r0+x.r,x.c,txt(x.t));mescla(r0+x.r,x.c,x.cs,x.rs)}});
+  const d0=r0+cab.nh;
+  fs.forEach((f,i)=>{put(d0+i,0,txt(f.nome));if(comCargo)put(d0+i,1,celXL(f.cargo));cols.forEach((c,j)=>{const x=folCelula(f,c),cel=celXL(x.v,x.z);if(cel&&x.f&&!x.aj)cel.f=x.f;put(d0+i,L+j,cel)})});
+  let r=d0+fs.length;
   // notas: o que foi descrito nos lançamentos (ex.: motivo dos descontos diversos)
   const notas=FOL.lanc.filter(l=>l.descricao&&cols.includes(l.coluna)&&fs.some(f=>f.id===l.funcionario_id))
     .map(l=>`*${FCOL[l.coluna].t} · ${FOL.func.find(f=>f.id===l.funcionario_id).nome}: ${l.descricao}`);
-  notas.forEach((t,i)=>put(fs.length+4+i,1,{t:'s',v:t}));
-  const ult=Math.max(fs.length+1,notas.length?fs.length+3+notas.length:0);
-  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:ult,c:cols.length+1}});
-  ws['!merges']=[gP>1&&{s:{r:0,c:2},e:{r:0,c:1+gP}},gD>1&&{s:{r:0,c:2+gP},e:{r:0,c:1+gP+gD}}].filter(Boolean);
-  ws['!cols']=[{wch:34},{wch:24},...cols.map(c=>({wch:c==='observacoes'?28:16}))];
+  if(notas.length){r+=2;notas.forEach(t=>put(r++,1,txt(t)))}
+  // férias que começam no mês (como no fim da planilha da empresa)
+  if(M.ferias){r+=4;put(r,0,txt('Férias'));mescla(r,0,7,1);r++;
+    [[0,'Funcionário'],[1,'Dias'],[2,'Período'],[4,'Venda'],[6,'Observações']].forEach(([c,t])=>put(r,c,txt(t)));mescla(r,2,2,1);r++;
+    FOL.fer.forEach(x=>{put(r,0,txt(x.nome));put(r,1,{t:'n',v:x.dias_contabilidade});
+      put(r,2,txt(`${dBR(x.inicio)} a ${dBR(x.fim_contabilidade)}`));mescla(r,2,2,1);if(x.venda)put(r,4,{t:'n',v:x.venda});
+      if(!['Aprovada','Enviada','Gerada'].includes(x.status))put(r,6,txt('Ainda não aprovada no sistema'));r++});
+    r+=Math.max(0,4-FOL.fer.length)}
+  // rescisões do mês no modelo da empresa: item, proventos e descontos
+  if(M.resc_itens){r+=2;put(r,0,txt('Rescisão'));mescla(r,0,3,1);r++;
+    FOL.resc.forEach(z=>{const v=z.valores||{};put(r,0,txt((FOL.func.find(f=>f.id===z.funcionario_id)?.nome||'').toUpperCase()));put(r,1,txt('Proventos'));put(r,2,txt('Descontos'));
+      if(z.tipo||z.data_demissao)put(r,3,txt([z.tipo,z.data_demissao?'demissão '+dBR(z.data_demissao):'',z.ultimo_dia?'último dia '+dBR(z.ultimo_dia):'',z.aviso_multa?'aviso: '+z.aviso_multa:'',z.obs].filter(Boolean).join(' · ')));r++;
+      M.resc_itens.forEach(([k,t])=>{put(r,0,txt(t));put(r,1,rescVal(v[k+'_p']));put(r,2,rescVal(v[k+'_d']));r++});r++})}
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(r,d0+fs.length),c:Math.max(cols.length+L-1,6)}});
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:34},...(comCargo?[{wch:24}]:[]),...cols.map(c=>({wch:c==='observacoes'?40:16}))];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,abaNome(cli.nome));
-  XLSX.writeFile(wb,`Planilha Folha ${m}.${y} - ${cli.nome}.xlsx`);
+  // controle dos descontos parcelados: uma aba por coluna, com as parcelas de janeiro a janeiro
+  cols.filter(c=>FCOL[c].parc).forEach(c=>{
+    const ms=[...Array(13).keys()].map(i=>addMes(`${y}-01-01`,i).slice(0,7)),nome=id=>FOL.func.find(f=>f.id===id)?.nome||'';
+    const ps=FOL.parc.filter(p=>p.coluna===c&&(p.parcelas||[]).some(x=>ms.includes(x.c))).sort((a,b)=>nome(a.funcionario_id).localeCompare(nome(b.funcionario_id))||String(a.emissao||'').localeCompare(String(b.emissao||'')));
+    if(!ps.length)return;
+    const aoa=[['Emissão','Guia','Usuário','Funcionário','Valor Bruto','Parcelas',...ms.map(x=>MESES[+x.slice(5)-1])],
+      ...ps.map(p=>[p.emissao?dObj(p.emissao):'',p.guia||'',p.usuario||'',nome(p.funcionario_id),+p.valor_total,(p.parcelas||[]).length,...ms.map(x=>{const q=(p.parcelas||[]).find(z=>z.c===x);return q?+q.v:''})])];
+    const w=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true});
+    Object.keys(w).forEach(k=>{if(k[0]==='!')return;const cel=w[k];if(cel.t==='d')cel.z='dd/mm/yyyy';else if(cel.t==='n'&&XLSX.utils.decode_cell(k).c>=6||XLSX.utils.decode_cell(k).c===4&&cel.t==='n')cel.z='#,##0.00'});
+    w['!cols']=[{wch:11},{wch:11},{wch:24},{wch:28},{wch:11},{wch:8},...ms.map(()=>({wch:10}))];
+    XLSX.utils.book_append_sheet(wb,w,abaNome(FCOL[c].aba||FCOL[c].t));
+  });
+  const arq=(M.arquivo||'Planilha Folha {mes}.{ano} - {empresa}').replace('{mes}',m).replace('{ano}',y).replace('{empresa}',cli.nome);
+  XLSX.writeFile(wb,arq+'.xlsx');
 }
+// valor da rescisão como na planilha: data, horas e número viram célula do Excel
+const rescVal=s=>{if(s==null||s==='')return null;s=String(s).trim();
+  let x=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(x)return {t:'n',v:(Date.UTC(+x[3],+x[2]-1,+x[1])-Date.UTC(1899,11,30))/864e5,z:'dd/mm/yyyy'};
+  if(/^\d+:\d{2}$/.test(s))return {t:'n',v:lerHoras(s)/1440,z:'[h]:mm'};
+  if(/^-?\d{1,3}(\.\d{3})*(,\d+)?$|^-?\d+([.,]\d+)?$/.test(s)){const n=parseMoney(s);if(isFinite(n))return {t:'n',v:n}}
+  return {t:'s',v:s}};
 $('folRescBaixar').onclick=()=>{
   const cli=FOL.cli,[y,m]=folMes.value.split('-'),ws={},merges=[];let r=2;
   const put=(c,cel)=>{if(cel)ws[XLSX.utils.encode_cell({r,c})]=cel};
-  const val=s=>{if(s==null||s==='')return null;s=String(s).trim();
-    let x=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(x)return {t:'n',v:(Date.UTC(+x[3],+x[2]-1,+x[1])-Date.UTC(1899,11,30))/864e5,z:'dd/mm/yyyy'};
-    if(/^\d+:\d{2}$/.test(s))return {t:'n',v:lerHoras(s)/1440,z:'[h]:mm'};
-    if(/^-?\d{1,3}(\.\d{3})*(,\d+)?$|^-?\d+([.,]\d+)?$/.test(s)){const n=parseMoney(s);if(isFinite(n))return {t:'n',v:n}}
-    return {t:'s',v:s}};
+  const val=rescVal;
   const dt=s=>s?val(dBR(s)):null;
   FOL.resc.forEach(z=>{
     const f=FOL.func.find(x=>x.id===z.funcionario_id),v=z.valores||{};
