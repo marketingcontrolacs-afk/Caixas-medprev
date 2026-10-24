@@ -2,7 +2,7 @@
 -- v24 · Oliveira: lideranças fora da tela Premiação
 -- =====================================================================
 -- Rode no SQL Editor do Supabase depois da v19. Pode rodar mais de uma vez.
--- Quem tem cargo de liderança não recebe premiação: some da tela RH › Premiação (o cliente não vê),
+-- Quem tem cargo de liderança (Fernanda, Danielle e Paula Fernanda na SJ; Claudinei em Palhoça) não recebe premiação: some da tela RH › Premiação (o cliente não vê),
 -- mas continua na folha, onde o escritório lança se precisar. Para mudar, marque ou desmarque
 -- "Fora da tela Premiação" em Folha › Colaboradores e valores fixos.
 
@@ -28,13 +28,23 @@ $$;
 drop table if exists pg_temp.sem_prem;
 create temp table sem_prem(empresa text, nome text);
 insert into sem_prem values
-  ('Oliveira SJ','Fernanda'),('Oliveira SJ','Danielle Areias Pereira'),('Oliveira SJ','Gabrielle Freitas'),
+  ('Oliveira SJ','Fernanda'),('Oliveira SJ','Danielle Areias Pereira'),
   ('Oliveira SJ','Paula Fernanda Souza'),('Oliveira Palhoça','Claudinei');
 
 update public.funcionarios f
    set folha_fixos = coalesce(f.folha_fixos,'{}'::jsonb) || '{"sem_premiacao":true}'::jsonb
   from sem_prem x join public.clientes c on c.nome = x.empresa
  where f.id = pg_temp.acha_func(c.id, x.nome);
+
+-- Gabrielle Freitas (SJ) não é liderança: está afastada na perícia. Fica como Afastada (sai da Premiação
+-- e da assiduidade, e o motivo vai para as observações da folha); quando voltar, mude para Ativo.
+update public.funcionarios f
+   set situacao = case when f.situacao = 'Ativo' then 'Afastado' else f.situacao end,
+       motivo_afastamento = coalesce(f.motivo_afastamento, 'Perícia'),
+       afastado_desde = coalesce(f.afastado_desde, current_date),
+       folha_fixos = coalesce(f.folha_fixos,'{}'::jsonb) - 'sem_premiacao'
+  from public.clientes c
+ where c.nome = 'Oliveira SJ' and f.id = pg_temp.acha_func(c.id, 'Gabrielle Freitas');
 
 notify pgrst, 'reload schema';
 

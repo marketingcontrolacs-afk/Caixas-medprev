@@ -413,7 +413,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="card block" style="margin-top:16px" id="prBar"></div>
     <div class="card tablebox"><table id="prTab"></table></div>
     <div class="row"><span class="spacer"></span><button class="btn primary" id="prSalvar">Salvar premiação</button></div>
-    <p class="note">Deixe em branco quem não tem premiação no mês. Depois que o escritório confere a folha, os valores ficam travados.</p>
+    <p class="note">Deixe em branco quem não tem premiação no mês. Afastados não aparecem aqui. Depois que o escritório confere a folha, os valores ficam travados.</p>
   </section>
   <!-- RH · COLABORADORES E PRAZOS -->
   <section id="viewColab" hidden>
@@ -2147,7 +2147,7 @@ async function renderPremio(){
   const er=[rf,rm,rl].find(x=>x.error)?.error;
   if(er){console.error(er);$('prTab').innerHTML='<tbody><tr><td class="l neg">Erro ao carregar. Verifique a internet e tente de novo.</td></tr></tbody>';return}
   const st=rm.data?.status||'Aberta',pode=podeLancar(cli.id,'folha')&&(ehEsc()?st!=='Enviada':st==='Aberta');
-  PRM={...PRM,lanc:rl.data||[],aberta:pode,cols,func:(rf.data||[]).filter(f=>(f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp)&&!ff(f,'sem_premiacao'))};
+  PRM={...PRM,lanc:rl.data||[],aberta:pode,cols,func:(rf.data||[]).filter(f=>(f.situacao==='Ativo'||f.situacao==='Desligado'&&f.desligado_em&&f.desligado_em>=comp)&&!ff(f,'sem_premiacao'))};
   $('prBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':'Folha '+st.toLowerCase()}</span>${pode?'':'<span class="note">Os valores deste mês não podem mais ser alterados. Fale com o escritório se precisar mudar algo.</span>'}`;
   const val=(f,c)=>{const ls=PRM.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c&&l.quantidade!=null);return ls.length?r2(ls.reduce((s,l)=>s+ +l.quantidade,0)):null};
   $('prTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${cols.map(c=>`<th class="l">${esc(rotulo(c))} (R$)</th>`).join('')}</tr></thead><tbody>${
