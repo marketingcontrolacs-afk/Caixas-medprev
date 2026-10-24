@@ -106,7 +106,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
-#dlgFer{width:min(860px,calc(100vw - 32px))} #dlgFer .db>*{min-width:0} #dlgFer td,#dlgFer th{white-space:nowrap}
+#dlgFer{width:min(860px,calc(100vw - 32px))} #dlgFer .db>*{min-width:0} #dlgFer td,#dlgFer th{white-space:nowrap} .fparc{display:grid;grid-template-columns:160px 90px 1fr auto;gap:8px;align-items:end} .fparc .pCont{align-self:center;font-size:12.5px} @media(max-width:560px){.fparc{grid-template-columns:1fr 80px auto}.fparc .pCont{grid-column:1/-1;order:9}}
 .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .fotos{display:flex;gap:10px;flex-wrap:wrap}
 .fotos img{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in}
@@ -1038,8 +1038,8 @@ function ferAlertas(r){
   const p=FPROG[r.id],ps=FPARC[p?.id]||[],a=[];
   if(p?.status==='Devolvida')a.push('Devolvida ao cliente para correção');
   ps.filter(x=>!x.inicio_valido).forEach(x=>a.push(`Início em ${dBR(x.inicio)} não é permitido (folga ou feriado logo depois)`));
-  if(ps.length&&!ps.some(x=>x.dias>=14))a.push('Nenhuma parcela com 14 dias ou mais');
-  if(ps.some(x=>x.dias<5))a.push('Parcela com menos de 5 dias');
+  if(ps.length&&!ps.some(x=>x.dias_contabilidade>=14))a.push('Nenhuma parcela com 14 dias ou mais');
+  if(ps.some(x=>x.dias_contabilidade<5))a.push('Parcela com menos de 5 dias');
   if(p&&['Proposta','Devolvida'].includes(p.status))ps.filter(x=>x.aviso_ate<TODAY).forEach(x=>a.push(`Aviso de 30 dias venceu em ${dBR(x.aviso_ate)}`));
   if(p&&p.status!=='Devolvida'&&r.saldo>0&&!FFORA.includes(r.situacao))a.push(`Faltam ${r.saldo} dias sem data`);
   if(r.saldo<0)a.push(`Programado ${-r.saldo} dias além do direito`);
@@ -1067,7 +1067,7 @@ async function renderRH(){
     const p=FPROG[r.id],al=ferAlertas(r),ob=r.obs||p?.nota_escritorio||'';
     const ch=!p?'<span class="chip c-none">Sem programação</span>':p.status==='Proposta'?'<span class="chip c-warn">A conferir</span>'
       :p.status==='Devolvida'?'<span class="chip c-bad">Devolvida</span>':`<span class="chip c-done">${esc(p.status)}</span>`;
-    return `<button class="lk" data-per="${r.id}" title="Ver detalhes e conferir">${ch}${al.length?`<span class="al">${al.length===1?esc(al[0]):al.length+' pendências'}</span>`:''}<span class="ob">${ob?esc(ob):'ver detalhes'}</span></button>`;
+    return `<button class="lk" data-per="${r.id}" title="Ver detalhes e conferir">${ch}${al.length?`<span class="al">${al.length===1?esc(al[0]):al.length+' pendências'}</span>`:''}<span class="ob">${ob?esc(ob):podeLancar(r.cliente_id,'ferias')&&!FFORA.includes(r.situacao)&&(!p||['Proposta','Devolvida'].includes(p.status))?(p?'ver ou alterar':'lançar férias'):'ver detalhes'}</span></button>`;
   };
   $('fHead').innerHTML=`<tr><th class="l">Matrícula</th><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Período aquisitivo</th><th>Limite para gozo</th><th>Direito</th><th>Saldo</th><th>Iniciar até</th><th class="l">Situação</th><th class="l">Programação</th></tr>`;
   $('fBody').innerHTML=rows.map(r=>`<tr><td class="l">${esc(r.matricula)}</td><td class="l">${esc(r.nome)}</td>${todas?`<td class="l">${esc(nomeCli(r.cliente_id))}</td>`:''}<td class="l">${dAno2(r.inicio_aquisitivo)} a ${dAno2(r.fim_aquisitivo)}</td><td>${dCurto(r.limite_concessivo)}</td><td>${r.direito}</td><td>${r.saldo}</td><td>${dCurto(r.iniciar_ate)}</td><td class="l"><span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span></td><td class="l">${prog(r)}</td></tr>`).join('')
@@ -1082,48 +1082,97 @@ async function renderRH(){
 }
 $('fBody').addEventListener('click',ev=>{const b=ev.target.closest('.lk');if(b)abrirFerias(b.dataset.per)});
 
-// Detalhe de um período: programação, datas para a contabilidade, pendências e observações
+// Detalhe de um período: programação, datas para a contabilidade, pendências e observações.
+// Quem lança (escritório ou usuário do cliente com "lançamento" em Férias) informa a venda e as datas aqui.
 let FERDLG=null;
+const addDias=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return isoLocal(d)};
+const fParcRow=(x={})=>`<div class="fparc"><label class="f">Início<input type="date" class="pIni" value="${x.inicio||''}"></label><label class="f">Dias<input type="number" class="pDias" min="1" max="30" value="${x.dias||''}"></label><div class="pCont note"></div><button type="button" class="btn small ghost pDel" aria-label="Tirar parcela">Tirar</button></div>`;
+function lerParcelas(){return [...document.querySelectorAll('#feParcs .fparc')].map(el=>({inicio:el.querySelector('.pIni').value,dias:+el.querySelector('.pDias').value||0}))}
+function feResumo(){
+  const {r}=FERDLG,venda=Math.max(0,+$('feVenda').value||0),legal=Math.min(venda,Math.floor(r.direito/3)),fora=venda-legal;
+  const ps=lerParcelas(),gozo=ps.reduce((s,x)=>s+x.dias,0),saldo=r.direito-r.ja_gozados-venda-gozo;
+  document.querySelectorAll('#feParcs .fparc').forEach((el,i)=>{const x=ps[i],d=x.dias+(i===0?fora:0);
+    el.querySelector('.pCont').innerHTML=x.inicio&&x.dias?`Real até ${dBR(addDias(x.inicio,x.dias-1))}<br>Contabilidade: ${dBR(x.inicio)} a ${dBR(addDias(x.inicio,d-1))} (${d} dias)`:''});
+  $('feAdd').hidden=ps.length>=3;
+  $('feRes').innerHTML=`Venda legal <b>${legal}</b> · por fora <b>${fora}</b> · gozo <b>${gozo}</b> · saldo <b class="${saldo<0?'neg':''}">${saldo}</b> dias`
+    +(fora&&ps.length?'<br><span class="muted">Os dias vendidos por fora são somados à 1ª parcela no que vai para a contabilidade.</span>':'');
+}
 function abrirFerias(per){
   const r=FER.find(x=>x.id===per);if(!r)return;
-  const p=FPROG[per],ps=FPARC[p?.id]||[],al=ferAlertas(r),e=ehEsc();FERDLG={r,p};
+  const p=FPROG[per],ps=FPARC[p?.id]||[],al=ferAlertas(r),e=ehEsc(),aberta=p&&['Proposta','Devolvida'].includes(p.status);
+  const edita=e||(podeLancar(r.cliente_id,'ferias')&&(!p||aberta))&&!FFORA.includes(r.situacao);FERDLG={r,p,edita};
   const L=(a,b,cl)=>`<div class="sline"><span>${a}</span><b class="${cl||''}">${b}</b></div>`;
   $('feTitle').textContent=`${r.nome} · ${r.matricula}`;$('feChip').innerHTML=`<span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span>`;
   const legal=p?Math.min(p.venda_total,Math.floor(r.direito/3)):0,fora=p?p.venda_total-legal:0;
+  const tabela=ps.length?`<div class="tablebox" style="margin-top:8px"><table><thead><tr><th class="l">Parcela</th><th>Gozo real</th><th>Dias</th><th>Para a contabilidade</th><th>Aviso até</th><th>Pagar até</th></tr></thead><tbody>
+        ${ps.map(x=>`<tr><td class="l">${x.ordem}ª${x.inicio_valido?'':' <span class="chip c-bad">data inválida</span>'}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_real)}</td><td>${x.dias}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_contabilidade)} (${x.dias_contabilidade} dias)</td><td>${dCurto(x.aviso_ate)}</td><td>${dCurto(x.pagar_ate)}</td></tr>`).join('')}
+      </tbody></table></div>`:'';
+  const form=`<p class="note" style="margin:0 0 8px">Informe o total de dias vendidos e as datas reais de gozo (até 3 parcelas). O sistema separa a venda legal da venda por fora.</p>
+      <div class="row" style="align-items:flex-end;gap:12px"><label class="f" style="max-width:180px">Dias vendidos (total)<input type="number" id="feVenda" min="0" max="30" value="${p?.venda_total||0}"></label>${p?`<span class="chip ${p.status==='Proposta'?'c-warn':p.status==='Devolvida'?'c-bad':'c-done'}">${esc(p.status==='Proposta'?'A conferir':p.status)}</span>`:''}</div>
+      <div id="feParcs" style="display:grid;gap:8px;margin-top:10px">${(ps.length?ps:[{}]).map(fParcRow).join('')}</div>
+      <button type="button" class="btn small" id="feAdd" style="margin-top:8px">+ Parcela</button>
+      <p class="calc" id="feRes" style="display:block;margin:10px 0 0"></p>
+      ${tabela?`<details style="margin-top:8px"><summary class="note">Datas salvas</summary>${tabela}</details>`:''}
+      <label class="f" style="margin-top:10px">Observação da programação<textarea id="feProgObs" rows="2">${esc(p?.obs||'')}</textarea></label>`;
   $('feBody').innerHTML=`
     <div><h3 style="margin-bottom:6px">Período aquisitivo</h3>${L('Aquisitivo',`${dBR(r.inicio_aquisitivo)} a ${dBR(r.fim_aquisitivo)}`)}${L('Limite para gozo',dBR(r.limite_concessivo))}
       ${L('Direito',`${r.direito} dias${r.faltas_injustificadas?` (${r.faltas_injustificadas} faltas)`:''}`)}${r.ja_gozados?L('Já gozados (sem data)',r.ja_gozados+' dias'):''}${L('Saldo',r.saldo+' dias',r.saldo<0?'neg':'')}${r.iniciar_ate?L('Iniciar até',dBR(r.iniciar_ate)):''}</div>
     <div><h3 style="margin-bottom:6px">Pendências</h3>${al.length?al.map(x=>`<p class="neg" style="margin:0 0 4px">• ${esc(x)}</p>`).join(''):'<p class="pos" style="margin:0">Nenhuma pendência.</p>'}</div>
-    <div><h3 style="margin-bottom:6px">Programação</h3>${!p?'<p class="muted" style="margin:0">O cliente ainda não informou a programação deste período.</p>':`
+    ${p?.nota_escritorio&&!e?`<div class="calc" style="display:block"><b>Nota do escritório:</b> ${esc(p.nota_escritorio)}</div>`:''}
+    <div><h3 style="margin-bottom:6px">Programação</h3>${edita?form:!p?'<p class="muted" style="margin:0">A programação deste período ainda não foi informada.</p>':`
       ${L('Situação',esc(p.status))}${L('Venda total',p.venda_total+' dias')}${p.venda_total?L('Venda legal (contabilidade) / por fora',`${legal} / ${fora} dias`):''}
-      ${ps.length?`<div class="tablebox" style="margin-top:8px"><table><thead><tr><th class="l">Parcela</th><th>Gozo real</th><th>Dias</th><th>Para a contabilidade</th><th>Aviso até</th><th>Pagar até</th></tr></thead><tbody>
-        ${ps.map(x=>`<tr><td class="l">${x.ordem}ª${x.inicio_valido?'':' <span class="chip c-bad">data inválida</span>'}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_real)}</td><td>${x.dias}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_contabilidade)} (${x.dias_contabilidade} dias)</td><td>${dCurto(x.aviso_ate)}</td><td>${dCurto(x.pagar_ate)}</td></tr>`).join('')}
-      </tbody></table></div>`:'<p class="muted" style="margin:6px 0 0">Sem datas de gozo informadas.</p>'}`}</div>
-    ${e?`<label class="f">Observação do período${'<textarea id="feObs" rows="3">'+esc(r.obs||'')+'</textarea>'}</label>
-      ${p?`<label class="f">Nota para o cliente (aparece para ele)<textarea id="feNota" rows="2">${esc(p.nota_escritorio||'')}</textarea></label>`:''}`
-      :`<div><h3 style="margin-bottom:6px">Observações</h3><p style="margin:0">${r.obs?esc(r.obs):'<span class="muted">Sem observação</span>'}</p>
-        ${p?.nota_escritorio?`<p style="margin:6px 0 0"><b>Escritório:</b> ${esc(p.nota_escritorio)}</p>`:''}</div>`}`;
-  const aberta=p&&['Proposta','Devolvida'].includes(p.status);
-  $('feSave').hidden=!e;$('feOk').hidden=!(e&&aberta);$('feDev').hidden=!(e&&p?.status==='Proposta');
+      ${tabela||'<p class="muted" style="margin:6px 0 0">Sem datas de gozo informadas.</p>'}${p.obs?`<p style="margin:8px 0 0"><b>Observação:</b> ${esc(p.obs)}</p>`:''}`}</div>
+    ${e?`<label class="f">Observação do período<textarea id="feObs" rows="3">${esc(r.obs||'')}</textarea></label>
+      <label class="f">Nota para o cliente (aparece para ele)<textarea id="feNota" rows="2">${esc(p?.nota_escritorio||'')}</textarea></label>`
+      :`<div><h3 style="margin-bottom:6px">Observação do período</h3><p style="margin:0">${r.obs?esc(r.obs):'<span class="muted">Sem observação</span>'}</p></div>`}
+    <p class="err" id="feErr" hidden></p>`;
+  if(edita){
+    $('feParcs').addEventListener('input',feResumo);
+    $('feParcs').addEventListener('click',ev=>{if(ev.target.closest('.pDel')){ev.target.closest('.fparc').remove();if(!lerParcelas().length)$('feParcs').insertAdjacentHTML('beforeend',fParcRow());feResumo()}});
+    $('feVenda').oninput=feResumo;
+    $('feAdd').onclick=()=>{$('feParcs').insertAdjacentHTML('beforeend',fParcRow());feResumo()};
+    feResumo();
+  }
+  $('feSave').hidden=!edita&&!e;$('feSave').textContent=e?'Salvar':'Enviar ao escritório';
+  $('feOk').hidden=!(e&&(aberta||!p));$('feDev').hidden=!(e&&p?.status==='Proposta');
   dlgFer.showModal();
 }
 async function salvarFerias(status){
-  const {r,p}=FERDLG,bts=['feSave','feOk','feDev'];bts.forEach(b=>$(b).disabled=true);
+  const {r,edita}=FERDLG,e=ehEsc(),bts=['feSave','feOk','feDev'],err=$('feErr');err.hidden=true;
+  const erro=t=>{err.textContent=t;err.hidden=false;err.scrollIntoView({block:'nearest'})};
+  let p=FERDLG.p;
+  const venda=edita?Math.max(0,+$('feVenda').value||0):0,ps=edita?lerParcelas().filter(x=>x.inicio||x.dias):[];
+  if(edita){
+    if(venda>30)return erro('A venda não pode passar de 30 dias.');
+    if(ps.some(x=>!x.inicio||x.dias<1||x.dias>30))return erro('Preencha o início e os dias (1 a 30) de cada parcela, ou tire a parcela vazia.');
+    if(r.direito-r.ja_gozados-venda-ps.reduce((s,x)=>s+x.dias,0)<0)return erro('Venda mais gozo passam do direito do período. Confira os dias.');
+    if(!p&&!venda&&!ps.length&&!e)return erro('Informe os dias vendidos ou as datas de gozo.');
+    if(status==='Aprovada'&&!venda&&!ps.length)return erro('Não há programação para aprovar.');
+  }
+  bts.forEach(b=>$(b).disabled=true);
   try{
-    const {error:e1}=await sb.from('ferias_periodos').update({obs:$('feObs').value.trim()||null}).eq('id',r.id);if(e1)throw e1;
-    if(p){
-      const upd={nota_escritorio:$('feNota').value.trim()||null};
-      if(status==='Aprovada')Object.assign(upd,{status,aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()});
-      if(status==='Devolvida')upd.status=status;
-      const {error:e2}=await sb.from('ferias_programacoes').update(upd).eq('id',p.id);if(e2)throw e2;
+    if(e){const {error}=await sb.from('ferias_periodos').update({obs:$('feObs').value.trim()||null}).eq('id',r.id);if(error)throw error}
+    const nota=e?$('feNota').value.trim()||null:undefined;
+    if(edita&&(p||venda||ps.length)){
+      const fora=venda-Math.min(venda,Math.floor(r.direito/3)),dados={venda_total:venda,obs:$('feProgObs').value.trim()||null};
+      if(e)dados.nota_escritorio=nota;else dados.status='Proposta';
+      if(!p){const {data,error}=await sb.from('ferias_programacoes').insert({...dados,periodo_id:r.id,status:'Proposta'}).select().single();if(error)throw error;p=FERDLG.p=data}
+      else{const {error}=await sb.from('ferias_programacoes').update(dados).eq('id',p.id);if(error)throw error}
+      const {error:ed}=await sb.from('ferias_parcelas').delete().eq('programacao_id',p.id).gt('ordem',ps.length);if(ed)throw ed;
+      if(ps.length){const {error}=await sb.from('ferias_parcelas').upsert(ps.map((x,i)=>({programacao_id:p.id,ordem:i+1,inicio:x.inicio,dias:x.dias,soma_por_fora:i===0&&fora>0})),{onConflict:'programacao_id,ordem'});if(error)throw error}
+    }else if(p&&e){const {error}=await sb.from('ferias_programacoes').update({nota_escritorio:nota}).eq('id',p.id);if(error)throw error}
+    if(status&&p){
+      const upd=status==='Aprovada'?{status,aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()}:{status};
+      const {error}=await sb.from('ferias_programacoes').update(upd).eq('id',p.id);if(error)throw error;
     }
-    dlgFer.close();toast(status==='Aprovada'?'Programação aprovada':status==='Devolvida'?'Programação devolvida ao cliente':'Observações salvas');renderRH();
-  }catch(ex){fail(ex)}finally{bts.forEach(b=>$(b).disabled=false)}
+    dlgFer.close();toast(status==='Aprovada'?'Programação aprovada':status==='Devolvida'?'Programação devolvida ao cliente':e?'Salvo':'Programação enviada ao escritório');renderRH();
+  }catch(ex){console.error(ex);erro(/férias não podem começar/i.test(ex.message||'')?ex.message:'Não foi possível salvar: '+(ex.message||'verifique a internet e tente de novo.'))}
+  finally{bts.forEach(b=>$(b).disabled=false)}
 }
 $('feClose').onclick=()=>dlgFer.close();
 $('feSave').onclick=()=>salvarFerias();
 $('feOk').onclick=()=>salvarFerias('Aprovada');
-$('feDev').onclick=()=>{if(!$('feNota').value.trim()){toast('Escreva na nota o que o cliente precisa corrigir');$('feNota').focus();return}salvarFerias('Devolvida')};
+$('feDev').onclick=()=>{if(!$('feNota').value.trim()){$('feErr').textContent='Escreva na nota o que o cliente precisa corrigir.';$('feErr').hidden=false;$('feNota').focus();return}salvarFerias('Devolvida')};
 
 // Importação da planilha de controle de férias (abas Funcionários e Controle). Pode rodar de novo: atualiza o que já existe.
 const semAcento=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
