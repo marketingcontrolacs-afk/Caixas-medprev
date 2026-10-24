@@ -1860,7 +1860,7 @@ const FCOL={
   premio_whats:{t:'Whatsapp',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Whatsapp',fixo:f=>ffNum(f,'premio_whats'),fx:[['ff.premio_whats','Premiação fixa R$','money'],['ff.sem_premiacao','Fora da tela Premiação','bool']]},
   // a assiduidade zera no mês em que há falta lançada; afastado não recebe
   assiduidade:{t:'Assiduidade',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Assiduidade',fx:[['ff.assiduidade','Assiduidade R$','money']],
-    fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='faltas_data')?0:v}},
+    fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&['faltas_data','faltas_dias','faltas_horas'].includes(l.coluna))?0:v}},
   // valor por dia × dias úteis do mês, mais os sábados trabalhados (lançados no mês) × valor do sábado
   ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
   he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas'},
@@ -2084,7 +2084,9 @@ $('folAdd').onclick=()=>{
     $('flV').className=k==='money'?'money':'';$('flV').inputMode=k==='texto'||k==='livre'?'text':'decimal';
     // falta pela data: pode ser do mês anterior (o fechamento da folha não é no dia 1º)
     $('flD').min=k==='datas'?addMes(FOL.comp,-1):FOL.comp;
-    if((k==='dias'||k==='datas')&&!$('flV').value)$('flV').value='1';$('flDsrL').hidden=!FCOL[c].dsr};
+    if((k==='dias'||k==='datas')&&!$('flV').value)$('flV').value='1';$('flDsrL').hidden=!FCOL[c].dsr;
+    // falta do dia inteiro desconta o DSR; falta de algumas horas desconta só as horas
+    $('flDsr').checked=k==='dias'};
   $('flC').onchange=()=>{$('flV').value='';ajusta()};ajusta();
 };
 async function salvarLanc(b,outro){
