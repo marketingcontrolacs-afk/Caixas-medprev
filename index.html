@@ -1857,7 +1857,7 @@ const FCOL={
   outros:{t:'Outros descontos',g:'D',k:'money',lanca:'money'},
   gratificacoes:{t:'Gratificações',g:'P',k:'money',lanca:'livre',dica:'Ex.: 140, Função, Pagar 3 dias',fixo:f=>ff(f,'gratificacoes'),fx:[['ff.gratificacoes','Gratificação fixa','livre']]},
   premio:{t:'Prêmio',g:'P',k:'money',lanca:'money'},
-  premio_whats:{t:'Whatsapp',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Whatsapp',fixo:f=>ffNum(f,'premio_whats'),fx:[['ff.premio_whats','Premiação fixa R$','money']]},
+  premio_whats:{t:'Whatsapp',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Whatsapp',fixo:f=>ffNum(f,'premio_whats'),fx:[['ff.premio_whats','Premiação fixa R$','money'],['ff.sem_premiacao','Fora da tela Premiação','bool']]},
   // a assiduidade zera no mês em que há falta lançada; afastado não recebe
   assiduidade:{t:'Assiduidade',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Assiduidade',fx:[['ff.assiduidade','Assiduidade R$','money']],
     fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='faltas_data')?0:v}},
@@ -2147,7 +2147,7 @@ async function renderPremio(){
   const er=[rf,rm,rl].find(x=>x.error)?.error;
   if(er){console.error(er);$('prTab').innerHTML='<tbody><tr><td class="l neg">Erro ao carregar. Verifique a internet e tente de novo.</td></tr></tbody>';return}
   const st=rm.data?.status||'Aberta',pode=podeLancar(cli.id,'folha')&&(ehEsc()?st!=='Enviada':st==='Aberta');
-  PRM={...PRM,lanc:rl.data||[],aberta:pode,cols,func:(rf.data||[]).filter(f=>f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp)};
+  PRM={...PRM,lanc:rl.data||[],aberta:pode,cols,func:(rf.data||[]).filter(f=>(f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp)&&!ff(f,'sem_premiacao'))};
   $('prBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':'Folha '+st.toLowerCase()}</span>${pode?'':'<span class="note">Os valores deste mês não podem mais ser alterados. Fale com o escritório se precisar mudar algo.</span>'}`;
   const val=(f,c)=>{const ls=PRM.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c&&l.quantidade!=null);return ls.length?r2(ls.reduce((s,l)=>s+ +l.quantidade,0)):null};
   $('prTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${cols.map(c=>`<th class="l">${esc(rotulo(c))} (R$)</th>`).join('')}</tr></thead><tbody>${
