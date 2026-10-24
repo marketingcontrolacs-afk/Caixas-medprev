@@ -1854,6 +1854,7 @@ function folCelula(f,c){
   const textos=ls.filter(l=>l.texto).map(l=>l.texto);
   if(c==='dsr'&&FOL.lanc.some(l=>l.funcionario_id===f.id&&FCOL[l.coluna]?.dsr&&l.texto==='dsr'))textos.unshift('Sim');
   if(c==='observacoes'&&f.situacao==='Afastado'&&f.motivo_afastamento)textos.unshift(f.motivo_afastamento);
+  if(c==='dif_salario'){const n=diasSemRegistro(f);if(n)textos.unshift(`${n} ${n===1?'dia':'dias'}`)}
   if(d.k==='simnao')return fx?{v:'Sim',txt:'Sim'}:{v:'Não',txt:'Não'};
   if(d.k==='texto'){const t=[...new Set(textos)].join('; ');return {v:t||null,txt:t}}
   if(d.k==='pct'){const p=[fx?pctTxt(fx):null,...textos].filter(Boolean);
@@ -1862,10 +1863,17 @@ function folCelula(f,c){
   if(d.k==='horas'){if(!nums.length)return {v:null,txt:''};const m=nums.reduce((s,l)=>s+ +l.quantidade,0);return {v:m/1440,z:'[h]:mm',txt:hhmm(m)}}
   if(d.k==='dias'){if(!nums.length)return {v:null,txt:''};const n=nums.reduce((s,l)=>s+ +l.quantidade,0),ds=nums.filter(l=>l.data).map(l=>dBR(l.data).slice(0,5));
     const t=ds.length?`${n} (${ds.join(', ')})`:String(n);return {v:ds.length?t:n,txt:t}}
-  // money
-  if(!nums.length&&!fx)return d.nao?{v:'Não',txt:'Não'}:{v:null,txt:''};
+  // money (com texto, como os dias trabalhados sem registro, a célula vai como texto)
+  if(!nums.length&&!fx){if(textos.length){const t=textos.join(' + ');return {v:t,txt:t}}return d.nao?{v:'Não',txt:'Não'}:{v:null,txt:''}}
   const tot=r2((fx||0)+nums.reduce((s,l)=>s+ +l.quantidade,0));
+  if(textos.length){const t=[...textos,fm(tot)].join(' + ');return {v:t,txt:t}}
   return {v:tot,z:'"R$" #,##0.00',txt:fm(tot)};
+}
+// Dias trabalhados antes da admissão (sem registro): entram na folha do mês em que a pessoa começou
+function diasSemRegistro(f){
+  const i=f.inicio_trabalho,a=f.admissao;
+  if(!i||!a||i>=a||i.slice(0,7)!==FOL.comp.slice(0,7))return 0;
+  return Math.round((dObj(a)-dObj(i))/864e5);
 }
 function folTexto(s,k){
   s=String(s??'').trim();if(!s)return {v:null,txt:''};
@@ -2185,7 +2193,7 @@ async function renderColab(){
     .sort((a,b)=>fl==='aniv'?a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)):a.exp.ord-b.exp.ord||String(a.exp.prazo||'').localeCompare(String(b.exp.prazo||''))||a.nome.localeCompare(b.nome));
   $('cbTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Cargo</th><th>Nascimento</th><th>Admissão</th><th>Fim 1º período</th><th>Fim prorrogação</th><th class="l">Experiência</th><th class="l">Observação</th></tr></thead><tbody>${
     rows.map(f=>`<tr class="click" data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${esc(f.cargo||'')}</td>
-      <td>${f.nascimento?`${dBR(f.nascimento)} <span class="muted">(${idade(f.nascimento)})</span>`:''}</td><td>${dCurto(f.admissao)}</td><td>${dCurto(f.fim_experiencia1)}</td><td>${dCurto(f.fim_experiencia2)}</td>
+      <td>${f.nascimento?`${dBR(f.nascimento)} <span class="muted">(${idade(f.nascimento)})</span>`:''}</td><td>${dCurto(f.admissao)}${f.inicio_trabalho&&f.admissao&&f.inicio_trabalho<f.admissao?`<div class="note">começou ${dBR(f.inicio_trabalho).slice(0,5)}</div>`:''}</td><td>${dCurto(f.fim_experiencia1)}</td><td>${dCurto(f.fim_experiencia2)}</td>
       <td class="l"><span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>${f.exp.alerta?`<div class="note neg" style="margin-top:3px">${esc(f.exp.alerta)}</div>`:''}</td><td class="l" style="white-space:normal;min-width:180px">${esc(f.prazos_obs||'')}</td></tr>`).join('')
     ||`<tr><td class="l muted" colspan="9">Ninguém neste filtro.</td></tr>`}</tbody>`;
   const ativos=COLAB.filter(f=>f.situacao!=='Desligado');
@@ -2205,7 +2213,8 @@ function abrirColab(f){
       <label class="f">Situação<select data-ck="situacao"${dis}>${['Ativo','Afastado','Desligado'].map(s=>`<option${v.situacao===s?' selected':''}>${s}</option>`).join('')}</select></label>
       ${I('nascimento','Nascimento','date')}${I('telefone','WhatsApp')}${I('matricula','Matrícula')}</div>
     <h3>Contrato de experiência</h3>
-    <div class="fields">${I('admissao','Admissão','date')}${I('fim_experiencia1','Fim do 1º período','date')}${I('fim_experiencia2','Fim da prorrogação','date')}${I('ultimo_dia_aviso','Último dia do aviso','date')}</div>
+    <div class="fields">${I('inicio_trabalho','Começou a trabalhar em','date')}${I('admissao','Admissão','date')}${I('fim_experiencia1','Fim do 1º período','date')}${I('fim_experiencia2','Fim da prorrogação','date')}${I('ultimo_dia_aviso','Último dia do aviso','date')}</div>
+    <p class="note" style="margin:0">Se começou antes da admissão, os dias sem registro vão para a folha do mês em que começou, na coluna Dif de salário (ex.: “2 dias”).</p>
     ${e?'<div class="row"><button type="button" class="btn small" id="cb4545">Calcular 45 + 45 dias pela admissão</button><span class="note">O 1º período termina no 45º dia e a prorrogação no 90º.</span></div>':''}
     <label class="f">Observação dos prazos<textarea data-ck="prazos_obs" rows="2"${dis}>${esc(v.prazos_obs||'')}</textarea></label>
     <h3>Benefícios</h3>
