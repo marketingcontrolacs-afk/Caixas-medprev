@@ -106,6 +106,11 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
+#dlgFer,#dlgRep{width:min(860px,calc(100vw - 32px))} #dlgRep .db>*{min-width:0}
+.alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
+.alerta b{color:var(--warn)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.cmp>div{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 #dlgFer{width:min(860px,calc(100vw - 32px))} #dlgFer .db>*{min-width:0} #dlgFer td,#dlgFer th{white-space:nowrap}
 .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 .fotos{display:flex;gap:10px;flex-wrap:wrap}
@@ -239,14 +244,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <!-- CAIXA: CONFERÊNCIA / CONSULTA -->
   <section id="viewEsc" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1 id="escTitle">Conferência de caixa</h1><p class="sub" id="escSub">Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.</p></div>
+      <div><h1 id="escTitle">Conferência de caixa</h1><p class="sub" id="escSub">Acompanhe os fechamentos e confira os dias.</p></div>
       <label class="f">Mês<select id="escMes"></select></label>
     </div>
-    <div class="tabs" role="tablist" id="tabsEsc">
-      <button role="tab" aria-selected="true" data-tab="painel">Dias do mês</button>
-      <button role="tab" aria-selected="false" data-tab="export" data-esc="1">Exportar Bom Controle</button>
-    </div>
-
     <div id="tabPainel">
       <div class="tiles" id="tiles"></div>
       <div class="toolbar"><span class="spacer"></span><button class="btn" id="btnPlanMes">Baixar planilha do mês</button></div>
@@ -259,18 +259,6 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <p class="note" id="painelNote">Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.</p>
     </div>
 
-    <div id="tabExport" hidden>
-      <div class="toolbar">
-        <label class="f">De<input type="date" id="exIni"></label>
-        <label class="f">Até<input type="date" id="exFim"></label>
-        <label style="display:flex;align-items:center;gap:8px;padding-bottom:10px;font-weight:600;font-size:14px"><input type="checkbox" id="exSoConf" style="width:auto"> Só dias conferidos</label>
-        <span class="spacer"></span>
-        <button class="btn" id="btnCopiar">Copiar linhas</button>
-        <button class="btn primary" id="btnBaixarBC">Baixar planilha do Bom Controle</button>
-      </div>
-      <p class="note" id="exInfo"></p>
-      <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
-    </div>
   </section>
 
   <!-- CONTAS A PAGAR / CARTÃO / TESOURARIA -->
@@ -282,6 +270,43 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="tiles" id="mTiles"></div>
     <div class="card tablebox"><table><thead id="mHead"></thead><tbody id="mBody"></tbody><tfoot id="mFoot"></tfoot></table></div>
     <p class="note" id="mNote"></p>
+  </section>
+
+  <!-- REPASSES DE PARCEIROS -->
+  <section id="viewRep" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Repasses de parceiros</h1><p class="sub" id="pSub"></p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="pFiltro"><option value="ativos">Parceiros ativos</option><option value="alerta">Só com alerta</option><option value="inativos">Inativos</option></select></label><button class="btn primary" id="pNovo">+ Novo parceiro</button></div>
+    </div>
+    <div class="alerta" id="pAlerta" hidden></div>
+    <div class="tiles" id="pTiles"></div>
+    <div class="toolbar"><input id="pBusca" placeholder="Buscar parceiro" style="max-width:280px"></div>
+    <div class="card tablebox"><table><thead id="pHead"></thead><tbody id="pBody"></tbody></table></div>
+    <p class="note" id="pNote"></p>
+  </section>
+
+  <!-- EXPORTAÇÃO BOM CONTROLE (escritório) -->
+  <section id="viewBC" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Exportação Bom Controle</h1><p class="sub" id="exSub">Escolha a origem e o período e baixe a planilha de importação do Bom Controle.</p></div>
+      <label class="f">Mês<select id="exMes"></select></label>
+    </div>
+    <div class="toolbar">
+      <label class="f">Origem<select id="exOrig">
+        <option value="caixa">Caixa</option>
+        <option value="tesouraria">Tesouraria</option>
+        <option value="pagar">Banco · Contas a pagar</option>
+        <option value="cartao">Cartão de crédito</option>
+      </select></label>
+      <label class="f">De<input type="date" id="exIni"></label>
+      <label class="f">Até<input type="date" id="exFim"></label>
+      <label style="display:flex;align-items:center;gap:8px;padding-bottom:10px;font-weight:600;font-size:14px"><input type="checkbox" id="exSoConf" style="width:auto"> <span id="exSoTxt">Só conferidos</span></label>
+      <span class="spacer"></span>
+      <button class="btn" id="btnCopiar">Copiar linhas</button>
+      <button class="btn primary" id="btnBaixarBC">Baixar planilha do Bom Controle</button>
+    </div>
+    <p class="note" id="exInfo"></p>
+    <div class="card tablebox" style="max-height:520px;overflow:auto"><table id="tbExp"></table></div>
   </section>
 
   <!-- CONFIGURAÇÕES (escritório) -->
@@ -318,7 +343,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div id="tabMapa" hidden>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Mapeamento para o Bom Controle</h2>
-        <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para todos os lançamentos do caixa.</p>
+        <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para o caixa e a tesouraria. Nas contas a pagar vale o banco informado no pagamento.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCfg"></table></div>
       </div>
     </div>
@@ -355,6 +380,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
   <div class="db" id="feBody"></div>
   <div class="df"><button class="btn ghost" id="feDev" hidden>Devolver ao cliente</button><span class="spacer"></span><button class="btn ghost" id="feClose">Fechar</button><button class="btn" id="feSave" hidden>Salvar observações</button><button class="btn primary" id="feOk" hidden>Aprovar</button></div>
+</dialog>
+<dialog id="dlgRep">
+  <div class="dh"><h2 id="rpTitle"></h2><span class="spacer"></span><span id="rpChip" class="chips"></span></div>
+  <div class="db" id="rpBody"></div>
+  <div class="df" id="rpFoot"></div>
 </dialog>
 <div class="toast" id="toast" hidden></div>
 
@@ -441,7 +471,7 @@ function anexoView(a,url,small){
 // ---------- sessão, acessos e menu ----------
 let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
-const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)'};
+const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',repasse:'Repasses de parceiros'};
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const podeLancar=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m&&a.nivel==='lancamento');
@@ -451,6 +481,8 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
+  repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
+  bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
@@ -459,12 +491,17 @@ const NAV=[
   {k:'tesouraria',t:'Tesouraria',g:'Financeiro',ok:()=>temAcesso('tesouraria')},
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
+  // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
+  {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Escritório':'Financeiro',ok:()=>temAcesso('repasse')},
+  {k:'bc',t:'Exportação Bom Controle',g:'Escritório',ok:ehEsc},
   {k:'cfg',t:'Configurações',g:'Escritório',ok:ehEsc},
 ];
 function renderNav(){
   let g=null,h='';
-  NAV.filter(n=>n.ok()).forEach(n=>{
-    if(n.g!==g){g=n.g;h+=`<div class="navgrp">${g}</div>`}
+  const grp=n=>typeof n.g==='function'?n.g():n.g;
+  const itens=NAV.filter(n=>n.ok());
+  ['Financeiro','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
+    if(grp(n)!==g){g=grp(n);h+=`<div class="navgrp">${g}</div>`}
     h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}</button>`;
   });
   $('nav').innerHTML=h;
@@ -478,17 +515,20 @@ function empresasDe(m){
 const escCli=$('escCli');
 function fillClientes(){
   const m=VIEW,v=escCli.value,lista=empresasDe(m);
-  const todas=m==='rh'&&lista.length>1?'<option value="*">Todas as empresas</option>':'';
+  const todas=(m==='rh'||m==='repasse')&&lista.length>1?'<option value="*">Todas as empresas</option>':'';
   escCli.innerHTML=todas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*'))escCli.value=v;
   $('ctxbar').hidden=m==='cfg';
   escCli.disabled=lista.length<2;
 }
 escCli.onchange=()=>openView();
-function go(v){VIEW=v;renderNav();fillClientes();openView()}
+function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
+  // o escritório abre os repasses com todas as empresas, para a conferência de quinta
+  if(v==='repasse'&&antes!=='repasse'&&ehEsc()&&escCli.querySelector('option[value="*"]'))escCli.value='*';
+  openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewBC','viewRep'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   if(VIEW==='caixa'){
     if(cli&&!ehEsc()&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
@@ -496,6 +536,8 @@ function openView(){
   }else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
   else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
+  else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
+  else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
 }
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);
@@ -664,7 +706,7 @@ $('opData').addEventListener('change',()=>{if($('opData').value)loadDay()});
 // =====================================================================
 // ESCRITÓRIO
 // =====================================================================
-let tab='painel', tabCfg='cadastro', MES=[], MAPA=[];
+let tabCfg='cadastro', MES=[], MAPA=[];
 const escMes=$('escMes');
 function mesesOpts(ate){
   const y=+TODAY.slice(0,4),opts=[];
@@ -672,23 +714,16 @@ function mesesOpts(ate){
   return opts.slice(0,26).join('');
 }
 function initEsc(){
-  if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7);syncExportDates()}
+  if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7)}
   const e=ehEsc();
   $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
-  $('escSub').textContent=e?'Acompanhe os fechamentos, confira os dias e gere a importação do Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
+  $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. A importação do Bom Controle fica em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
   $('painelNote').textContent=e?'Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.':'Clique num dia para ver os detalhes e os comprovantes.';
-  document.querySelectorAll('#tabsEsc [data-esc]').forEach(b=>b.hidden=!e);
-  if(!e)tab='painel';
   $('dConf').hidden=!e;
-  renderEsc();
+  renderPainel();
 }
-escMes.onchange=()=>{syncExportDates();renderEsc()};
-document.querySelectorAll('#tabsEsc button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;document.querySelectorAll('#tabsEsc button').forEach(x=>x.setAttribute('aria-selected',x===b));renderEsc()});
+escMes.onchange=()=>renderPainel();
 document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
-function renderEsc(){
-  $('tabPainel').hidden=tab!=='painel';$('tabExport').hidden=tab!=='export';
-  if(tab==='painel')renderPainel();if(tab==='export')renderExport();
-}
 function renderCfg(){
   $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';
   if(tabCfg==='cadastro')renderCadastro();else renderMapa();
@@ -768,34 +803,77 @@ $('btnPlanMes').onclick=()=>{
 
 // ---------- exportação Bom Controle ----------
 const HEAD=["Tipo(Despesa/Receita)","Conta Bancária","CNPJ/CPF","Nome do Cliente/Fornecedor","Forma de Pagamento","Categoria Financeira","Departamento","Status Movimentação(Em aberto/Pago)","Data Vencimento","Data Pagamento","Valor (R$)","Observação","Nº Documento","Data Competência","Valor Conciliado (R$)","Etiqueta"];
-const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf');
-function syncExportDates(){const [a,b]=monthRange(escMes.value);exIni.value=a;exFim.value=b}
+const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf'),exMes=$('exMes'),exOrig=$('exOrig');
+// origens da importação: o texto da caixinha de filtro e o aviso de cada uma
+const EXORIG={
+  caixa:{so:'Só dias conferidos',nota:'Débito e crédito ficam fora por enquanto'},
+  tesouraria:{so:'Só lançamentos conferidos',nota:'Só as despesas: os suprimentos vêm do caixa e já entram na exportação do caixa'},
+  pagar:{so:'Só contas pagas',nota:'Contas pelo vencimento. A conta bancária é o banco informado no pagamento'},
+  cartao:{so:'Só notas conferidas com a fatura',nota:'Uma linha por nota, pela data da compra. As parcelas vão na observação'}
+};
+function syncExportDates(){const [a,b]=monthRange(exMes.value);exIni.value=a;exFim.value=b}
+function initExport(){
+  if(!exMes.options.length){exMes.innerHTML=mesesOpts(TODAY.slice(0,7));exMes.value=TODAY.slice(0,7);syncExportDates()}
+  renderExport();
+}
+exMes.onchange=()=>{syncExportDates();renderExport()};
+exOrig.onchange=()=>{$('exSoTxt').textContent=EXORIG[exOrig.value].so;renderExport()};
 [exIni,exFim,exSo].forEach(el=>el.onchange=renderExport);
 async function loadMapa(){const {data}=await sb.from('mapeamento_bc').select('*');MAPA=data||[];return MAPA}
 let lastRows=[];
-async function exportRows(){
-  const mp=Object.fromEntries((await loadMapa()).map(m=>[m.lancamento,m]));
-  const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
+// registros de tesouraria, contas a pagar ou cartão da empresa no período
+async function loadMod(tabela,dataK){
   const out=[];
-  const push=(lanc,data,valor,obs,doc,nome)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
+  for(let i=0;;i+=1000){
+    let q=sb.from(tabela).select('*').eq('cliente_id',escCli.value).gte(dataK,exIni.value).lte(dataK,exFim.value);
+    if(exSo.checked)q=q.eq('conferido',true);
+    const {data,error}=await q.order(dataK).order('id').range(i,i+999);
+    if(error){fail(error,'Erro ao carregar');break}
+    out.push(...data);if(data.length<1000)break;
+  }
+  return out;
+}
+async function exportRows(){
+  if(!escCli.value)return [];
+  const mp=Object.fromEntries((await loadMapa()).map(m=>[m.lancamento,m]));
+  const cli=cliAtual(),orig=exOrig.value,out=[];
+  const contaTes=cli?.conta_tesouraria_bc||'';
+  // f: campos que mudam por lançamento (tipo, conta, nome, status, pagamento, documento, observação)
+  const push=(lanc,data,valor,f)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
+    const tipo=m.tipo||f.tipo||'',status=f.status||m.status||'';
+    out.push([tipo,f.conta||m.conta||'',m.cnpj||'',f.nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',status,data,f.pag!==undefined?f.pag:status==='Pago'?data:'',valor,tipo==='Receita'?'':f.obs||'',f.doc||'',data,'',m.etiqueta||'']);};
+  if(orig==='caixa'){
+    const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
     // tudo do caixa é dinheiro e vai na conta Tesouraria da empresa; nas receitas a observação fica em branco
-    out.push([m.tipo||'',conta||m.conta||'',m.cnpj||'',nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',m.status||'',data,m.status==='Pago'?data:'',valor,m.tipo==='Receita'?'':obs,doc||'',data,'',m.etiqueta||'']);};
-  const conta=cliAtual()?.conta_tesouraria_bc||'';
-  dias.forEach(d=>{const c=calc(d);const br=dBR(d.data);const o=x=>`Caixa ${br} - ${x}`+(d.obs?' | '+d.obs:'');
-    push('Venda em dinheiro',d.data,d.din_sis,o('Venda em dinheiro'));
-    // débito e crédito ficam fora por enquanto: na Tesouraria só entra dinheiro (falta conciliar com o relatório da adquirente)
-    push('Falta de caixa',d.data,Math.max(-c.fs,0),o('Falta de caixa'));
-    push('Sobra de caixa',d.data,Math.max(c.fs,0),o('Sobra de caixa'));
-    d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),s.tipo==='Repasse'?'':s.guia,s.tipo==='Repasse'?s.parceiro:''));
-  });
+    dias.forEach(d=>{const c=calc(d);const br=dBR(d.data);const o=x=>`Caixa ${br} - ${x}`+(d.obs?' | '+d.obs:'');
+      push('Venda em dinheiro',d.data,d.din_sis,{conta:contaTes,obs:o('Venda em dinheiro')});
+      // débito e crédito ficam fora por enquanto: na Tesouraria só entra dinheiro (falta conciliar com o relatório da adquirente)
+      push('Falta de caixa',d.data,Math.max(-c.fs,0),{conta:contaTes,obs:o('Falta de caixa')});
+      push('Sobra de caixa',d.data,Math.max(c.fs,0),{conta:contaTes,obs:o('Sobra de caixa')});
+      d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,{conta:contaTes,obs:`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),doc:s.tipo==='Repasse'?'':s.guia,nome:s.tipo==='Repasse'?s.parceiro:''}));
+    });
+  }else if(orig==='tesouraria'){
+    (await loadMod('tesouraria','data')).filter(r=>r.tipo==='Despesa').forEach(r=>
+      push('Tesouraria - Despesa',r.data,r.valor,{tipo:'Despesa',conta:contaTes,nome:r.descricao,doc:r.documento,obs:`Tesouraria ${dBR(r.data)} - ${r.descricao}`+(r.obs?' | '+r.obs:'')}));
+  }else if(orig==='pagar'){
+    (await loadMod('contas_pagar','vencimento')).forEach(r=>
+      push('Contas a pagar',r.vencimento,r.valor,{tipo:'Despesa',conta:r.banco,nome:r.fornecedor,doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
+  }else if(orig==='cartao'){
+    (await loadMod('cartao_notas','data')).forEach(r=>
+      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',nome:r.fornecedor,doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
+  }
   return out;
 }
 async function renderExport(){
-  lastRows=await exportRows();
-  const rec=lastRows.filter(r=>r[0]==='Receita').reduce((a,r)=>a+r[10],0),des=lastRows.filter(r=>r[0]==='Despesa').reduce((a,r)=>a+r[10],0);
-  const sem=lastRows.filter(r=>!r[0]||!r[1]||!r[5]).length;
-  const semConta=!cliAtual()?.conta_tesouraria_bc;
-  $('exInfo').innerHTML=`${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · Débito e crédito ficam fora por enquanto`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete a aba Mapeamento</span>`:'');
+  const orig=exOrig.value;
+  if(orig!=='caixa'&&!window.V2){lastRows=[];$('exInfo').innerHTML='<span class="neg">Esta origem precisa da atualização v2 do banco. Rode o SQL no Supabase.</span>'}
+  else{
+    lastRows=await exportRows();
+    const rec=lastRows.filter(r=>r[0]==='Receita').reduce((a,r)=>a+r[10],0),des=lastRows.filter(r=>r[0]==='Despesa').reduce((a,r)=>a+r[10],0);
+    const sem=lastRows.filter(r=>!r[0]||!r[1]||!r[5]).length;
+    const semConta=(orig==='caixa'||orig==='tesouraria')&&escCli.value&&!cliAtual()?.conta_tesouraria_bc;
+    $('exInfo').innerHTML=`${esc(cliAtual()?.nome||'')} · ${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · ${EXORIG[orig].nota}`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete em Configurações › Mapeamento Bom Controle${orig==='pagar'?' ou informe o banco no pagamento':''}</span>`:'');
+  }
   $('tbExp').innerHTML=`<thead><tr>${HEAD.map(h=>`<th class="l">${h}</th>`).join('')}</tr></thead><tbody>${
     lastRows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===10?'':'l'}">${i===10?showMoney(v):[8,9,13].includes(i)&&v?dBR(v):esc(v)}</td>`).join('')}</tr>`).join('')||'<tr><td class="l muted" colspan="16">Nenhum lançamento no período.</td></tr>'}</tbody>`;
   $('btnCopiar').disabled=$('btnBaixarBC').disabled=!lastRows.length;
@@ -808,7 +886,7 @@ $('btnBaixarBC').onclick=()=>{
   const aoa=[HEAD,...lastRows.map(r=>r.map((v,i)=>[8,9,13].includes(i)&&v?dObj(v):v))];
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=HEAD.map(()=>({wch:18}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Importação');
-  XLSX.writeFile(wb,`Bom Controle ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
+  XLSX.writeFile(wb,`Bom Controle ${({caixa:'Caixa',tesouraria:'Tesouraria',pagar:'Contas a pagar',cartao:'Cartão'})[exOrig.value]} ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
 };
 
 // ---------- cadastros ----------
@@ -1176,6 +1254,171 @@ $('fImportFile').addEventListener('change',async e=>{
     renderRH();
   }catch(ex){console.error(ex);res.innerHTML=`<p class="err" style="margin:0">Não foi possível importar: ${esc(ex.message||ex)}</p>`}
 });
+
+// =====================================================================
+// REPASSES DE PARCEIROS
+// =====================================================================
+// Dados bancários dos parceiros para os repasses que a Controlacs paga às quintas.
+// O cliente cadastra, pede alteração de conta e lança descontos; o escritório confere e paga.
+let PARC=[], PALT={}, PDESC={}, PARCDLG=null, PMODO=null;
+const PIXTIPOS=['CPF','CNPJ','E-mail','Telefone','Aleatória'], TIPOSCONTA=['Corrente','Poupança','Pagamento'];
+const CONTAK=['pix_tipo','pix_chave','banco','agencia','conta','tipo_conta','titular','cpf_cnpj'];
+const proxQuinta=()=>{const d=dObj(TODAY);d.setDate(d.getDate()+(4-d.getDay()+7)%7);return isoLocal(d)};
+const contaTxt=p=>[p.pix_chave?`Pix (${p.pix_tipo||'chave'}): ${p.pix_chave}`:'',p.banco||p.conta?`${p.banco||'Banco'} · Ag. ${p.agencia||'—'} · ${p.tipo_conta?p.tipo_conta+' ':''}${p.conta||'—'}`:'',p.titular||p.cpf_cnpj?`Titular: ${[p.titular,p.cpf_cnpj].filter(Boolean).join(' · ')}`:''].filter(Boolean);
+const descTxt=d=>`Desconto de ${fm(d.valor)} referente a ${d.motivo}${d.referencia?' ('+d.referencia+')':''}`;
+const pAlertas=p=>{const a=[];if(PALT[p.id])a.push(['c-bad','Alteração de conta']);if(!p.conferido)a.push(['c-warn','Novo, conferir dados']);
+  const ds=PDESC[p.id]||[];if(ds.length)a.push(['c-warn',`Desconto ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}`]);
+  if(!p.pix_chave&&!(p.banco&&p.conta))a.push(['c-bad','Sem dados bancários']);return a};
+function copiar(t,msg){navigator.clipboard.writeText(t).then(()=>toast(msg||'Copiado'),()=>toast('Não deu para copiar.'))}
+const pIds=()=>{const lista=empresasDe('repasse');return escCli.value==='*'?lista.map(c=>c.id):escCli.value?[escCli.value]:[]};
+const pLancaEm=()=>empresasDe('repasse').filter(c=>podeLancar(c.id,'repasse'));
+async function renderRep(){
+  const e=ehEsc(),ids=pIds(),todas=escCli.value==='*';
+  const vazio=(t,cl)=>{$('pHead').innerHTML='';$('pBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pTiles').innerHTML='';$('pAlerta').hidden=true;$('pNote').textContent=''};
+  $('pSub').textContent=e?`Contas dos parceiros para os repasses de quinta-feira (próxima: ${dBR(proxQuinta())}). Confira as alterações de conta e os descontos antes de pagar.`
+    :'Cadastre os parceiros, avise quando um parceiro trocar de conta e informe os descontos a fazer no repasse.';
+  $('pNovo').hidden=!pLancaEm().length;
+  if(!ids.length){vazio('Nenhuma empresa liberada para repasses.');return}
+  const [r1,r2_,r3]=await Promise.all([sb.from('parceiros').select('*').in('cliente_id',ids).order('nome'),
+    sb.from('parceiro_alteracoes').select('*').in('cliente_id',ids).eq('status','Pendente'),
+    sb.from('repasse_descontos').select('*').in('cliente_id',ids).eq('status','Pendente').order('criado_em')]);
+  const err=r1.error||r2_.error||r3.error;
+  if(err){console.error(err);vazio(err.code==='42P01'||/parceir|repasse/.test(err.message||'')?'Este módulo precisa da atualização v7 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
+  PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
+  const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  const f=$('pFiltro').value,q=$('pBusca').value.trim().toLowerCase();
+  const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||(p.nome+' '+(p.especialidade||'')).toLowerCase().includes(q)))
+    .sort((a,b)=>(pAlertas(b).length>0)-(pAlertas(a).length>0)||a.nome.localeCompare(b.nome));
+  $('pHead').innerHTML=`<tr><th class="l">Parceiro</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Pix</th><th class="l">Banco · agência · conta</th><th class="l">Titular</th><th class="l">Alertas</th></tr>`;
+  $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b>${p.especialidade?`<br><span class="muted">${esc(p.especialidade)}</span>`:''}</td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
+    ||`<tr><td class="l muted" colspan="6">${f==='alerta'?'Nenhum parceiro com alerta.':PARC.length?'Nenhum parceiro neste filtro.':'Nenhum parceiro cadastrado.'+($('pNovo').hidden?'':' Use “Novo parceiro” para começar.')}</td></tr>`;
+  const ativos=PARC.filter(p=>p.ativo),nAlt=Object.keys(PALT).length,nNovo=ativos.filter(p=>!p.conferido).length;
+  const descs=Object.values(PDESC).flat(),vDesc=r2(descs.reduce((x,d)=>x+(+d.valor),0)),semConta=ativos.filter(p=>!p.pix_chave&&!(p.banco&&p.conta)).length;
+  $('pTiles').innerHTML=[['Parceiros ativos',ativos.length,todas?'em todas as empresas':'nesta empresa'],['Alterações de conta',nAlt,e?'aplique antes de pagar':'aguardando o escritório'],
+    ['Parceiros novos',nNovo,e?'conferir os dados':'aguardando o escritório'],['Descontos a fazer',fm(vDesc),descs.length+(descs.length===1?' desconto':' descontos')+' no próximo repasse']]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  const av=[nAlt?`<b>${nAlt} ${nAlt===1?'parceiro trocou':'parceiros trocaram'} de conta</b>`:'',descs.length?`<b>${descs.length} ${descs.length===1?'desconto':'descontos'} (${fm(vDesc)})</b>`:'',nNovo?`<b>${nNovo} ${nNovo===1?'parceiro novo':'parceiros novos'} para conferir</b>`:'',semConta?`<b>${semConta} sem dados bancários</b>`:''].filter(Boolean);
+  $('pAlerta').hidden=!av.length;
+  $('pAlerta').innerHTML=av.length?`<span>${e?'Antes de pagar os repasses de quinta-feira, '+dBR(proxQuinta())+':':'Pendências com o escritório:'}</span><span>${av.join(' · ')}</span>`:'';
+  $('pNote').textContent='Clique num parceiro para ver os dados, '+(e?'aplicar a alteração de conta e marcar os descontos como feitos.':'informar alteração de conta ou lançar um desconto.');
+}
+$('pFiltro').onchange=renderRep;$('pBusca').oninput=()=>{clearTimeout(renderRep.t);renderRep.t=setTimeout(renderRep,250)};
+$('pBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirParceiro(PARC.find(p=>p.id===tr.dataset.id))});
+$('pBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirParceiro(PARC.find(p=>p.id===tr.dataset.id))}});
+$('pNovo').onclick=()=>abrirParceiro(null);
+const dlgRep=$('dlgRep');
+// campos de cadastro; pre = prefixo dos ids (pc = cadastro, pa = alteração de conta)
+function pCampos(pre,p,dis,soConta){
+  const d=dis?' disabled':'',v=k=>esc(p?.[k]||'');
+  const sel=(k,t,ops)=>`<label class="f">${t}<select id="${pre}_${k}"${d}><option value=""></option>${ops.map(o=>`<option${p?.[k]===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
+  const inp=(k,t,ph)=>`<label class="f">${t}<input id="${pre}_${k}" value="${v(k)}"${ph?` placeholder="${ph}"`:''}${d}></label>`;
+  return `<div class="fields">${soConta?'':inp('nome','Nome do parceiro *')+inp('especialidade','Especialidade','Ex.: Cardiologia')}
+    ${sel('pix_tipo','Tipo da chave Pix',PIXTIPOS)}${inp('pix_chave','Chave Pix')}
+    ${inp('banco','Banco','Ex.: Sicredi')}${inp('agencia','Agência')}${inp('conta','Conta','com o dígito')}${sel('tipo_conta','Tipo de conta',TIPOSCONTA)}
+    ${inp('titular','Titular da conta','se não for o próprio parceiro')}${inp('cpf_cnpj','CPF/CNPJ do titular')}
+    ${soConta?'':`<label class="f wide">Observação<textarea id="${pre}_obs" rows="2"${d}>${v('obs')}</textarea></label>`}</div>`;
+}
+const lerCampos=(pre,ks)=>Object.fromEntries(ks.map(k=>[k,($(pre+'_'+k)?.value||'').trim()||null]));
+const temConta=o=>o.pix_chave||(o.banco&&o.agencia&&o.conta);
+async function abrirParceiro(p,modo){
+  PARCDLG=p;PMODO=modo||null;const e=ehEsc();
+  const pode=p?podeLancar(p.cliente_id,'repasse'):true,editaCad=!p||e||(pode&&!p.conferido);
+  const alt=p&&PALT[p.id],descs=p?PDESC[p.id]||[]:[];
+  $('rpTitle').textContent=p?p.nome:'Novo parceiro';
+  $('rpChip').innerHTML=p?(pAlertas(p).map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'):'';
+  let hist=[];
+  if(p){const [{data:ha},{data:hd}]=await Promise.all([sb.from('parceiro_alteracoes').select('*').eq('parceiro_id',p.id).neq('status','Pendente').order('solicitado_em',{ascending:false}).limit(10),
+    sb.from('repasse_descontos').select('*').eq('parceiro_id',p.id).neq('status','Pendente').order('criado_em',{ascending:false}).limit(10)]);
+    hist=[...(ha||[]).map(a=>[a.resolvido_em||a.solicitado_em,`Alteração de conta ${a.status==='Aplicada'?'aplicada':'recusada'}${a.motivo?' · '+a.motivo:''}${a.anterior&&a.status==='Aplicada'?' · conta anterior: '+contaTxt(a.anterior).join(' · '):''}${a.nota_escritorio?' · '+a.nota_escritorio:''}`]),
+      ...(hd||[]).map(d=>[d.descontado_em||d.criado_em,`${d.status==='Descontado'?'Descontado':'Cancelado'}: ${descTxt(d)}`])].sort((a,b)=>String(b[0]).localeCompare(String(a[0])));}
+  const cmpBox=(t,o)=>`<div><b>${t}</b><br>${contaTxt(o).map(esc).join('<br>')||'<span class="muted">sem dados</span>'}</div>`;
+  let h='';
+  if(!p){const ls=pLancaEm();h+=`<label class="f">Empresa<select id="pc_cliente">${ls.map(c=>`<option value="${c.id}"${c.id===escCli.value?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
+  if(modo==='alt'){
+    h+=`<p class="note" style="margin:0">Informe a conta nova. O escritório confere e troca antes do próximo repasse; até lá, o pagamento continua na conta atual.</p>
+      <div class="cmp">${cmpBox('Conta atual',p)}</div>${pCampos('pa',p,false,true)}
+      <label class="f">Motivo ou quem pediu a troca *<textarea id="pa_motivo" rows="2" placeholder="Ex.: parceiro pediu por WhatsApp em 24/10 para receber na conta da empresa dele"></textarea></label>`;
+  }else if(modo==='desc'){
+    h+=`<p class="note" style="margin:0">O desconto fica em alerta para o escritório e sai do próximo repasse de ${esc(p.nome)}.</p>
+      <div class="fields"><label class="f">Valor do desconto *<input class="money" id="pd_valor" inputmode="decimal" placeholder="0,00"></label>
+      <label class="f">Referência<input id="pd_ref" placeholder="Procedimento, paciente ou data"></label>
+      <label class="f wide">Motivo *<textarea id="pd_motivo" rows="2" placeholder="Ex.: procedimento refeito sem cobrança"></textarea></label></div>`;
+  }else{
+    if(alt)h+=`<div class="alerta" style="margin:0"><b>Alteração de conta pedida em ${dBR(alt.solicitado_em.slice(0,10))}</b>${alt.motivo?`<span>${esc(alt.motivo)}</span>`:''}
+      <div class="cmp" style="margin-top:6px">${cmpBox('Conta atual',p)}${cmpBox('Conta nova',alt)}</div>
+      ${e?`<label class="f">Nota (opcional)<input id="pa_nota" placeholder="Ex.: confirmado por telefone com o parceiro"></label>`:''}
+      <div class="row" style="gap:8px">${e?'<button class="btn small primary" data-act="aplicar">Aplicar a conta nova</button><button class="btn small ghost" data-act="recusar">Recusar</button>':''}${!e&&pode?'<button class="btn small ghost" data-act="cancAlt">Cancelar pedido</button>':''}<button class="btn small ghost" data-act="copNova">Copiar conta nova</button></div></div>`;
+    if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
+      ${e?'<p class="note" style="margin:6px 0 0">“Copiar” leva o texto do desconto para colar no comprovante.</p>':''}</div>`;
+    h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
+      ${p&&!editaCad?'<p class="note" style="margin:6px 0 0">Os dados já foram conferidos pelo escritório. Para trocar a conta, use “Informar alteração de conta”.</p>':''}
+      ${e&&p?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px"><input type="checkbox" id="pc_ativo" style="width:auto"${p.ativo?' checked':''}> Parceiro ativo</label>`:''}</div>`;
+    if(hist.length)h+=`<div><h3 style="margin-bottom:6px">Histórico</h3>${hist.map(x=>`<p class="note" style="margin:0 0 4px">${dBR(String(x[0]).slice(0,10))} · ${esc(x[1])}</p>`).join('')}</div>`;
+  }
+  h+='<p class="err" id="rpErr" hidden></p>';
+  $('rpBody').innerHTML=h;
+  const b=(act,t,cl)=>`<button class="btn ${cl||''}" data-act="${act}">${t}</button>`;
+  let f='';
+  if(modo)f=b('voltar','Voltar','ghost')+'<span class="spacer"></span>'+b(modo==='alt'?'salvarAlt':'salvarDesc',modo==='alt'?'Enviar alteração':'Lançar desconto','primary');
+  else{
+    if(p)f+=b('copConta','Copiar dados','ghost');
+    if(p&&pode&&!alt)f+=b('modoAlt','Informar alteração de conta','ghost');
+    if(p&&pode)f+=b('modoDesc','+ Desconto','ghost');
+    f+='<span class="spacer"></span>'+b('fechar','Fechar','ghost');
+    if(e&&p&&!p.conferido)f+=b('conferir','Dados conferidos');
+    if(editaCad)f+=b('salvar',p?'Salvar':'Cadastrar','primary');
+  }
+  $('rpFoot').innerHTML=f;
+  if(!dlgRep.open)dlgRep.showModal();
+}
+const rpErr=t=>{$('rpErr').textContent=t;$('rpErr').hidden=false};
+async function rpAcao(act,el){
+  const p=PARCDLG,e=ehEsc(),me=async()=>(await sb.auth.getUser()).data.user.id;
+  const dId=el.closest('tr')?.dataset.d,d=dId&&(PDESC[p?.id]||[]).find(x=>x.id===dId);
+  const recarregar=async(msg)=>{if(msg)toast(msg);await renderRep();const np=p&&PARC.find(x=>x.id===p.id);if(np)abrirParceiro(np);else dlgRep.close()};
+  try{
+    if(act==='fechar')return dlgRep.close();
+    if(act==='voltar')return abrirParceiro(p);
+    if(act==='modoAlt')return abrirParceiro(p,'alt');
+    if(act==='modoDesc')return abrirParceiro(p,'desc');
+    if(act==='copConta')return copiar([p.nome,...contaTxt(p)].join('\n'),'Dados do parceiro copiados');
+    if(act==='copNova')return copiar([p.nome,...contaTxt(PALT[p.id])].join('\n'),'Conta nova copiada');
+    if(act==='copDesc')return copiar(descTxt(d),'Texto do desconto copiado');
+    el.disabled=true;
+    if(act==='salvar'){
+      const o=lerCampos('pc',['nome','especialidade','obs',...CONTAK]);
+      if(!o.nome)return rpErr('Informe o nome do parceiro.');
+      if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta.');
+      if(p){if(e&&$('pc_ativo'))o.ativo=$('pc_ativo').checked;o.atualizado_em=new Date().toISOString();
+        const {error}=await sb.from('parceiros').update(o).eq('id',p.id);if(error)throw error;return recarregar('Parceiro salvo')}
+      o.cliente_id=$('pc_cliente').value;o.conferido=e;
+      const {data,error}=await sb.from('parceiros').insert(o).select().single();if(error)throw error;
+      PARCDLG=data;return recarregar(e?'Parceiro cadastrado':'Parceiro cadastrado. O escritório vai conferir os dados.');
+    }
+    if(act==='conferir'){const {error}=await sb.from('parceiros').update({conferido:true}).eq('id',p.id);if(error)throw error;return recarregar('Dados conferidos')}
+    if(act==='salvarAlt'){
+      const o=lerCampos('pa',CONTAK);o.motivo=$('pa_motivo').value.trim();
+      if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta novos.');
+      if(!o.motivo)return rpErr('Informe o motivo ou quem pediu a troca.');
+      if(CONTAK.every(k=>(o[k]||null)===(p[k]||null)))return rpErr('A conta nova está igual à atual.');
+      o.parceiro_id=p.id;const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
+      PMODO=null;return recarregar(e?'Alteração registrada. Aplique para trocar a conta.':'Alteração enviada ao escritório');
+    }
+    if(act==='salvarDesc'){
+      const valor=parseMoney($('pd_valor').value),motivo=$('pd_motivo').value.trim();
+      if(!(valor>0))return rpErr('Informe o valor do desconto.');if(!motivo)return rpErr('Informe o motivo do desconto.');
+      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:p.id,valor,motivo,referencia:$('pd_ref').value.trim()||null});if(error)throw error;
+      PMODO=null;return recarregar('Desconto lançado');
+    }
+    if(act==='aplicar'){const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:PALT[p.id].id,nota:$('pa_nota')?.value.trim()||null});if(error)throw error;return recarregar('Conta do parceiro atualizada')}
+    if(act==='recusar'){const {error}=await sb.from('parceiro_alteracoes').update({status:'Recusada',resolvido_em:new Date().toISOString(),resolvido_por:await me(),nota_escritorio:$('pa_nota')?.value.trim()||null}).eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Alteração recusada')}
+    if(act==='cancAlt'){if(!confirm('Cancelar o pedido de alteração de conta?'))return;const {error}=await sb.from('parceiro_alteracoes').delete().eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Pedido cancelado')}
+    if(act==='descontado'){const {error}=await sb.from('repasse_descontos').update({status:'Descontado',descontado_em:TODAY,resolvido_por:await me()}).eq('id',d.id);if(error)throw error;return recarregar('Desconto marcado como feito')}
+    if(act==='cancDesc'){if(!confirm('Cancelar este desconto?'))return;
+      const {error}=e?await sb.from('repasse_descontos').update({status:'Cancelado',resolvido_por:await me()}).eq('id',d.id):await sb.from('repasse_descontos').delete().eq('id',d.id);if(error)throw error;return recarregar('Desconto cancelado')}
+  }catch(ex){fail(ex)}finally{if(el.isConnected)el.disabled=false}
+}
+dlgRep.addEventListener('click',ev=>{const el=ev.target.closest('[data-act]');if(el){ev.preventDefault();rpAcao(el.dataset.act,el)}});
 
 boot();
 })();
