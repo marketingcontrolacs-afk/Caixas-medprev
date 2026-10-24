@@ -314,7 +314,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div id="tabMapa" hidden>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Mapeamento para o Bom Controle</h2>
-        <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha.</p>
+        <p class="note" style="margin:0">Escreva os nomes exatamente como estão cadastrados no Bom Controle. Cada alteração é salva sozinha. A conta bancária de cada empresa (Tesouraria) fica em Empresas e vale para todos os lançamentos do caixa.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCfg"></table></div>
       </div>
     </div>
@@ -769,12 +769,12 @@ async function exportRows(){
   const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
   const out=[];
   const push=(lanc,data,valor,obs,doc,nome)=>{valor=r2(valor);if(!(valor>0))return;const m=mp[lanc]||{};
-    out.push([m.tipo||'',m.conta||'',m.cnpj||'',nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',m.status||'',data,m.status==='Pago'?data:'',valor,obs,doc||'',data,'',m.etiqueta||'']);};
+    // tudo do caixa é dinheiro e vai na conta Tesouraria da empresa; nas receitas a observação fica em branco
+    out.push([m.tipo||'',conta||m.conta||'',m.cnpj||'',nome||m.nome||'',m.forma||'',m.categoria||'',m.departamento||'',m.status||'',data,m.status==='Pago'?data:'',valor,m.tipo==='Receita'?'':obs,doc||'',data,'',m.etiqueta||'']);};
+  const conta=cliAtual()?.conta_tesouraria_bc||'';
   dias.forEach(d=>{const c=calc(d);const br=dBR(d.data);const o=x=>`Caixa ${br} - ${x}`+(d.obs?' | '+d.obs:'');
     push('Venda em dinheiro',d.data,d.din_sis,o('Venda em dinheiro'));
-    push('Venda cartão de débito',d.data,d.deb_maq,o('Venda cartão de débito'));
-    push('Venda cartão de crédito',d.data,+d.cred_maq-c.juros,o('Venda cartão de crédito'));
-    push('Juros de parcelamento (crédito)',d.data,c.juros,o('Juros de parcelamento (crédito)'));
+    // débito e crédito ficam fora por enquanto: na Tesouraria só entra dinheiro (falta conciliar com o relatório da adquirente)
     push('Falta de caixa',d.data,Math.max(-c.fs,0),o('Falta de caixa'));
     push('Sobra de caixa',d.data,Math.max(c.fs,0),o('Sobra de caixa'));
     d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),s.tipo==='Repasse'?'':s.guia,s.tipo==='Repasse'?s.parceiro:''));
@@ -785,7 +785,8 @@ async function renderExport(){
   lastRows=await exportRows();
   const rec=lastRows.filter(r=>r[0]==='Receita').reduce((a,r)=>a+r[10],0),des=lastRows.filter(r=>r[0]==='Despesa').reduce((a,r)=>a+r[10],0);
   const sem=lastRows.filter(r=>!r[0]||!r[1]||!r[5]).length;
-  $('exInfo').innerHTML=`${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)}`+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete a aba Mapeamento</span>`:'');
+  const semConta=!cliAtual()?.conta_tesouraria_bc;
+  $('exInfo').innerHTML=`${lastRows.length} linhas no layout do Bom Controle · Receitas ${fm(rec)} · Despesas ${fm(des)} · Débito e crédito ficam fora por enquanto`+(semConta?` · <span class="neg">Informe a conta Tesouraria desta empresa em Configurações › Empresas</span>`:'')+(sem?` · <span class="neg">${sem} linhas sem conta ou categoria: complete a aba Mapeamento</span>`:'');
   $('tbExp').innerHTML=`<thead><tr>${HEAD.map(h=>`<th class="l">${h}</th>`).join('')}</tr></thead><tbody>${
     lastRows.map(r=>`<tr>${r.map((v,i)=>`<td class="${i===10?'':'l'}">${i===10?showMoney(v):[8,9,13].includes(i)&&v?dBR(v):esc(v)}</td>`).join('')}</tr>`).join('')||'<tr><td class="l muted" colspan="16">Nenhum lançamento no período.</td></tr>'}</tbody>`;
   $('btnCopiar').disabled=$('btnBaixarBC').disabled=!lastRows.length;
@@ -805,8 +806,8 @@ $('btnBaixarBC').onclick=()=>{
 let USERS=[];
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const {data:us}=await sb.from('perfis').select('*').order('email');USERS=us||[];
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
