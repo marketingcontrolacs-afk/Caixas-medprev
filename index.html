@@ -891,6 +891,7 @@ async function exportRows(){
   if(MODCAT.includes(orig))await loadCats();
   // só entra o que o escritório já confirmou a categoria; o resto vai para o quadro de confirmação
   await loadFbc();
+  if(MODCAT.includes(orig))await syncRecorrentes(orig,escCli.value);
   const pend=[],conf=r=>{if(r.categoria_ok&&(!FBC.lista.length||FBC.map[r.fornecedor_bc]))return true;pend.push(r);return false};
   const fb=r=>{const x=FBC.map[r.fornecedor_bc];return x?{nome:x.razao_social,cnpj:x.documento||''}:{}};
   const catDe=r=>r.categoria;
@@ -1091,7 +1092,7 @@ async function renderExConf(){
   const dk=exOrig.value==='pagar'?'vencimento':'data';
   box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
     <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">No Bom Controle</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
-      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
+      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${r.categoria_ok?'<span class="chip c-ok">categoria ok · falta o fornecedor</span> ':sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
     <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
@@ -1159,8 +1160,31 @@ $('ccOk').onclick=async()=>{
   if(error){fail(error);return}
   if(trocou)toast('Lançamento passado para '+(CLIENTES.find(c=>c.id===emp)?.nome||'a outra empresa'));
   await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat,fbc);toast('Confirmado');
-  EXPEND.splice(CCI,1);abrirCC(CCI);
+  EXPEND.splice(CCI,1);await aplicaRecorrentes(orig,upd.cliente_id||r.cliente_id);abrirCC(CCI);
 };
+// Lançamentos recorrentes (ex.: "Frutas da semana"): o mesmo texto de "do que se trata" (na tesouraria, a descrição)
+// recebe a categoria do último já confirmado da empresa. O fornecedor continua sendo conferido um a um.
+const recKey=(o,r)=>chave(o==='tesouraria'?r.descricao:r.sobre).replace(/[^a-z0-9]+/g,' ').trim();
+async function syncRecorrentes(orig,cliId){
+  const t=TABCAT[orig],dk=orig==='pagar'?'vencimento':'data',feitos={};
+  const col=orig==='tesouraria'?'descricao':'sobre';
+  let q=sb.from(t).select('id,'+col).eq('cliente_id',cliId).eq('categoria_ok',false);if(orig==='tesouraria')q=q.eq('tipo','Despesa');
+  const {data:pend}=await q.limit(2000);if(!pend?.length)return feitos;
+  const chaves=new Set(pend.map(r=>recKey(orig,r)).filter(Boolean));if(!chaves.size)return feitos;
+  const {data:ok}=await sb.from(t).select(col+',categoria').eq('cliente_id',cliId).eq('categoria_ok',true).not('categoria','is',null).order(dk,{ascending:false}).limit(3000);
+  const cat={};(ok||[]).forEach(r=>{const k=recKey(orig,r);if(k&&chaves.has(k)&&!cat[k])cat[k]=r.categoria});
+  const grupos={};pend.forEach(r=>{const c=cat[recKey(orig,r)];if(c)(grupos[c]||=[]).push(r.id)});
+  for(const [c,ids] of Object.entries(grupos)){const {error}=await sb.from(t).update({categoria:c,categoria_ok:true}).in('id',ids);if(!error)ids.forEach(id=>feitos[id]=c)}
+  return feitos;
+}
+// depois de confirmar um: os iguais da lista ficam com a categoria e, se não houver cadastro de fornecedores, saem da lista
+async function aplicaRecorrentes(orig,cliId){
+  const f=await syncRecorrentes(orig,cliId),n=Object.keys(f).length;if(!n)return 0;
+  EXPEND.forEach(r=>{if(f[r.id]){r.categoria=f[r.id];r.categoria_ok=true}});
+  if(!FBC.lista.length)EXPEND=EXPEND.filter(r=>!f[r.id]);
+  toast(n+(n===1?' lançamento recorrente recebeu':' lançamentos recorrentes receberam')+' a mesma categoria'+(FBC.lista.length?'. Falta só conferir o fornecedor.':'.'));
+  return n;
+}
 async function confirmarCat(tr){
   const r=EXPEND.find(x=>x.id===tr.dataset.id),cat=tr.querySelector('input').value.trim();
   if(!cat){toast('Escolha a categoria de '+fornDe(r)+'.');return false}
@@ -1168,7 +1192,7 @@ async function confirmarCat(tr){
   if(FBC.lista.length&&!fbc){toast('Use “Conferir” para escolher o fornecedor do Bom Controle de '+fornDe(r)+'.');return false}
   const {error}=await sb.from(TABCAT[exOrig.value]).update({categoria:cat,categoria_ok:true,fornecedor_bc:fbc||null}).eq('id',r.id);
   if(error){fail(error);return false}
-  await aprenderCat(fornDe(r),cat,fbc);return true;
+  await aprenderCat(fornDe(r),cat,fbc);await aplicaRecorrentes(exOrig.value,r.cliente_id);return true;
 }
 $('exConf').addEventListener('click',async e=>{
   if(e.target.closest('[data-cc]'))return abrirCC(EXPEND.findIndex(r=>r.id===e.target.closest('tr').dataset.id));
