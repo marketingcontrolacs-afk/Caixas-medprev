@@ -1428,7 +1428,7 @@ const rpErr=t=>{$('rpErr').textContent=t;$('rpErr').hidden=false};
 async function rpAcao(act,el){
   const p=PARCDLG,e=ehEsc(),me=async()=>(await sb.auth.getUser()).data.user.id;
   const dId=el.closest('tr')?.dataset.d,d=dId&&(PDESC[p?.id]||[]).find(x=>x.id===dId);
-  const recarregar=async(msg)=>{if(msg)toast(msg);await renderRep();const np=p&&PARC.find(x=>x.id===p.id);if(np)abrirParceiro(np);else dlgRep.close()};
+  const recarregar=async(msg)=>{if(msg)toast(msg);await renderRep();const np=PARCDLG&&PARC.find(x=>x.id===PARCDLG.id);if(np)abrirParceiro(np);else dlgRep.close()};
   try{
     if(act==='fechar')return dlgRep.close();
     if(act==='voltar')return abrirParceiro(p);
@@ -1441,7 +1441,7 @@ async function rpAcao(act,el){
     if(act==='salvar'){
       const o=lerCampos('pc',['nome','obs',...CONTAK]);
       if(!o.nome)return rpErr('Informe o nome do parceiro.');
-      if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta.');
+      if((o.banco||o.agencia||o.conta)&&!temConta(o))return rpErr('Complete banco, agência e conta, ou deixe em branco e preencha depois.');
       if(p){if(e&&$('pc_ativo'))o.ativo=$('pc_ativo').checked;o.atualizado_em=new Date().toISOString();
         const {error}=await sb.from('parceiros').update(o).eq('id',p.id);if(error)throw error;return recarregar('Parceiro salvo')}
       o.cliente_id=$('pc_cliente').value;o.conferido=e;
