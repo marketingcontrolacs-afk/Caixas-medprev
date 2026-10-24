@@ -106,7 +106,10 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
-#dlgFer,#dlgRep{width:min(860px,calc(100vw - 32px))} #dlgRep .db>*{min-width:0}
+#dlgFer,#dlgRep{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
+.ccgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}.ccgrid>*{min-width:0}
+@media (max-width:900px){.ccgrid{grid-template-columns:minmax(0,1fr)}}
+#ccDoc img{max-width:100%;border:1px solid var(--line);border-radius:8px}#ccDoc iframe{width:100%;height:68vh;border:1px solid var(--line);border-radius:8px;background:#fff} #dlgRep .db>*{min-width:0}
 .alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
 .alerta b{color:var(--warn)}
 .rat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:10px}
@@ -407,6 +410,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
   <div class="db" id="feBody"></div>
   <div class="df"><button class="btn ghost" id="feDev" hidden>Devolver ao cliente</button><span class="spacer"></span><button class="btn ghost" id="feClose">Fechar</button><button class="btn" id="feSave" hidden>Salvar observações</button><button class="btn primary" id="feOk" hidden>Aprovar</button></div>
+</dialog>
+<dialog id="dlgCC">
+  <div class="dh"><h2 id="ccTitle"></h2><span class="spacer"></span><span class="note" id="ccPos"></span></div>
+  <div class="db"><div class="ccgrid"><div id="ccDoc"></div><div id="ccDados" style="display:grid;gap:12px;align-content:start"></div></div><p class="err" id="ccErr" hidden></p></div>
+  <div class="df"><button type="button" class="btn ghost" id="ccFechar">Fechar</button><span class="spacer"></span><button type="button" class="btn" id="ccPular">Pular</button><button type="button" class="btn primary" id="ccOk">Confirmar e ir para o próximo</button></div>
 </dialog>
 <dialog id="dlgRep">
   <div class="dh"><h2 id="rpTitle"></h2><span class="spacer"></span><span id="rpChip" class="chips"></span></div>
@@ -989,17 +997,56 @@ const fornDe=r=>r.fornecedor||r.descricao||'';
 const textoDe=r=>[r.sobre,r.descricao,r.obs].filter(Boolean).join(' ');
 const catOpts=()=>PCAT.plano.map(c=>`<option value="${esc(c.categoria)}"${c.codigo?` label="${esc(c.codigo)} · ${esc(c.categoria)}"`:''}>`).join('');
 // quadro da exportação: lançamentos do período aguardando o escritório confirmar a categoria
-let EXPEND=[];
-function renderExConf(){
+let EXPEND=[],EXDOCS={};
+async function renderExConf(){
   const box=$('exConf');
   if(!EXPEND.length){box.innerHTML='';return}
+  EXDOCS={};const {data:dd}=await sb.from('documentos').select('*').in('registro_id',EXPEND.map(r=>r.id));(dd||[]).forEach(d=>(EXDOCS[d.registro_id]||=[]).push(d));
   const dk=exOrig.value==='pagar'?'vencimento':'data';
   box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
     <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
-      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
+      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
     <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
+// Conferência completa de um lançamento: documento ao lado de todos os dados, para o escritório
+// corrigir o que precisar antes de confirmar (qualquer erro trava a importação no Bom Controle)
+const dlgCC=$('dlgCC');let CCI=-1;
+async function abrirCC(i){
+  if(i<0||i>=EXPEND.length){dlgCC.close();renderExport();return}
+  CCI=i;const r=EXPEND[i],orig=exOrig.value,cfg=MODCFG[orig],docs=EXDOCS[r.id]||[];
+  $('ccTitle').textContent=fornDe(r)||'Lançamento';$('ccPos').textContent=`${i+1} de ${EXPEND.length} a confirmar`;$('ccErr').hidden=true;
+  const urls=await signed(docs.map(d=>d.caminho));
+  $('ccDoc').innerHTML=docs.length?docs.map(d=>{const u=urls[d.caminho]||'';return `<div style="display:grid;gap:6px;margin-bottom:12px"><div class="row" style="justify-content:space-between"><b>${esc(d.categoria)}</b><a href="${u}" target="_blank" rel="noopener" class="note">Abrir em outra aba</a></div>${kindOf(d)==='pdf'?`<iframe src="${u}" title="${esc(d.nome_arquivo)}"></iframe>`:`<img src="${u}" alt="${esc(d.nome_arquivo)}">`}</div>`}).join('')
+    :'<div class="alerta" style="margin:0"><b>Nenhum documento anexado</b><span>Peça o documento ao cliente antes de confirmar.</span></div>';
+  const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));
+  $('ccDados').innerHTML=`<div class="fields">${cfg.campos.filter(([k])=>k!=='tipo').map(([k,t,tp])=>{const v=r[k];
+      if(tp==='textarea')return `<label class="f wide">${t}<textarea data-k="${k}" rows="2">${esc(v||'')}</textarea></label>`;
+      if(tp==='parc')return `<label class="f">${t}<input value="${v}x" disabled></label>`;
+      if(tp==='money')return `<label class="f">${t}<input class="money" data-k="${k}" inputmode="decimal" value="${showMoney(v)}"></label>`;
+      return `<label class="f${tp==='sobre'?' wide':''}">${t}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v||'')}"></label>`}).join('')}</div>
+    ${Array.isArray(r.rateio)&&r.rateio.length?`<p class="note" style="margin:0"><b>Rateio:</b> ${r.rateio.map(x=>esc(x.filial)+' '+fm(x.valor)).join(' · ')}</p>`:''}
+    ${orig==='pagar'?`<p class="note" style="margin:0">${r.conferido?`Paga em ${dBR(r.pago_em||r.vencimento)}${r.banco?' pelo '+esc(r.banco):''}`:'Ainda não paga'}</p>`:''}
+    <label class="f"><span>Categoria no Bom Controle ${sg&&!r.categoria?'<span class="chip c-warn">sugerida</span>':''}</span><input id="ccCat" list="catsListCC" value="${esc(sg)}" placeholder="Escolha do plano de contas"></label><datalist id="catsListCC">${catOpts()}</datalist>`;
+  if(!dlgCC.open)dlgCC.showModal();
+}
+$('ccFechar').onclick=()=>{dlgCC.close();renderExport()};
+$('ccPular').onclick=()=>abrirCC(CCI+1);
+$('ccOk').onclick=async()=>{
+  const r=EXPEND[CCI],orig=exOrig.value,upd={},err=$('ccErr');err.hidden=true;
+  $('ccDados').querySelectorAll('[data-k]').forEach(el=>{upd[el.dataset.k]=el.classList.contains('money')?parseMoney(el.value):el.value.trim()||null});
+  const cat=$('ccCat').value.trim(),falta=MODCFG[orig].campos.find(([k,,tp,req])=>req&&k in upd&&(upd[k]==null||upd[k]===''));
+  let m=!cat?'Escolha a categoria.':falta?'Preencha: '+falta[1]+'.':!(upd.valor>0)?'O valor precisa ser maior que zero.':'';
+  if(!m&&Array.isArray(r.rateio)&&r.rateio.length&&Math.abs(r2(upd.valor)-r2(r.rateio.reduce((a,x)=>a+x.valor,0)))>=0.005)m='O valor mudou e não bate mais com o rateio. Ajuste o rateio no lançamento.';
+  if(m){err.textContent=m;err.hidden=false;return}
+  upd.valor=r2(upd.valor);upd.categoria=cat;upd.categoria_ok=true;
+  $('ccOk').disabled=true;
+  const {error}=await sb.from(TABCAT[orig]).update(upd).eq('id',r.id);
+  $('ccOk').disabled=false;
+  if(error){fail(error);return}
+  await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat);toast('Confirmado');
+  EXPEND.splice(CCI,1);abrirCC(CCI);
+};
 async function confirmarCat(tr){
   const r=EXPEND.find(x=>x.id===tr.dataset.id),cat=tr.querySelector('input').value.trim();
   if(!cat){toast('Escolha a categoria de '+fornDe(r)+'.');return false}
@@ -1008,6 +1055,7 @@ async function confirmarCat(tr){
   await aprenderCat(fornDe(r),cat);return true;
 }
 $('exConf').addEventListener('click',async e=>{
+  if(e.target.closest('[data-cc]'))return abrirCC(EXPEND.findIndex(r=>r.id===e.target.closest('tr').dataset.id));
   if(e.target.closest('[data-ok]')){const b=e.target.closest('[data-ok]');b.disabled=true;if(await confirmarCat(b.closest('tr'))){toast('Categoria confirmada');renderExport()}else b.disabled=false}
   if(e.target.id==='exConfTodas'){e.target.disabled=true;let n=0;for(const tr of $('exConf').querySelectorAll('tbody tr'))if(tr.querySelector('input').value.trim()&&await confirmarCat(tr))n++;toast(n+' categorias confirmadas');renderExport()}
 });
