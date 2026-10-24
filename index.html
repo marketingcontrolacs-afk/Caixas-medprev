@@ -103,7 +103,7 @@ tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
 tfoot td{font-weight:700;background:var(--sunk)}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
-td .fcell{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:28px}td .fcell:hover{color:var(--brand);text-decoration:underline}td.fadj{background:var(--warn-soft)}
+.fin{display:flex;align-items:center;gap:2px}.fin input{min-width:84px;width:100%;padding:5px 7px;font-size:14px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}
 .fdet{display:block;padding:16px 18px;min-width:0}.fdet>*+*{margin-top:12px}.fdet summary{cursor:pointer}
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
@@ -422,7 +422,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
-    <p class="note">Valores fixos vêm do cadastro do colaborador e o resto vem dos lançamentos do mês. Células em amarelo foram ajustadas na conferência.</p>
+    <p class="note">Valores fixos vêm do cadastro do colaborador e o resto vem dos lançamentos do mês. O escritório pode alterar qualquer célula direto na tabela, inclusive os fixos: a mudança vale só para este mês e a célula fica em amarelo (↺ volta ao valor calculado). Para mudar um fixo de vez, use “Colaboradores e valores fixos”.</p>
     <h2 style="margin-top:22px">Lançamentos do mês</h2>
     <div class="card tablebox"><table id="folLanc"></table></div>
     <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Rescisões do mês</h2><button class="btn" id="folRescBaixar" hidden>Baixar planilha de rescisão</button></div>
@@ -1902,7 +1902,7 @@ async function renderFolha(){
   const er=[rf,rm,rl,ra,rr].find(x=>x.error)?.error;
   if(er){console.error(er);vazio(er.code==='42P01'||/folha_/.test(er.message||'')?['Este módulo precisa da atualização v14 do banco. Rode o SQL no Supabase.','neg']:['Erro ao carregar. Verifique a internet e tente de novo.','neg']);return}
   FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:Object.fromEntries((ra.data||[]).map(a=>[a.funcionario_id+'|'+a.coluna,a.valor]))};
-  const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
+  const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
   $('folAdd').hidden=$('folRescAdd').hidden=!lanca;
   // barra de situação do mês
   $('folBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':st}</span>`
@@ -1914,7 +1914,7 @@ async function renderFolha(){
   $('folGrid').innerHTML=`<thead><tr><th class="l" colspan="2"></th>${gP.length?`<th class="l" colspan="${gP.length}">Proventos</th>`:''}${gD.length?`<th class="l" colspan="${gD.length}">Descontos</th>`:''}${gO.length?`<th colspan="${gO.length}"></th>`:''}</tr>
     <tr><th class="l">Colaborador</th><th class="l">Cargo</th>${cols.map(c=>`<th class="l">${esc(FCOL[c].t)}</th>`).join('')}</tr></thead><tbody>${
     fs.map(f=>`<tr><td class="l"><b>${esc(f.nome)}</b>${f.situacao!=='Ativo'?` <span class="chip c-none">${esc(f.situacao)}</span>`:''}</td><td class="l">${esc(f.cargo||'')}</td>${cols.map(c=>{const x=folCelula(f,c);
-      return `<td class="l${x.aj?' fadj':''}">${e?`<button class="fcell" data-f="${f.id}" data-c="${c}" title="${x.aj?'Ajustado na conferência. ':''}Clique para ajustar">${esc(x.txt)||'<span class="muted">·</span>'}</button>`:esc(x.txt)}</td>`}).join('')}</tr>`).join('')
+      return `<td class="l${x.aj?' fadj':''}">${edGrid?folInput(f,c,x):esc(x.txt)}</td>`}).join('')}</tr>`).join('')
     ||`<tr><td class="l muted" colspan="${cols.length+2}">Nenhum colaborador cadastrado nesta empresa.${e?' Cadastre em “Colaboradores e valores fixos”, abaixo.':''}</td></tr>`}</tbody>`;
   // lançamentos do mês
   const nome=id=>FOL.func.find(f=>f.id===id)?.nome||'';
@@ -1987,22 +1987,26 @@ async function salvarLanc(b,outro){
 }
 FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
 
-// Ajuste de uma célula na conferência (escritório)
-$('folGrid').addEventListener('click',ev=>{
-  const b=ev.target.closest('.fcell');if(!b)return;const f=FOL.func.find(x=>x.id===b.dataset.f),c=b.dataset.c,x=folCelula(f,c),aj=FOL.aj[f.id+'|'+c];
-  const ls=FOL.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c);
-  FOLACAO.ajCtx={f,c};
-  folDlg(`${f.nome} · ${FNOME(c)}`,`<p class="note" style="margin:0">${aj!==undefined?'Este valor foi ajustado na conferência.':'Valor calculado: '+(esc(x.txt)||'vazio')+(FCOL[c].fixo?' (fixo do cadastro'+(ls.length?' e lançamentos)':')'):ls.length?' (lançamentos do mês)':'')}</p>
-    <label class="f">Valor que vai para a planilha<input id="faV" value="${esc(aj!==undefined?aj:x.txt)}" placeholder="Deixe vazio para ficar em branco"></label>
-    <p class="note" style="margin:0">Horas em h:mm, percentuais com %, valores em reais. Qualquer outro texto vai como está.</p>`,
-    (aj!==undefined?'<button type="button" class="btn" data-fo="ajLimpa">Voltar ao calculado</button>':'')+'<button type="button" class="btn primary" data-fo="ajSalva">Salvar ajuste</button>');
+// Edição direta das células (escritório): o valor vale só para este mês e fica guardado como ajuste.
+// Os fixos do cadastro continuam iguais; para mudar de vez, use “Colaboradores e valores fixos”.
+const folInput=(f,c,x)=>`<span class="fin"><input data-f="${f.id}" data-c="${c}" value="${esc(x.txt)}" placeholder="–" aria-label="${esc(f.nome+' · '+FNOME(c))}" title="${x.aj?'Alterado neste mês. ':''}Altere aqui para este mês">${x.aj?`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`:''}</span>`;
+$('folGrid').addEventListener('change',async ev=>{
+  const i=ev.target.closest('.fin input');if(!i)return;const f=FOL.func.find(x=>x.id===i.dataset.f),c=i.dataset.c,k=f.id+'|'+c,v=i.value.trim();
+  if(FOL.aj[k]===undefined&&v===folCelula(f,c).txt)return;
+  const {error}=await sb.from('folha_ajustes').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,funcionario_id:f.id,coluna:c,valor:v},{onConflict:'cliente_id,competencia,funcionario_id,coluna'});
+  if(error){fail(error);return}
+  FOL.aj[k]=v;const x=folCelula(f,c),td=i.closest('td');td.classList.add('fadj');
+  if(document.activeElement!==i)i.value=x.txt;
+  if(!td.querySelector('.fvolta'))i.insertAdjacentHTML('afterend',`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`);
+  toast('Alterado só neste mês');
 });
-FOLACAO.ajSalva=async b=>{const {f,c}=FOLACAO.ajCtx;b.disabled=true;
-  const {error}=await sb.from('folha_ajustes').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,funcionario_id:f.id,coluna:c,valor:$('faV').value.trim()},{onConflict:'cliente_id,competencia,funcionario_id,coluna'});
-  b.disabled=false;if(error){console.error(error);return foErro('Não foi possível salvar.')}dlgFol.close();toast('Ajuste salvo');renderFolha()};
-FOLACAO.ajLimpa=async b=>{const {f,c}=FOLACAO.ajCtx;b.disabled=true;
+$('folGrid').addEventListener('click',async ev=>{
+  const b=ev.target.closest('.fvolta');if(!b)return;const f=FOL.func.find(x=>x.id===b.dataset.f),c=b.dataset.c;
   const {error}=await sb.from('folha_ajustes').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('funcionario_id',f.id).eq('coluna',c);
-  b.disabled=false;if(error){console.error(error);return foErro('Não foi possível salvar.')}dlgFol.close();toast('Voltou ao valor calculado');renderFolha()};
+  if(error){fail(error);return}
+  delete FOL.aj[f.id+'|'+c];const td=b.closest('td');td.classList.remove('fadj');td.querySelector('input').value=folCelula(f,c).txt;b.remove();toast('Voltou ao valor calculado');
+});
+$('folGrid').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('.fin input'))ev.target.blur()});
 
 // Rescisão
 $('folRescAdd').onclick=()=>abrirResc(null);
