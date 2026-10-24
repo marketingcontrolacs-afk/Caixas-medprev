@@ -2178,9 +2178,10 @@ function pontoAba(aba){
   const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
-  // resumo com "H.E 100%" igual ao "H.E" em todas as linhas: é a mesma hora contada duas vezes, fica só a HE normal
+  // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
+  // fica só a HE normal; se um dia houver HE 100% de verdade, escolha a coluna à mão
   const iHe=sel.find(x=>x[0]==='he65'),iCem=sel.find(x=>x[0]==='he100');
-  if(iHe&&iCem&&iHe[2]>=0&&iCem[2]>=0&&PNT.txt.slice(h+1).every(r=>String(r[iHe[2]]).trim()===String(r[iCem[2]]).trim()))iCem[2]=-1;
+  if(iHe&&iCem&&iHe[2]>=0&&iCem[2]>=0&&/^h\.? ?e$/i.test(cab[iHe[2]]))iCem[2]=-1;
   const temDia=sel.some(x=>x[0]==='faltas_dias'),temHora=sel.some(x=>x[0]==='faltas_horas');
   $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>
