@@ -1,8 +1,8 @@
 -- =====================================================================
--- v30 · Oliveira: adiantamento salarial de R$ 830 (Ana Paula, Joyce e Silmara)
+-- v30 · Oliveira: adiantamento salarial de R$ 830 (Ana Paula, Joice e Silmara)
 -- =====================================================================
 -- Rode no SQL Editor do Supabase. Pode rodar mais de uma vez.
--- Regra (Carol, 25/10): o adiantamento salarial é de no máximo R$ 830. Recebem: SJ Ana Paula Agostinho, Palhoça Joyce,
+-- Regra (Carol, 25/10): o adiantamento salarial é de no máximo R$ 830. Recebem: SJ Ana Paula Agostinho, Palhoça Joice,
 -- Biguaçu Silmara. Todo mês o valor já entra na folha em vermelho, com ✓ (confirmar), ✎ (mudar o valor) e ✗ (excluir).
 -- Para mudar de vez, edite "Adiantamento salarial R$" em Folha › Colaboradores e valores fixos.
 create or replace function pg_temp.sem_acento(t text) returns text language sql immutable as
@@ -23,7 +23,7 @@ $$
   select case when (select count(*) from melhor) = 1 then (select id from melhor) end
 $$;
 
-with q(empresa, nome) as (values ('Oliveira SJ','Ana Paula Agostinho'),('Oliveira Palhoça','Joyce'),('Oliveira Biguaçu','Silmara'))
+with q(empresa, nome) as (values ('Oliveira SJ','Ana Paula Agostinho'),('Oliveira Palhoça','Joice'),('Oliveira Biguaçu','Silmara'))
 update public.funcionarios f
    set folha_fixos = coalesce(f.folha_fixos,'{}'::jsonb) || '{"adto_salarial":830}'::jsonb
   from q join public.clientes c on c.nome = q.empresa
@@ -31,6 +31,6 @@ update public.funcionarios f
 
 notify pgrst, 'reload schema';
 
-with q(empresa, nome) as (values ('Oliveira SJ','Ana Paula Agostinho'),('Oliveira Palhoça','Joyce'),('Oliveira Biguaçu','Silmara'))
+with q(empresa, nome) as (values ('Oliveira SJ','Ana Paula Agostinho'),('Oliveira Palhoça','Joice'),('Oliveira Biguaçu','Silmara'))
 select q.empresa, q.nome as procurado, coalesce(f.nome,'NÃO ENCONTRADO') as colaborador, f.folha_fixos->>'adto_salarial' as adiantamento
   from q join public.clientes c on c.nome = q.empresa left join public.funcionarios f on f.id = pg_temp.acha_func(c.id, q.nome);
