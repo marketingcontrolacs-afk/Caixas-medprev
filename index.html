@@ -1963,6 +1963,10 @@ function folCelula(f,c){
   if(typeof fx==='string'){const n=/^[\d.,\s]+$/.test(fx)?parseMoney(fx):NaN;if(isFinite(n)&&d.k==='money')fx=n;else{textos.unshift(fx);fx=null}}
   if(c==='dsr'&&FOL.lanc.some(l=>l.funcionario_id===f.id&&FCOL[l.coluna]?.dsr&&l.texto==='dsr'))textos.unshift('Sim');
   if(c==='observacoes'&&f.situacao==='Afastado'&&f.motivo_afastamento)textos.unshift(f.motivo_afastamento);
+  // quem tem ajuda de custo e sábado no mês: lembrete de que o sábado está somado na ajuda (Carol, 25/10)
+  if(c==='observacoes'&&colsDe(FOL.cli).includes('ajuda_dia')&&FOL.aj[f.id+'|ajuda_dia']===undefined){
+    const sab=FOL.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna==='ajuda_dia').reduce((s,l)=>s+(+l.quantidade||0),0),x=sab?ajudaDia(f,[]):null;
+    if(sab&&x.v){const vs=ffNum(f,'ajuda_sabado')||0;textos.push(`Ajuda de custo ${fm(x.v)} + ${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)} = ${fm(r2(x.v+sab*vs))} (sábado somado na ajuda)`)}}
   if(c==='dif_salario'){const n=diasSemRegistro(f);if(n)textos.unshift(`${n} ${n===1?'dia':'dias'}`)}
   if(d.k==='simnao')return fx?{v:'Sim',txt:'Sim'}:{v:'Não',txt:'Não'};
   // parcelas dos descontos parcelados que caem neste mês
