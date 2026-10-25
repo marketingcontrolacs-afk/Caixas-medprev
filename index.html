@@ -2234,13 +2234,15 @@ function pontoPrev(){
   // 44h semanais com o sábado compensado na semana (até 9h por dia): o dia faltado e as horas faltantes são a mesma coisa
   const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0;
   if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;const r=g.v.faltas_horas-jor*g.dias.reduce((s,d)=>s+d.n,0);if(r>0)g.v.faltas_horas=r;else delete g.v.faltas_horas});
+  // total do mês abaixo de 10 minutos (falta ou extra) não é lançado (Carol, 25/10)
+  por.forEach(g=>Object.keys(g.v).forEach(k=>{if(g.v[k]<10)delete g.v[k]}));
   PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length);
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>${
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
       usa.map(([k])=>`<td>${k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}</tr>`).join('')
     ||`<tr><td class="l muted" colspan="${usa.length+2}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
-    <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
+    <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. Totais abaixo de 10 minutos não são lançados. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
   $('pnOk').hidden=!PNT.g.length;
 }
 FOLACAO.pontoLanca=async b=>{
