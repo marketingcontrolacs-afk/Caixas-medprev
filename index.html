@@ -2229,12 +2229,13 @@ async function pdfTabela(buf){
 // no domingo (H.E se positivo, H.F se negativo). Na semana com falta, o H.F do domingo já é o dia faltado: desconta
 // o dia (com DSR) e só o que passar de 9h por dia faltado (o dia mais longo da escala) entra como horas de falta.
 // Sábado trabalhado só conta (ajuda de custo) quando a semana fechou com mais de 4h extras (Carol, 25/10).
-const SAB_HE=4*60,DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
+// a partir de 16/02/2027 a escala passa a 5x2 e ninguém trabalha no sábado: a regra do sábado vale até 15/02/2027
+const SAB_HE=4*60,SAB_ATE='2027-02-15',DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
 function espelhoDiario(pags){
   const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
   let nome='',col=null,sem={f:[],hf:0,he:0,sab:null};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
-    if(sem.sab&&sem.he>SAB_HE)out.push([nome,sem.sab,0,'','',1]);
+    if(sem.sab&&sem.he>SAB_HE&&sem.sab.split('/').reverse().join('-')<=SAB_ATE)out.push([nome,sem.sab,0,'','',1]);
     const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
   for(const ls of pags)for(const l of ls){
     const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
@@ -2257,7 +2258,7 @@ function pontoAba(aba){
   let h=PNT.txt.findIndex(r=>txt(r)>=2&&r.some(v=>/nome|funcion|colab|empreg/i.test(v)));if(h<0)h=PNT.txt.findIndex(r=>txt(r)>=3);if(h<0)h=0;
   PNT.h=h;const cab=PNT.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`);
   const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],
-    ...(colsDe(FOL.cli).includes('ajuda_dia')?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),...PNT.cols];
+    ...(colsDe(FOL.cli).includes('ajuda_dia')&&FOL.comp<=SAB_ATE.slice(0,7)+'-01'?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
