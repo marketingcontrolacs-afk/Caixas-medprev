@@ -482,17 +482,19 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="bnBar"></div></div>
+    <h2 style="margin-top:18px">Escala de sábados</h2>
+    <div class="card tablebox"><table id="bnSab"></table></div>
     <h2 style="margin-top:18px" id="bnVtTit">Vale transporte e combustível</h2>
     <div class="card tablebox"><table id="bnVt"></table></div>
     <h2 style="margin-top:18px">Alimentação</h2>
     <div class="card tablebox"><table id="bnVa"></table></div>
-    <p class="note">Passagens = (dias do mês − feriados e domingos − sábados de folga − faltas) × 2. Alimentação por dia = dias do mês − sábados, domingos e feriados − faltas. As faltas vêm da folha do mês do pedido (faltas de dia inteiro e atestados) e das férias que caem no mês de uso; dá para mudar qualquer número antes de salvar.</p>
+    <p class="note">Dias = dias úteis do mês de uso + sábados da escala − faltas, atestados e férias. Passagens = dias × 2. Alimentação por dia = dias × valor do dia; alimentação fixa (Viva) = valor fixo, que atestado não desconta, mais a assiduidade, que a pessoa perde se faltar sem atestado. As faltas e atestados vêm do ponto lançado na folha do mês do pedido; dá para mudar qualquer número antes de salvar.</p>
     <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Pendências</h2><button class="btn" id="bnPendAdd">+ Pendência</button></div>
     <div class="card tablebox"><table id="bnPend"></table></div>
     <div id="bnCadBox" hidden>
       <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Benefícios de cada colaborador</h2><button class="btn" id="bnCadSalvar">Salvar cadastro</button></div>
       <div class="card tablebox"><table id="bnCad"></table></div>
-      <p class="note">Esses valores montam o pedido de cada mês. "Sábados de folga" é quantos sábados a pessoa não trabalha no mês (4 = segunda a sexta).</p>
+      <p class="note">Esses valores montam o pedido de cada mês. "Sábados" preenche a escala de sábados do mês (todos, alternados ou nenhum); depois dá para marcar sábado a sábado na escala. A partir de 16/02/2027 (escala 5x2) ninguém entra trabalhando no sábado.</p>
     </div>
   </section>
   <!-- RH · COLABORADORES E PRAZOS -->
@@ -2526,49 +2528,53 @@ $('prSalvar').onclick=async ev=>{
   finally{b.disabled=false}
 };
 
-// RH › Pedido de benefícios (supabase/v34_beneficios.sql): substitui as planilhas "VC e VA / VR e VT".
-// O pedido é feito no fim do mês para o mês de uso (competência): desconta as faltas e atestados lançados na folha
-// do mês do pedido e as férias que caem no mês de uso. Combustível só onde a empresa tem (Oliveira e BJ).
-// Regra de desconto na folha (Carol, 25/10): Oliveira não desconta; as demais, 6% de VT e R$ 1,00 de VA.
+// RH › Pedido de benefícios (supabase/v34_beneficios.sql e v35): substitui as planilhas "VC e VA / VR e VT".
+// Regra (Carol, 25/10): segue o espelho de ponto. O pedido é para o mês seguinte (mês de uso):
+// dias = dias úteis do mês de uso + sábados da escala − faltas e atestados (do ponto, lançados na folha do mês do pedido)
+// − férias que caem no mês de uso. VT de todas as empresas e o VA por dia (Oliveira e BJ) usam esses dias, × 2 no VT.
+// Viva: VA fixo (atestado não desconta) com a assiduidade paga junto, que a pessoa perde se faltar.
+// Combustível só onde a empresa tem (Oliveira e BJ). Desconto na folha: Oliveira não desconta; as demais, 6% VT e R$ 1,00 VA.
 const BEN_PADRAO={desconta:true,combustivel:false};
 const benRegra=cli=>({...BEN_PADRAO,...(cli?.folha_modelo?.beneficios||{})});
-const BTIPO={vt:'Vale transporte',comb:'Combustível',va:'Alimentação'};
-let BEN={cli:null,comp:null,rows:[],salvo:false,mes:null,pend:[],func:[],cal:null,semTab:false};
+let BEN={cli:null,comp:null,rows:[],salvo:false,mes:null,pend:[],func:[],cal:null};
 function initBen(){
   if(!$('bnMes').options.length){$('bnMes').innerHTML=mesesOpts(addMes(TODAY,2).slice(0,7));$('bnMes').value=addMes(TODAY,1).slice(0,7)}
   renderBen();
 }
 $('bnMes').onchange=()=>renderBen();
-// calendário do mês de uso: dias, domingos, sábados e feriados (feriado no domingo conta como domingo)
+// calendário do mês de uso: dias úteis (seg a sex, fora feriados) e os sábados que não são feriado
 function benCal(comp,fer){
-  const d=new Date(comp+'T12:00'),m=d.getMonth(),fs=new Set(fer);let dias=0,dom=0,sab=0,f=0;const fl=[];
-  for(;d.getMonth()===m;d.setDate(d.getDate()+1)){dias++;const w=d.getDay(),iso=isoLocal(d);
-    if(w===0)dom++;else if(fs.has(iso)){f++;fl.push(iso)}else if(w===6)sab++}
-  return {dias,dom,sab,fer:f,ferDatas:fl};
+  const d=new Date(comp+'T12:00'),m=d.getMonth(),fs=new Set(fer);let uteis=0;const sabs=[],fl=[];
+  for(;d.getMonth()===m;d.setDate(d.getDate()+1)){const w=d.getDay(),iso=isoLocal(d);
+    if(fs.has(iso)){if(w>0)fl.push(iso);continue}if(w>0&&w<6)uteis++;else if(w===6)sabs.push(iso)}
+  return {uteis,sabs,ferDatas:fl};
 }
-// dias úteis (seg a sex, fora feriados) de um período dentro do mês de uso: férias que caem no mês
+// dias úteis de um período dentro do mês de uso: férias que caem no mês
 function benUteis(ini,fim,comp,fer){
   const a=ini>comp?ini:comp,z=fim<fimMes(comp)?fim:fimMes(comp),fs=new Set(fer);let n=0;
   for(const d=new Date(a+'T12:00');isoLocal(d)<=z;d.setDate(d.getDate()+1)){const w=d.getDay();if(w>0&&w<6&&!fs.has(isoLocal(d)))n++}
   return n;
 }
+// sábados da escala pelo cadastro: todos, alternados (começando no 1º) ou nenhum; a partir de 16/02/2027 é 5x2
+const benSabPadrao=f=>{const e=ff(f,'sab_escala'),s=BEN.cal.sabs.filter(d=>d<='2027-02-15');return e==='todos'?s:e==='alt'?s.filter((_,i)=>i%2===0):[]};
 // linha do pedido a partir do cadastro (ff.vt_* e ff.va_*) e das faltas
-function benLinha(f,tipo,falta){
-  const C=BEN.cal,r={funcionario_id:f.id,tipo,faltas:falta.n,obs:falta.t||null,dias_mes:C.dias};
-  if(tipo==='va'){Object.assign(r,{empresa:ff(f,'va_empresa')||'',va_tipo:ff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:ffNum(f,'va_valor')||0,fer_dom:C.dom+C.sab+C.fer});}
-  else{const sn=ffNum(f,'vt_sab_nao');
-    // a partir de 16/02/2027 a escala é 5x2: ninguém trabalha no sábado
-    Object.assign(r,{empresa:ff(f,'vt_empresa')||'',unitario:ffNum(f,'vt_unit')||0,fer_dom:C.dom+C.fer,sab_nao:BEN.comp>='2027-03-01'||sn==null?C.sab:Math.min(sn,C.sab)})}
+function benLinha(f,tipo,fa){
+  const sd=benSabPadrao(f),r={funcionario_id:f.id,tipo,faltas:fa.n,faltas_injust:fa.inj,obs:fa.t||null,dias_uteis:BEN.cal.uteis,sab_datas:sd,sab_trab:sd.length};
+  if(tipo==='va')Object.assign(r,{empresa:ff(f,'va_empresa')||'',va_tipo:ff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:ffNum(f,'va_valor')||0,assid:ff(f,'va_tipo')==='fixo'?ffNum(f,'va_assid'):null});
+  else Object.assign(r,{empresa:ff(f,'vt_empresa')||'',unitario:ffNum(f,'vt_unit')||0});
   return benCalc(r);
 }
+const benDias=r=>Math.max(0,(+r.dias_uteis||0)+(+r.sab_trab||0)-(+r.faltas||0));
 function benCalc(r){
-  if(r.tipo==='va'){r.quant=r.va_tipo==='fixo'?null:Math.max(0,(r.dias_mes||0)-((r.fer_dom||0)+(+r.faltas||0)));r.total=r2(r.va_tipo==='fixo'?r.unitario:(r.quant||0)*(r.unitario||0))}
-  else{if(!r.quantFixa)r.quant=Math.max(0,((r.dias_mes||0)-((r.fer_dom||0)+(r.sab_nao||0)+(+r.faltas||0)))*2);r.total=r2((r.quant||0)*(r.unitario||0))}
+  if(r.tipo==='va'){
+    if(r.va_tipo==='fixo'){r.quant=null;r.total=r2((+r.unitario||0)+((+r.faltas_injust||0)>0?0:(+r.assid||0)))}
+    else{r.quant=benDias(r);r.total=r2(r.quant*(+r.unitario||0))}}
+  else{if(!r.quantFixa)r.quant=benDias(r)*2;r.total=r2((+r.quant||0)*(+r.unitario||0))}
   return r;
 }
 async function renderBen(){
   const cli=cliAtual(),e=ehEsc();BEN.cli=cli;
-  const vazio=t=>{['bnVt','bnVa','bnPend','bnCad'].forEach(x=>$(x).innerHTML='');$('bnBar').innerHTML=t;$('bnSalvar').hidden=$('bnBaixar').hidden=true;$('bnCadBox').hidden=true};
+  const vazio=t=>{['bnVt','bnVa','bnPend','bnCad','bnSab'].forEach(x=>$(x).innerHTML='');$('bnBar').innerHTML=t;$('bnSalvar').hidden=$('bnBaixar').hidden=true;$('bnCadBox').hidden=true};
   if(!cli){vazio('<span class="muted">Nenhuma empresa liberada.</span>');return}
   const comp=BEN.comp=$('bnMes').value+'-01',ant=addMes(comp,-1),fim=fimMes(comp);
   const [rf,rp,rm,rpe,rl,rh,rv]=await Promise.all([
@@ -2583,71 +2589,91 @@ async function renderBen(){
   if(er){console.error(er);vazio(er.code==='42P01'||er.code==='PGRST205'||/beneficios/.test(er.message||'')?'<span class="neg">Este módulo precisa da atualização v34 do banco. Rode o SQL no Supabase.</span>':'<span class="neg">Erro ao carregar. Verifique a internet e tente de novo.</span>');return}
   const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
   BEN.cal=benCal(comp,fer);BEN.mes=rm.data;BEN.pend=rpe.data||[];
+  if(BEN.mes?.dias_uteis!=null)BEN.cal.uteis=BEN.mes.dias_uteis;
   BEN.func=(rf.data||[]).filter(f=>f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp);
   const R=benRegra(cli),lanca=podeLancar(cli.id,'folha');
-  // faltas do mês do pedido (dia inteiro e atestados) e férias no mês de uso, por colaborador
-  const nomeIg=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().split(/\s+/).slice(0,2).join(' ');
-  const falta=f=>{const ls=(rl.data||[]).filter(l=>l.funcionario_id===f.id),t=[];let n=0;
-    ls.filter(l=>l.coluna==='faltas_dias'||l.coluna==='faltas_data').forEach(l=>{n+=+l.quantidade||1;t.push(`falta ${l.data?dBR(l.data).slice(0,5):''}`.trim())});
+  // faltas (sem atestado), atestados e férias de cada colaborador
+  const nomeIg=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().split(/\s+/).slice(0,2).join(' ');
+  const falta=f=>{const ls=(rl.data||[]).filter(l=>l.funcionario_id===f.id),t=[];let n=0,inj=0;
+    ls.filter(l=>l.coluna==='faltas_dias'||l.coluna==='faltas_data').forEach(l=>{const k=+l.quantidade||1;n+=k;inj+=k;t.push(`falta ${l.data?dBR(l.data).slice(0,5):''}`.trim())});
     ls.filter(l=>l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')).forEach(l=>{const ds=(l.texto.match(/\d{2}\/\d{2}/g)||[]);n+=ds.length||1;t.push('atestado '+ds.join(', '))});
     (rv.data||[]).filter(x=>x.status!=='Devolvida'&&(x.matricula&&f.matricula?String(x.matricula)===String(f.matricula):nomeIg(x.nome)===nomeIg(f.nome))).forEach(x=>{const k=benUteis(x.inicio,x.fim_real,comp,fer);if(k){n+=k;t.push(`férias ${dBR(x.inicio).slice(0,5)} a ${dBR(x.fim_real).slice(0,5)} (${k} ${k===1?'dia':'dias'})`)}});
-    return {n,t:t.join('; ')}};
+    return {n,inj,t:t.join('; ')}};
   BEN.salvo=(rp.data||[]).length>0;
-  BEN.rows=BEN.salvo?(rp.data||[]).map(r=>({...r,quantFixa:r.tipo!=='va'&&r.quant!=null&&r.quant!==Math.max(0,((r.dias_mes||0)-((r.fer_dom||0)+(r.sab_nao||0)+(+r.faltas||0)))*2)}))
-    :BEN.func.filter(f=>f.situacao!=='Desligado').flatMap(f=>{const fa=falta(f),o=[];const vt=ff(f,'vt_tipo');
+  BEN.rows=BEN.salvo?(rp.data||[]).map(r=>({...r,sab_datas:r.sab_datas||[],quantFixa:r.tipo!=='va'&&r.quant!=null&&+r.quant!==benDias(r)*2}))
+    :BEN.func.filter(f=>f.situacao!=='Desligado').flatMap(f=>{const fa=falta(f),o=[],vt=ff(f,'vt_tipo');
       if(vt==='vt'||vt==='comb'&&R.combustivel)o.push(benLinha(f,vt,fa));if(ff(f,'va_tipo'))o.push(benLinha(f,'va',fa));return o});
   const C=BEN.cal,st=BEN.mes?.status||'Rascunho',[y,m]=comp.split('-');
   $('bnBar').innerHTML=`<span class="chip ${st==='Pedido feito'?'c-done':BEN.salvo?'c-warn':'c-none'}">${st==='Pedido feito'?'Pedido feito'+(BEN.mes?.pedido_em?' em '+dBR(BEN.mes.pedido_em.slice(0,10)):''):BEN.salvo?'Salvo, falta fazer o pedido':'Ainda não salvo'}</span>
-    <span class="note">${MESES[+m-1]}/${y}: ${C.dias} dias, ${C.dom} domingos, ${C.sab} sábados, ${C.fer} ${C.fer===1?'feriado':'feriados'}${C.ferDatas.length?' ('+C.ferDatas.map(d=>dBR(d).slice(0,5)).join(', ')+')':''}. Faltas e atestados da folha de ${MESES[+addMes(comp,-1).slice(5,7)-1].toLowerCase()}.</span>
+    <label class="f" style="margin:0" title="Segunda a sexta, menos feriados. Mude se a empresa tiver outro calendário.">Dias úteis de ${MESES[+m-1].toLowerCase()}<input id="bnUteis" type="number" min="0" max="31" value="${C.uteis}" style="max-width:70px"${lanca?'':' disabled'}></label>
+    <span class="note">${C.ferDatas.length?'Feriados: '+C.ferDatas.map(d=>dBR(d).slice(0,5)).join(', ')+'. ':''}${C.sabs.length} sábados. Faltas e atestados do ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()}.</span>
     <span class="spacer"></span>${R.desconta?`<span class="chip ${R.confirmado?'c-warn':'c-bad'}">Desconta na folha: 6% de VT e R$ 1,00 de VA${R.confirmado?'':' (regra padrão: conferir)'}</span>${!R.confirmado&&e?'<button class="btn small" data-bn="regra">Confirmar regra</button><button class="btn small ghost" data-bn="naodesc">Não desconta</button>':''}`:'<span class="chip c-ok">Não desconta VT e VA na folha</span>'}
     ${lanca&&BEN.salvo?st==='Pedido feito'?'<button class="btn small ghost" data-bn="reabrir">Voltar para rascunho</button>':'<button class="btn small" data-bn="feito">Marcar pedido como feito</button>':''}
-    ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelas faltas (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
+    ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelo ponto (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
   $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;
   $('bnVtTit').textContent=R.combustivel?'Vale transporte e combustível':'Vale transporte';
-  benTabelas(lanca);renderBenPend(lanca);
+  benEscala(lanca);benTabelas(lanca);renderBenPend(lanca);
   $('bnCadBox').hidden=!e;if(e)renderBenCad();
 }
 const benNome=id=>BEN.func.find(f=>f.id===id)?.nome||'?';
+const benIds=()=>[...new Set(BEN.rows.filter(r=>!(r.tipo==='va'&&r.va_tipo==='fixo')).map(r=>r.funcionario_id))].sort((a,b)=>benNome(a).localeCompare(benNome(b)));
+// escala de sábados do mês de uso: quem trabalha em cada sábado (soma nos dias do VT e do VA por dia)
+function benEscala(lanca){
+  const ss=BEN.cal.sabs,ids=benIds(),sab=id=>new Set(BEN.rows.find(r=>r.funcionario_id===id)?.sab_datas||[]);
+  $('bnSab').innerHTML=!ss.length||!ids.length?'<tbody><tr><td class="l muted">Nenhum sábado no mês ou ninguém com benefício por dia.</td></tr></tbody>'
+    :`<thead><tr><th class="l">Colaborador</th>${ss.map(d=>`<th>${dBR(d).slice(0,5)}</th>`).join('')}<th>Sábados</th></tr></thead><tbody>${
+      ids.map(id=>{const s=sab(id);return `<tr><td class="l"><b>${esc(benNome(id))}</b></td>${ss.map(d=>`<td><input type="checkbox" data-bs="${id}" value="${d}"${s.has(d)?' checked':''}${lanca?'':' disabled'} style="width:auto" aria-label="${esc(benNome(id))} trabalha em ${dBR(d)}"></td>`).join('')}<td><b>${s.size}</b></td></tr>`}).join('')}</tbody>`;
+}
+$('bnSab').addEventListener('change',ev=>{const c=ev.target.closest('[data-bs]');if(!c)return;const id=c.dataset.bs,
+  ds=[...document.querySelectorAll(`#bnSab [data-bs="${id}"]:checked`)].map(x=>x.value);
+  BEN.rows.filter(r=>r.funcionario_id===id).forEach(r=>{r.sab_datas=ds;r.sab_trab=ds.length;benCalc(r)});
+  c.closest('tr').lastElementChild.innerHTML=`<b>${ds.length}</b>`;benTabelas(true)});
 function benTabelas(lanca){
   const dis=lanca?'':' disabled',num=(i,k,v,w=60)=>`<input data-bi="${i}" data-bk="${k}" value="${v??''}" inputmode="decimal" style="width:${w}px;min-width:${w}px;padding:5px 6px;text-align:right"${dis}>`;
   const txt=(i,k,v,w=150)=>`<input data-bi="${i}" data-bk="${k}" value="${esc(v||'')}" style="width:${w}px;min-width:${w}px;padding:5px 6px"${dis}>`;
   const rs=BEN.rows.map((r,i)=>({r,i})),vt=rs.filter(x=>x.r.tipo!=='va').sort((a,b)=>a.r.tipo.localeCompare(b.r.tipo)||benNome(a.r.funcionario_id).localeCompare(benNome(b.r.funcionario_id))),
     va=rs.filter(x=>x.r.tipo==='va').sort((a,b)=>benNome(a.r.funcionario_id).localeCompare(benNome(b.r.funcionario_id)));
   const tot=xs=>fm(xs.reduce((s,x)=>s+(+x.r.total||0),0)),del=i=>lanca?`<button class="btn small ghost" data-bdel="${i}" title="Tirar do pedido deste mês" aria-label="Tirar do pedido">✕</button>`:'';
-  $('bnVt').innerHTML=vt.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Tipo</th><th class="l">Empresa</th><th>Dias do mês</th><th>Feriados/ Domingos</th><th>Sábado não trabalhado</th><th>Faltas/ Férias</th><th>Quant.</th><th>R$ Unitário</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
-    vt.map(({r,i})=>`<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${r.tipo==='comb'?'Combustível':'VT'}</td><td class="l">${txt(i,'empresa',r.empresa,130)}</td><td>${num(i,'dias_mes',r.dias_mes,50)}</td><td>${num(i,'fer_dom',r.fer_dom,50)}</td><td>${num(i,'sab_nao',r.sab_nao,50)}</td><td>${num(i,'faltas',r.faltas,50)}</td><td>${num(i,'quant',r.quant,55)}${r.quantFixa?' <span class="chip c-warn" title="Mudado à mão">✎</span>':''}</td><td>${num(i,'unitario',showMoney(r.unitario),70)}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`).join('')}</tbody>
+  $('bnVt').innerHTML=vt.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Tipo</th><th class="l">Empresa</th><th>Dias úteis</th><th>Sábados</th><th>Faltas/ Atestados/ Férias</th><th>Dias</th><th>Passagens</th><th>R$ Unitário</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
+    vt.map(({r,i})=>`<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${r.tipo==='comb'?'Combustível':'VT'}</td><td class="l">${txt(i,'empresa',r.empresa,130)}</td><td>${num(i,'dias_uteis',r.dias_uteis,50)}</td><td data-bsab="${i}">${r.sab_trab||0}</td><td>${num(i,'faltas',r.faltas,50)}</td><td data-bd="${i}">${benDias(r)}</td><td>${num(i,'quant',r.quant,55)}${r.quantFixa?' <span class="chip c-warn" title="Mudado à mão">✎</span>':''}</td><td>${num(i,'unitario',showMoney(r.unitario),70)}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td class="l" colspan="9"><b>Total</b></td><td><b id="bnVtTot">${tot(vt)}</b></td><td colspan="2"></td></tr></tfoot>`
     :'<tbody><tr><td class="l muted">Ninguém com vale transporte ou combustível. Cadastre em “Benefícios de cada colaborador”.</td></tr></tbody>';
-  $('bnVa').innerHTML=va.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Empresa</th><th class="l">Tipo</th><th>Valor diário</th><th>Dias do mês</th><th>FDS/ Feriados</th><th>Faltas/ Férias</th><th>Dias a receber</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
-    va.map(({r,i})=>`<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${txt(i,'empresa',r.empresa,120)}</td><td class="l"><select data-bi="${i}" data-bk="va_tipo"${dis}><option value="dia"${r.va_tipo!=='fixo'?' selected':''}>Dia trabalhado</option><option value="fixo"${r.va_tipo==='fixo'?' selected':''}>Fixo</option></select></td><td>${num(i,'unitario',showMoney(r.unitario),70)}</td><td>${r.va_tipo==='fixo'?'':num(i,'dias_mes',r.dias_mes,50)}</td><td>${r.va_tipo==='fixo'?'':num(i,'fer_dom',r.fer_dom,50)}</td><td>${num(i,'faltas',r.faltas,50)}</td><td data-bq="${i}">${r.quant??''}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td class="l" colspan="8"><b>Total</b></td><td><b id="bnVaTot">${tot(va)}</b></td><td colspan="2"></td></tr></tfoot>`
+  const temFixo=va.some(x=>x.r.va_tipo==='fixo');
+  $('bnVa').innerHTML=va.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Empresa</th><th class="l">Tipo</th><th>R$ Valor (dia ou fixo)</th>${temFixo?'<th>R$ Assiduidade</th>':''}<th>Dias úteis</th><th>Sábados</th><th>Faltas/ Atestados/ Férias</th><th>Dias a receber</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
+    va.map(({r,i})=>{const fx=r.va_tipo==='fixo',perde=fx&&(+r.faltas_injust||0)>0&&+r.assid>0;
+      return `<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${txt(i,'empresa',r.empresa,120)}</td><td class="l"><select data-bi="${i}" data-bk="va_tipo"${dis}><option value="dia"${!fx?' selected':''}>Dia trabalhado</option><option value="fixo"${fx?' selected':''}>Fixo</option></select></td><td>${num(i,'unitario',showMoney(r.unitario),75)}</td>${temFixo?`<td>${fx?num(i,'assid',showMoney(r.assid),75)+(perde?' <span class="chip c-bad" title="Faltou sem atestado">perde</span>':''):''}</td>`:''}<td>${fx?'':num(i,'dias_uteis',r.dias_uteis,50)}</td><td data-bsab="${i}">${fx?'':r.sab_trab||0}</td><td>${num(i,'faltas',r.faltas,50)}${fx?`<div class="note" style="margin:0">${+r.faltas_injust||0} sem atestado ${num(i,'faltas_injust',r.faltas_injust,40)}</div>`:''}</td><td data-bq="${i}">${r.quant??''}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`}).join('')}</tbody>
+    <tfoot><tr><td class="l" colspan="${temFixo?9:8}"><b>Total</b></td><td><b id="bnVaTot">${tot(va)}</b></td><td colspan="2"></td></tr></tfoot>`
     :'<tbody><tr><td class="l muted">Ninguém com vale alimentação. Cadastre em “Benefícios de cada colaborador”.</td></tr></tbody>';
 }
 // edição das linhas: recalcula a linha e os totais sem redesenhar (para não perder o foco)
 document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('input',ev=>{
-  const el=ev.target.closest('[data-bi]');if(!el)return;const r=BEN.rows[+el.dataset.bi],k=el.dataset.bk,v=el.value.trim();
+  const el=ev.target.closest('[data-bi]');if(!el)return;const i=el.dataset.bi,r=BEN.rows[+i],k=el.dataset.bk,v=el.value.trim();
   if(k==='empresa'||k==='obs')r[k]=v||null;else if(k==='va_tipo'){r.va_tipo=v;benCalc(r);benTabelas(true);return}
-  else{const n=k==='unitario'?parseMoney(v):Number(v.replace(',','.'));r[k]=v===''||!isFinite(n)?null:n;if(k==='quant')r.quantFixa=v!=='';}
-  benCalc(r);const td=document.querySelector(`[data-bt="${el.dataset.bi}"]`);if(td)td.innerHTML=`<b>${fm(r.total)}</b>`;
-  const q=document.querySelector(`[data-bq="${el.dataset.bi}"]`);if(q)q.textContent=r.quant??'';
-  if(r.tipo!=='va'&&k!=='quant'&&!r.quantFixa){const qi=document.querySelector(`[data-bi="${el.dataset.bi}"][data-bk="quant"]`);if(qi)qi.value=r.quant}
+  else{const n=k==='unitario'||k==='assid'?parseMoney(v):Number(v.replace(',','.'));r[k]=v===''||!isFinite(n)?null:n;if(k==='quant')r.quantFixa=v!=='';}
+  benCalc(r);const q=s=>document.querySelector(`[${s}="${i}"]`);
+  if(q('data-bt'))q('data-bt').innerHTML=`<b>${fm(r.total)}</b>`;if(q('data-bq'))q('data-bq').textContent=r.quant??'';if(q('data-bd'))q('data-bd').textContent=benDias(r);
+  if(r.tipo!=='va'&&k!=='quant'&&!r.quantFixa){const qi=document.querySelector(`[data-bi="${i}"][data-bk="quant"]`);if(qi)qi.value=r.quant}
   const s=t=>fm(BEN.rows.filter(x=>t?x.tipo==='va':x.tipo!=='va').reduce((a,x)=>a+(+x.total||0),0));if($('bnVtTot'))$('bnVtTot').textContent=s(false);if($('bnVaTot'))$('bnVaTot').textContent=s(true);
 }));
 document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('change',ev=>{if(ev.target.matches('select[data-bk]'))ev.target.dispatchEvent(new Event('input',{bubbles:true}))}));
-document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('click',ev=>{const b=ev.target.closest('[data-bdel]');if(!b)return;BEN.rows.splice(+b.dataset.bdel,1);benTabelas(true);toast('Tirado do pedido. Salve para confirmar.')}));
+document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('click',ev=>{const b=ev.target.closest('[data-bdel]');if(!b)return;BEN.rows.splice(+b.dataset.bdel,1);benEscala(true);benTabelas(true);toast('Tirado do pedido. Salve para confirmar.')}));
+// dias úteis do mês (vale para todas as linhas do pedido)
+$('bnBar').addEventListener('change',ev=>{if(ev.target.id!=='bnUteis')return;const n=parseInt(ev.target.value,10);if(!(n>=0&&n<=31)){toast('Dias úteis entre 0 e 31');return}
+  BEN.cal.uteis=n;BEN.rows.forEach(r=>{r.dias_uteis=n;benCalc(r)});benTabelas(true);toast('Dias úteis mudados. Salve o pedido para guardar.')});
 $('bnSalvar').onclick=async ev=>{
   const b=ev.target;b.disabled=true;
   try{
     const {error:e1}=await sb.from('beneficios_pedidos').delete().eq('cliente_id',BEN.cli.id).eq('competencia',BEN.comp);if(e1)throw e1;
     const rows=BEN.rows.map(({id,criado_em,quantFixa,...r})=>({...r,cliente_id:BEN.cli.id,competencia:BEN.comp}));
     if(rows.length){const {error:e2}=await sb.from('beneficios_pedidos').insert(rows);if(e2)throw e2}
+    const {error:e3}=await sb.from('beneficios_meses').upsert({cliente_id:BEN.cli.id,competencia:BEN.comp,dias_uteis:BEN.cal.uteis},{onConflict:'cliente_id,competencia'});if(e3)throw e3;
     toast('Pedido salvo');renderBen();
-  }catch(ex){fail(ex)}finally{b.disabled=false}
+  }catch(ex){console.error(ex);toast(/sab_datas|dias_uteis|faltas_injust|assid/.test(ex.message||'')?'Falta rodar a atualização v35 do banco no Supabase.':'Não foi possível salvar. Verifique a internet e tente de novo.')}finally{b.disabled=false}
 };
 $('bnBar').addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn;b.disabled=true;let error;
   if(a==='feito'||a==='reabrir')({error}=await sb.from('beneficios_meses').upsert({cliente_id:BEN.cli.id,competencia:BEN.comp,status:a==='feito'?'Pedido feito':'Rascunho',pedido_em:a==='feito'?new Date().toISOString():null},{onConflict:'cliente_id,competencia'}));
-  else if(a==='refazer'){if(!confirm('Montar o pedido de novo pelo cadastro e pelas faltas? O que foi mudado à mão neste mês se perde.')){b.disabled=false;return}
+  else if(a==='refazer'){if(!confirm('Montar o pedido de novo pelo cadastro e pelo ponto? O que foi mudado à mão neste mês se perde.')){b.disabled=false;return}
     ({error}=await sb.from('beneficios_pedidos').delete().eq('cliente_id',BEN.cli.id).eq('competencia',BEN.comp))}
   else{const fm2={...(BEN.cli.folha_modelo||{}),beneficios:{...benRegra(BEN.cli),desconta:a==='regra',confirmado:true}};
     ({error}=await sb.from('clientes').update({folha_modelo:fm2}).eq('id',BEN.cli.id));if(!error)BEN.cli.folha_modelo=fm2}
@@ -2671,22 +2697,23 @@ FOLACAO.benPend=async b=>{const t=$('bpT').value.trim();if(!t)return foErro('Esc
   b.disabled=false;if(error)return foErro('Não foi possível salvar. Verifique a internet e tente de novo.');dlgFol.close();toast('Pendência salva');renderBen()};
 // cadastro dos benefícios de cada colaborador (escritório)
 function renderBenCad(){
-  const R=benRegra(BEN.cli),fs=BEN.func.filter(f=>f.situacao!=='Desligado');
-  $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th>Sábados de folga</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th></tr></thead><tbody>${
+  const R=benRegra(BEN.cli),fs=BEN.func.filter(f=>f.situacao!=='Desligado'),sel=(f,k,ops)=>`<select data-k="${k}">${ops.map(([v,t])=>`<option value="${v}"${(ff(f,k)||'')===v?' selected':''}>${t}</option>`).join('')}</select>`;
+  $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th class="l">Sábados</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th><th>R$ Assiduidade (no VA fixo)</th></tr></thead><tbody>${
     fs.map(f=>`<tr data-bc="${f.id}"><td class="l"><b>${esc(f.nome)}</b></td>
-      <td class="l"><select data-k="vt_tipo"><option value="">Não tem</option><option value="vt"${ff(f,'vt_tipo')==='vt'?' selected':''}>Vale transporte</option>${R.combustivel||ff(f,'vt_tipo')==='comb'?`<option value="comb"${ff(f,'vt_tipo')==='comb'?' selected':''}>Combustível</option>`:''}</select></td>
+      <td class="l">${sel(f,'vt_tipo',[['','Não tem'],['vt','Vale transporte'],...(R.combustivel||ff(f,'vt_tipo')==='comb'?[['comb','Combustível']]:[])])}</td>
       <td class="l"><input data-k="vt_empresa" value="${esc(ff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" value="${showMoney(ffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
-      <td><input data-k="vt_sab_nao" value="${ff(f,'vt_sab_nao')??''}" placeholder="4" style="width:55px;min-width:55px" inputmode="numeric"></td>
-      <td class="l"><select data-k="va_tipo"><option value="">Não tem</option><option value="dia"${ff(f,'va_tipo')==='dia'?' selected':''}>Por dia trabalhado</option><option value="fixo"${ff(f,'va_tipo')==='fixo'?' selected':''}>Fixo no mês</option></select></td>
-      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" value="${showMoney(ffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td></tr>`).join('')}</tbody>`
+      <td class="l">${sel(f,'sab_escala',[['','Não trabalha'],['todos','Todos'],['alt','Alternados']])}</td>
+      <td class="l">${sel(f,'va_tipo',[['','Não tem'],['dia','Por dia trabalhado'],['fixo','Fixo no mês']])}</td>
+      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" value="${showMoney(ffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
+      <td><input data-k="va_assid" value="${showMoney(ffNum(f,'va_assid'))}" style="width:80px;min-width:80px" inputmode="decimal"></td></tr>`).join('')}</tbody>`
     :'<tbody><tr><td class="l muted">Nenhum colaborador ativo.</td></tr></tbody>';
 }
 $('bnCadSalvar').onclick=async ev=>{
   const b=ev.target,muda=[];
   for(const tr of document.querySelectorAll('#bnCad [data-bc]')){const f=BEN.func.find(x=>x.id===tr.dataset.bc),fx={...(f.folha_fixos||{})},g=k=>tr.querySelector(`[data-k="${k}"]`).value.trim();
-    for(const k of ['vt_tipo','vt_empresa','va_tipo','va_empresa'])if(g(k))fx[k]=g(k);else delete fx[k];
-    for(const k of ['vt_unit','va_valor']){const n=parseMoney(g(k));if(Number.isNaN(n)){toast(`Confira o valor de ${f.nome}`);return}if(n)fx[k]=n;else delete fx[k]}
-    const sn=g('vt_sab_nao');if(sn==='')delete fx.vt_sab_nao;else if(/^\d$/.test(sn))fx.vt_sab_nao=+sn;else{toast(`Sábados de folga de ${f.nome}: use um número de 0 a 5`);return}
+    delete fx.vt_sab_nao;
+    for(const k of ['vt_tipo','vt_empresa','va_tipo','va_empresa','sab_escala'])if(g(k))fx[k]=g(k);else delete fx[k];
+    for(const k of ['vt_unit','va_valor','va_assid']){const n=parseMoney(g(k));if(Number.isNaN(n)){toast(`Confira o valor de ${f.nome}`);return}if(n)fx[k]=n;else delete fx[k]}
     if(JSON.stringify(fx)!==JSON.stringify(f.folha_fixos||{}))muda.push([f,fx])}
   if(!muda.length){toast('Nada alterado');return}
   b.disabled=true;
@@ -2700,7 +2727,7 @@ $('bnBaixar').onclick=()=>{
   const put=(c,v,z)=>{if(v==null||v==='')return;ws[XLSX.utils.encode_cell({r,c})]=typeof v==='number'?{t:'n',v,...(z?{z}:{})}:{t:'s',v:String(v)}};
   const R$='"R$" #,##0.00',W=10;
   put(0,cli.folha_modelo?.titulo||cli.nome);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.titulo);alto[r]=26;r++;
-  put(0,`Competência: ${MESES[+m-1]}/${y}`);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.sub);r+=2;
+  put(0,`Competência: ${MESES[+m-1]}/${y} · ${BEN.cal.uteis} dias úteis`);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.sub);r+=2;
   const bloco=(tit,lista,H,lin)=>{if(!lista.length)return;
     put(0,tit);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.secao);alto[r]=22;r++;
     H.forEach((h,c)=>put(c,h));xFaixa(ws,r,0,W-1,XS.cab2);alto[r]=30;r++;const r1=r;
@@ -2708,16 +2735,17 @@ $('bnBaixar').onclick=()=>{
     ws[XLSX.utils.encode_cell({r,c:W-3})]={t:'s',v:'Total'};ws[XLSX.utils.encode_cell({r,c:W-2})]={t:'n',v:r2(lista.reduce((s,x)=>s+(+x.total||0),0)),z:R$,f:`SUM(${XLSX.utils.encode_cell({r:r1,c:W-2})}:${XLSX.utils.encode_cell({r:r-1,c:W-2})})`};
     xSt(ws,r,W-3,{font:{bold:true}});xSt(ws,r,W-2,XS.cel,{font:{bold:true}},XS.num);r+=2};
   const ord=t=>BEN.rows.filter(x=>x.tipo===t).sort((a,b)=>benNome(a.funcionario_id).localeCompare(benNome(b.funcionario_id)));
-  const HV=['Funcionário','Empresa','Dias do mês','Feriados/ Domingos','Sábado não trabalhado','Faltas/ Férias','Quant. VT','R$ Unitário','R$ Total','Observação'];
-  const lv=x=>[benNome(x.funcionario_id),x.empresa,x.dias_mes,x.fer_dom,x.sab_nao,+x.faltas||0,x.quant,[+x.unitario||0,R$],[+x.total||0,R$],x.obs];
+  const HV=['Funcionário','Empresa','Dias úteis','Sábados trabalhados','Faltas/ Atestados/ Férias','Dias','Passagens','R$ Unitário','R$ Total','Observação'];
+  const lv=x=>[benNome(x.funcionario_id),x.empresa,x.dias_uteis,x.sab_trab||0,+x.faltas||0,benDias(x),x.quant,[+x.unitario||0,R$],[+x.total||0,R$],x.obs];
   bloco('Vale Transporte',ord('vt'),HV,lv);bloco('Vale Combustível',ord('comb'),HV,lv);
-  bloco('Pedido Alimentação',ord('va'),['Funcionário','Empresa','Tipo','Valor Diário','Dias do mês','FDS/ Feriados','Faltas/ Férias','Dias a Receber','R$ Total','Observação'],
-    x=>[benNome(x.funcionario_id),x.empresa,x.va_tipo==='fixo'?'Fixo':'Dia Trabalhado',[+x.unitario||0,R$],x.va_tipo==='fixo'?'':x.dias_mes,x.va_tipo==='fixo'?'':x.fer_dom,+x.faltas||0,x.quant,[+x.total||0,R$],x.obs]);
+  bloco('Pedido Alimentação',ord('va'),['Funcionário','Empresa','Tipo','R$ Valor','Dias úteis','Sábados trabalhados','Faltas/ Atestados/ Férias','Dias a Receber','R$ Total','Observação'],
+    x=>{const fx=x.va_tipo==='fixo',as=fx&&+x.assid?((+x.faltas_injust||0)>0?'sem assiduidade (faltou)':'+ assiduidade '+fm(x.assid)):'';
+      return [benNome(x.funcionario_id),x.empresa,fx?'Fixo':'Dia Trabalhado',[+x.unitario||0,R$],fx?'':x.dias_uteis,fx?'':x.sab_trab||0,+x.faltas||0,fx?'':x.quant,[+x.total||0,R$],[as,x.obs].filter(Boolean).join('; ')]});
   const pe=BEN.pend.filter(p=>!p.resolvida);
   if(pe.length){put(0,'Pendências');merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.secao);r++;
     pe.forEach(p=>{put(0,p.funcionario_id?benNome(p.funcionario_id):'Todos');put(1,p.texto);if(p.competencia)put(W-1,'Descontar em '+ymTxt(p.competencia.slice(0,7)));merges.push({s:{r,c:1},e:{r,c:W-2}});xSt(ws,r,0,XS.nome);xSt(ws,r,1,XS.nota);r++})}
   ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r,c:W-1}});ws['!merges']=merges;
-  ws['!cols']=[{wch:32},{wch:20},{wch:12},{wch:12},{wch:12},{wch:11},{wch:11},{wch:12},{wch:13},{wch:40}];
+  ws['!cols']=[{wch:32},{wch:20},{wch:12},{wch:12},{wch:13},{wch:10},{wch:11},{wch:12},{wch:13},{wch:40}];
   ws['!rows']=Object.entries(alto).reduce((a,[k,h])=>{a[+k]={hpt:h};return a},[]);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,MESES[+m-1]);
   XLSX.writeFile(wb,`Pedido de beneficios ${cli.nome} ${m}.${y}.xlsx`);
