@@ -2161,7 +2161,7 @@ FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
 // Importar espelho de ponto (Excel ou CSV de qualquer sistema de ponto): o usuário diz qual coluna é o quê,
 // o sistema liga os nomes aos colaboradores e lança faltas (dia com DSR, horas sem DSR) e horas extras.
 // Importar de novo no mesmo mês troca a importação anterior (lançamentos com a descrição PONTO).
-const PONTO='Espelho de ponto';
+const PONTO='Espelho de ponto',SAB_PADRAO=50;
 const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras|^h\.? ?f$/],
   ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)|^h\.? ?e$/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
 const normNome=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean);
@@ -2292,9 +2292,11 @@ function pontoPrev(){
   const vsDe=id=>{const f=fs.find(x=>x.id===id);return f?ffNum(f,'ajuda_sabado')||0:0},temSab=m.sab!==undefined&&fs.some(f=>vsDe(f.id)>0);
   por.forEach(g=>{g.he=(g.v.he65||0)+(g.v.he100||0)+(g.v.horas_extras||0)});
   por.forEach(g=>Object.keys(g.v).forEach(k=>{if(g.v[k]<10)delete g.v[k]}));
-  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||(g.f&&vsDe(g.f.id)&&(g.sab||g.he>240)));
+  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||(temSab&&g.f&&(g.sab||g.he>240)));
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
-  const sabCel=(g,i,id)=>{const vs=vsDe(id);return vs?`<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs)}${!g.sab&&m.sab<0&&g.he>240?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`:'<span class="muted">–</span>'};
+  // quem não tem valor de sábado no cadastro é de contrato antigo (seg a sex): R$ 50 por sábado, que fica gravado no cadastro ao lançar
+  const sabCel=(g,i,id)=>{const vs=vsDe(id);if(!id||(!vs&&!g.sab&&g.he<=240))return '<span class="muted">–</span>';
+    return `<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs||SAB_PADRAO)}${vs?'':' <span class="muted">(contrato antigo)</span>'}${!g.sab&&m.sab<0&&g.he>240?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`};
   PNT.sabCel=sabCel;
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}</tr></thead><tbody>${
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
@@ -2311,11 +2313,13 @@ FOLACAO.pontoLanca=async b=>{
     g.dias.forEach(d=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:d.data&&d.data.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d.data<=fimMes(FOL.comp)?d.data:null,texto:'dsr'}));
     Object.entries(g.v).forEach(([k,mi])=>regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)}));
     const sab=+document.querySelector(`[data-ps="${s.dataset.pg}"]`)?.value||0;if(sab>0)regs.push({...base,funcionario_id:f,coluna:'ajuda_dia',quantidade:sab})});
+  const novosSab=[...new Set(regs.filter(r=>r.coluna==='ajuda_dia').map(r=>r.funcionario_id))].map(id=>FOL.func.find(x=>x.id===id)).filter(x=>x&&!ffNum(x,'ajuda_sabado'));
   if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
   b.disabled=true;
   try{
     const {error:e1}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);if(e1)throw e1;
     const {error:e2}=await sb.from('folha_lancamentos').insert(regs);if(e2)throw e2;
+    for(const x of novosSab){const {error:e3}=await sb.from('funcionarios').update({folha_fixos:{...(x.folha_fixos||{}),ajuda_sabado:SAB_PADRAO}}).eq('id',x.id);if(e3)throw e3}
     dlgFol.close();toast(`Espelho de ponto lançado: ${regs.length} lançamentos`);renderFolha();
   }catch(ex){console.error(ex);foErro(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
   finally{b.disabled=false}
