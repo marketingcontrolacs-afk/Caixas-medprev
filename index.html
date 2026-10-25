@@ -2226,17 +2226,18 @@ async function pdfTabela(buf){
 // o dia (com DSR) e só o que passar de 9h por dia faltado (o dia mais longo da escala) entra como horas de falta.
 const DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
 function espelhoDiario(pags){
-  const out=[['Colaborador','Data','Faltas','H.F','H.E']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
+  const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
   let nome='',col=null,sem={f:[],hf:0,he:0};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
     const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0}};
   for(const ls of pags)for(const l of ls){
     const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
     if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();nome=v}continue}
-    if(l.its.some(i=>i.s==='H.F')&&l.its.some(i=>i.s==='H.E')){col={he:l.its.find(i=>i.s==='H.E').cx,hf:l.its.find(i=>i.s==='H.F').cx};continue}
+    if(l.its.some(i=>i.s==='H.F')&&l.its.some(i=>i.s==='H.E')){col={he:l.its.find(i=>i.s==='H.E').cx,hf:l.its.find(i=>i.s==='H.F').cx,td:l.its.find(i=>i.s==='T.Dia')?.cx};continue}
     const m=DIA_RE.exec(l.its[0].s);if(!m||!col)continue;
     const em=cx=>l.its.find(i=>Math.abs(i.cx-cx)<10)?.s,dia=`${m[2]}/${m[3]}/20${m[4]}`;
     if(l.its.some(i=>/^falta$/i.test(i.s)))sem.f.push(dia);
+    if(/^s[aá]b/i.test(m[1])&&col.td&&num(em(col.td)))out.push([nome,dia,0,'','',1]);
     sem.hf+=num(em(col.hf));sem.he+=num(em(col.he));
     if(/^dom/i.test(m[1]))fecha();
   }
@@ -2249,7 +2250,8 @@ function pontoAba(aba){
   const txt=r=>r.filter(v=>typeof v==='string'&&v.trim()).length;
   let h=PNT.txt.findIndex(r=>txt(r)>=2&&r.some(v=>/nome|funcion|colab|empreg/i.test(v)));if(h<0)h=PNT.txt.findIndex(r=>txt(r)>=3);if(h<0)h=0;
   PNT.h=h;const cab=PNT.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`);
-  const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],...PNT.cols];
+  const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],
+    ...(colsDe(FOL.cli).includes('ajuda_dia')?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
@@ -2273,7 +2275,8 @@ function pontoPrev(){
     const tx=PNT.txt[r],rw=PNT.raw[r];let nome=String(tx[m.nome]||'').trim();
     // espelho por dia costuma trazer o nome só na primeira linha do colaborador
     if(!nome&&m.data>=0&&pontoData(rw[m.data]))nome=ultimo;if(!nome||/^tota(l|is)\b/i.test(nome))continue;ultimo=nome;
-    const g=por.get(nome)||{nome,f:achaFunc(nome,fs),v:{},dias:[]};
+    const g=por.get(nome)||{nome,f:achaFunc(nome,fs),v:{},dias:[],sab:0};
+    if(m.sab>=0)g.sab+=pontoDias(tx[m.sab]);
     PNT.cols.forEach(([k])=>{if(m[k]<0)return;
       if(k==='faltas_dias'){const n=pontoDias(tx[m.faltas_dias]);if(n)g.dias.push({n,data:m.data>=0?pontoData(rw[m.data]):null})}
       else{const mi=lerHoras(String(tx[m[k]]||'').replace(/^-/,''));if(isFinite(mi)&&mi>0)g.v[k]=(g.v[k]||0)+mi}});
@@ -2284,21 +2287,30 @@ function pontoPrev(){
   const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0;
   if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;const r=g.v.faltas_horas-jor*g.dias.reduce((s,d)=>s+d.n,0);if(r>0)g.v.faltas_horas=r;else delete g.v.faltas_horas});
   // total do mês abaixo de 10 minutos (falta ou extra) não é lançado (Carol, 25/10)
+  // sábado trabalhado (quem tem "Sábado R$" no cadastro) entra na ajuda de custo. O resumo de totais não diz os sábados:
+  // quem passou de 4h extras fica marcado para conferir no espelho.
+  const vsDe=id=>{const f=fs.find(x=>x.id===id);return f?ffNum(f,'ajuda_sabado')||0:0},temSab=m.sab!==undefined&&fs.some(f=>vsDe(f.id)>0);
+  por.forEach(g=>{g.he=(g.v.he65||0)+(g.v.he100||0)+(g.v.horas_extras||0)});
   por.forEach(g=>Object.keys(g.v).forEach(k=>{if(g.v[k]<10)delete g.v[k]}));
-  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length);
+  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||(g.f&&vsDe(g.f.id)&&(g.sab||g.he>240)));
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
-  $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>${
+  const sabCel=(g,i,id)=>{const vs=vsDe(id);return vs?`<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs)}${!g.sab&&m.sab<0&&g.he>240?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`:'<span class="muted">–</span>'};
+  PNT.sabCel=sabCel;
+  $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}</tr></thead><tbody>${
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
-      usa.map(([k])=>`<td>${k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}</tr>`).join('')
-    ||`<tr><td class="l muted" colspan="${usa.length+2}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
+      usa.map(([k])=>`<td>${k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}${temSab?`<td class="l" data-pst="${i}">${sabCel(g,i,g.f?.id)}</td>`:''}</tr>`).join('')
+    ||`<tr><td class="l muted" colspan="${usa.length+2+temSab}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
     <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. Totais abaixo de 10 minutos não são lançados. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
   $('pnOk').hidden=!PNT.g.length;
+  if(temSab)$('pnPrev').querySelectorAll('[data-pg]').forEach(s=>s.onchange=()=>{const i=+s.dataset.pg,td=$('pnPrev').querySelector(`[data-pst="${i}"]`);
+    const ant=td.querySelector('input');if(ant)PNT.g[i].sab=+ant.value||0;td.innerHTML=sabCel(PNT.g[i],i,s.value)});
 }
 FOLACAO.pontoLanca=async b=>{
   const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO};
   document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
     g.dias.forEach(d=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:d.data&&d.data.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d.data<=fimMes(FOL.comp)?d.data:null,texto:'dsr'}));
-    Object.entries(g.v).forEach(([k,mi])=>regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)}))});
+    Object.entries(g.v).forEach(([k,mi])=>regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)}));
+    const sab=+document.querySelector(`[data-ps="${s.dataset.pg}"]`)?.value||0;if(sab>0)regs.push({...base,funcionario_id:f,coluna:'ajuda_dia',quantidade:sab})});
   if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
   b.disabled=true;
   try{
