@@ -2,7 +2,7 @@
 -- v28 · Oliveira SJ: Fellyphe não pode fazer hora extra
 -- =====================================================================
 -- Rode no SQL Editor do Supabase depois da v19. Pode rodar mais de uma vez.
--- O cadastro pode estar como Fellype ou Fellyphe: procura pelo começo "Fell".
+-- O cadastro pode estar como Fellype ou Fellyphe: procura pelo começo "Fel" (Felipe, Fellype, Fellyphe).
 -- O Fellyphe (SJ) é menor de idade e trabalha 6h: não pode fazer hora extra. Ao importar o espelho de ponto, a HE dele
 -- não é lançada; vira um alerta nas observações da folha. Para mudar, marque ou desmarque "Não pode fazer hora extra"
 -- em Folha › Colaboradores e valores fixos.
@@ -27,10 +27,10 @@ $$;
 update public.funcionarios f
    set folha_fixos = coalesce(f.folha_fixos,'{}'::jsonb) || '{"sem_he":true}'::jsonb
   from public.clientes c
- where c.nome = 'Oliveira SJ' and f.id = pg_temp.acha_func(c.id, 'Fell');
+ where c.nome = 'Oliveira SJ' and f.id = pg_temp.acha_func(c.id, 'Fel');
 
 notify pgrst, 'reload schema';
 
 select c.nome as empresa, coalesce(f.nome,'NÃO ENCONTRADO') as colaborador, f.folha_fixos->>'sem_he' as nao_pode_he
-  from public.clientes c left join public.funcionarios f on f.id = pg_temp.acha_func(c.id, 'Fell')
+  from public.clientes c left join public.funcionarios f on f.id = pg_temp.acha_func(c.id, 'Fel')
  where c.nome = 'Oliveira SJ';
