@@ -2141,7 +2141,7 @@ $('folPonto').onclick=()=>{
     '<button type="button" class="btn primary" data-fo="pontoLanca" id="pnOk" hidden>Lançar na folha</button>');
   $('pnArq').onchange=async()=>{const f=$('pnArq').files[0];if(!f)return;
     try{const buf=await f.arrayBuffer();
-      if(/\.pdf$/i.test(f.name)){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(await pdfTabela(buf)),'PDF');PNT.wb=wb}
+      if(/\.pdf$/i.test(f.name)){const t=await pdfTabela(buf),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t.linhas),t.diario?'Espelho diário':'PDF');PNT.wb=wb}
       else PNT.wb=XLSX.read(buf,{type:'array',cellDates:true});
       pontoAba(PNT.wb.SheetNames[0])}
     catch(ex){console.error(ex);foErro(/\.pdf$/i.test(f.name)?'Não consegui ler este PDF. Ele precisa ser gerado pelo sistema de ponto (não escaneado).':'Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
@@ -2152,11 +2152,15 @@ const PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const carregaJs=src=>new Promise((ok,ko)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>ko(new Error('script '+src));document.head.appendChild(e)});
 async function pdfTabela(buf){
   if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
-  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise,linhas=[];let cols=null,iNome=0;
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise,linhas=[],pags=[];let cols=null,iNome=0;
   for(let p=1;p<=doc.numPages;p++){
     const pg=await doc.getPage(p),vp=pg.getViewport({scale:1}),its=(await pg.getTextContent()).items.filter(i=>i.str.trim()).map(i=>{
       const t=pdfjsLib.Util.transform(vp.transform,i.transform);return {s:i.str.trim(),x:t[4],y:t[5],cx:t[4]+i.width/2}}).sort((a,b)=>a.y-b.y||a.x-b.x);
     const ls=[];its.forEach(i=>{const l=ls[ls.length-1];if(l&&Math.abs(l.y-i.y)<=3)l.its.push(i);else ls.push({y:i.y,its:[i]})});
+    ls.forEach(l=>l.its.sort((a,b)=>a.x-b.x));pags.push(ls);
+  }
+  if(pags.some(ls=>ls.some(l=>DIA_RE.test(l.its[0].s))&&ls.some(l=>l.its.some(i=>/^Nome:/.test(i.s)))))return {diario:true,linhas:espelhoDiario(pags)};
+  for(const ls of pags){
     let ini=0;const h=ls.findIndex(l=>l.its.length>=3&&l.its.some(i=>/colab|nome|funcion|empreg/i.test(i.s)));
     if(h>=0){ini=h+1;if(!cols){cols=ls[h].its.map(i=>i.cx);iNome=ls[h].its.findIndex(i=>/colab|nome|funcion|empreg/i.test(i.s));linhas.push(ls[h].its.map(i=>i.s))}}
     if(!cols)continue;let resto='';
@@ -2166,7 +2170,28 @@ async function pdfTabela(buf){
       if(resto){r[iNome]=resto+' '+r[iNome];resto=''}linhas.push(r)}
   }
   if(!cols)throw new Error('cabeçalho não encontrado no PDF');
-  return linhas;
+  return {linhas};
+}
+// Espelho de ponto diário (um ou vários colaboradores): o ponto é de 44h semanais e o sistema fecha o saldo da semana
+// no domingo (H.E se positivo, H.F se negativo). Na semana com falta, o H.F do domingo já é o dia faltado: desconta
+// o dia (com DSR) e só o que passar de 9h por dia faltado (o dia mais longo da escala) entra como horas de falta.
+const DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
+function espelhoDiario(pags){
+  const out=[['Colaborador','Data','Faltas','H.F','H.E']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
+  let nome='',col=null,sem={f:[],hf:0,he:0};
+  const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
+    const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0}};
+  for(const ls of pags)for(const l of ls){
+    const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
+    if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();nome=v}continue}
+    if(l.its.some(i=>i.s==='H.F')&&l.its.some(i=>i.s==='H.E')){col={he:l.its.find(i=>i.s==='H.E').cx,hf:l.its.find(i=>i.s==='H.F').cx};continue}
+    const m=DIA_RE.exec(l.its[0].s);if(!m||!col)continue;
+    const em=cx=>l.its.find(i=>Math.abs(i.cx-cx)<10)?.s,dia=`${m[2]}/${m[3]}/20${m[4]}`;
+    if(l.its.some(i=>/^falta$/i.test(i.s)))sem.f.push(dia);
+    sem.hf+=num(em(col.hf));sem.he+=num(em(col.he));
+    if(/^dom/i.test(m[1]))fecha();
+  }
+  fecha();return out;
 }
 function pontoAba(aba){
   const ws=PNT.wb.Sheets[aba];PNT.aba=aba;
@@ -2185,9 +2210,9 @@ function pontoAba(aba){
   const temDia=sel.some(x=>x[0]==='faltas_dias'),temHora=sel.some(x=>x[0]==='faltas_horas');
   $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>
-    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="8:00" style="width:70px" inputmode="numeric"> por dia de falta (sábado <input id="pnJorS" value="4:00" style="width:70px" inputmode="numeric">)</label>`:''}`;
+    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="9:00" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
   if($('pnAba'))$('pnAba').onchange=()=>pontoAba($('pnAba').value);
-  $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH,#pnJorS').forEach(s=>s.onchange=pontoPrev);pontoPrev();
+  $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH').forEach(s=>s.onchange=pontoPrev);pontoPrev();
 }
 const pontoData=v=>{if(v instanceof Date)return isoLocal(v);const m=String(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(!m)return null;const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${pad(m[2])}-${pad(m[1])}`};
 const pontoDias=v=>{const s=String(v||'').trim();if(!s||/^0+([.,]0+)?$|^0?0:00$/.test(s))return 0;if(/^\d+([.,]\d+)?$/.test(s))return +s.replace(',','.');return /:/.test(s)?0:1};
@@ -2206,13 +2231,9 @@ function pontoPrev(){
     por.set(nome,g);
   }
   // o sistema de ponto já põe a jornada do dia faltado nas horas de falta: tira para não descontar duas vezes
-  // 44h semanais: 8h de segunda a sexta e 4h no sábado. Na falta com data usa o dia da semana; sem data (resumo),
-  // conta como dia de semana, a não ser que as horas de falta não cheguem a isso (aí foi sábado).
-  const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0,sab=$('pnJor')?.checked?lerHoras($('pnJorS').value)||jor:0;
-  if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;let hf=g.v.faltas_horas,semData=0;
-    g.dias.forEach(d=>{if(d.data)hf-=d.n*(new Date(d.data+'T12:00').getDay()===6?sab:jor);else semData+=d.n});
-    let k=semData;while(k>0&&jor*k+sab*(semData-k)>hf)k--;hf-=jor*k+sab*(semData-k);
-    if(hf>0)g.v.faltas_horas=hf;else delete g.v.faltas_horas});
+  // 44h semanais com o sábado compensado na semana (até 9h por dia): o dia faltado e as horas faltantes são a mesma coisa
+  const jor=$('pnJor')?.checked?lerHoras($('pnJorH').value):0;
+  if(jor>0)por.forEach(g=>{if(!g.v.faltas_horas)return;const r=g.v.faltas_horas-jor*g.dias.reduce((s,d)=>s+d.n,0);if(r>0)g.v.faltas_horas=r;else delete g.v.faltas_horas});
   PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length);
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>${
