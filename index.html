@@ -1922,7 +1922,7 @@ const FCOL={
     // O atestado vem como observação que começa com "Atestado" (do espelho de ponto ou lançada à mão)
     fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;
       return FOL.lanc.some(l=>l.funcionario_id===f.id&&(['faltas_data','faltas_dias'].includes(l.coluna)||l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')))?0:v}},
-  // valor por dia × dias úteis do mês, mais os sábados trabalhados (lançados no mês) × valor do sábado
+  // valor por dia × 22 dias fixos (transporte, Carol 25/10), mais os sábados trabalhados (lançados no mês) × valor do sábado
   ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
   he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas',fx:[['ff.sem_he','Não pode fazer hora extra','bool']]},
   he100:{t:'HE 100%',g:'P',k:'horas',lanca:'horas'},
@@ -1930,6 +1930,7 @@ const FCOL={
 };
 const ADTO='Adiantamento salarial',ADTO_MAX=830;
 const adtoDecidido=f=>FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='adiantamento'&&(l.descricao||'').startsWith(ADTO));
+const AJUDA_DIAS=22;
 const FPADRAO=['ajuda_custo','gratificacao','horas_extras','dif_salario','quebra_cx','insalubridade','va','vt','descontos_diversos','quebra_cx_desc','faltas_horas','faltas_dias','dsr','adiantamento','observacoes'];
 const FNOME=c=>FCOL[c].nome||FCOL[c].t;
 // título da coluna e nome da aba como na planilha da empresa (folha_modelo.titulos / .abas)
@@ -1981,13 +1982,13 @@ function folCelula(f,c){
   const pend=c==='adiantamento'&&fx!=null;
   return {v:tot,z:'"R$" #,##0.00',txt:fm(tot),pend,dica:pend?`${ADTO} de ${fm(fx)} a confirmar`:undefined};
 }
-// Ajuda de custo por dia: dias úteis × valor do dia + sábados lançados × valor do sábado (vai com a fórmula, como na planilha)
+// Ajuda de custo por dia: 22 dias fixos × valor do dia + sábados lançados × valor do sábado (vai com a fórmula, como na planilha)
 function ajudaDia(f,ls){
   const dia=ffNum(f,'ajuda_dia'),mes=ffNum(f,'ajuda_mes'),sab=ls.reduce((s,l)=>s+(+l.quantidade||0),0),vs=ffNum(f,'ajuda_sabado')||0;
   if(!dia&&!mes&&!sab)return {v:null,txt:''};
   const a=dia?r2(FOL.du*dia):mes||0,b=r2(sab*vs),tot=r2(a+b),pt=[dia?`${FOL.du}*${dia}`:mes?String(mes):'',b?String(b):''].filter(Boolean);
   return {v:tot,z:'"R$" #,##0.00',f:pt.length>1?`(${pt[0]})+${pt[1]}`:pt[0],txt:fm(tot),
-    dica:[dia?`${FOL.du} dias úteis × ${fm(dia)}`:mes?`${fm(mes)} fixo no mês`:'',sab?`${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)}`:''].filter(Boolean).join(' + ')};
+    dica:[dia?`${FOL.du} dias × ${fm(dia)}`:mes?`${fm(mes)} fixo no mês`:'',sab?`${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)}`:''].filter(Boolean).join(' + ')};
 }
 // Faltas pela data do dia (uma falta: a data; mais de uma: as datas separadas por vírgula)
 const xlsDia=s=>(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))-Date.UTC(1899,11,30))/864e5;
@@ -2067,7 +2068,8 @@ async function renderFolha(){
   FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:Object.fromEntries((ra.data||[]).map(a=>[a.funcionario_id+'|'+a.coluna,a.valor])),
     parc:rp.error?[]:rp.data||[],semParc:!!rp.error,fer:rv.error?[]:(rv.data||[]).filter(x=>x.status!=='Devolvida')};
   const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
-  FOL.du=FOL.mes?.dias_uteis??diasUteis(comp,fer);
+  // a ajuda de custo de transporte usa 22 dias fixos (Carol, 25/10); o escritório pode mudar no mês
+  FOL.du=FOL.mes?.dias_uteis??AJUDA_DIAS;
   if(FOL.fer.length&&cli.folha_modelo?.ferias){const {data:pg}=await sb.from('ferias_programacoes').select('id,venda_total').in('id',[...new Set(FOL.fer.map(x=>x.programacao_id))]);
     FOL.fer.forEach(x=>x.venda=x.ordem===1?(pg||[]).find(p=>p.id===x.programacao_id)?.venda_total||0:0)}
   // cada empresa tem a sua planilha de folha: sem o modelo configurado, não usa um modelo genérico
@@ -2083,7 +2085,7 @@ async function renderFolha(){
     +(FOL.mes?.conferido_em?`<span class="note">Conferida em ${dBR(FOL.mes.conferido_em.slice(0,10))}</span>`:'')
     +(e?`<span class="spacer"></span>${st==='Aberta'?'<button class="btn" data-fst="Conferida">Marcar como conferida</button>':st==='Conferida'?'<button class="btn ghost" data-fst="Aberta">Reabrir</button><button class="btn" data-fst="Enviada">Marcar como enviada</button>':'<button class="btn ghost" data-fst="Aberta">Reabrir</button>'}
       <button class="btn primary" id="folBaixar">Baixar planilha da folha</button>`:'')
-    +(cols.includes('ajuda_dia')?`<label class="f" style="margin-left:8px" title="Segunda a sexta, menos feriados. Usado na ajuda de custo por dia.">Dias úteis do mês<input id="folDU" type="number" min="0" max="31" value="${FOL.du}" style="max-width:80px"${edGrid?'':' disabled'}></label>`:'');
+    +(cols.includes('ajuda_dia')?`<label class="f" style="margin-left:8px" title="22 dias fixos. Usado na ajuda de custo por dia (transporte). Mude só se precisar neste mês.">Dias da ajuda de custo<input id="folDU" type="number" min="0" max="31" value="${FOL.du}" style="max-width:80px"${edGrid?'':' disabled'}></label>`:'');
   // grade no formato da planilha
   const cab=folCab(cols),M=folModelo(),comCargo=M.cargo!==false;
   $('folGrid').innerHTML=`<thead>${M.titulo?`<tr><th class="l" colspan="${cols.length+cab.L}">${esc(M.titulo)}</th></tr>`:''}${[...Array(cab.nh).keys()].map(r=>`<tr>${cab.cel.filter(x=>x.r===r).sort((a,b)=>a.c-b.c)
@@ -2117,9 +2119,9 @@ $('folBar').addEventListener('click',async ev=>{
   renderFolha();
 });
 $('folBar').addEventListener('change',async ev=>{
-  if(ev.target.id!=='folDU')return;const n=parseInt(ev.target.value,10);if(!(n>=0&&n<=31)){toast('Dias úteis entre 0 e 31');return}
+  if(ev.target.id!=='folDU')return;const n=parseInt(ev.target.value,10);if(!(n>=0&&n<=31)){toast('Dias entre 0 e 31');return}
   const {error}=await sb.from('folha_meses').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,dias_uteis:n},{onConflict:'cliente_id,competencia'});
-  if(error){fail(error);return}toast('Dias úteis do mês salvos');renderFolha();
+  if(error){fail(error);return}toast('Dias da ajuda de custo salvos');renderFolha();
 });
 $('folLanc').addEventListener('click',async ev=>{const b=ev.target.closest('[data-flx]');if(!b||!confirm('Apagar este lançamento?'))return;
   const {error}=await sb.from('folha_lancamentos').delete().eq('id',b.dataset.flx);if(error)fail(error,'Não foi possível apagar');else{toast('Lançamento apagado');renderFolha()}});
