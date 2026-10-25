@@ -1912,7 +1912,7 @@ const FCOL={
     fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&['faltas_data','faltas_dias','faltas_horas'].includes(l.coluna))?0:v}},
   // valor por dia × dias úteis do mês, mais os sábados trabalhados (lançados no mês) × valor do sábado
   ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
-  he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas'},
+  he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas',fx:[['ff.sem_he','Não pode fazer hora extra','bool']]},
   he100:{t:'HE 100%',g:'P',k:'horas',lanca:'horas'},
   observacoes:{t:'Observações',g:'O',k:'texto',lanca:'texto',fixo:f=>ff(f,'observacoes'),fx:[['ff.observacoes','Observação fixa','texto']]},
 };
@@ -2161,7 +2161,9 @@ FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
 // Importar espelho de ponto (Excel ou CSV de qualquer sistema de ponto): o usuário diz qual coluna é o quê,
 // o sistema liga os nomes aos colaboradores e lança faltas (dia com DSR, horas sem DSR) e horas extras.
 // Importar de novo no mesmo mês troca a importação anterior (lançamentos com a descrição PONTO).
-const PONTO='Espelho de ponto',SAB_PADRAO=50;
+const PONTO='Espelho de ponto',SAB_PADRAO=50,HE_COLS=['he65','he100','he50','he75','horas_extras'];
+// quem não pode fazer hora extra (menor de idade, jornada de 6h): a HE do ponto não é lançada, vira um alerta nas observações
+const semHE=id=>{const f=FOL.func.find(x=>x.id===id);return !!(f&&ff(f,'sem_he'))};
 const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras|^h\.? ?f$/],
   ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)|^h\.? ?e$/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
 const normNome=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean);
@@ -2307,7 +2309,7 @@ function pontoPrev(){
   PNT.sabCel=sabCel;
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}</tr></thead><tbody>${
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
-      usa.map(([k])=>`<td>${k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}${temSab?`<td class="l" data-pst="${i}">${sabCel(g,i,g.f?.id)}</td>`:''}</tr>`).join('')
+      usa.map(([k])=>`<td>${HE_COLS.includes(k)&&g.v[k]&&g.f&&semHE(g.f.id)?`<s>${hhmm(g.v[k])}</s> <span class="chip c-warn">⚠ não pode fazer HE: vai só como alerta</span>`:k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}${temSab?`<td class="l" data-pst="${i}">${sabCel(g,i,g.f?.id)}</td>`:''}</tr>`).join('')
     ||`<tr><td class="l muted" colspan="${usa.length+2+temSab}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
     <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. Totais abaixo de 10 minutos não são lançados. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
   $('pnOk').hidden=!PNT.g.length;
@@ -2318,7 +2320,9 @@ FOLACAO.pontoLanca=async b=>{
   const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO};
   document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
     g.dias.forEach(d=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:d.data&&d.data.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d.data<=fimMes(FOL.comp)?d.data:null,texto:'dsr'}));
-    Object.entries(g.v).forEach(([k,mi])=>regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)}));
+    const heBloq=semHE(f)?Object.entries(g.v).filter(([k])=>HE_COLS.includes(k)).reduce((t,[,mi])=>t+mi,0):0;
+    Object.entries(g.v).forEach(([k,mi])=>{if(!(heBloq&&HE_COLS.includes(k)))regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)})});
+    if(heBloq&&colsDe(FOL.cli).includes('observacoes'))regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`⚠ ALERTA: fez ${hhmm(heBloq)} de hora extra no ponto, mas não pode fazer HE (menor de idade, jornada de 6h). Não foi lançada.`});
     const sab=+document.querySelector(`[data-ps="${s.dataset.pg}"]`)?.value||0;if(sab>0)regs.push({...base,funcionario_id:f,coluna:'ajuda_dia',quantidade:sab})});
   const novosSab=[...new Set(regs.filter(r=>r.coluna==='ajuda_dia').map(r=>r.funcionario_id))].map(id=>FOL.func.find(x=>x.id===id)).filter(x=>x&&!ffNum(x,'ajuda_sabado'));
   if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
