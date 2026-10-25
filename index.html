@@ -110,6 +110,8 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .fin{display:flex;align-items:center;gap:2px}.fin input{min-width:90px;width:100%;padding:4px 6px;font-size:13px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}
 .fdet{display:block;padding:16px 18px;min-width:0}.fdet>*+*{margin-top:12px}.fdet summary{cursor:pointer}
 dialog::backdrop{background:rgba(10,20,22,.45)}
+dialog[open].cheia{width:calc(100vw - 16px)!important;max-width:none;height:calc(100vh - 16px);max-height:none;display:flex;flex-direction:column}dialog.cheia .db{flex:1;min-height:0}
+.dcheia{margin-left:auto;flex:none}select[data-pg]{min-width:230px}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
 #dlgFer,#dlgRep,#dlgFol,#dlgColab{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
@@ -2165,6 +2167,11 @@ FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
 // Importar espelho de ponto (Excel ou CSV de qualquer sistema de ponto): o usuário diz qual coluna é o quê,
 // o sistema liga os nomes aos colaboradores e lança faltas (dia com DSR, horas sem DSR) e horas extras.
 // Importar de novo no mesmo mês troca a importação anterior (lançamentos com a descrição PONTO).
+// Toda janela (diálogo) ganha o botão de tela cheia no título; ao fechar, volta ao tamanho normal
+document.querySelectorAll('dialog .dh').forEach(h=>{const d=h.closest('dialog'),b=document.createElement('button');
+  b.type='button';b.className='btn small dcheia';b.textContent='⛶ Tela cheia';b.title='Abrir esta janela na tela inteira';
+  b.onclick=()=>{const on=d.classList.toggle('cheia');b.textContent=on?'↙ Diminuir':'⛶ Tela cheia'};h.appendChild(b);
+  d.addEventListener('close',()=>{d.classList.remove('cheia');b.textContent='⛶ Tela cheia'})});
 // Tela cheia da folha: a tabela ocupa a janela toda; Esc ou o botão de novo fecham
 $('folCheia').onclick=()=>{const b=$('folGrid').parentElement,on=b.classList.toggle('cheia');$('folCheia').textContent=on?'✕ Fechar tela cheia':'⛶ Tela cheia';
   if(on){const x=document.createElement('button');x.className='btn small';x.id='folCheiaX';x.textContent='✕ Fechar';x.style.cssText='position:sticky;left:0;top:0;z-index:3;margin:6px';x.onclick=()=>$('folCheia').click();b.prepend(x)}else $('folCheiaX')?.remove()};
