@@ -112,7 +112,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .fdet{display:block;padding:16px 18px;min-width:0}.fdet>*+*{margin-top:12px}.fdet summary{cursor:pointer}
 dialog::backdrop{background:rgba(10,20,22,.45)}
 dialog[open].cheia{width:calc(100vw - 16px)!important;max-width:none;height:calc(100vh - 16px);max-height:none;display:flex;flex-direction:column}dialog.cheia .db{flex:1;min-height:0}
-.dcheia{margin-left:auto;flex:none}select[data-pg]{min-width:230px}
+.dcheia{margin-left:auto;flex:none}select[data-pg]{min-width:230px}#bnCad select{min-width:160px}#bnVa select{min-width:140px}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
 #dlgFer,#dlgRep,#dlgFol,#dlgColab{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
@@ -475,6 +475,26 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="row"><span class="spacer"></span><button class="btn primary" id="prSalvar">Salvar premiação</button></div>
     <p class="note">Deixe em branco quem não tem premiação no mês. Afastados não aparecem aqui. Depois que o escritório confere a folha, os valores ficam travados.</p>
   </section>
+  <!-- RH · PEDIDO DE BENEFÍCIOS -->
+  <section id="viewBen" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Pedido de benefícios</h1><p class="sub">Vale transporte, combustível e alimentação. O pedido é feito no fim do mês para o mês seguinte e já desconta as faltas, atestados e férias.</p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
+    </div>
+    <div class="card block" style="margin-top:16px"><div class="row" id="bnBar"></div></div>
+    <h2 style="margin-top:18px" id="bnVtTit">Vale transporte e combustível</h2>
+    <div class="card tablebox"><table id="bnVt"></table></div>
+    <h2 style="margin-top:18px">Alimentação</h2>
+    <div class="card tablebox"><table id="bnVa"></table></div>
+    <p class="note">Passagens = (dias do mês − feriados e domingos − sábados de folga − faltas) × 2. Alimentação por dia = dias do mês − sábados, domingos e feriados − faltas. As faltas vêm da folha do mês do pedido (faltas de dia inteiro e atestados) e das férias que caem no mês de uso; dá para mudar qualquer número antes de salvar.</p>
+    <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Pendências</h2><button class="btn" id="bnPendAdd">+ Pendência</button></div>
+    <div class="card tablebox"><table id="bnPend"></table></div>
+    <div id="bnCadBox" hidden>
+      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Benefícios de cada colaborador</h2><button class="btn" id="bnCadSalvar">Salvar cadastro</button></div>
+      <div class="card tablebox"><table id="bnCad"></table></div>
+      <p class="note">Esses valores montam o pedido de cada mês. "Sábados de folga" é quantos sábados a pessoa não trabalha no mês (4 = segunda a sexta).</p>
+    </div>
+  </section>
   <!-- RH · COLABORADORES E PRAZOS -->
   <section id="viewColab" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -659,6 +679,7 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   folha:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
+  ben:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/>',
   premio:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>',
   colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
@@ -677,6 +698,7 @@ const NAV=[
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
   {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
+  {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',ok:()=>temAcesso('folha')},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('folha')||temAcesso('ferias')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',ok:()=>ehEsc()||ACESSOS.length>0},
@@ -705,7 +727,7 @@ function empresasDe(m){
   if(m==='premio')return empresasDe('folha').filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
   if(m==='tarefas')return CLIENTES.filter(c=>c.ativo!==false&&podeVer(c.id,'tarefas'));
-  const mod=m==='rh'?'ferias':m==='premio'?'folha':m;
+  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):podeVer(c.id,mod)));
 }
@@ -726,7 +748,7 @@ function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewTar','viewAv'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewBen','viewTar','viewAv'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -739,6 +761,7 @@ function openView(){
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
   else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
+  else if(VIEW==='ben'){$('viewBen').hidden=false;initBen()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
@@ -1942,8 +1965,9 @@ const FCOL={
   dif_salario:{t:'Dif de salário',g:'P',k:'money',lanca:'money'},
   quebra_cx:{t:'Quebra de CX',g:'P',k:'pct',fixo:f=>+f.folha_quebra_cx||null,fx:[['folha_quebra_cx','Quebra CX %','pct']]},
   insalubridade:{t:'Insalubridade',g:'P',k:'pct',fixo:f=>+f.folha_insalubridade||null,fx:[['folha_insalubridade','Insalub. %','pct']]},
-  va:{t:'VA',g:'D',k:'simnao',fixo:f=>f.folha_va,fx:[['folha_va','VA','bool']]},
-  vt:{t:'VT',g:'D',k:'simnao',fixo:f=>f.folha_vt,fx:[['folha_vt','VT','bool']]},
+  // com pedido de benefícios no mês (e a empresa descontando), o VA/VT segue o pedido; sem pedido, o cadastro
+  va:{t:'VA',g:'D',k:'simnao',fixo:f=>folBen(f,'va')??f.folha_va,fx:[['folha_va','VA','bool']]},
+  vt:{t:'VT',g:'D',k:'simnao',fixo:f=>folBen(f,'vt')??f.folha_vt,fx:[['folha_vt','VT','bool']]},
   descontos_diversos:{t:'Descontos Diversos',g:'D',k:'money',lanca:'money'},
   quebra_cx_desc:{t:'Quebra de CX',g:'D',k:'money',lanca:'money',nome:'Quebra de CX (desconto)'},
   faltas_horas:{t:'Faltas/ Horas',g:'D',k:'horas',lanca:'horas',dsr:true},
@@ -1974,6 +1998,7 @@ const FCOL={
 const ADTO='Adiantamento salarial',ADTO_MAX=830;
 const adtoDecidido=f=>FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='adiantamento'&&(l.descricao||'').startsWith(ADTO));
 const AJUDA_DIAS=22;
+const folBen=(f,t)=>FOL.ben?.length&&benRegra(FOL.cli).desconta?FOL.ben.some(x=>x.funcionario_id===f.id&&x.tipo===t):null;
 const FPADRAO=['ajuda_custo','gratificacao','horas_extras','dif_salario','quebra_cx','insalubridade','va','vt','descontos_diversos','quebra_cx_desc','faltas_horas','faltas_dias','dsr','adiantamento','observacoes'];
 const FNOME=c=>FCOL[c].nome||FCOL[c].t;
 // título da coluna e nome da aba como na planilha da empresa (folha_modelo.titulos / .abas)
@@ -2108,12 +2133,13 @@ async function renderFolha(){
     sb.from('folha_rescisoes').select('*').eq('cliente_id',cli.id).gte('data_demissao',comp).lte('data_demissao',fim).order('data_demissao')]);
   const er=[rf,rm,rl,ra,rr].find(x=>x.error)?.error;
   // descontos parcelados (v19), feriados do mês e férias que começam no mês: sem eles a folha abre do mesmo jeito
-  const [rp,rh,rv]=await Promise.all([sb.from('folha_parcelamentos').select('*').eq('cliente_id',cli.id).order('emissao'),
+  const [rp,rh,rv,rb]=await Promise.all([sb.from('folha_parcelamentos').select('*').eq('cliente_id',cli.id).order('emissao'),
     sb.from('feriados').select('data,uf,municipio').gte('data',comp).lte('data',fim),
-    sb.from('v_ferias_parcelas').select('*').eq('cliente_id',cli.id).gte('inicio',comp).lte('inicio',fim).order('inicio')]);
+    sb.from('v_ferias_parcelas').select('*').eq('cliente_id',cli.id).gte('inicio',comp).lte('inicio',fim).order('inicio'),
+    sb.from('beneficios_pedidos').select('funcionario_id,tipo').eq('cliente_id',cli.id).eq('competencia',comp)]);
   if(er){console.error(er);vazio(er.code==='42P01'||/folha_/.test(er.message||'')?['Este módulo precisa da atualização v14 do banco. Rode o SQL no Supabase.','neg']:['Erro ao carregar. Verifique a internet e tente de novo.','neg']);return}
   FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:Object.fromEntries((ra.data||[]).map(a=>[a.funcionario_id+'|'+a.coluna,a.valor])),
-    parc:rp.error?[]:rp.data||[],semParc:!!rp.error,fer:rv.error?[]:(rv.data||[]).filter(x=>x.status!=='Devolvida')};
+    parc:rp.error?[]:rp.data||[],semParc:!!rp.error,ben:rb.error?null:rb.data,fer:rv.error?[]:(rv.data||[]).filter(x=>x.status!=='Devolvida')};
   const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
   // a ajuda de custo de transporte usa 22 dias fixos (Carol, 25/10); o escritório pode mudar no mês
   FOL.du=FOL.mes?.dias_uteis??AJUDA_DIAS;
@@ -2498,6 +2524,203 @@ $('prSalvar').onclick=async ev=>{
     toast('Premiação salva');renderPremio();
   }catch(ex){console.error(ex);toast(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível salvar. Verifique a internet e tente de novo.')}
   finally{b.disabled=false}
+};
+
+// RH › Pedido de benefícios (supabase/v34_beneficios.sql): substitui as planilhas "VC e VA / VR e VT".
+// O pedido é feito no fim do mês para o mês de uso (competência): desconta as faltas e atestados lançados na folha
+// do mês do pedido e as férias que caem no mês de uso. Combustível só onde a empresa tem (Oliveira e BJ).
+// Regra de desconto na folha (Carol, 25/10): Oliveira não desconta; as demais, 6% de VT e R$ 1,00 de VA.
+const BEN_PADRAO={desconta:true,combustivel:false};
+const benRegra=cli=>({...BEN_PADRAO,...(cli?.folha_modelo?.beneficios||{})});
+const BTIPO={vt:'Vale transporte',comb:'Combustível',va:'Alimentação'};
+let BEN={cli:null,comp:null,rows:[],salvo:false,mes:null,pend:[],func:[],cal:null,semTab:false};
+function initBen(){
+  if(!$('bnMes').options.length){$('bnMes').innerHTML=mesesOpts(addMes(TODAY,2).slice(0,7));$('bnMes').value=addMes(TODAY,1).slice(0,7)}
+  renderBen();
+}
+$('bnMes').onchange=()=>renderBen();
+// calendário do mês de uso: dias, domingos, sábados e feriados (feriado no domingo conta como domingo)
+function benCal(comp,fer){
+  const d=new Date(comp+'T12:00'),m=d.getMonth(),fs=new Set(fer);let dias=0,dom=0,sab=0,f=0;const fl=[];
+  for(;d.getMonth()===m;d.setDate(d.getDate()+1)){dias++;const w=d.getDay(),iso=isoLocal(d);
+    if(w===0)dom++;else if(fs.has(iso)){f++;fl.push(iso)}else if(w===6)sab++}
+  return {dias,dom,sab,fer:f,ferDatas:fl};
+}
+// dias úteis (seg a sex, fora feriados) de um período dentro do mês de uso: férias que caem no mês
+function benUteis(ini,fim,comp,fer){
+  const a=ini>comp?ini:comp,z=fim<fimMes(comp)?fim:fimMes(comp),fs=new Set(fer);let n=0;
+  for(const d=new Date(a+'T12:00');isoLocal(d)<=z;d.setDate(d.getDate()+1)){const w=d.getDay();if(w>0&&w<6&&!fs.has(isoLocal(d)))n++}
+  return n;
+}
+// linha do pedido a partir do cadastro (ff.vt_* e ff.va_*) e das faltas
+function benLinha(f,tipo,falta){
+  const C=BEN.cal,r={funcionario_id:f.id,tipo,faltas:falta.n,obs:falta.t||null,dias_mes:C.dias};
+  if(tipo==='va'){Object.assign(r,{empresa:ff(f,'va_empresa')||'',va_tipo:ff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:ffNum(f,'va_valor')||0,fer_dom:C.dom+C.sab+C.fer});}
+  else{const sn=ffNum(f,'vt_sab_nao');
+    // a partir de 16/02/2027 a escala é 5x2: ninguém trabalha no sábado
+    Object.assign(r,{empresa:ff(f,'vt_empresa')||'',unitario:ffNum(f,'vt_unit')||0,fer_dom:C.dom+C.fer,sab_nao:BEN.comp>='2027-03-01'||sn==null?C.sab:Math.min(sn,C.sab)})}
+  return benCalc(r);
+}
+function benCalc(r){
+  if(r.tipo==='va'){r.quant=r.va_tipo==='fixo'?null:Math.max(0,(r.dias_mes||0)-((r.fer_dom||0)+(+r.faltas||0)));r.total=r2(r.va_tipo==='fixo'?r.unitario:(r.quant||0)*(r.unitario||0))}
+  else{if(!r.quantFixa)r.quant=Math.max(0,((r.dias_mes||0)-((r.fer_dom||0)+(r.sab_nao||0)+(+r.faltas||0)))*2);r.total=r2((r.quant||0)*(r.unitario||0))}
+  return r;
+}
+async function renderBen(){
+  const cli=cliAtual(),e=ehEsc();BEN.cli=cli;
+  const vazio=t=>{['bnVt','bnVa','bnPend','bnCad'].forEach(x=>$(x).innerHTML='');$('bnBar').innerHTML=t;$('bnSalvar').hidden=$('bnBaixar').hidden=true;$('bnCadBox').hidden=true};
+  if(!cli){vazio('<span class="muted">Nenhuma empresa liberada.</span>');return}
+  const comp=BEN.comp=$('bnMes').value+'-01',ant=addMes(comp,-1),fim=fimMes(comp);
+  const [rf,rp,rm,rpe,rl,rh,rv]=await Promise.all([
+    sb.from('funcionarios').select('id,nome,matricula,situacao,admissao,desligado_em,folha_fixos').eq('cliente_id',cli.id).order('nome'),
+    sb.from('beneficios_pedidos').select('*').eq('cliente_id',cli.id).eq('competencia',comp),
+    sb.from('beneficios_meses').select('*').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
+    sb.from('beneficios_pendencias').select('*').eq('cliente_id',cli.id).order('criado_em'),
+    sb.from('folha_lancamentos').select('funcionario_id,coluna,quantidade,data,texto').eq('cliente_id',cli.id).eq('competencia',ant).in('coluna',['faltas_dias','faltas_data','observacoes']),
+    sb.from('feriados').select('data,uf,municipio').gte('data',comp).lte('data',fim),
+    sb.from('v_ferias_parcelas').select('nome,matricula,inicio,fim_real,status').eq('cliente_id',cli.id).lte('inicio',fim).gte('fim_real',comp)]);
+  const er=[rf,rp,rm,rpe].find(x=>x.error)?.error;
+  if(er){console.error(er);vazio(er.code==='42P01'||er.code==='PGRST205'||/beneficios/.test(er.message||'')?'<span class="neg">Este módulo precisa da atualização v34 do banco. Rode o SQL no Supabase.</span>':'<span class="neg">Erro ao carregar. Verifique a internet e tente de novo.</span>');return}
+  const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
+  BEN.cal=benCal(comp,fer);BEN.mes=rm.data;BEN.pend=rpe.data||[];
+  BEN.func=(rf.data||[]).filter(f=>f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp);
+  const R=benRegra(cli),lanca=podeLancar(cli.id,'folha');
+  // faltas do mês do pedido (dia inteiro e atestados) e férias no mês de uso, por colaborador
+  const nomeIg=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().split(/\s+/).slice(0,2).join(' ');
+  const falta=f=>{const ls=(rl.data||[]).filter(l=>l.funcionario_id===f.id),t=[];let n=0;
+    ls.filter(l=>l.coluna==='faltas_dias'||l.coluna==='faltas_data').forEach(l=>{n+=+l.quantidade||1;t.push(`falta ${l.data?dBR(l.data).slice(0,5):''}`.trim())});
+    ls.filter(l=>l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')).forEach(l=>{const ds=(l.texto.match(/\d{2}\/\d{2}/g)||[]);n+=ds.length||1;t.push('atestado '+ds.join(', '))});
+    (rv.data||[]).filter(x=>x.status!=='Devolvida'&&(x.matricula&&f.matricula?String(x.matricula)===String(f.matricula):nomeIg(x.nome)===nomeIg(f.nome))).forEach(x=>{const k=benUteis(x.inicio,x.fim_real,comp,fer);if(k){n+=k;t.push(`férias ${dBR(x.inicio).slice(0,5)} a ${dBR(x.fim_real).slice(0,5)} (${k} ${k===1?'dia':'dias'})`)}});
+    return {n,t:t.join('; ')}};
+  BEN.salvo=(rp.data||[]).length>0;
+  BEN.rows=BEN.salvo?(rp.data||[]).map(r=>({...r,quantFixa:r.tipo!=='va'&&r.quant!=null&&r.quant!==Math.max(0,((r.dias_mes||0)-((r.fer_dom||0)+(r.sab_nao||0)+(+r.faltas||0)))*2)}))
+    :BEN.func.filter(f=>f.situacao!=='Desligado').flatMap(f=>{const fa=falta(f),o=[];const vt=ff(f,'vt_tipo');
+      if(vt==='vt'||vt==='comb'&&R.combustivel)o.push(benLinha(f,vt,fa));if(ff(f,'va_tipo'))o.push(benLinha(f,'va',fa));return o});
+  const C=BEN.cal,st=BEN.mes?.status||'Rascunho',[y,m]=comp.split('-');
+  $('bnBar').innerHTML=`<span class="chip ${st==='Pedido feito'?'c-done':BEN.salvo?'c-warn':'c-none'}">${st==='Pedido feito'?'Pedido feito'+(BEN.mes?.pedido_em?' em '+dBR(BEN.mes.pedido_em.slice(0,10)):''):BEN.salvo?'Salvo, falta fazer o pedido':'Ainda não salvo'}</span>
+    <span class="note">${MESES[+m-1]}/${y}: ${C.dias} dias, ${C.dom} domingos, ${C.sab} sábados, ${C.fer} ${C.fer===1?'feriado':'feriados'}${C.ferDatas.length?' ('+C.ferDatas.map(d=>dBR(d).slice(0,5)).join(', ')+')':''}. Faltas e atestados da folha de ${MESES[+addMes(comp,-1).slice(5,7)-1].toLowerCase()}.</span>
+    <span class="spacer"></span>${R.desconta?`<span class="chip ${R.confirmado?'c-warn':'c-bad'}">Desconta na folha: 6% de VT e R$ 1,00 de VA${R.confirmado?'':' (regra padrão: conferir)'}</span>${!R.confirmado&&e?'<button class="btn small" data-bn="regra">Confirmar regra</button><button class="btn small ghost" data-bn="naodesc">Não desconta</button>':''}`:'<span class="chip c-ok">Não desconta VT e VA na folha</span>'}
+    ${lanca&&BEN.salvo?st==='Pedido feito'?'<button class="btn small ghost" data-bn="reabrir">Voltar para rascunho</button>':'<button class="btn small" data-bn="feito">Marcar pedido como feito</button>':''}
+    ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelas faltas (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
+  $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;
+  $('bnVtTit').textContent=R.combustivel?'Vale transporte e combustível':'Vale transporte';
+  benTabelas(lanca);renderBenPend(lanca);
+  $('bnCadBox').hidden=!e;if(e)renderBenCad();
+}
+const benNome=id=>BEN.func.find(f=>f.id===id)?.nome||'?';
+function benTabelas(lanca){
+  const dis=lanca?'':' disabled',num=(i,k,v,w=60)=>`<input data-bi="${i}" data-bk="${k}" value="${v??''}" inputmode="decimal" style="width:${w}px;min-width:${w}px;padding:5px 6px;text-align:right"${dis}>`;
+  const txt=(i,k,v,w=150)=>`<input data-bi="${i}" data-bk="${k}" value="${esc(v||'')}" style="width:${w}px;min-width:${w}px;padding:5px 6px"${dis}>`;
+  const rs=BEN.rows.map((r,i)=>({r,i})),vt=rs.filter(x=>x.r.tipo!=='va').sort((a,b)=>a.r.tipo.localeCompare(b.r.tipo)||benNome(a.r.funcionario_id).localeCompare(benNome(b.r.funcionario_id))),
+    va=rs.filter(x=>x.r.tipo==='va').sort((a,b)=>benNome(a.r.funcionario_id).localeCompare(benNome(b.r.funcionario_id)));
+  const tot=xs=>fm(xs.reduce((s,x)=>s+(+x.r.total||0),0)),del=i=>lanca?`<button class="btn small ghost" data-bdel="${i}" title="Tirar do pedido deste mês" aria-label="Tirar do pedido">✕</button>`:'';
+  $('bnVt').innerHTML=vt.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Tipo</th><th class="l">Empresa</th><th>Dias do mês</th><th>Feriados/ Domingos</th><th>Sábado não trabalhado</th><th>Faltas/ Férias</th><th>Quant.</th><th>R$ Unitário</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
+    vt.map(({r,i})=>`<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${r.tipo==='comb'?'Combustível':'VT'}</td><td class="l">${txt(i,'empresa',r.empresa,130)}</td><td>${num(i,'dias_mes',r.dias_mes,50)}</td><td>${num(i,'fer_dom',r.fer_dom,50)}</td><td>${num(i,'sab_nao',r.sab_nao,50)}</td><td>${num(i,'faltas',r.faltas,50)}</td><td>${num(i,'quant',r.quant,55)}${r.quantFixa?' <span class="chip c-warn" title="Mudado à mão">✎</span>':''}</td><td>${num(i,'unitario',showMoney(r.unitario),70)}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td class="l" colspan="9"><b>Total</b></td><td><b id="bnVtTot">${tot(vt)}</b></td><td colspan="2"></td></tr></tfoot>`
+    :'<tbody><tr><td class="l muted">Ninguém com vale transporte ou combustível. Cadastre em “Benefícios de cada colaborador”.</td></tr></tbody>';
+  $('bnVa').innerHTML=va.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Empresa</th><th class="l">Tipo</th><th>Valor diário</th><th>Dias do mês</th><th>FDS/ Feriados</th><th>Faltas/ Férias</th><th>Dias a receber</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
+    va.map(({r,i})=>`<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${txt(i,'empresa',r.empresa,120)}</td><td class="l"><select data-bi="${i}" data-bk="va_tipo"${dis}><option value="dia"${r.va_tipo!=='fixo'?' selected':''}>Dia trabalhado</option><option value="fixo"${r.va_tipo==='fixo'?' selected':''}>Fixo</option></select></td><td>${num(i,'unitario',showMoney(r.unitario),70)}</td><td>${r.va_tipo==='fixo'?'':num(i,'dias_mes',r.dias_mes,50)}</td><td>${r.va_tipo==='fixo'?'':num(i,'fer_dom',r.fer_dom,50)}</td><td>${num(i,'faltas',r.faltas,50)}</td><td data-bq="${i}">${r.quant??''}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td class="l" colspan="8"><b>Total</b></td><td><b id="bnVaTot">${tot(va)}</b></td><td colspan="2"></td></tr></tfoot>`
+    :'<tbody><tr><td class="l muted">Ninguém com vale alimentação. Cadastre em “Benefícios de cada colaborador”.</td></tr></tbody>';
+}
+// edição das linhas: recalcula a linha e os totais sem redesenhar (para não perder o foco)
+document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('input',ev=>{
+  const el=ev.target.closest('[data-bi]');if(!el)return;const r=BEN.rows[+el.dataset.bi],k=el.dataset.bk,v=el.value.trim();
+  if(k==='empresa'||k==='obs')r[k]=v||null;else if(k==='va_tipo'){r.va_tipo=v;benCalc(r);benTabelas(true);return}
+  else{const n=k==='unitario'?parseMoney(v):Number(v.replace(',','.'));r[k]=v===''||!isFinite(n)?null:n;if(k==='quant')r.quantFixa=v!=='';}
+  benCalc(r);const td=document.querySelector(`[data-bt="${el.dataset.bi}"]`);if(td)td.innerHTML=`<b>${fm(r.total)}</b>`;
+  const q=document.querySelector(`[data-bq="${el.dataset.bi}"]`);if(q)q.textContent=r.quant??'';
+  if(r.tipo!=='va'&&k!=='quant'&&!r.quantFixa){const qi=document.querySelector(`[data-bi="${el.dataset.bi}"][data-bk="quant"]`);if(qi)qi.value=r.quant}
+  const s=t=>fm(BEN.rows.filter(x=>t?x.tipo==='va':x.tipo!=='va').reduce((a,x)=>a+(+x.total||0),0));if($('bnVtTot'))$('bnVtTot').textContent=s(false);if($('bnVaTot'))$('bnVaTot').textContent=s(true);
+}));
+document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('change',ev=>{if(ev.target.matches('select[data-bk]'))ev.target.dispatchEvent(new Event('input',{bubbles:true}))}));
+document.querySelectorAll('#bnVt,#bnVa').forEach(t=>t.addEventListener('click',ev=>{const b=ev.target.closest('[data-bdel]');if(!b)return;BEN.rows.splice(+b.dataset.bdel,1);benTabelas(true);toast('Tirado do pedido. Salve para confirmar.')}));
+$('bnSalvar').onclick=async ev=>{
+  const b=ev.target;b.disabled=true;
+  try{
+    const {error:e1}=await sb.from('beneficios_pedidos').delete().eq('cliente_id',BEN.cli.id).eq('competencia',BEN.comp);if(e1)throw e1;
+    const rows=BEN.rows.map(({id,criado_em,quantFixa,...r})=>({...r,cliente_id:BEN.cli.id,competencia:BEN.comp}));
+    if(rows.length){const {error:e2}=await sb.from('beneficios_pedidos').insert(rows);if(e2)throw e2}
+    toast('Pedido salvo');renderBen();
+  }catch(ex){fail(ex)}finally{b.disabled=false}
+};
+$('bnBar').addEventListener('click',async ev=>{
+  const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn;b.disabled=true;let error;
+  if(a==='feito'||a==='reabrir')({error}=await sb.from('beneficios_meses').upsert({cliente_id:BEN.cli.id,competencia:BEN.comp,status:a==='feito'?'Pedido feito':'Rascunho',pedido_em:a==='feito'?new Date().toISOString():null},{onConflict:'cliente_id,competencia'}));
+  else if(a==='refazer'){if(!confirm('Montar o pedido de novo pelo cadastro e pelas faltas? O que foi mudado à mão neste mês se perde.')){b.disabled=false;return}
+    ({error}=await sb.from('beneficios_pedidos').delete().eq('cliente_id',BEN.cli.id).eq('competencia',BEN.comp))}
+  else{const fm2={...(BEN.cli.folha_modelo||{}),beneficios:{...benRegra(BEN.cli),desconta:a==='regra',confirmado:true}};
+    ({error}=await sb.from('clientes').update({folha_modelo:fm2}).eq('id',BEN.cli.id));if(!error)BEN.cli.folha_modelo=fm2}
+  if(error){fail(error);b.disabled=false;return}
+  toast({feito:'Pedido marcado como feito',reabrir:'Pedido voltou para rascunho',refazer:'Pedido montado de novo (ainda não salvo)',regra:'Regra confirmada',naodesc:'Regra salva: não desconta na folha'}[a]);renderBen();
+});
+// pendências: o que descontar ou recarregar a mais nos próximos pedidos
+function renderBenPend(lanca){
+  const ab=BEN.pend.filter(p=>!p.resolvida),fe=BEN.pend.filter(p=>p.resolvida).slice(-5);$('bnPendAdd').hidden=!lanca;
+  $('bnPend').innerHTML=BEN.pend.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Pendência</th><th class="l">Descontar no pedido de</th><th></th></tr></thead><tbody>${
+    [...ab,...fe].map(p=>`<tr${p.resolvida?' class="muted"':''}><td class="l">${p.funcionario_id?esc(benNome(p.funcionario_id)):'Todos'}</td><td class="l">${p.resolvida?'<s>':''}${esc(p.texto)}${p.resolvida?'</s>':''}${!p.resolvida&&p.competencia&&p.competencia<=BEN.comp?' <span class="chip c-bad">neste pedido</span>':''}</td><td class="l">${p.competencia?ymTxt(p.competencia.slice(0,7)):''}</td><td>${lanca?`<button class="btn small ghost" data-bp="${p.id}" data-res="${p.resolvida?0:1}">${p.resolvida?'Reabrir':'✓ Resolvida'}</button>`:''}</td></tr>`).join('')}</tbody>`
+    :'<tbody><tr><td class="l muted">Nenhuma pendência. Use “+ Pendência” para lembrar de descontar ou recarregar algo num próximo pedido.</td></tr></tbody>';
+}
+$('bnPend').addEventListener('click',async ev=>{const b=ev.target.closest('[data-bp]');if(!b)return;
+  const {error}=await sb.from('beneficios_pendencias').update({resolvida:b.dataset.res==='1'}).eq('id',b.dataset.bp);if(error)fail(error);else renderBen()});
+$('bnPendAdd').onclick=()=>folDlg('Nova pendência de benefício',`<label class="f">Colaborador<select id="bpF"><option value="">Todos</option>${BEN.func.filter(f=>f.situacao!=='Desligado').map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('')}</select></label>
+  <label class="f">Pendência<input id="bpT" placeholder="Ex.: descontar 2ª via do VA R$ 9,00"></label>
+  <label class="f">Descontar no pedido de<select id="bpC">${mesesOpts(addMes(TODAY,4).slice(0,7))}</select></label>`,'<button class="btn primary" data-fo="benPend">Salvar</button>');
+FOLACAO.benPend=async b=>{const t=$('bpT').value.trim();if(!t)return foErro('Escreva a pendência.');b.disabled=true;
+  const {error}=await sb.from('beneficios_pendencias').insert({cliente_id:BEN.cli.id,funcionario_id:$('bpF').value||null,texto:t,competencia:$('bpC').value+'-01'});
+  b.disabled=false;if(error)return foErro('Não foi possível salvar. Verifique a internet e tente de novo.');dlgFol.close();toast('Pendência salva');renderBen()};
+// cadastro dos benefícios de cada colaborador (escritório)
+function renderBenCad(){
+  const R=benRegra(BEN.cli),fs=BEN.func.filter(f=>f.situacao!=='Desligado');
+  $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th>Sábados de folga</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th></tr></thead><tbody>${
+    fs.map(f=>`<tr data-bc="${f.id}"><td class="l"><b>${esc(f.nome)}</b></td>
+      <td class="l"><select data-k="vt_tipo"><option value="">Não tem</option><option value="vt"${ff(f,'vt_tipo')==='vt'?' selected':''}>Vale transporte</option>${R.combustivel||ff(f,'vt_tipo')==='comb'?`<option value="comb"${ff(f,'vt_tipo')==='comb'?' selected':''}>Combustível</option>`:''}</select></td>
+      <td class="l"><input data-k="vt_empresa" value="${esc(ff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" value="${showMoney(ffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
+      <td><input data-k="vt_sab_nao" value="${ff(f,'vt_sab_nao')??''}" placeholder="4" style="width:55px;min-width:55px" inputmode="numeric"></td>
+      <td class="l"><select data-k="va_tipo"><option value="">Não tem</option><option value="dia"${ff(f,'va_tipo')==='dia'?' selected':''}>Por dia trabalhado</option><option value="fixo"${ff(f,'va_tipo')==='fixo'?' selected':''}>Fixo no mês</option></select></td>
+      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" value="${showMoney(ffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td></tr>`).join('')}</tbody>`
+    :'<tbody><tr><td class="l muted">Nenhum colaborador ativo.</td></tr></tbody>';
+}
+$('bnCadSalvar').onclick=async ev=>{
+  const b=ev.target,muda=[];
+  for(const tr of document.querySelectorAll('#bnCad [data-bc]')){const f=BEN.func.find(x=>x.id===tr.dataset.bc),fx={...(f.folha_fixos||{})},g=k=>tr.querySelector(`[data-k="${k}"]`).value.trim();
+    for(const k of ['vt_tipo','vt_empresa','va_tipo','va_empresa'])if(g(k))fx[k]=g(k);else delete fx[k];
+    for(const k of ['vt_unit','va_valor']){const n=parseMoney(g(k));if(Number.isNaN(n)){toast(`Confira o valor de ${f.nome}`);return}if(n)fx[k]=n;else delete fx[k]}
+    const sn=g('vt_sab_nao');if(sn==='')delete fx.vt_sab_nao;else if(/^\d$/.test(sn))fx.vt_sab_nao=+sn;else{toast(`Sábados de folga de ${f.nome}: use um número de 0 a 5`);return}
+    if(JSON.stringify(fx)!==JSON.stringify(f.folha_fixos||{}))muda.push([f,fx])}
+  if(!muda.length){toast('Nada alterado');return}
+  b.disabled=true;
+  try{for(const [f,fx] of muda){const {error}=await sb.from('funcionarios').update({folha_fixos:fx}).eq('id',f.id);if(error)throw error;f.folha_fixos=fx}
+    toast(`Cadastro salvo (${muda.length} ${muda.length===1?'colaborador':'colaboradores'})${BEN.salvo?'. O pedido já salvo não muda: use “Montar de novo” se quiser.':''}`);renderBen()}
+  catch(ex){fail(ex)}finally{b.disabled=false}
+};
+// planilha do pedido, no formato das planilhas da Oliveira
+$('bnBaixar').onclick=()=>{
+  const cli=BEN.cli,[y,m]=BEN.comp.split('-'),ws={},merges=[],alto={};let r=0;
+  const put=(c,v,z)=>{if(v==null||v==='')return;ws[XLSX.utils.encode_cell({r,c})]=typeof v==='number'?{t:'n',v,...(z?{z}:{})}:{t:'s',v:String(v)}};
+  const R$='"R$" #,##0.00',W=10;
+  put(0,cli.folha_modelo?.titulo||cli.nome);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.titulo);alto[r]=26;r++;
+  put(0,`Competência: ${MESES[+m-1]}/${y}`);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.sub);r+=2;
+  const bloco=(tit,lista,H,lin)=>{if(!lista.length)return;
+    put(0,tit);merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.secao);alto[r]=22;r++;
+    H.forEach((h,c)=>put(c,h));xFaixa(ws,r,0,W-1,XS.cab2);alto[r]=30;r++;const r1=r;
+    lista.forEach((x,i)=>{lin(x).forEach((v,c)=>Array.isArray(v)?put(c,v[0],v[1]):put(c,v));for(let c=0;c<W;c++){const k=ws[XLSX.utils.encode_cell({r,c})];xSt(ws,r,c,XS.cel,i%2?XS.zebra:null,c===0?XS.nome:k?.t==='n'?XS.num:XS.txt)}r++});
+    ws[XLSX.utils.encode_cell({r,c:W-3})]={t:'s',v:'Total'};ws[XLSX.utils.encode_cell({r,c:W-2})]={t:'n',v:r2(lista.reduce((s,x)=>s+(+x.total||0),0)),z:R$,f:`SUM(${XLSX.utils.encode_cell({r:r1,c:W-2})}:${XLSX.utils.encode_cell({r:r-1,c:W-2})})`};
+    xSt(ws,r,W-3,{font:{bold:true}});xSt(ws,r,W-2,XS.cel,{font:{bold:true}},XS.num);r+=2};
+  const ord=t=>BEN.rows.filter(x=>x.tipo===t).sort((a,b)=>benNome(a.funcionario_id).localeCompare(benNome(b.funcionario_id)));
+  const HV=['Funcionário','Empresa','Dias do mês','Feriados/ Domingos','Sábado não trabalhado','Faltas/ Férias','Quant. VT','R$ Unitário','R$ Total','Observação'];
+  const lv=x=>[benNome(x.funcionario_id),x.empresa,x.dias_mes,x.fer_dom,x.sab_nao,+x.faltas||0,x.quant,[+x.unitario||0,R$],[+x.total||0,R$],x.obs];
+  bloco('Vale Transporte',ord('vt'),HV,lv);bloco('Vale Combustível',ord('comb'),HV,lv);
+  bloco('Pedido Alimentação',ord('va'),['Funcionário','Empresa','Tipo','Valor Diário','Dias do mês','FDS/ Feriados','Faltas/ Férias','Dias a Receber','R$ Total','Observação'],
+    x=>[benNome(x.funcionario_id),x.empresa,x.va_tipo==='fixo'?'Fixo':'Dia Trabalhado',[+x.unitario||0,R$],x.va_tipo==='fixo'?'':x.dias_mes,x.va_tipo==='fixo'?'':x.fer_dom,+x.faltas||0,x.quant,[+x.total||0,R$],x.obs]);
+  const pe=BEN.pend.filter(p=>!p.resolvida);
+  if(pe.length){put(0,'Pendências');merges.push({s:{r,c:0},e:{r,c:W-1}});xFaixa(ws,r,0,W-1,XS.secao);r++;
+    pe.forEach(p=>{put(0,p.funcionario_id?benNome(p.funcionario_id):'Todos');put(1,p.texto);if(p.competencia)put(W-1,'Descontar em '+ymTxt(p.competencia.slice(0,7)));merges.push({s:{r,c:1},e:{r,c:W-2}});xSt(ws,r,0,XS.nome);xSt(ws,r,1,XS.nota);r++})}
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r,c:W-1}});ws['!merges']=merges;
+  ws['!cols']=[{wch:32},{wch:20},{wch:12},{wch:12},{wch:12},{wch:11},{wch:11},{wch:12},{wch:13},{wch:40}];
+  ws['!rows']=Object.entries(alto).reduce((a,[k,h])=>{a[+k]={hpt:h};return a},[]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,MESES[+m-1]);
+  XLSX.writeFile(wb,`Pedido de beneficios ${cli.nome} ${m}.${y}.xlsx`);
 };
 
 // Descontos parcelados (vale de atendimentos, adiantamento): cada parcela tem o mês e o valor
