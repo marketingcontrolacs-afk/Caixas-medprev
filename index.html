@@ -3140,7 +3140,10 @@ async function tAcao(act,btn){
       const {error}=await sb.from('tarefas').delete().eq('id',t.id);if(error)throw error;
       toast('Tarefa excluída');dlgTar.close();renderTarefas();
     }
-  }catch(err){console.error(err);tdErr(err.message&&!err.code?err.message:'Não foi possível salvar. Verifique a internet e tente de novo.')}
+  }catch(err){console.error(err);const m=err.message||'';
+    // banco sem a v26 ou outro erro do banco: mostra o motivo para o escritório poder corrigir
+    tdErr(m&&!err.code?m:err.code==='42P01'||err.code==='PGRST205'||err.code==='PGRST204'||/relation .*tarefa|tarefa.* does not exist|schema cache/i.test(m)?'O banco ainda não tem a atualização v26 (Tarefas e recados). Rode o SQL no Supabase.'
+      :`Não foi possível salvar.${m?' Motivo: '+m:' Verifique a internet e tente de novo.'}`)}
   finally{btn.disabled=false}
 }
 
