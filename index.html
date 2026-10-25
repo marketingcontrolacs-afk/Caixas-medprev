@@ -396,7 +396,8 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Usuários</h2>
-        <p class="note" style="margin:0">Para criar um usuário: no Supabase, vá em Authentication › Users › Add user › Create new user, informe e-mail e senha e marque “Auto Confirm User”. Ele aparece aqui como “Pendente”. Depois libere os módulos dele no quadro abaixo.</p>
+        <p class="note" style="margin:0">Para criar um usuário: no Supabase, vá em Authentication › Users › Add user › Create new user, informe e-mail e senha e marque “Auto Confirm User”. Ele aparece aqui como “Pendente”. Escolha o tipo e, para clientes e colaboradores, libere as empresas e os módulos no quadro Acessos.</p>
+        <p class="note" style="margin:0"><b>Administração Controlacs</b>: vê tudo e muda o tipo dos usuários. <b>Operador Controlacs</b>: equipe, usa os módulos do escritório e vê as tarefas liberadas para ele. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -1463,15 +1464,23 @@ $('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr')
 
 // ---------- cadastros ----------
 let USERS=[];
+const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Administração Controlacs (vê tudo)'],['equipe','Operador Controlacs'],['cliente','Cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
+// tipo do usuário; antes da v33 vem do papel
+const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
   $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
     CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
-  const {data:us}=await sb.from('perfis').select('*').order('email');USERS=us||[];
-  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th></tr></thead><tbody>${
+  const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
+  // permissões de cada usuário do cliente: empresa › módulos (nível)
+  const perm=u=>{if(u.papel==='escritorio')return u.tipo==='admin'||u.admin?'Tudo, inclusive as tarefas restritas':'Todos os módulos do escritório';
+    const g={};(acs||[]).filter(a=>a.user_id===u.user_id).forEach(a=>(g[a.cliente_id]||=[]).push(`${MODNOME[a.modulo]||a.modulo} (${a.nivel==='lancamento'?'Lançamento':'Consulta'})`));
+    return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Libere no quadro Acessos.</span>'};
+  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
-      <td><select data-k="papel" ${u.user_id===ME.user_id?'disabled':''}>${[['pendente','Pendente (sem acesso)'],['operador','Usuário do cliente'],['escritorio','Escritório (vê tudo)']].map(([v,t])=>`<option value="${v}"${u.papel===v?' selected':''}>${t}</option>`).join('')}</select></td></tr>`).join('')}</tbody>`;
-  $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)})</option>`).join('');
+      <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
+      <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)}</td></tr>`).join('')}</tbody>`;
+  $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
   $('acMod').innerHTML=Object.entries(MODNOME).map(([k,t])=>`<label><input type="checkbox" value="${k}"> ${t}</label>`).join('');
   renderAcessos();
@@ -1502,7 +1511,11 @@ $('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
   const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);c[k]=v}});
 $('tbUsr').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.value||null;
-  const {error}=await sb.from('perfis').update({[k]:v}).eq('user_id',id);if(error)fail(error);else toast('Usuário salvo')});
+  // o tipo define também o papel (o banco ajusta o papel e a administração pelo tipo)
+  const r=k!=='tipo'?{[k]:v}:v==='pendente'?{tipo:null,papel:'pendente'}:{tipo:v};
+  const {error}=await sb.from('perfis').update(r).eq('user_id',id);
+  if(error){console.error(error);toast(/tipo/.test(error.message||'')&&!/administradora/.test(error.message)?'Rode a atualização v33 do banco para guardar o tipo de usuário.':/administradora/.test(error.message||'')?'Só a administradora muda o tipo de usuário.':'Não foi possível salvar. Verifique a internet e tente de novo.');renderCadastro();return}
+  toast('Usuário salvo');if(k==='tipo'){DIRUS=null;renderCadastro()}});
 $('formCli').addEventListener('submit',async e=>{e.preventDefault();const nome=$('novoCli').value.trim();if(!nome)return;
   const {error}=await sb.from('clientes').insert({nome});if(error)fail(error,'Não foi possível criar (o nome já existe?)');else{$('novoCli').value='';toast('Empresa criada');renderCadastro()}});
 async function renderMapa(){
@@ -3247,7 +3260,7 @@ async function dirUsuarios(){
   if(DIRUS)return DIRUS;
   const [{data:ps},{data:ac}]=await Promise.all([sb.from('perfis').select('*'),sb.from('acessos').select('user_id,cliente_id,modulo')]);
   const nome=u=>u.nome||u.email,perfis=(ps||[]).filter(u=>u.papel!=='pendente').sort((a,b)=>nome(a).localeCompare(nome(b))),acs=ac||[];
-  const us=l=>l.map(u=>({id:u.user_id,nome:nome(u),email:u.email,admin:!!u.admin}));
+  const us=l=>l.map(u=>({id:u.user_id,nome:nome(u),email:u.email,admin:!!u.admin,tipo:tipoUsr(u)}));
   return DIRUS={perfis,nome:id=>{const u=perfis.find(x=>x.user_id===id);return u?nome(u):'?'},
     equipe:us(perfis.filter(u=>u.papel==='escritorio')),
     porEmpresa:(cli,mod)=>us(perfis.filter(u=>u.papel==='operador'&&acs.some(a=>a.user_id===u.user_id&&a.cliente_id===cli&&(!mod||a.modulo===mod)))),
@@ -3258,7 +3271,7 @@ function pickUsers(id,grupos,marcados){
   const m=new Set(marcados||[]);
   return `<div class="pick" id="${id}"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
     ${grupos.map(g=>`<div class="pkg"><div>${esc(g.nome)}${grupos.length>1?' <button type="button" class="btn small ghost" data-pk="grupo">marcar o grupo</button>':''}</div>
-      <div class="chk">${g.users.map(u=>`<label title="${esc(u.email||'')}"><input type="checkbox" value="${u.id}"${m.has(u.id)?' checked':''}> ${esc(u.nome)}</label>`).join('')}</div></div>`).join('')}</div>`;
+      <div class="chk">${g.users.map(u=>`<label title="${esc(u.email||'')}"><input type="checkbox" value="${u.id}"${m.has(u.id)?' checked':''}> ${esc(u.nome)}${u.tipo==='colaborador'?' <span class="muted">(colaborador)</span>':u.tipo==='cliente'?' <span class="muted">(gestor)</span>':''}</label>`).join('')}</div></div>`).join('')}</div>`;
 }
 const pickLer=id=>[...new Set([...($(id)?.querySelectorAll('input:checked')||[])].map(x=>x.value))];
 document.addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(!b)return;const pk=b.closest('.pick');
