@@ -2675,7 +2675,7 @@ const XS={
   cel:{font:{color:{rgb:XC.ink}},alignment:{vertical:'center'},border:XBORDA},
   zebra:{fill:{fgColor:{rgb:XC.zebra}}},
   nome:{font:{bold:true}},num:{alignment:{horizontal:'right'}},txt:{alignment:{horizontal:'left',wrapText:true}},
-  alerta:{font:{bold:true,color:{rgb:XC.neg}}},nota:{font:{italic:true,sz:10,color:{rgb:XC.muted}}},
+  alerta:{font:{bold:true,color:{rgb:XC.neg}}},desc:{font:{color:{rgb:XC.neg}}},nota:{font:{italic:true,sz:10,color:{rgb:XC.muted}}},
   secao:{font:{bold:true,sz:12,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:XC.brand}},alignment:{horizontal:'left',vertical:'center'}},
 };
 // aplica o estilo numa célula (cria a célula vazia, para a borda e o fundo aparecerem)
@@ -2708,7 +2708,7 @@ function baixarFolha(){
   fs.forEach((f,i)=>{const z=i%2?XS.zebra:null;put(d0+i,0,txt(f.nome));xSt(ws,d0+i,0,XS.cel,z,XS.nome);
     if(comCargo){put(d0+i,1,celXL(f.cargo));xSt(ws,d0+i,1,XS.cel,z,XS.txt)}
     cols.forEach((c,j)=>{const x=folCelula(f,c),cel=celXL(x.v,x.z);if(cel&&x.f&&!x.aj)cel.f=x.f;if(cel&&cel.t==='n'&&!cel.z&&FCOL[c].k==='money')cel.z='"R$" #,##0.00';put(d0+i,L+j,cel);
-      xSt(ws,d0+i,L+j,XS.cel,z,cel&&cel.t==='n'?XS.num:c==='observacoes'?XS.txt:{alignment:{horizontal:'center'}},x.pend?XS.alerta:null)})});
+      xSt(ws,d0+i,L+j,XS.cel,z,cel&&cel.t==='n'?XS.num:c==='observacoes'?XS.txt:{alignment:{horizontal:'center'}},FCOL[c].g==='D'?XS.desc:null,x.pend?XS.alerta:null)})});
   let r=d0+fs.length;
   // notas: o que foi descrito nos lançamentos (ex.: motivo dos descontos diversos)
   const notas=FOL.lanc.filter(l=>l.descricao&&l.descricao!==PONTO&&cols.includes(l.coluna)&&fs.some(f=>f.id===l.funcionario_id))
@@ -2729,7 +2729,7 @@ function baixarFolha(){
       xSt(ws,r,0,XS.cab,{alignment:{horizontal:'left'}});xSt(ws,r,1,XS.cab2,XS.P);xSt(ws,r,2,XS.cab2,XS.D);
       if(z.tipo||z.data_demissao){put(r,3,txt([z.tipo,z.data_demissao?'demissão '+dBR(z.data_demissao):'',z.ultimo_dia?'último dia '+dBR(z.ultimo_dia):'',z.aviso_multa?'aviso: '+z.aviso_multa:'',z.obs].filter(Boolean).join(' · ')));xSt(ws,r,3,XS.nota)}r++;
       M.resc_itens.forEach(([k,t],i)=>{put(r,0,txt(t));put(r,1,rescVal(v[k+'_p']));put(r,2,rescVal(v[k+'_d']));
-        for(let c=0;c<3;c++)xSt(ws,r,c,XS.cel,i%2?XS.zebra:null,c?XS.num:null);r++});r++})}
+        for(let c=0;c<3;c++)xSt(ws,r,c,XS.cel,i%2?XS.zebra:null,c?XS.num:null,c===2?XS.desc:null);r++});r++})}
   ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(r,d0+fs.length),c:Math.max(cols.length+L-1,6)}});
   ws['!merges']=merges;
   ws['!cols']=[{wch:34},...(comCargo?[{wch:24}]:[]),...cols.map(c=>({wch:c==='observacoes'?48:15}))];
@@ -2770,7 +2770,7 @@ $('folRescBaixar').onclick=()=>{
     [['PROVENTOS',RPROV,3,'P'],['DESCONTOS',RDESC,7,'D']].forEach(([t,lista,ate,g])=>{
       put(0,{t:'s',v:t});merges.push({s:{r,c:0},e:{r,c:ate}});xFaixa(ws,r,0,ate,XS.cab2,XS[g],{alignment:{horizontal:'center'}});r++;
       lista.forEach(([k,n],i)=>{put(i,{t:'s',v:n});xSt(ws,r,i,XS.cab2)});r++;
-      lista.forEach(([k],i)=>{put(i,val(v[k]));xSt(ws,r,i,XS.cel,{alignment:{horizontal:'center'}})});r+=2;
+      lista.forEach(([k],i)=>{put(i,val(v[k]));xSt(ws,r,i,XS.cel,{alignment:{horizontal:'center'}},g==='D'?XS.desc:null)});r+=2;
     });
     r+=2;
   });
