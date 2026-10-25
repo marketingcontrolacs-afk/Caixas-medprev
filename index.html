@@ -146,6 +146,26 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .ctxbar .f{min-width:220px}
 .docrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fields .wide{grid-column:1/-1}
+.navbtn .nbadge{margin-left:auto;min-width:20px;text-align:center;font-size:11px;font-weight:700;background:var(--bad);color:#fff;border-radius:999px;padding:1px 6px}
+.kanban{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:12px;margin-top:16px;overflow-x:auto;padding-bottom:6px;align-items:start}
+.kcol{background:var(--sunk);border-radius:12px;padding:10px;display:grid;gap:8px;min-height:120px;align-content:start}
+.kcol.over{outline:2px dashed var(--brand);outline-offset:-2px}
+.kcol h3{display:flex;align-items:center;gap:8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:2px 4px}
+.kcol h3 .n{margin-left:auto;font-weight:700;background:var(--surface);border-radius:999px;padding:0 8px;color:var(--ink)}
+.klist{display:grid;gap:8px;min-height:60px;align-content:start}
+.kcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px;cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%}
+.kcard:hover{border-color:var(--brand)}.kcard.drag{opacity:.45}.kcard.novo{border-left:4px solid var(--bad)}
+.kcard .t{font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.kcard .m{display:flex;gap:6px 12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.kcard .m .late{color:var(--bad);font-weight:700}
+.kcard .m .new{color:var(--bad);font-weight:700}
+.kchips{display:flex;gap:4px;flex-wrap:wrap}.kchips .chip{font-size:11px;padding:2px 7px}
+@media (max-width:900px){.kanban{grid-template-columns:repeat(4,minmax(78vw,1fr));scroll-snap-type:x mandatory}.kcol{scroll-snap-align:start}}
+.conv{display:grid;gap:8px;max-height:46vh;overflow:auto;padding-right:2px}
+.msg{border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:grid;gap:3px;font-size:14px}
+.msg .q{font-size:12px;color:var(--muted)}.msg .x{white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.mine{background:var(--brand-soft);border-color:transparent}.msg.int{background:var(--warn-soft);border-color:var(--warn)}
+.msg.sys{border:0;padding:0 4px;font-size:12px;color:var(--muted);font-style:italic}
+#dlgTar{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*{min-width:0}
 .chk{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:400;color:var(--ink)}.chk label{display:flex;gap:6px;align-items:center}.chk input{width:auto;margin:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -292,6 +312,22 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="toolbar"><input id="pBusca" placeholder="Buscar parceiro" style="max-width:280px"></div>
     <div class="card tablebox"><table><thead id="pHead"></thead><tbody id="pBody"></tbody></table></div>
     <p class="note" id="pNote"></p>
+  </section>
+
+  <!-- TAREFAS E RECADOS (Kanban) -->
+  <section id="viewTar" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Tarefas e recados</h1><p class="sub" id="tSub"></p></div>
+      <button class="btn primary" id="tNova">+ Nova tarefa</button>
+    </div>
+    <div class="alerta" id="tAlerta" hidden></div>
+    <div class="toolbar">
+      <input id="tBusca" placeholder="Buscar tarefa" style="max-width:240px">
+      <label class="f" id="tRespBox">Responsável<select id="tResp"></select></label>
+      <label class="f">Concluídas<select id="tConc"><option value="30">Últimos 30 dias</option><option value="tudo">Todas</option><option value="nao">Esconder</option></select></label>
+    </div>
+    <div class="kanban" id="tBoard"></div>
+    <p class="note" id="tNote"></p>
   </section>
 
   <!-- EXPORTAÇÃO BOM CONTROLE (escritório) -->
@@ -484,6 +520,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="rpBody"></div>
   <div class="df" id="rpFoot"></div>
 </dialog>
+<dialog id="dlgTar">
+  <div class="dh"><h2 id="tdTitle"></h2><span class="spacer"></span><span id="tdChip" class="chips"></span></div>
+  <div class="db" id="tdBody"></div>
+  <div class="df" id="tdFoot"></div>
+</dialog>
 <dialog id="dlgColab">
   <div class="dh"><h2 id="cbTitle"></h2><span class="spacer"></span><span id="cbChip"></span></div>
   <div class="db" id="cbBody"></div>
@@ -579,7 +620,7 @@ function anexoView(a,url,small){
 // ---------- sessão, acessos e menu ----------
 let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
-const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros'};
+const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados'};
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const podeLancar=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m&&a.nivel==='lancamento');
@@ -595,6 +636,7 @@ const ICO={
   confcaixa:'<path d="M9 4h6v3H9z"/><path d="M15 5h3v16H6V5h3"/><path d="M9 13l2 2 4-4"/>',
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
+  tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
@@ -607,18 +649,20 @@ const NAV=[
   {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('folha')||temAcesso('ferias')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
+  {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',ok:()=>temAcesso('tarefas')},
   {k:'confcaixa',t:'Conferência de caixa',g:'Escritório',ok:ehEsc},
   {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Escritório':'Financeiro',ok:()=>temAcesso('repasse')},
   {k:'bc',t:'Exportação Bom Controle',g:'Escritório',ok:ehEsc},
   {k:'cfg',t:'Configurações',g:'Escritório',ok:ehEsc},
 ];
+const NAVBADGE={};
 function renderNav(){
   let g=null,h='';
   const grp=n=>typeof n.g==='function'?n.g():n.g;
   const itens=NAV.filter(n=>n.ok());
-  ['Financeiro','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
+  ['Comunicação','Financeiro','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
     if(grp(n)!==g){g=grp(n);h+=`<div class="navgrp">${g}</div>`}
-    h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}</button>`;
+    h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}${NAVBADGE[n.k]?`<span class="nbadge" title="Com novidade">${NAVBADGE[n.k]}</span>`:''}</button>`;
   });
   $('nav').innerHTML=h;
 }
@@ -628,6 +672,8 @@ function empresasDe(m){
   if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:podeVer(c.id,'folha')||podeVer(c.id,'ferias')));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
   if(m==='premio')return empresasDe('folha').filter(c=>c.folha_modelo?.premiacao?.length);
+  // tarefas: todas as empresas (inclusive as só de RH)
+  if(m==='tarefas')return CLIENTES.filter(c=>c.ativo!==false&&podeVer(c.id,'tarefas'));
   const mod=m==='rh'?'ferias':m==='premio'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):podeVer(c.id,mod)));
@@ -635,20 +681,21 @@ function empresasDe(m){
 const escCli=$('escCli');
 function fillClientes(){
   const m=VIEW,v=escCli.value,lista=empresasDe(m);
-  const todas=(m==='rh'||m==='repasse'||m==='colab')&&lista.length>1?'<option value="*">Todas as empresas</option>':'';
-  escCli.innerHTML=todas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
-  if(lista.some(c=>c.id===v)||(todas&&v==='*'))escCli.value=v;
+  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas')&&(lista.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
+  const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
+  escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
+  if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
   $('ctxbar').hidden=m==='cfg';
-  escCli.disabled=lista.length<2;
+  escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>openView();
 function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
   // o escritório abre os repasses com todas as empresas, para a conferência de quinta
-  if(v==='repasse'&&antes!=='repasse'&&ehEsc()&&escCli.querySelector('option[value="*"]'))escCli.value='*';
+  if((v==='repasse'||v==='tarefas')&&antes!==v&&ehEsc()&&escCli.querySelector('option[value="*"]'))escCli.value='*';
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewTar'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -663,6 +710,7 @@ function openView(){
   else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
+  else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
 }
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);
@@ -684,6 +732,7 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon);
   if(!first){show('viewPend');return}
   show('app');go(first.k);
+  tNovidades();clearInterval(boot.t);boot.t=setInterval(tNovidades,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -2834,6 +2883,188 @@ async function rpAcao(act,el){
   }catch(ex){fail(ex)}finally{if(el.isConnected)el.disabled=false}
 }
 dlgRep.addEventListener('click',ev=>{const el=ev.target.closest('[data-act]');if(el){ev.preventDefault();rpAcao(el.dataset.act,el)}});
+
+// =====================================================================
+// TAREFAS E RECADOS (Kanban com conversa em cada tarefa)
+// =====================================================================
+const TCOLS=[['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando cliente'],['concluida','Concluída']];
+const TPRI={baixa:['c-none','Baixa'],normal:['','Normal'],alta:['c-warn','Alta'],urgente:['c-bad','Urgente']};
+const SEMEMP='00000000-0000-0000-0000-000000000000';   // pasta dos anexos das tarefas sem empresa
+let TAR=[], TNOV={}, TARDLG=null, TEQUIPE=null, TDRAG=null;
+const dtBR=s=>new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+const tLanca=t=>t.cliente_id?podeLancar(t.cliente_id,'tarefas'):ehEsc();
+// empresas em que o usuário pode abrir tarefa
+const tLancaEm=()=>empresasDe('tarefas').filter(c=>podeLancar(c.id,'tarefas'));
+async function tNovidades(){
+  if(!temAcesso('tarefas'))return;
+  const {data,error}=await sb.rpc('tarefas_novidades');if(error)return;
+  TNOV=Object.fromEntries((data||[]).map(r=>[r.tarefa_id,r]));
+  const n=(data||[]).length;if((NAVBADGE.tarefas||0)!==n){NAVBADGE.tarefas=n;renderNav()}
+}
+async function tEquipe(){
+  if(TEQUIPE||!ehEsc())return TEQUIPE||[];
+  const {data}=await sb.from('perfis').select('user_id,nome,email').eq('papel','escritorio').order('nome');
+  return TEQUIPE=(data||[]).map(u=>({id:u.user_id,nome:u.nome||u.email}));
+}
+async function renderTarefas(){
+  const e=ehEsc(),v=escCli.value,todas=v==='*';
+  $('tSub').textContent=e?'Tarefas da equipe e recados com os clientes. Arraste o cartão para mudar de coluna; clique para abrir a conversa.'
+    :'Mande pedidos e recados para a Controlacs e acompanhe o andamento. Clique numa tarefa para ver a conversa.';
+  $('tNova').hidden=!(e||tLancaEm().length);
+  $('tRespBox').hidden=!e;
+  const vazio=(t,cl)=>{$('tBoard').innerHTML=`<p class="${cl||'muted'}">${t}</p>`;$('tAlerta').hidden=true;$('tNote').textContent=''};
+  if(!v){vazio('Nenhuma empresa liberada para tarefas.');return}
+  let q=sb.from('tarefas').select('*, tarefa_comentarios(count)').eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
+  if(v==='int')q=q.eq('interna',true);else if(!todas)q=q.eq('cliente_id',v);
+  const conc=$('tConc').value;
+  if(conc==='nao')q=q.neq('status','concluida');
+  else if(conc==='30')q=q.or(`status.neq.concluida,concluida_em.gte.${new Date(Date.now()-30*864e5).toISOString()}`);
+  const [{data,error}]=await Promise.all([q.order('ordem'),tNovidades(),tEquipe()]);
+  if(error){console.error(error);vazio(error.code==='42P01'||error.code==='PGRST205'||/tarefa/.test(error.message||'')?'Este módulo precisa da atualização v26 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
+  TAR=data||[];
+  // responsáveis: a equipe do escritório e quem já aparece nas tarefas
+  const rs=$('tResp'),rv=rs.value||'todos',nomes=new Map((TEQUIPE||[]).map(u=>[u.id,u.nome]));
+  TAR.forEach(t=>t.responsavel&&!nomes.has(t.responsavel)&&nomes.set(t.responsavel,t.responsavel_nome||'?'));
+  rs.innerHTML=`<option value="todos">Todos</option><option value="meus">Minhas tarefas</option><option value="sem">Sem responsável</option>`+[...nomes].map(([id,n])=>`<option value="${id}">${esc(n)}</option>`).join('');
+  rs.value=[...rs.options].some(o=>o.value===rv)?rv:'todos';
+  tDesenha();
+}
+function tFiltradas(){
+  const busca=$('tBusca').value.trim().toLowerCase(),r=$('tResp').value;
+  return TAR.filter(t=>(!busca||(t.titulo+' '+(t.descricao||'')).toLowerCase().includes(busca))
+    &&(!ehEsc()||r==='todos'||(r==='meus'?t.responsavel===ME.user_id:r==='sem'?!t.responsavel:t.responsavel===r)));
+}
+function tCard(t,todas){
+  const nome=t.cliente_id?CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'':'Interna',nv=TNOV[t.id],pr=TPRI[t.prioridade];
+  const late=t.prazo&&t.status!=='concluida'&&t.prazo<TODAY,hoje=t.prazo===TODAY&&t.status!=='concluida';
+  const n=t.tarefa_comentarios?.[0]?.count||0;
+  const chips=[pr[0]?`<span class="chip ${pr[0]}">${pr[1]}</span>`:'',todas&&t.cliente_id?`<span class="chip c-done">${esc(nome)}</span>`:'',
+    t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':''].join('');
+  const meta=[t.prazo?`<span class="${late||hoje?'late':''}">📅 ${late?'Atrasada · ':hoje?'Hoje · ':''}${dBR(t.prazo).slice(0,5)}</span>`:'',
+    t.responsavel_nome?`<span>👤 ${esc(t.responsavel_nome)}</span>`:'',n?`<span>💬 ${n}</span>`:'',
+    nv?`<span class="new">● ${nv.mensagens?nv.mensagens+(nv.mensagens===1?' mensagem nova':' mensagens novas'):'Nova'}</span>`:''].join('');
+  return `<button type="button" class="kcard${nv?' novo':''}" data-id="${t.id}" draggable="${tLanca(t)}">${chips?`<div class="kchips">${chips}</div>`:''}<div class="t">${esc(t.titulo)}</div>${meta?`<div class="m">${meta}</div>`:''}</button>`;
+}
+function tDesenha(){
+  const todas=escCli.value==='*'||escCli.value==='int',lista=tFiltradas();
+  $('tBoard').innerHTML=TCOLS.map(([k,nome])=>{
+    const cs=lista.filter(t=>t.status===k);
+    if(k==='concluida')cs.sort((a,b)=>String(b.concluida_em).localeCompare(String(a.concluida_em)));
+    return `<div class="kcol" data-s="${k}"><h3>${nome}<span class="n">${cs.length}</span></h3><div class="klist">${cs.map(t=>tCard(t,todas)).join('')||'<p class="note" style="margin:4px">Nenhuma tarefa.</p>'}</div></div>`;
+  }).join('');
+  const ab=TAR.filter(t=>t.status!=='concluida'),late=ab.filter(t=>t.prazo&&t.prazo<TODAY).length,
+    nov=TAR.filter(t=>TNOV[t.id]).length,cli=ab.filter(t=>t.status==='cliente').length;
+  const av=[nov?`<b>${nov} ${nov===1?'tarefa com novidade':'tarefas com novidade'}</b>`:'',late?`<b>${late} ${late===1?'atrasada':'atrasadas'}</b>`:'',
+    cli&&!ehEsc()?`<b>${cli} ${cli===1?'tarefa aguardando a sua resposta':'tarefas aguardando a sua resposta'}</b>`:''].filter(Boolean);
+  $('tAlerta').hidden=!av.length;$('tAlerta').innerHTML=av.length?`<span>${av.join(' · ')}</span>`:'';
+  $('tNote').textContent=ehEsc()?'Tarefas internas (sem empresa ou marcadas como internas) e as notas internas da conversa não aparecem para o cliente. As concluídas há mais de 30 dias saem do quadro, mas continuam em “Concluídas: Todas”.'
+    :'Quando a tarefa estiver em “Aguardando cliente”, a Controlacs precisa de uma resposta sua na conversa.';
+}
+$('tBusca').oninput=()=>{clearTimeout(tDesenha.t);tDesenha.t=setTimeout(tDesenha,200)};
+$('tResp').onchange=tDesenha;$('tConc').onchange=renderTarefas;
+$('tNova').onclick=()=>abrirTarefa(null);
+$('tBoard').addEventListener('click',e=>{const c=e.target.closest('.kcard');if(c)abrirTarefa(TAR.find(t=>t.id===c.dataset.id))});
+// arrastar entre as colunas (no celular, muda-se a coluna dentro da tarefa)
+$('tBoard').addEventListener('dragstart',e=>{const c=e.target.closest('.kcard');if(!c)return;TDRAG=c.dataset.id;c.classList.add('drag');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',TDRAG)});
+$('tBoard').addEventListener('dragend',e=>{e.target.closest('.kcard')?.classList.remove('drag');document.querySelectorAll('.kcol.over').forEach(x=>x.classList.remove('over'))});
+$('tBoard').addEventListener('dragover',e=>{const col=e.target.closest('.kcol');if(!col||!TDRAG)return;e.preventDefault();
+  document.querySelectorAll('.kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
+$('tBoard').addEventListener('drop',async e=>{
+  const col=e.target.closest('.kcol');if(!col||!TDRAG)return;e.preventDefault();col.classList.remove('over');
+  const t=TAR.find(x=>x.id===TDRAG);TDRAG=null;if(!t)return;
+  // posição: entre os cartões acima e abaixo do ponto em que soltou
+  const cards=[...col.querySelectorAll('.kcard')].filter(c=>c.dataset.id!==t.id);
+  const i=cards.findIndex(c=>{const r=c.getBoundingClientRect();return e.clientY<r.top+r.height/2});
+  const ord=id=>TAR.find(x=>x.id===id).ordem,ant=i<0?cards.at(-1):cards[i-1],dep=i<0?null:cards[i];
+  const ordem=ant&&dep?(ord(ant.dataset.id)+ord(dep.dataset.id))/2:ant?ord(ant.dataset.id)+1000:dep?ord(dep.dataset.id)-1000:t.ordem;
+  const status=col.dataset.s;if(status===t.status&&ordem===t.ordem)return;
+  const antes={status:t.status,ordem:t.ordem};Object.assign(t,{status,ordem});tDesenha();
+  const {data,error}=await sb.from('tarefas').update({status,ordem}).eq('id',t.id).select().single();
+  if(error){Object.assign(t,antes);tDesenha();fail(error,'Não foi possível mover a tarefa');return}
+  Object.assign(t,data);if(antes.status!==status)toast('Movida para “'+TCOLS.find(c=>c[0]===status)[1]+'”');
+});
+const dlgTar=$('dlgTar');
+async function abrirTarefa(t){
+  TARDLG=t;const e=ehEsc(),pode=t?tLanca(t):true,equipe=await tEquipe();
+  $('tdTitle').textContent=t?t.titulo:'Nova tarefa';
+  $('tdChip').innerHTML=t?(t.cliente_id?`<span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:'')+(t.interna&&e?'<span class="chip c-none">🔒 Interna</span>':''):'';
+  const d=pode?'':' disabled',sel=(id,ops,v)=>`<select id="${id}"${d}>${ops.map(([k,n])=>`<option value="${k}"${k===v?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
+  let h='';
+  if(!t){const ls=e?empresasDe('tarefas'):tLancaEm(),cv=escCli.value;
+    h+=`<label class="f">Empresa<select id="td_cli">${e?'<option value="">Interna da Controlacs (sem empresa)</option>':''}${ls.map(c=>`<option value="${c.id}"${c.id===cv?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
+  h+=`<div class="fields"><label class="f wide">Título *<input id="td_titulo" value="${esc(t?.titulo||'')}" maxlength="160" placeholder="Ex.: enviar extrato de setembro"${d}></label>
+    <label class="f wide">Descrição<textarea id="td_desc" rows="3"${d}>${esc(t?.descricao||'')}</textarea></label>
+    <label class="f">Coluna${sel('td_status',TCOLS,t?.status||'afazer')}</label>
+    <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
+    <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
+    ${e?`<label class="f">Responsável${sel('td_resp',[['','Ninguém'],...equipe.map(u=>[u.id,u.nome])],t?t.responsavel||'':ME.user_id)}</label>`:''}</div>
+    ${e?`<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px" id="td_intBox"><input type="checkbox" id="td_int" style="width:auto"${t?.interna?' checked':''}> Tarefa interna (o cliente não vê)</label>`:''}
+    ${t?`<p class="note" style="margin:0">Aberta por ${esc(t.criado_por_nome||'?')} em ${dtBR(t.criado_em)}${t.concluida_em?' · concluída em '+dtBR(t.concluida_em):''}</p>`:''}`;
+  if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
+    ${pode?`<div style="display:grid;gap:8px;margin-top:10px"><textarea id="td_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
+      <div class="row" style="gap:10px;align-items:center"><input type="file" id="td_file" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF">
+      ${e&&!t.interna?'<label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="td_nint" style="width:auto"> Nota interna (o cliente não vê)</label>':''}
+      <span class="spacer"></span><button type="button" class="btn primary small" data-act="enviar">Enviar</button></div></div>`:''}</div>`;
+  h+='<p class="err" id="tdErr" hidden></p>';
+  $('tdBody').innerHTML=h;
+  const b=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-act="${act}">${txt}</button>`;
+  $('tdFoot').innerHTML=(e&&t?b('excluir','Excluir','ghost')+b('arquivar','Arquivar','ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+(pode?b('salvar',t?'Salvar':'Criar tarefa','primary'):'');
+  const ic=$('td_cli'),ib=$('td_intBox');if(ic&&ib){const f=()=>ib.hidden=!ic.value;ic.onchange=f;f()}
+  if(t&&!t.cliente_id&&ib)ib.hidden=true;
+  if(!dlgTar.open)dlgTar.showModal();
+  if(t)tConversa(t);else $('td_titulo').focus();
+}
+async function tConversa(t){
+  const {data,error}=await sb.from('tarefa_comentarios').select('*').eq('tarefa_id',t.id).order('criado_em');
+  const box=$('td_conv');if(!box||TARDLG?.id!==t.id)return;
+  if(error){box.innerHTML='<p class="neg">Erro ao carregar a conversa.</p>';return}
+  const urls=await signed((data||[]).filter(c=>c.anexo_caminho).map(c=>c.anexo_caminho));
+  box.innerHTML=(data||[]).map(c=>c.sistema?`<div class="msg sys">${esc(c.autor_nome||'')} · ${esc(c.texto)} · ${dtBR(c.criado_em)}</div>`
+    :`<div class="msg${c.interno?' int':c.autor===ME.user_id?' mine':''}"><span class="q"><b>${esc(c.autor_nome||'?')}</b> · ${dtBR(c.criado_em)}${c.interno?' · nota interna':''}</span>${c.texto?`<span class="x">${esc(c.texto)}</span>`:''}${c.anexo_caminho?`<a href="${urls[c.anexo_caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(c.anexo_nome||'anexo')}</a>`:''}</div>`).join('')
+    ||'<p class="note" style="margin:0">Nenhuma mensagem ainda.</p>';
+  box.scrollTop=box.scrollHeight;
+  // marca como lida
+  await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:t.id,lido_em:new Date().toISOString()},{onConflict:'user_id,tarefa_id'});
+  if(TNOV[t.id]){delete TNOV[t.id];NAVBADGE.tarefas=Object.keys(TNOV).length;renderNav();if(VIEW==='tarefas')tDesenha()}
+}
+const tdErr=x=>{$('tdErr').textContent=x;$('tdErr').hidden=false};
+$('tdFoot').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b)tAcao(b.dataset.act,b)});
+$('tdBody').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b)tAcao(b.dataset.act,b)});
+async function tAcao(act,btn){
+  const t=TARDLG,e=ehEsc();
+  if(act==='fechar')return dlgTar.close();
+  btn.disabled=true;
+  try{
+    if(act==='salvar'){
+      const titulo=$('td_titulo').value.trim();if(!titulo)return tdErr('Informe o título da tarefa.');
+      const r={titulo,descricao:$('td_desc').value.trim()||null,status:$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
+      if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked}
+      if(!t){const c=$('td_cli').value||null;if(!c&&!e)return tdErr('Escolha a empresa.');r.cliente_id=c;
+        const col=TAR.filter(x=>x.status===r.status);r.ordem=col.length?Math.min(...col.map(x=>x.ordem))-1000:Date.now()/1000}
+      const {data,error}=t?await sb.from('tarefas').update(r).eq('id',t.id).select().single():await sb.from('tarefas').insert(r).select().single();
+      if(error)throw error;
+      if(!t)await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:data.id},{onConflict:'user_id,tarefa_id'});
+      toast(t?'Tarefa salva':'Tarefa criada');dlgTar.close();renderTarefas();
+    }else if(act==='enviar'){
+      const texto=$('td_msg').value.trim(),f=$('td_file').files[0];if(!texto&&!f)return tdErr('Escreva a mensagem ou anexe um arquivo.');
+      const r={tarefa_id:t.id,texto:texto||null,interno:!!$('td_nint')?.checked};
+      if(f){const up=await uploadAnexo(f,t.cliente_id||SEMEMP,'tarefas');r.anexo_caminho=up.caminho;r.anexo_nome=up.nome_arquivo}
+      const {error}=await sb.from('tarefa_comentarios').insert(r);if(error)throw error;
+      $('td_msg').value='';$('td_file').value='';$('tdErr').hidden=true;
+      const x=TAR.find(y=>y.id===t.id);if(x&&x.tarefa_comentarios?.[0])x.tarefa_comentarios[0].count++;
+      await tConversa(t);if(VIEW==='tarefas')tDesenha();
+    }else if(act==='arquivar'){
+      if(!confirm('Arquivar esta tarefa? Ela sai do quadro.'))return;
+      const {error}=await sb.from('tarefas').update({arquivada:true}).eq('id',t.id);if(error)throw error;
+      toast('Tarefa arquivada');dlgTar.close();renderTarefas();
+    }else if(act==='excluir'){
+      if(!confirm('Excluir esta tarefa e toda a conversa? Não dá para desfazer.'))return;
+      const {error}=await sb.from('tarefas').delete().eq('id',t.id);if(error)throw error;
+      toast('Tarefa excluída');dlgTar.close();renderTarefas();
+    }
+  }catch(err){console.error(err);tdErr(err.message&&!err.code?err.message:'Não foi possível salvar. Verifique a internet e tente de novo.')}
+  finally{btn.disabled=false}
+}
 
 boot();
 })();
