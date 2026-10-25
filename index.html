@@ -3091,7 +3091,7 @@ function tCard(t,todas){
   const n=t.tarefa_comentarios?.[0]?.count||0;
   const chips=[pr[0]?`<span class="chip ${pr[0]}">${pr[1]}</span>`:'',todas&&t.cliente_id?`<span class="chip c-done">${esc(nome)}</span>`:'',
     t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':'',
-    ehEsc()&&!t.interna&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados do cliente veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:''].join('');
+    ehEsc()&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:''].join('');
   const meta=[t.prazo?`<span class="${late||hoje?'late':''}">📅 ${late?'Atrasada · ':hoje?'Hoje · ':''}${dBR(t.prazo).slice(0,5)}</span>`:'',
     t.responsavel_nome?`<span>👤 ${esc(t.responsavel_nome)}</span>`:'',n?`<span>💬 ${n}</span>`:'',
     nv?`<span class="new">● ${nv.mensagens?nv.mensagens+(nv.mensagens===1?' mensagem nova':' mensagens novas'):'Nova'}</span>`:''].join('');
@@ -3166,13 +3166,15 @@ async function abrirTarefa(t){
   if(t&&!t.cliente_id&&ib)ib.hidden=true;
   if($('td_visBox')){
     const marc=(t?.tarefa_usuarios||[]).map(x=>x.user_id);
-    const vis=async()=>{const cli=t?t.cliente_id:$('td_cli').value,box=$('td_visBox');
-      if(!cli||$('td_int')?.checked){box.innerHTML='';return}
-      const d=await dirUsuarios(),us=d.porEmpresa(cli,'tarefas');
+    // a lista vale para a equipe e, nas tarefas de empresa que não são internas, para os usuários do cliente
+    const vis=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,box=$('td_visBox'),interna=!cli||$('td_int')?.checked;
+      const d=await dirUsuarios(),grupos=[{nome:'Equipe da Controlacs',users:d.equipe.filter(u=>!u.admin)}];
+      if(!interna)grupos.push({nome:'Usuários do cliente com acesso às tarefas',users:d.porEmpresa(cli,'tarefas')});
+      const gs=grupos.filter(g=>g.users.length),adm=d.equipe.filter(u=>u.admin).map(u=>u.nome).join(', ');
       const rest=box.querySelector('input[name="td_vis"]:checked')?.value??(marc.length?'marcados':'todos');
-      box.innerHTML=`<div class="f"><span>Quem vê esta tarefa</span><div class="vis"><label><input type="radio" name="td_vis" value="todos"${rest==='todos'?' checked':''}> Todos os usuários da empresa</label><label><input type="radio" name="td_vis" value="marcados"${rest==='marcados'?' checked':''}> Só os usuários marcados</label></div></div>
-        <div id="td_pickBox"${rest==='marcados'?'':' hidden'}>${us.length?pickUsers('td_pick',[{nome:'Usuários com acesso às tarefas da empresa',users:us}],marc):'<p class="note" style="margin:0">Nenhum usuário desta empresa tem acesso às tarefas. Libere em Configurações › Acessos.</p>'}
-        <p class="note" style="margin:6px 0 0">A equipe da Controlacs vê todas as tarefas.</p></div>`;
+      box.innerHTML=`<div class="f"><span>Quem vê esta tarefa</span><div class="vis"><label><input type="radio" name="td_vis" value="todos"${rest==='todos'?' checked':''}> ${interna?'Toda a equipe':'Todos (a equipe e os usuários da empresa)'}</label><label><input type="radio" name="td_vis" value="marcados"${rest==='marcados'?' checked':''}> Só os usuários marcados</label></div></div>
+        <div id="td_pickBox"${rest==='marcados'?'':' hidden'}>${gs.length?pickUsers('td_pick',gs,marc):'<p class="note" style="margin:0">Ainda não há outros usuários para marcar. Cadastre em Configurações › Empresas e usuários.</p>'}
+        <p class="note" style="margin:6px 0 0">${adm?esc(adm)+' (administração), ':''}quem abriu a tarefa e o responsável sempre veem.</p></div>`;
       box.querySelectorAll('input[name="td_vis"]').forEach(r=>r.onchange=()=>$('td_pickBox').hidden=r.value!=='marcados'||!r.checked)};
     if(ic)ic.addEventListener('change',vis);if($('td_int'))$('td_int').addEventListener('change',vis);vis();
   }
@@ -3205,14 +3207,14 @@ async function tAcao(act,btn){
       const r={titulo,descricao:$('td_desc').value.trim()||null,status:$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
       if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked}
       const restrito=e&&$('td_visBox')?.querySelector('input[name="td_vis"]:checked')?.value==='marcados',quem=restrito?pickLer('td_pick'):[];
-      if(restrito&&!quem.length)return tdErr('Marque pelo menos um usuário que pode ver a tarefa, ou escolha “Todos os usuários da empresa”.');
+      if(restrito&&!quem.length)return tdErr('Marque pelo menos um usuário que pode ver a tarefa, ou escolha a opção de todos.');
       if(!t){const c=$('td_cli').value||null;if(!c&&!e)return tdErr('Escolha a empresa.');r.cliente_id=c;
         const col=TAR.filter(x=>x.status===r.status);r.ordem=col.length?Math.min(...col.map(x=>x.ordem))-1000:Date.now()/1000}
       const {data,error}=t?await sb.from('tarefas').update(r).eq('id',t.id).select().single():await sb.from('tarefas').insert(r).select().single();
       if(error)throw error;
       if(!t)await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:data.id},{onConflict:'user_id,tarefa_id'});
       if(e&&window.V31){const {error:e1}=await sb.from('tarefa_usuarios').delete().eq('tarefa_id',data.id);if(e1)throw e1;
-        if(quem.length&&!data.interna){const {error:e2}=await sb.from('tarefa_usuarios').insert(quem.map(u=>({tarefa_id:data.id,user_id:u})));if(e2)throw e2}}
+        if(quem.length){const {error:e2}=await sb.from('tarefa_usuarios').insert(quem.map(u=>({tarefa_id:data.id,user_id:u})));if(e2)throw e2}}
       toast(t?'Tarefa salva':'Tarefa criada');dlgTar.close();renderTarefas();
     }else if(act==='enviar'){
       const texto=$('td_msg').value.trim(),f=$('td_file').files[0];if(!texto&&!f)return tdErr('Escreva a mensagem ou anexe um arquivo.');
@@ -3243,9 +3245,9 @@ let DIRUS=null;
 // usuários e acessos (só o escritório lê todos)
 async function dirUsuarios(){
   if(DIRUS)return DIRUS;
-  const [{data:ps},{data:ac}]=await Promise.all([sb.from('perfis').select('user_id,nome,email,papel'),sb.from('acessos').select('user_id,cliente_id,modulo')]);
+  const [{data:ps},{data:ac}]=await Promise.all([sb.from('perfis').select('*'),sb.from('acessos').select('user_id,cliente_id,modulo')]);
   const nome=u=>u.nome||u.email,perfis=(ps||[]).filter(u=>u.papel!=='pendente').sort((a,b)=>nome(a).localeCompare(nome(b))),acs=ac||[];
-  const us=l=>l.map(u=>({id:u.user_id,nome:nome(u),email:u.email}));
+  const us=l=>l.map(u=>({id:u.user_id,nome:nome(u),email:u.email,admin:!!u.admin}));
   return DIRUS={perfis,nome:id=>{const u=perfis.find(x=>x.user_id===id);return u?nome(u):'?'},
     equipe:us(perfis.filter(u=>u.papel==='escritorio')),
     porEmpresa:(cli,mod)=>us(perfis.filter(u=>u.papel==='operador'&&acs.some(a=>a.user_id===u.user_id&&a.cliente_id===cli&&(!mod||a.modulo===mod)))),
