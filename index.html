@@ -173,6 +173,12 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .msg.mine{background:var(--brand-soft);border-color:transparent}.msg.int{background:var(--warn-soft);border-color:var(--warn)}
 .msg.sys{border:0;padding:0 4px;font-size:12px;color:var(--muted);font-style:italic}
 #dlgTar{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*{min-width:0}
+.pick{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:10px;max-height:300px;overflow:auto}
+.pick .pkg{display:grid;gap:4px}.pick .pkg>div:first-child{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700}
+.vis{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:14px;font-weight:600}.vis label{display:flex;gap:6px;align-items:center}.vis input{width:auto;margin:0}
+.aviso{padding:14px 18px;display:grid;gap:6px}.aviso.imp{border-left:4px solid var(--amber)}.aviso.novo{box-shadow:0 0 0 2px var(--brand)}
+.aviso h3{margin:0;font-size:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.aviso .x{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.aviso .q{font-size:12px;color:var(--muted)}
 .chk{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:400;color:var(--ink)}.chk label{display:flex;gap:6px;align-items:center}.chk input{width:auto;margin:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -210,6 +216,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="shell" id="app" hidden>
     <nav class="side" id="nav" aria-label="Módulos"></nav>
     <div style="min-width:0">
+      <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div class="ctxbar" id="ctxbar"><label class="f">Empresa<select id="escCli"></select></label></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
@@ -319,6 +326,15 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="toolbar"><input id="pBusca" placeholder="Buscar parceiro" style="max-width:280px"></div>
     <div class="card tablebox"><table><thead id="pHead"></thead><tbody id="pBody"></tbody></table></div>
     <p class="note" id="pNote"></p>
+  </section>
+
+  <!-- AVISOS E NOTÍCIAS -->
+  <section id="viewAv" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Avisos e notícias</h1><p class="sub" id="avSub"></p></div>
+      <div class="row" style="align-items:flex-end"><label class="f" id="avFiltroBox">Mostrar<select id="avFiltro"><option value="ativos">Em vigor</option><option value="todos">Todos, inclusive vencidos</option></select></label><button class="btn primary" id="avNovo">+ Novo aviso</button></div>
+    </div>
+    <div id="avLista" style="display:grid;gap:12px;margin-top:16px"></div>
   </section>
 
   <!-- TAREFAS E RECADOS (Kanban) -->
@@ -527,6 +543,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="rpBody"></div>
   <div class="df" id="rpFoot"></div>
 </dialog>
+<dialog id="dlgAv">
+  <div class="dh"><h2 id="adTitle"></h2></div>
+  <div class="db" id="adBody"></div>
+  <div class="df" id="adFoot"></div>
+</dialog>
 <dialog id="dlgTar">
   <div class="dh"><h2 id="tdTitle"></h2><span class="spacer"></span><span id="tdChip" class="chips"></span></div>
   <div class="db" id="tdBody"></div>
@@ -643,6 +664,7 @@ const ICO={
   confcaixa:'<path d="M9 4h6v3H9z"/><path d="M15 5h3v16H6V5h3"/><path d="M9 13l2 2 4-4"/>',
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
+  avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
@@ -656,6 +678,7 @@ const NAV=[
   {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('folha')||temAcesso('ferias')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
+  {k:'avisos',t:'Avisos e notícias',g:'Comunicação',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',ok:()=>temAcesso('tarefas')},
   {k:'confcaixa',t:'Conferência de caixa',g:'Escritório',ok:ehEsc},
   {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Escritório':'Financeiro',ok:()=>temAcesso('repasse')},
@@ -692,7 +715,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m==='cfg';
+  $('ctxbar').hidden=m==='cfg'||m==='avisos';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>openView();
@@ -702,7 +725,7 @@ function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewTar'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewTar','viewAv'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -718,6 +741,8 @@ function openView(){
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
+  else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos()}
+  avBanner();
 }
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);
@@ -739,7 +764,7 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon);
   if(!first){show('viewPend');return}
   show('app');go(first.k);
-  tNovidades();clearInterval(boot.t);boot.t=setInterval(tNovidades,60000);
+  const novid=()=>{tNovidades();avNovidades()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -3038,7 +3063,9 @@ async function renderTarefas(){
   $('tRespBox').hidden=!e;
   const vazio=(t,cl)=>{$('tBoard').innerHTML=`<p class="${cl||'muted'}">${t}</p>`;$('tAlerta').hidden=true;$('tNote').textContent=''};
   if(!v){vazio('Nenhuma empresa liberada para tarefas.');return}
-  let q=sb.from('tarefas').select('*, tarefa_comentarios(count)').eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
+  if(window.V31===undefined){const {error:e31}=await sb.from('tarefa_usuarios').select('tarefa_id').limit(1);window.V31=!e31}
+  DIRUS=null;
+  let q=sb.from('tarefas').select('*, tarefa_comentarios(count)'+(window.V31?', tarefa_usuarios(user_id)':'')).eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
   if(v==='int')q=q.eq('interna',true);else if(!todas)q=q.eq('cliente_id',v);
   const conc=$('tConc').value;
   if(conc==='nao')q=q.neq('status','concluida');
@@ -3063,7 +3090,8 @@ function tCard(t,todas){
   const late=t.prazo&&t.status!=='concluida'&&t.prazo<TODAY,hoje=t.prazo===TODAY&&t.status!=='concluida';
   const n=t.tarefa_comentarios?.[0]?.count||0;
   const chips=[pr[0]?`<span class="chip ${pr[0]}">${pr[1]}</span>`:'',todas&&t.cliente_id?`<span class="chip c-done">${esc(nome)}</span>`:'',
-    t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':''].join('');
+    t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':'',
+    ehEsc()&&!t.interna&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados do cliente veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:''].join('');
   const meta=[t.prazo?`<span class="${late||hoje?'late':''}">📅 ${late?'Atrasada · ':hoje?'Hoje · ':''}${dBR(t.prazo).slice(0,5)}</span>`:'',
     t.responsavel_nome?`<span>👤 ${esc(t.responsavel_nome)}</span>`:'',n?`<span>💬 ${n}</span>`:'',
     nv?`<span class="new">● ${nv.mensagens?nv.mensagens+(nv.mensagens===1?' mensagem nova':' mensagens novas'):'Nova'}</span>`:''].join('');
@@ -3122,6 +3150,7 @@ async function abrirTarefa(t){
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
     ${e?`<label class="f">Responsável${sel('td_resp',[['','Ninguém'],...equipe.map(u=>[u.id,u.nome])],t?t.responsavel||'':ME.user_id)}</label>`:''}</div>
+    ${e&&window.V31?'<div id="td_visBox"></div>':''}
     ${e?`<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px" id="td_intBox"><input type="checkbox" id="td_int" style="width:auto"${t?.interna?' checked':''}> Tarefa interna (o cliente não vê)</label>`:''}
     ${t?`<p class="note" style="margin:0">Aberta por ${esc(t.criado_por_nome||'?')} em ${dtBR(t.criado_em)}${t.concluida_em?' · concluída em '+dtBR(t.concluida_em):''}</p>`:''}`;
   if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
@@ -3135,6 +3164,18 @@ async function abrirTarefa(t){
   $('tdFoot').innerHTML=(e&&t?b('excluir','Excluir','ghost')+b('arquivar','Arquivar','ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+(pode?b('salvar',t?'Salvar':'Criar tarefa','primary'):'');
   const ic=$('td_cli'),ib=$('td_intBox');if(ic&&ib){const f=()=>ib.hidden=!ic.value;ic.onchange=f;f()}
   if(t&&!t.cliente_id&&ib)ib.hidden=true;
+  if($('td_visBox')){
+    const marc=(t?.tarefa_usuarios||[]).map(x=>x.user_id);
+    const vis=async()=>{const cli=t?t.cliente_id:$('td_cli').value,box=$('td_visBox');
+      if(!cli||$('td_int')?.checked){box.innerHTML='';return}
+      const d=await dirUsuarios(),us=d.porEmpresa(cli,'tarefas');
+      const rest=box.querySelector('input[name="td_vis"]:checked')?.value??(marc.length?'marcados':'todos');
+      box.innerHTML=`<div class="f"><span>Quem vê esta tarefa</span><div class="vis"><label><input type="radio" name="td_vis" value="todos"${rest==='todos'?' checked':''}> Todos os usuários da empresa</label><label><input type="radio" name="td_vis" value="marcados"${rest==='marcados'?' checked':''}> Só os usuários marcados</label></div></div>
+        <div id="td_pickBox"${rest==='marcados'?'':' hidden'}>${us.length?pickUsers('td_pick',[{nome:'Usuários com acesso às tarefas da empresa',users:us}],marc):'<p class="note" style="margin:0">Nenhum usuário desta empresa tem acesso às tarefas. Libere em Configurações › Acessos.</p>'}
+        <p class="note" style="margin:6px 0 0">A equipe da Controlacs vê todas as tarefas.</p></div>`;
+      box.querySelectorAll('input[name="td_vis"]').forEach(r=>r.onchange=()=>$('td_pickBox').hidden=r.value!=='marcados'||!r.checked)};
+    if(ic)ic.addEventListener('change',vis);if($('td_int'))$('td_int').addEventListener('change',vis);vis();
+  }
   if(!dlgTar.open)dlgTar.showModal();
   if(t)tConversa(t);else $('td_titulo').focus();
 }
@@ -3163,11 +3204,15 @@ async function tAcao(act,btn){
       const titulo=$('td_titulo').value.trim();if(!titulo)return tdErr('Informe o título da tarefa.');
       const r={titulo,descricao:$('td_desc').value.trim()||null,status:$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
       if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked}
+      const restrito=e&&$('td_visBox')?.querySelector('input[name="td_vis"]:checked')?.value==='marcados',quem=restrito?pickLer('td_pick'):[];
+      if(restrito&&!quem.length)return tdErr('Marque pelo menos um usuário que pode ver a tarefa, ou escolha “Todos os usuários da empresa”.');
       if(!t){const c=$('td_cli').value||null;if(!c&&!e)return tdErr('Escolha a empresa.');r.cliente_id=c;
         const col=TAR.filter(x=>x.status===r.status);r.ordem=col.length?Math.min(...col.map(x=>x.ordem))-1000:Date.now()/1000}
       const {data,error}=t?await sb.from('tarefas').update(r).eq('id',t.id).select().single():await sb.from('tarefas').insert(r).select().single();
       if(error)throw error;
       if(!t)await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:data.id},{onConflict:'user_id,tarefa_id'});
+      if(e&&window.V31){const {error:e1}=await sb.from('tarefa_usuarios').delete().eq('tarefa_id',data.id);if(e1)throw e1;
+        if(quem.length&&!data.interna){const {error:e2}=await sb.from('tarefa_usuarios').insert(quem.map(u=>({tarefa_id:data.id,user_id:u})));if(e2)throw e2}}
       toast(t?'Tarefa salva':'Tarefa criada');dlgTar.close();renderTarefas();
     }else if(act==='enviar'){
       const texto=$('td_msg').value.trim(),f=$('td_file').files[0];if(!texto&&!f)return tdErr('Escreva a mensagem ou anexe um arquivo.');
@@ -3192,6 +3237,118 @@ async function tAcao(act,btn){
       :`Não foi possível salvar.${m?' Motivo: '+m:' Verifique a internet e tente de novo.'}`)}
   finally{btn.disabled=false}
 }
+
+// ---------- escolha de usuários (quem vê) ----------
+let DIRUS=null;
+// usuários e acessos (só o escritório lê todos)
+async function dirUsuarios(){
+  if(DIRUS)return DIRUS;
+  const [{data:ps},{data:ac}]=await Promise.all([sb.from('perfis').select('user_id,nome,email,papel'),sb.from('acessos').select('user_id,cliente_id,modulo')]);
+  const nome=u=>u.nome||u.email,perfis=(ps||[]).filter(u=>u.papel!=='pendente').sort((a,b)=>nome(a).localeCompare(nome(b))),acs=ac||[];
+  const us=l=>l.map(u=>({id:u.user_id,nome:nome(u),email:u.email}));
+  return DIRUS={perfis,nome:id=>{const u=perfis.find(x=>x.user_id===id);return u?nome(u):'?'},
+    equipe:us(perfis.filter(u=>u.papel==='escritorio')),
+    porEmpresa:(cli,mod)=>us(perfis.filter(u=>u.papel==='operador'&&acs.some(a=>a.user_id===u.user_id&&a.cliente_id===cli&&(!mod||a.modulo===mod)))),
+    empresas:()=>CLIENTES.filter(c=>c.ativo!==false).map(c=>({nome:c.nome,users:us(perfis.filter(u=>u.papel==='operador'&&acs.some(a=>a.user_id===u.user_id&&a.cliente_id===c.id)))})).filter(g=>g.users.length)};
+}
+// lista de usuários com caixas de marcar, em grupos; quem está em mais de um grupo fica marcado em todos
+function pickUsers(id,grupos,marcados){
+  const m=new Set(marcados||[]);
+  return `<div class="pick" id="${id}"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
+    ${grupos.map(g=>`<div class="pkg"><div>${esc(g.nome)}${grupos.length>1?' <button type="button" class="btn small ghost" data-pk="grupo">marcar o grupo</button>':''}</div>
+      <div class="chk">${g.users.map(u=>`<label title="${esc(u.email||'')}"><input type="checkbox" value="${u.id}"${m.has(u.id)?' checked':''}> ${esc(u.nome)}</label>`).join('')}</div></div>`).join('')}</div>`;
+}
+const pickLer=id=>[...new Set([...($(id)?.querySelectorAll('input:checked')||[])].map(x=>x.value))];
+document.addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(!b)return;const pk=b.closest('.pick');
+  const alvo=b.dataset.pk==='grupo'?b.closest('.pkg'):pk,bs=[...alvo.querySelectorAll('input')],v=b.dataset.pk==='nenhum'?false:b.dataset.pk==='todos'?true:bs.some(x=>!x.checked);
+  bs.forEach(x=>pk.querySelectorAll(`input[value="${x.value}"]`).forEach(y=>y.checked=v))});
+document.addEventListener('change',e=>{const x=e.target;if(x.type==='checkbox'&&x.closest('.pick'))x.closest('.pick').querySelectorAll(`input[value="${x.value}"]`).forEach(y=>y.checked=x.checked)});
+
+// =====================================================================
+// AVISOS E NOTÍCIAS
+// =====================================================================
+const AVPUB={todos:'Todos os usuários',clientes:'Só os clientes',equipe:'Só a equipe da Controlacs',selecionados:'Usuários marcados'};
+let AVS=[], AVDLG=null;
+async function avNovidades(){
+  if(!(ehEsc()||ACESSOS.length))return;
+  const {data,error}=await sb.rpc('avisos_nao_lidos');if(error)return;
+  const n=Number(data)||0;if((NAVBADGE.avisos||0)!==n){NAVBADGE.avisos=n;renderNav()}
+  avBanner();
+}
+function avBanner(){
+  const n=NAVBADGE.avisos||0,el=$('avBanner');el.hidden=!n||VIEW==='avisos';
+  if(!el.hidden)el.innerHTML=`<span>📣 <b>Você tem ${n} ${n===1?'aviso novo':'avisos novos'}.</b></span><button type="button" class="btn small primary" data-v="avisos">Ver avisos</button>`;
+}
+$('avBanner').addEventListener('click',e=>{if(e.target.closest('[data-v]'))go('avisos')});
+async function renderAvisos(){
+  const e=ehEsc();DIRUS=null;
+  $('avSub').textContent=e?'Publique avisos e notícias para os clientes e para a equipe e escolha quem vê cada um.':'Avisos e notícias da Controlacs.';
+  $('avNovo').hidden=!e;$('avFiltroBox').hidden=!e;
+  const lista=$('avLista');
+  let q=sb.from('avisos').select(e?'*, aviso_usuarios(user_id)':'*');
+  if(!e||$('avFiltro').value==='ativos')q=q.or(`expira_em.is.null,expira_em.gte.${TODAY}`);
+  const [{data,error},{data:lid}]=await Promise.all([q.order('importante',{ascending:false}).order('criado_em',{ascending:false}),
+    sb.from('aviso_leituras').select('aviso_id,user_id')]);
+  if(error){console.error(error);lista.innerHTML=`<p class="neg">${error.code==='42P01'||error.code==='PGRST205'||/aviso/.test(error.message||'')?'Este módulo precisa da atualização v31 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
+  AVS=data||[];
+  const meus=new Set((lid||[]).filter(l=>l.user_id===ME.user_id).map(l=>l.aviso_id));
+  const lidos={};(lid||[]).forEach(l=>lidos[l.aviso_id]=(lidos[l.aviso_id]||0)+1);
+  // para a equipe, "novo" só nos avisos que são para ela
+  const paraMim=a=>!e||a.publico==='todos'||a.publico==='equipe'||(a.aviso_usuarios||[]).some(u=>u.user_id===ME.user_id);
+  const novos=AVS.filter(a=>!meus.has(a.id)&&a.criado_por!==ME.user_id&&paraMim(a));
+  const d=e?await dirUsuarios():null;
+  const urls=await signed(AVS.filter(a=>a.anexo_caminho).map(a=>a.anexo_caminho));
+  lista.innerHTML=AVS.map(a=>{const nv=novos.includes(a),venc=a.expira_em&&a.expira_em<TODAY;
+    const para=a.publico==='selecionados'?(a.aviso_usuarios||[]).map(u=>d.nome(u.user_id)).join(', ')||'ninguém marcado':AVPUB[a.publico];
+    return `<div class="card aviso${a.importante?' imp':''}${nv?' novo':''}" data-id="${a.id}"><h3>${esc(a.titulo)}${a.importante?'<span class="chip c-warn">Importante</span>':''}${nv?'<span class="chip c-bad">Novo</span>':''}${venc?'<span class="chip c-none">Vencido</span>':''}</h3>
+      <span class="q">${esc(a.criado_por_nome||'Controlacs')} · ${dtBR(a.criado_em)}${a.expira_em?' · até '+dBR(a.expira_em):''}</span>
+      ${a.texto?`<div class="x">${esc(a.texto)}</div>`:''}${a.anexo_caminho?`<a href="${urls[a.anexo_caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(a.anexo_nome||'anexo')}</a>`:''}
+      ${e?`<div class="row" style="gap:8px;align-items:center"><span class="q">Para: ${esc(para)} · lido por ${lidos[a.id]||0}</span><span class="spacer"></span><button type="button" class="btn small ghost" data-act="editar">Editar</button><button type="button" class="btn small ghost" data-act="excluir">Excluir</button></div>`:''}</div>`}).join('')
+    ||`<div class="card aviso"><p class="note" style="margin:0">${e?'Nenhum aviso publicado. Use “Novo aviso” para começar.':'Nenhum aviso no momento.'}</p></div>`;
+  if(novos.length){await sb.from('aviso_leituras').upsert(novos.map(a=>({aviso_id:a.id,user_id:ME.user_id})),{onConflict:'aviso_id,user_id'});avNovidades()}
+}
+$('avFiltro').onchange=renderAvisos;$('avNovo').onclick=()=>abrirAviso(null);
+$('avLista').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=AVS.find(x=>x.id===b.closest('[data-id]').dataset.id);
+  if(b.dataset.act==='editar')return abrirAviso(a);
+  if(!confirm('Excluir o aviso “'+a.titulo+'”? Não dá para desfazer.'))return;
+  const {error}=await sb.from('avisos').delete().eq('id',a.id);if(error)return fail(error,'Não foi possível excluir');toast('Aviso excluído');renderAvisos()});
+const dlgAv=$('dlgAv');
+async function abrirAviso(a){
+  AVDLG=a;const d=await dirUsuarios(),pub=a?.publico||'todos';
+  $('adTitle').textContent=a?'Editar aviso':'Novo aviso';
+  $('adBody').innerHTML=`<div class="fields"><label class="f wide">Título *<input id="ad_titulo" maxlength="160" value="${esc(a?.titulo||'')}" placeholder="Ex.: feriado de 15/11, o escritório não abre"></label>
+    <label class="f wide">Texto<textarea id="ad_texto" rows="6">${esc(a?.texto||'')}</textarea></label>
+    <label class="f">Mostrar até (opcional)<input type="date" id="ad_exp" value="${a?.expira_em||''}"></label>
+    <label class="f">Anexo (foto ou PDF)<input type="file" id="ad_file" accept="image/*,application/pdf"></label></div>
+    ${a?.anexo_caminho?`<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="ad_tiraAnexo" style="width:auto"> Tirar o anexo atual (${esc(a.anexo_nome||'anexo')})</label>`:''}
+    <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px"><input type="checkbox" id="ad_imp" style="width:auto"${a?.importante?' checked':''}> Importante (fica no topo, destacado)</label>
+    <div class="f"><span>Quem vê</span><div class="vis">${Object.entries(AVPUB).map(([k,t])=>`<label><input type="radio" name="ad_pub" value="${k}"${k===pub?' checked':''}> ${t}</label>`).join('')}</div></div>
+    <div id="ad_pickBox"${pub==='selecionados'?'':' hidden'}>${pickUsers('ad_pick',[{nome:'Equipe da Controlacs',users:d.equipe},...d.empresas()],(a?.aviso_usuarios||[]).map(u=>u.user_id))}
+      <p class="note" style="margin:6px 0 0">Os usuários dos clientes aparecem embaixo de cada empresa que eles podem acessar.</p></div>
+    <p class="err" id="adErr" hidden></p>`;
+  $('adBody').querySelectorAll('input[name="ad_pub"]').forEach(r=>r.onchange=()=>$('ad_pickBox').hidden=r.value!=='selecionados');
+  $('adFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">'+(a?'Salvar':'Publicar')+'</button>';
+  if(!dlgAv.open)dlgAv.showModal();
+}
+$('adFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgAv.close();
+  const err=t=>{$('adErr').textContent=t;$('adErr').hidden=false},a=AVDLG;
+  const titulo=$('ad_titulo').value.trim(),publico=$('adBody').querySelector('input[name="ad_pub"]:checked').value,quem=publico==='selecionados'?pickLer('ad_pick'):[];
+  if(!titulo)return err('Informe o título do aviso.');
+  if(publico==='selecionados'&&!quem.length)return err('Marque pelo menos um usuário, ou escolha outra opção em “Quem vê”.');
+  b.disabled=true;
+  try{
+    const r={titulo,texto:$('ad_texto').value.trim()||null,publico,importante:$('ad_imp').checked,expira_em:$('ad_exp').value||null};
+    const f=$('ad_file').files[0];
+    if(f){const up=await uploadAnexo(f,SEMEMP,'avisos');r.anexo_caminho=up.caminho;r.anexo_nome=up.nome_arquivo}
+    else if($('ad_tiraAnexo')?.checked){r.anexo_caminho=null;r.anexo_nome=null}
+    const {data,error}=a?await sb.from('avisos').update(r).eq('id',a.id).select().single():await sb.from('avisos').insert(r).select().single();
+    if(error)throw error;
+    const {error:e1}=await sb.from('aviso_usuarios').delete().eq('aviso_id',data.id);if(e1)throw e1;
+    if(quem.length){const {error:e2}=await sb.from('aviso_usuarios').insert(quem.map(u=>({aviso_id:data.id,user_id:u})));if(e2)throw e2}
+    toast(a?'Aviso salvo':'Aviso publicado');dlgAv.close();renderAvisos();
+  }catch(x){console.error(x);err(x.message&&!x.code?x.message:'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
+  finally{b.disabled=false}
+});
 
 boot();
 })();
