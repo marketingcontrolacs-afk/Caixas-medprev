@@ -1915,7 +1915,10 @@ const FCOL={
   premio_whats:{t:'Whatsapp',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Whatsapp',fixo:f=>ffNum(f,'premio_whats'),fx:[['ff.premio_whats','Premiação fixa R$','money'],['ff.sem_premiacao','Fora da tela Premiação','bool']]},
   // a assiduidade zera no mês em que há falta lançada; afastado não recebe
   assiduidade:{t:'Assiduidade',sub:'Premiação',g:'P',k:'money',lanca:'money',nome:'Premiação Assiduidade',fx:[['ff.assiduidade','Assiduidade R$','money']],
-    fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;return FOL.lanc.some(l=>l.funcionario_id===f.id&&['faltas_data','faltas_dias','faltas_horas'].includes(l.coluna))?0:v}},
+    // Oliveira (Carol, 25/10): só ganha quem trabalhou todo o período do ponto. Qualquer falta (dia ou horas) ou atestado
+    // zera; o atestado vem como observação que começa com "Atestado" (do espelho de ponto ou lançada à mão)
+    fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;
+      return FOL.lanc.some(l=>l.funcionario_id===f.id&&(['faltas_data','faltas_dias','faltas_horas'].includes(l.coluna)||l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')))?0:v}},
   // valor por dia × dias úteis do mês, mais os sábados trabalhados (lançados no mês) × valor do sábado
   ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
   he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas',fx:[['ff.sem_he','Não pode fazer hora extra','bool']]},
@@ -2249,7 +2252,7 @@ async function pdfTabela(buf){
 // a partir de 16/02/2027 a escala passa a 5x2 e ninguém trabalha no sábado: a regra do sábado vale até 15/02/2027
 const SAB_HE=4*60,SAB_ATE='2027-02-15',DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
 function espelhoDiario(pags){
-  const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
+  const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados','Atestado']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
   let nome='',col=null,sem={f:[],hf:0,he:0,sab:null};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
     if(sem.sab&&sem.he>SAB_HE&&sem.sab.split('/').reverse().join('-')<=SAB_ATE)out.push([nome,sem.sab,0,'','',1]);
@@ -2261,6 +2264,7 @@ function espelhoDiario(pags){
     const m=DIA_RE.exec(l.its[0].s);if(!m||!col)continue;
     const em=cx=>l.its.find(i=>Math.abs(i.cx-cx)<10)?.s,dia=`${m[2]}/${m[3]}/20${m[4]}`;
     if(l.its.some(i=>/^falta$/i.test(i.s)))sem.f.push(dia);
+    if(l.its.some(i=>/atestado/i.test(i.s)))out.push([nome,dia,0,'','','',1]);
     if(/^s[aá]b/i.test(m[1])&&col.td&&num(em(col.td)))sem.sab=dia;
     sem.hf+=num(em(col.hf));sem.he+=num(em(col.he));
     if(/^dom/i.test(m[1]))fecha();
@@ -2275,7 +2279,8 @@ function pontoAba(aba){
   let h=PNT.txt.findIndex(r=>txt(r)>=2&&r.some(v=>/nome|funcion|colab|empreg/i.test(v)));if(h<0)h=PNT.txt.findIndex(r=>txt(r)>=3);if(h<0)h=0;
   PNT.h=h;const cab=PNT.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`);
   const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],
-    ...(colsDe(FOL.cli).includes('ajuda_dia')&&FOL.comp<=SAB_ATE.slice(0,7)+'-01'?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),...PNT.cols];
+    ...(colsDe(FOL.cli).includes('ajuda_dia')&&FOL.comp<=SAB_ATE.slice(0,7)+'-01'?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),
+    ...(colsDe(FOL.cli).includes('observacoes')?[['atest','Atestados (zera a assiduidade)',/atestado/]]:[]),...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
@@ -2301,6 +2306,7 @@ function pontoPrev(){
     if(!nome&&m.data>=0&&pontoData(rw[m.data]))nome=ultimo;if(!nome||/^tota(l|is)\b/i.test(nome))continue;ultimo=nome;
     const g=por.get(nome)||{nome,f:achaFunc(nome,fs),v:{},dias:[],sab:0};
     if(m.sab>=0)g.sab+=pontoDias(tx[m.sab]);
+    if(m.atest>=0&&pontoDias(tx[m.atest])){const d=m.data>=0?pontoData(rw[m.data]):null;g.atest=g.atest||[];if(!g.atest.includes(d))g.atest.push(d)}
     PNT.cols.forEach(([k])=>{if(m[k]<0)return;
       if(k==='faltas_dias'){const n=pontoDias(tx[m.faltas_dias]),data=m.data>=0?pontoData(rw[m.data]):null;if(n&&!(data&&g.dias.some(d=>d.data===data)))g.dias.push({n,data})}
       else{const mi=lerHoras(String(tx[m[k]]||'').replace(/^-/,''));if(isFinite(mi)&&mi>0)g.v[k]=(g.v[k]||0)+mi}});
@@ -2316,15 +2322,15 @@ function pontoPrev(){
   const vsDe=id=>{const f=fs.find(x=>x.id===id);return f?ffNum(f,'ajuda_sabado')||0:0},temSab=m.sab!==undefined;
   por.forEach(g=>{g.he=(g.v.he65||0)+(g.v.he100||0)+(g.v.horas_extras||0)});
   por.forEach(g=>Object.keys(g.v).forEach(k=>{if(g.v[k]<10)delete g.v[k]}));
-  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||(temSab&&g.f&&(g.sab||g.he>SAB_HE)));
+  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||g.atest||(temSab&&g.f&&(g.sab||g.he>SAB_HE)));
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   // quem não tem valor de sábado no cadastro é de contrato antigo (seg a sex): R$ 50 por sábado, que fica gravado no cadastro ao lançar
   const sabCel=(g,i,id)=>{const vs=vsDe(id);if(!id||(!vs&&!g.sab&&g.he<=SAB_HE))return '<span class="muted">–</span>';
     return `<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs||SAB_PADRAO)}${vs?'':' <span class="muted">(contrato antigo)</span>'}${!g.sab&&m.sab<0&&g.he>SAB_HE?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`};
   PNT.sabCel=sabCel;
-  $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}</tr></thead><tbody>${
+  $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}${m.atest>=0?'<th class="l">Atestado</th>':''}</tr></thead><tbody>${
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
-      usa.map(([k])=>`<td>${k==='faltas_horas'&&g.v[k]&&g.f&&semHE(g.f.id)&&HE_COLS.some(x=>g.v[x])?(r=>`<b>${r>=10?hhmm(r):'–'}</b> <span class="muted">(${hhmm(g.v[k])} − ${hhmm(Math.min(g.v[k],HE_COLS.reduce((t,x)=>t+(g.v[x]||0),0)))} de HE)</span>`)(g.v[k]-Math.min(g.v[k],HE_COLS.reduce((t,x)=>t+(g.v[x]||0),0))):HE_COLS.includes(k)&&g.v[k]&&g.f&&semHE(g.f.id)?`<s>${hhmm(g.v[k])}</s> <span class="chip c-warn">⚠ não pode fazer HE: abate das faltas, o resto vai como alerta</span>`:k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}${temSab?`<td class="l" data-pst="${i}">${sabCel(g,i,g.f?.id)}</td>`:''}</tr>`).join('')
+      usa.map(([k])=>`<td>${k==='faltas_horas'&&g.v[k]&&g.f&&semHE(g.f.id)&&HE_COLS.some(x=>g.v[x])?(r=>`<b>${r>=10?hhmm(r):'–'}</b> <span class="muted">(${hhmm(g.v[k])} − ${hhmm(Math.min(g.v[k],HE_COLS.reduce((t,x)=>t+(g.v[x]||0),0)))} de HE)</span>`)(g.v[k]-Math.min(g.v[k],HE_COLS.reduce((t,x)=>t+(g.v[x]||0),0))):HE_COLS.includes(k)&&g.v[k]&&g.f&&semHE(g.f.id)?`<s>${hhmm(g.v[k])}</s> <span class="chip c-warn">⚠ não pode fazer HE: abate das faltas, o resto vai como alerta</span>`:k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}${temSab?`<td class="l" data-pst="${i}">${sabCel(g,i,g.f?.id)}</td>`:''}${m.atest>=0?`<td class="l">${g.atest?`${g.atest.filter(Boolean).map(d=>dBR(d).slice(0,5)).join(', ')||g.atest.length} <span class="chip c-warn">zera a assiduidade</span>`:''}</td>`:''}</tr>`).join('')
     ||`<tr><td class="l muted" colspan="${usa.length+2+temSab}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
     <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. Totais abaixo de 10 minutos não são lançados. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
   $('pnOk').hidden=!PNT.g.length;
@@ -2339,6 +2345,7 @@ FOLACAO.pontoLanca=async b=>{
     const heBloq=semHE(f)?Object.entries(g.v).filter(([k])=>HE_COLS.includes(k)).reduce((t,[,mi])=>t+mi,0):0,
       abate=heBloq?Math.min(heBloq,g.v.faltas_horas||0):0,v={...g.v};if(abate){v.faltas_horas-=abate;if(v.faltas_horas<10)delete v.faltas_horas}
     Object.entries(v).forEach(([k,mi])=>{if(!(heBloq&&HE_COLS.includes(k))&&Math.round(mi)>0)regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)})});
+    if(g.atest&&colsDe(FOL.cli).includes('observacoes'))regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Atestado: ${g.atest.filter(Boolean).map(d=>dBR(d).slice(0,5)).join(', ')||g.atest.length+' dia(s)'}`});
     if(heBloq&&colsDe(FOL.cli).includes('observacoes'))regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`⚠ ALERTA: fez ${hhmm(heBloq)} de hora extra no ponto, mas não pode fazer HE (menor de idade, jornada de 6h).${abate?` ${hhmm(abate)} abatida das horas de falta.`:''}${heBloq>abate?` ${hhmm(heBloq-abate)} não lançada.`:''}`});
     const sab=+document.querySelector(`[data-ps="${s.dataset.pg}"]`)?.value||0;if(sab>0)regs.push({...base,funcionario_id:f,coluna:'ajuda_dia',quantidade:sab})});
   const novosSab=[...new Set(regs.filter(r=>r.coluna==='ajuda_dia').map(r=>r.funcionario_id))].map(id=>FOL.func.find(x=>x.id===id)).filter(x=>x&&!ffNum(x,'ajuda_sabado'));
