@@ -2186,14 +2186,18 @@ $('folPonto').onclick=()=>{
   PNT={cols:PONTO_COLS.filter(x=>colsDe(FOL.cli).includes(x[0]))};
   folDlg(`Importar espelho de ponto · ${MESES[+folMes.value.slice(5)-1]} ${folMes.value.slice(0,4)}`,
     `<p class="note" style="margin-top:0">Envie o resumo do espelho de ponto em PDF (gerado pelo sistema de ponto, não escaneado), Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
-    <label class="f">Arquivo<input type="file" id="pnArq" accept=".pdf,.xlsx,.xls,.csv"></label><div id="pnMap"></div><div id="pnPrev"></div>`,
+    <label class="f">Arquivo (pode escolher vários espelhos em PDF de uma vez)<input type="file" id="pnArq" accept=".pdf,.xlsx,.xls,.csv" multiple></label><div id="pnMap"></div><div id="pnPrev"></div>`,
     '<button type="button" class="btn primary" data-fo="pontoLanca" id="pnOk" hidden>Lançar na folha</button>');
-  $('pnArq').onchange=async()=>{const f=$('pnArq').files[0];if(!f)return;
-    try{const buf=await f.arrayBuffer();
-      if(/\.pdf$/i.test(f.name)){const t=await pdfTabela(buf),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t.linhas),t.diario?'Espelho diário':'PDF');PNT.wb=wb}
-      else PNT.wb=XLSX.read(buf,{type:'array',cellDates:true});
+  // vários arquivos: os espelhos diários em PDF (um por colaborador) viram uma tabela só
+  $('pnArq').onchange=async()=>{const fs=[...$('pnArq').files];if(!fs.length)return;let f=fs[0];$('foErr').hidden=true;
+    try{
+      if(fs.length>1&&fs.some(x=>!/\.pdf$/i.test(x.name)))return foErro('Vários arquivos de uma vez só funciona com os espelhos em PDF.');
+      if(/\.pdf$/i.test(f.name)){const ts=[];for(f of fs)ts.push(await pdfTabela(await f.arrayBuffer()));
+        if(ts.length>1&&!ts.every(t=>t.diario))return foErro('Vários arquivos de uma vez só funciona com o espelho de ponto mensal (dia a dia) de cada colaborador.');
+        const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ts.flatMap((t,i)=>i?t.linhas.slice(1):t.linhas)),ts[0].diario?'Espelho diário':'PDF');PNT.wb=wb}
+      else PNT.wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
       pontoAba(PNT.wb.SheetNames[0])}
-    catch(ex){console.error(ex);foErro(/\.pdf$/i.test(f.name)?'Não consegui ler este PDF. Ele precisa ser gerado pelo sistema de ponto (não escaneado).':'Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
+    catch(ex){console.error(ex);foErro(/\.pdf$/i.test(f.name)?`Não consegui ler o PDF ${f.name}. Ele precisa ser gerado pelo sistema de ponto (não escaneado).`:'Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
 };
 // PDF: lê o texto com o pdf.js e monta a tabela pelas posições das colunas do cabeçalho (a linha com "Colaborador").
 // Nome quebrado em duas linhas: a linha só com o começo do nome junta com a linha de baixo.
@@ -2224,12 +2228,14 @@ async function pdfTabela(buf){
 // Espelho de ponto diário (um ou vários colaboradores): o ponto é de 44h semanais e o sistema fecha o saldo da semana
 // no domingo (H.E se positivo, H.F se negativo). Na semana com falta, o H.F do domingo já é o dia faltado: desconta
 // o dia (com DSR) e só o que passar de 9h por dia faltado (o dia mais longo da escala) entra como horas de falta.
-const DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
+// Sábado trabalhado só conta (ajuda de custo) quando a semana fechou com mais de 4h extras (Carol, 25/10).
+const SAB_HE=4*60,DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
 function espelhoDiario(pags){
   const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
-  let nome='',col=null,sem={f:[],hf:0,he:0};
+  let nome='',col=null,sem={f:[],hf:0,he:0,sab:null};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
-    const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0}};
+    if(sem.sab&&sem.he>SAB_HE)out.push([nome,sem.sab,0,'','',1]);
+    const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
   for(const ls of pags)for(const l of ls){
     const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
     if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();nome=v}continue}
@@ -2237,7 +2243,7 @@ function espelhoDiario(pags){
     const m=DIA_RE.exec(l.its[0].s);if(!m||!col)continue;
     const em=cx=>l.its.find(i=>Math.abs(i.cx-cx)<10)?.s,dia=`${m[2]}/${m[3]}/20${m[4]}`;
     if(l.its.some(i=>/^falta$/i.test(i.s)))sem.f.push(dia);
-    if(/^s[aá]b/i.test(m[1])&&col.td&&num(em(col.td)))out.push([nome,dia,0,'','',1]);
+    if(/^s[aá]b/i.test(m[1])&&col.td&&num(em(col.td)))sem.sab=dia;
     sem.hf+=num(em(col.hf));sem.he+=num(em(col.he));
     if(/^dom/i.test(m[1]))fecha();
   }
@@ -2278,7 +2284,7 @@ function pontoPrev(){
     const g=por.get(nome)||{nome,f:achaFunc(nome,fs),v:{},dias:[],sab:0};
     if(m.sab>=0)g.sab+=pontoDias(tx[m.sab]);
     PNT.cols.forEach(([k])=>{if(m[k]<0)return;
-      if(k==='faltas_dias'){const n=pontoDias(tx[m.faltas_dias]);if(n)g.dias.push({n,data:m.data>=0?pontoData(rw[m.data]):null})}
+      if(k==='faltas_dias'){const n=pontoDias(tx[m.faltas_dias]),data=m.data>=0?pontoData(rw[m.data]):null;if(n&&!(data&&g.dias.some(d=>d.data===data)))g.dias.push({n,data})}
       else{const mi=lerHoras(String(tx[m[k]]||'').replace(/^-/,''));if(isFinite(mi)&&mi>0)g.v[k]=(g.v[k]||0)+mi}});
     por.set(nome,g);
   }
@@ -2289,14 +2295,14 @@ function pontoPrev(){
   // total do mês abaixo de 10 minutos (falta ou extra) não é lançado (Carol, 25/10)
   // sábado trabalhado (quem tem "Sábado R$" no cadastro) entra na ajuda de custo. O resumo de totais não diz os sábados:
   // quem passou de 4h extras fica marcado para conferir no espelho.
-  const vsDe=id=>{const f=fs.find(x=>x.id===id);return f?ffNum(f,'ajuda_sabado')||0:0},temSab=m.sab!==undefined&&fs.some(f=>vsDe(f.id)>0);
+  const vsDe=id=>{const f=fs.find(x=>x.id===id);return f?ffNum(f,'ajuda_sabado')||0:0},temSab=m.sab!==undefined;
   por.forEach(g=>{g.he=(g.v.he65||0)+(g.v.he100||0)+(g.v.horas_extras||0)});
   por.forEach(g=>Object.keys(g.v).forEach(k=>{if(g.v[k]<10)delete g.v[k]}));
-  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||(temSab&&g.f&&(g.sab||g.he>240)));
+  PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||(temSab&&g.f&&(g.sab||g.he>SAB_HE)));
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   // quem não tem valor de sábado no cadastro é de contrato antigo (seg a sex): R$ 50 por sábado, que fica gravado no cadastro ao lançar
-  const sabCel=(g,i,id)=>{const vs=vsDe(id);if(!id||(!vs&&!g.sab&&g.he<=240))return '<span class="muted">–</span>';
-    return `<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs||SAB_PADRAO)}${vs?'':' <span class="muted">(contrato antigo)</span>'}${!g.sab&&m.sab<0&&g.he>240?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`};
+  const sabCel=(g,i,id)=>{const vs=vsDe(id);if(!id||(!vs&&!g.sab&&g.he<=SAB_HE))return '<span class="muted">–</span>';
+    return `<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs||SAB_PADRAO)}${vs?'':' <span class="muted">(contrato antigo)</span>'}${!g.sab&&m.sab<0&&g.he>SAB_HE?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`};
   PNT.sabCel=sabCel;
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}</tr></thead><tbody>${
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
