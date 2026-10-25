@@ -28,7 +28,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
-.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1600px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topin{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
 .logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--ink)}
@@ -92,10 +92,14 @@ textarea{min-height:64px;resize:vertical}
 .tile .k{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .tile .v{font-family:var(--display);font-size:24px;font-weight:700;margin-top:4px}
 .tile .n{font-size:13px;color:var(--muted)}
-.tablebox{overflow-x:auto;margin-top:14px}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
-th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--sunk);position:sticky;top:0}
+/* a tabela rola dentro da caixa (no máximo a altura da tela): a barra de rolagem para o lado fica sempre à vista */
+.tablebox{overflow:auto;max-height:calc(100vh - 150px);margin-top:14px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+thead{position:sticky;top:0;z-index:2}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:var(--sunk)}
+#folGrid tbody td:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
+.tablebox.cheia{position:fixed;inset:8px;z-index:60;max-height:none;margin:0;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 th:first-child,td:first-child,td.l,th.l{text-align:left}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover{background:var(--sunk)}
@@ -103,7 +107,7 @@ tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
 tfoot td{font-weight:700;background:var(--sunk)}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
-.fin{display:flex;align-items:center;gap:2px}.fin input{min-width:84px;width:100%;padding:5px 7px;font-size:14px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}
+.fin{display:flex;align-items:center;gap:2px}.fin input{min-width:90px;width:100%;padding:4px 6px;font-size:13px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}
 .fdet{display:block;padding:16px 18px;min-width:0}.fdet>*+*{margin-top:12px}.fdet summary{cursor:pointer}
 dialog::backdrop{background:rgba(10,20,22,.45)}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
@@ -465,7 +469,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewFolha" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Folha de pagamento</h1><p class="sub" id="folSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folPonto">Importar espelho de ponto</button><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folCheia" title="Abrir a folha na tela inteira (Esc fecha)">⛶ Tela cheia</button><button class="btn" id="folPonto">Importar espelho de ponto</button><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
@@ -2161,6 +2165,10 @@ FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
 // Importar espelho de ponto (Excel ou CSV de qualquer sistema de ponto): o usuário diz qual coluna é o quê,
 // o sistema liga os nomes aos colaboradores e lança faltas (dia com DSR, horas sem DSR) e horas extras.
 // Importar de novo no mesmo mês troca a importação anterior (lançamentos com a descrição PONTO).
+// Tela cheia da folha: a tabela ocupa a janela toda; Esc ou o botão de novo fecham
+$('folCheia').onclick=()=>{const b=$('folGrid').parentElement,on=b.classList.toggle('cheia');$('folCheia').textContent=on?'✕ Fechar tela cheia':'⛶ Tela cheia';
+  if(on){const x=document.createElement('button');x.className='btn small';x.id='folCheiaX';x.textContent='✕ Fechar';x.style.cssText='position:sticky;left:0;top:0;z-index:3;margin:6px';x.onclick=()=>$('folCheia').click();b.prepend(x)}else $('folCheiaX')?.remove()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('folGrid').parentElement.classList.contains('cheia'))$('folCheia').click()});
 const PONTO='Espelho de ponto',SAB_PADRAO=50,HE_COLS=['he65','he100','he50','he75','horas_extras'];
 // quem não pode fazer hora extra (menor de idade, jornada de 6h): a HE do ponto não é lançada, vira um alerta nas observações
 const semHE=id=>{const f=FOL.func.find(x=>x.id===id);return !!(f&&ff(f,'sem_he'))};
