@@ -405,7 +405,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
           <button class="btn primary" type="submit">Cadastrar usuário</button>
         </form>
         <div class="alerta" id="nuOk" hidden style="margin:0"></div>
-        <p class="note" style="margin:0"><b>Administração Controlacs</b>: vê tudo e muda o tipo dos usuários. <b>Operador Controlacs</b>: equipe, usa os módulos do escritório e vê as tarefas liberadas para ele. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
+        <p class="note" style="margin:0"><b>Administração Controlacs</b>: vê tudo e muda o tipo dos usuários. <b>Operador Controlacs</b>: equipe; vê os módulos e as empresas que você escolher em “Escolher módulos e empresas”, mais Tarefas e Avisos. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -574,6 +574,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="rpBody"></div>
   <div class="df" id="rpFoot"></div>
 </dialog>
+<dialog id="dlgPerm">
+  <div class="dh"><h2 id="pmTitle"></h2></div>
+  <div class="db" id="pmBody"></div>
+  <div class="df" id="pmFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
+</dialog>
 <dialog id="dlgAv">
   <div class="dh"><h2 id="adTitle"></h2></div>
   <div class="db" id="adBody"></div>
@@ -679,6 +684,11 @@ function anexoView(a,url,small){
 // ---------- sessão, acessos e menu ----------
 let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
+const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
+// Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
+// Tarefas e Avisos são de toda a equipe
+const SEMPRE=['tarefas','avisos'];
+const eqPode=k=>!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k);
 const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados'};
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
@@ -722,7 +732,7 @@ const NAVBADGE={};
 function renderNav(){
   let g=null,h='';
   const grp=n=>typeof n.g==='function'?n.g():n.g;
-  const itens=NAV.filter(n=>n.ok());
+  const itens=NAV.filter(n=>n.ok()&&eqPode(n.k));
   ['Comunicação','Financeiro','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
     if(grp(n)!==g){g=grp(n);h+=`<div class="navgrp">${g}</div>`}
     h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}${NAVBADGE[n.k]?`<span class="nbadge" title="Com novidade">${NAVBADGE[n.k]}</span>`:''}</button>`;
@@ -732,6 +742,10 @@ function renderNav(){
 $('nav').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)go(b.dataset.v)});
 // empresas que aparecem no seletor para o módulo aberto
 function empresasDe(m){
+  const l=empresasMod(m),so=ehEsc()&&!ehAdm()&&ME.empresas_equipe?.length?ME.empresas_equipe:null;
+  return so?l.filter(c=>so.includes(c.id)):l;
+}
+function empresasMod(m){
   if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:podeVer(c.id,'folha')||podeVer(c.id,'ferias')));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
   if(m==='premio')return empresasDe('folha').filter(c=>c.folha_modelo?.premiacao?.length);
@@ -752,7 +766,7 @@ function fillClientes(){
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>openView();
-function go(v){const antes=VIEW;VIEW=v;renderNav();fillClientes();
+function go(v){if(!eqPode(v))return;const antes=VIEW;VIEW=v;renderNav();fillClientes();
   // o escritório abre os repasses com todas as empresas, para a conferência de quinta
   if((v==='repasse'||v==='tarefas')&&antes!==v&&ehEsc()&&escCli.querySelector('option[value="*"]'))escCli.value='*';
   openView()}
@@ -795,7 +809,7 @@ async function boot(){
   window.V2=!eac;
   const nomes=[...new Set(ACESSOS.map(a=>CLIENTES.find(c=>c.id===a.cliente_id)?.nome).filter(Boolean))];
   $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
-  const first=NAV.find(n=>n.ok()&&!n.soon);
+  const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   show('app');go(first.k);
   const novid=()=>{tNovidades();avNovidades()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
@@ -1506,7 +1520,9 @@ async function renderCadastro(){
     CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   // permissões de cada usuário do cliente: empresa › módulos (nível)
-  const perm=u=>{if(u.papel==='escritorio')return u.tipo==='admin'||u.admin?'Tudo, inclusive as tarefas restritas':'Todos os módulos do escritório';
+  const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Tudo, inclusive as tarefas restritas';
+      const ms=u.modulos_equipe?NAV.filter(n=>u.modulos_equipe.includes(n.k)).map(n=>n.t):null,es=u.empresas_equipe?.length?u.empresas_equipe.map(id=>CLIENTES.find(c=>c.id===id)?.nome).filter(Boolean):null;
+      return `${ms?(ms.length?esc(ms.join(', ')):'Só Tarefas e Avisos'):'Todos os módulos'}${ms&&ms.length?' + Tarefas e Avisos':''}<br><span class="muted">${es?'Empresas: '+esc(es.join(', ')):'Todas as empresas'}</span>${ehAdm()?' <button type="button" class="btn small ghost" data-perm="1">Escolher módulos e empresas</button>':''}`}
     const g={};(acs||[]).filter(a=>a.user_id===u.user_id).forEach(a=>(g[a.cliente_id]||=[]).push(`${MODNOME[a.modulo]||a.modulo} (${a.nivel==='lancamento'?'Lançamento':'Consulta'})`));
     return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Libere no quadro Acessos.</span>'};
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th><th></th></tr></thead><tbody>${
@@ -1564,6 +1580,30 @@ $('formUsr').addEventListener('submit',async e=>{
   $('formUsr').reset();$('nuSenha').value=senhaNova();DIRUS=null;await renderCadastro();
   if(tipo==='cliente'||tipo==='colaborador'){const u=USERS.find(x=>x.email===email);if(u)$('acUsr').value=u.user_id}
 });
+$('tbUsr').addEventListener('click',e=>{const b=e.target.closest('[data-perm]');if(b)abrirPermissoes(USERS.find(x=>x.user_id===b.closest('tr').dataset.id))});
+const dlgPerm=$('dlgPerm');let PERMU=null;
+function abrirPermissoes(u){
+  PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
+  const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Escritório':n.g;
+  const grupos=['Financeiro','Recursos humanos','Escritório'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
+  const ck=(n)=>`<label><input type="checkbox" value="${n.k}"${!ms||ms.includes(n.k)?' checked':''}> ${n.t}</label>`;
+  $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe.</p>
+    <div class="pick" id="pmMods" style="max-height:none"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
+      ${grupos.map(x=>`<div class="pkg"><div>${x.g} <button type="button" class="btn small ghost" data-pk="grupo">marcar o grupo</button></div><div class="chk">${x.itens.map(ck).join('')}</div></div>`).join('')}</div>
+    <div class="f"><span>Empresas</span><div class="vis"><label><input type="radio" name="pm_emp" value="todas"${es?'':' checked'}> Todas as empresas</label><label><input type="radio" name="pm_emp" value="marcadas"${es?' checked':''}> Só as marcadas</label></div></div>
+    <div class="chk" id="pmEmps"${es?'':' hidden'}>${CLIENTES.filter(c=>c.ativo!==false).map(c=>`<label><input type="checkbox" value="${c.id}"${es&&es.includes(c.id)?' checked':''}> ${esc(c.nome)}</label>`).join('')}</div>
+    <p class="err" id="pmErr" hidden></p>`;
+  $('pmBody').querySelectorAll('input[name="pm_emp"]').forEach(r=>r.onchange=()=>$('pmEmps').hidden=r.value!=='marcadas');
+  dlgPerm.showModal();
+}
+$('pmFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgPerm.close();
+  const todosMods=NAV.filter(n=>!SEMPRE.includes(n.k)).map(n=>n.k),mods=[...$('pmMods').querySelectorAll('input:checked')].map(x=>x.value);
+  const soEmp=$('pmBody').querySelector('input[name="pm_emp"]:checked').value==='marcadas',emps=[...$('pmEmps').querySelectorAll('input:checked')].map(x=>x.value);
+  if(soEmp&&!emps.length){$('pmErr').textContent='Marque pelo menos uma empresa, ou escolha “Todas as empresas”.';$('pmErr').hidden=false;return}
+  const r={modulos_equipe:todosMods.every(k=>mods.includes(k))?null:mods,empresas_equipe:soEmp?emps:null};
+  b.disabled=true;const {error}=await sb.from('perfis').update(r).eq('user_id',PERMU.user_id);b.disabled=false;
+  if(error){console.error(error);$('pmErr').textContent=/modulos_equipe|empresas_equipe/.test(error.message||'')&&!/administradora/.test(error.message)?'Rode a atualização v37 do banco no Supabase.':error.message||'Não foi possível salvar.';$('pmErr').hidden=false;return}
+  toast('Permissões salvas');dlgPerm.close();renderCadastro()});
 $('tbUsr').addEventListener('click',async e=>{const b=e.target.closest('[data-senha]');if(!b)return;
   const u=USERS.find(x=>x.user_id===b.closest('tr').dataset.id);
   const senha=prompt(`Nova senha para ${u.email} (mínimo 6 caracteres):`,senhaNova());if(senha===null)return;
@@ -3366,6 +3406,7 @@ async function renderTarefas(){
   DIRUS=null;
   let q=sb.from('tarefas').select('*, tarefa_comentarios(count)'+(window.V31?', tarefa_usuarios(user_id)':'')).eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
   if(v==='int')q=q.eq('interna',true);else if(!todas)q=q.eq('cliente_id',v);
+  else if(ehEsc()&&!ehAdm()&&ME.empresas_equipe?.length)q=q.or(`cliente_id.is.null,cliente_id.in.(${ME.empresas_equipe.join(',')})`);
   const conc=$('tConc').value;
   if(conc==='nao')q=q.neq('status','concluida');
   else if(conc==='30')q=q.or(`status.neq.concluida,concluida_em.gte.${new Date(Date.now()-30*864e5).toISOString()}`);
