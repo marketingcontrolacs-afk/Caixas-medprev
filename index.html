@@ -396,7 +396,15 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Usuários</h2>
-        <p class="note" style="margin:0">Para criar um usuário: no Supabase, vá em Authentication › Users › Add user › Create new user, informe e-mail e senha e marque “Auto Confirm User”. Ele aparece aqui como “Pendente”. Escolha o tipo e, para clientes e colaboradores, libere as empresas e os módulos no quadro Acessos.</p>
+        <p class="note" style="margin:0">Cadastre aqui o login de cada pessoa. Ela já pode entrar com o e-mail e a senha informados. Para clientes e colaboradores, depois libere as empresas e os módulos no quadro Acessos.</p>
+        <form class="row" id="formUsr" style="align-items:flex-end">
+          <label class="f">E-mail<input type="email" id="nuEmail" required autocomplete="off" placeholder="pessoa@empresa.com"></label>
+          <label class="f">Nome<input id="nuNome" placeholder="Nome e sobrenome"></label>
+          <label class="f">Senha provisória<input id="nuSenha" required minlength="6" autocomplete="new-password"></label>
+          <label class="f">Tipo<select id="nuTipo"></select></label>
+          <button class="btn primary" type="submit">Cadastrar usuário</button>
+        </form>
+        <div class="alerta" id="nuOk" hidden style="margin:0"></div>
         <p class="note" style="margin:0"><b>Administração Controlacs</b>: vê tudo e muda o tipo dos usuários. <b>Operador Controlacs</b>: equipe, usa os módulos do escritório e vê as tarefas liberadas para ele. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
       </div>
@@ -1501,10 +1509,15 @@ async function renderCadastro(){
   const perm=u=>{if(u.papel==='escritorio')return u.tipo==='admin'||u.admin?'Tudo, inclusive as tarefas restritas':'Todos os módulos do escritório';
     const g={};(acs||[]).filter(a=>a.user_id===u.user_id).forEach(a=>(g[a.cliente_id]||=[]).push(`${MODNOME[a.modulo]||a.modulo} (${a.nivel==='lancamento'?'Lançamento':'Consulta'})`));
     return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Libere no quadro Acessos.</span>'};
-  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th></tr></thead><tbody>${
+  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th><th></th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
       <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
-      <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)}</td></tr>`).join('')}</tbody>`;
+      <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)}</td>
+      <td>${u.user_id===ME.user_id?'':'<button type="button" class="btn small ghost" data-senha="1">Trocar senha</button>'}</td></tr>`).join('')}</tbody>`;
+  // novo usuário: a equipe só cadastra clientes e colaboradores
+  const adm=ME.tipo==='admin'||ME.admin;
+  $('nuTipo').innerHTML=TIPOSUSR.filter(([v])=>v!=='pendente'&&(adm||v==='cliente'||v==='colaborador')).map(([v,t])=>`<option value="${v}"${v==='cliente'?' selected':''}>${t}</option>`).join('');
+  if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
   $('acMod').innerHTML=Object.entries(MODNOME).map(([k,t])=>`<label><input type="checkbox" value="${k}"> ${t}</label>`).join('');
@@ -1535,6 +1548,28 @@ $('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-
   const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
   const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);c[k]=v}});
+// senha provisória fácil de ditar: 4 letras + 4 números
+const senhaNova=()=>{const L='abcdefghjkmnpqrstuvwxyz',a=new Uint32Array(8);crypto.getRandomValues(a);return [...a].map((x,i)=>i<4?L[x%L.length]:String(x%10)).join('')};
+const msgBanco=(e,v)=>/criar_usuario|trocar_senha|function/i.test(e.message||'')&&/not find|does not exist|schema cache/i.test(e.message||'')?`Rode a atualização ${v} do banco no Supabase.`:(e.message||'Verifique a internet e tente de novo.');
+const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origin+location.pathname}\nE-mail: ${email}\nSenha: ${senha}`;
+$('formUsr').addEventListener('submit',async e=>{
+  e.preventDefault();const b=e.submitter||e.target.querySelector('button');b.disabled=true;
+  const email=$('nuEmail').value.trim().toLowerCase(),senha=$('nuSenha').value,tipo=$('nuTipo').value;
+  const {error}=await sb.rpc('criar_usuario',{p_email:email,p_senha:senha,p_nome:$('nuNome').value.trim(),p_tipo:tipo});
+  b.disabled=false;
+  if(error){console.error(error);toast('Não foi possível cadastrar: '+msgBanco(error,'v36'));return}
+  const txt=dadosAcesso(email,senha);
+  $('nuOk').innerHTML=`<b>Usuário cadastrado: ${esc(email)}</b><span>${tipo==='cliente'||tipo==='colaborador'?'Agora libere as empresas e os módulos dele no quadro Acessos, abaixo. ':''}Mande para a pessoa o endereço do portal, o e-mail e a senha.</span><div><button type="button" class="btn small primary" id="nuCopiar">Copiar dados de acesso</button></div>`;
+  $('nuOk').hidden=false;$('nuCopiar').onclick=()=>copiar(txt,'Dados de acesso copiados');
+  $('formUsr').reset();$('nuSenha').value=senhaNova();DIRUS=null;await renderCadastro();
+  if(tipo==='cliente'||tipo==='colaborador'){const u=USERS.find(x=>x.email===email);if(u)$('acUsr').value=u.user_id}
+});
+$('tbUsr').addEventListener('click',async e=>{const b=e.target.closest('[data-senha]');if(!b)return;
+  const u=USERS.find(x=>x.user_id===b.closest('tr').dataset.id);
+  const senha=prompt(`Nova senha para ${u.email} (mínimo 6 caracteres):`,senhaNova());if(senha===null)return;
+  const {error}=await sb.rpc('trocar_senha',{p_user:u.user_id,p_senha:senha});
+  if(error){console.error(error);toast('Não foi possível trocar a senha: '+msgBanco(error,'v36'));return}
+  copiar(dadosAcesso(u.email,senha),'Senha trocada. Dados de acesso copiados')});
 $('tbUsr').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.value||null;
   // o tipo define também o papel (o banco ajusta o papel e a administração pelo tipo)
   const r=k!=='tipo'?{[k]:v}:v==='pendente'?{tipo:null,papel:'pendente'}:{tipo:v};
