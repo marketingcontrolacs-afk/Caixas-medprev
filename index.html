@@ -483,6 +483,16 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="row"><span class="spacer"></span><button class="btn primary" id="prSalvar">Salvar premiação</button></div>
     <p class="note">Deixe em branco quem não tem premiação no mês. Afastados não aparecem aqui. Depois que o escritório confere a folha, os valores ficam travados.</p>
   </section>
+  <!-- RH · ESPELHO DE PONTO (alimenta a folha e o pedido de benefícios) -->
+  <section id="viewPonto" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Espelho de ponto</h1><p class="sub">Importe o espelho de ponto do mês. As faltas, atestados, horas extras e sábados entram na folha de pagamento do mês e no pedido de benefícios do mês seguinte.</p></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês do ponto<select id="ptMes"></select></label><button class="btn primary" id="ptImp">Importar espelho de ponto</button></div>
+    </div>
+    <div class="card block" style="margin-top:16px"><div class="row" id="ptBar"></div></div>
+    <div class="card tablebox"><table id="ptRes"></table></div>
+    <p class="note">Importar de novo no mesmo mês troca a importação anterior. Falta do dia inteiro entra com DSR; falta em horas, sem DSR. Depois que o escritório confere a folha do mês, a importação fica travada.</p>
+  </section>
   <!-- RH · PEDIDO DE BENEFÍCIOS -->
   <section id="viewBen" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -496,7 +506,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="card tablebox"><table id="bnVt"></table></div>
     <h2 style="margin-top:18px">Alimentação</h2>
     <div class="card tablebox"><table id="bnVa"></table></div>
-    <p class="note">Dias = dias úteis do mês de uso + sábados da escala − faltas, atestados e férias. Passagens = dias × 2. Alimentação por dia = dias × valor do dia; alimentação fixa (Viva) = valor fixo, que atestado não desconta, mais a assiduidade, que a pessoa perde se faltar sem atestado. As faltas e atestados vêm do ponto lançado na folha do mês do pedido; dá para mudar qualquer número antes de salvar.</p>
+    <p class="note">Dias = dias úteis do mês de uso + sábados da escala − faltas, atestados e férias. Passagens = dias × 2. Alimentação por dia = dias × valor do dia; alimentação fixa (Viva) = valor fixo, que atestado não desconta, mais a assiduidade, que a pessoa perde se faltar sem atestado. As faltas e atestados vêm do Espelho de ponto do mês do pedido (importado na seção Espelho de ponto); se o ponto for importado depois de salvar, o rascunho atualiza as faltas sozinho. Dá para mudar qualquer número antes de salvar.</p>
     <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Pendências</h2><button class="btn" id="bnPendAdd">+ Pendência</button></div>
     <div class="card tablebox"><table id="bnPend"></table></div>
     <div id="bnCadBox" hidden>
@@ -519,7 +529,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewFolha" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Folha de pagamento</h1><p class="sub" id="folSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folCheia" title="Abrir a folha na tela inteira (Esc fecha)">⛶ Tela cheia</button><button class="btn" id="folPonto">Importar espelho de ponto</button><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folCheia" title="Abrir a folha na tela inteira (Esc fecha)">⛶ Tela cheia</button><button class="btn" id="folPonto" title="A importação do ponto fica na seção Espelho de ponto">Espelho de ponto ›</button><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
@@ -689,11 +699,11 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Tarefas e Avisos são de toda a equipe
 const SEMPRE=['tarefas','avisos'];
 const eqPode=k=>!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k);
-const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
+const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
 // seções agrupadas no quadro Acessos
-const MODGRUPOS=[['Financeiro',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','premio','beneficios','colab']],['Comunicação',['tarefas']]];
+const MODGRUPOS=[['Financeiro',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas']]];
 // os dados da folha e das férias também servem às seções que dependem deles (igual ao banco, v38)
-const MODEQ={folha:['folha','premio','beneficios','colab'],ferias:['ferias','colab']};
+const MODEQ={folha:['folha','ponto','premio','beneficios','colab'],ferias:['ferias','colab']};
 const temEm=(cli,m)=>ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo));
@@ -704,6 +714,7 @@ const ICO={
   tesouraria:'<path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/>',
   cartao:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   folha:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
+  ponto:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
   ben:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/>',
   premio:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>',
   colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
@@ -722,6 +733,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
+  {k:'ponto',t:'Espelho de ponto',g:'Recursos humanos',ok:()=>temAcesso('ponto')},
   {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
   {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',ok:()=>temAcesso('beneficios')},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('colab')},
@@ -756,10 +768,10 @@ function empresasMod(m){
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
   if(m==='tarefas')return CLIENTES.filter(c=>c.ativo!==false&&podeVer(c.id,'tarefas'));
-  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'?'folha':m;
+  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   // o cliente vê só as empresas em que tem a seção liberada (Benefícios é seção própria)
-  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':mod)));
+  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':m==='ponto'?'ponto':mod)));
 }
 const escCli=$('escCli');
 function fillClientes(){
@@ -778,7 +790,7 @@ function go(v){if(!eqPode(v))return;const antes=VIEW;VIEW=v;renderNav();fillClie
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewBen','viewTar','viewAv'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -791,6 +803,7 @@ function openView(){
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
   else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
+  else if(VIEW==='ponto'){$('viewPonto').hidden=false;initPonto()}
   else if(VIEW==='ben'){$('viewBen').hidden=false;initBen()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
@@ -2235,7 +2248,7 @@ async function renderFolha(){
   }
   const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
   $('folAdd').hidden=$('folRescAdd').hidden=!lanca;
-  $('folPonto').hidden=!lanca||!cols.some(c=>PONTO_COLS.some(x=>x[0]===c));
+  $('folPonto').hidden=!temAcesso('ponto')||!eqPode('ponto');
   // barra de situação do mês
   $('folBar').innerHTML=`<span class="chip ${FSTAT[st]}">${st==='Aberta'?'Aberta para lançamentos':st}</span>`
     +(FOL.mes?.conferido_em?`<span class="note">Conferida em ${dBR(FOL.mes.conferido_em.slice(0,10))}</span>`:'')
@@ -2367,12 +2380,15 @@ function achaFunc(nome,fs){
   return pts.length&&(pts.length===1||pts[0][1]>pts[1][1])?pts[0][0]:null;
 }
 let PNT=null;
-$('folPonto').onclick=()=>{
-  PNT={cols:PONTO_COLS.filter(x=>colsDe(FOL.cli).includes(x[0]))};
-  folDlg(`Importar espelho de ponto · ${MESES[+folMes.value.slice(5)-1]} ${folMes.value.slice(0,4)}`,
+// a folha abre a seção Espelho de ponto no mesmo mês
+$('folPonto').onclick=()=>{PT_MES=folMes.value;go('ponto')};
+// as faltas em dias sempre entram (o pedido de benefícios usa), mesmo que a planilha da folha não tenha a coluna
+$('ptImp').onclick=()=>{
+  PNT={cols:PONTO_COLS.filter(x=>x[0]==='faltas_dias'||colsDe(FOL.cli).includes(x[0]))};
+  folDlg(`Importar espelho de ponto · ${MESES[+FOL.comp.slice(5,7)-1]} ${FOL.comp.slice(0,4)}`,
     `<p class="note" style="margin-top:0">Envie o resumo do espelho de ponto em PDF (gerado pelo sistema de ponto, não escaneado), Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
     <label class="f">Arquivo (pode escolher vários espelhos em PDF de uma vez)<input type="file" id="pnArq" accept=".pdf,.xlsx,.xls,.csv" multiple></label><div id="pnMap"></div><div id="pnPrev"></div>`,
-    '<button type="button" class="btn primary" data-fo="pontoLanca" id="pnOk" hidden>Lançar na folha</button>');
+    '<button type="button" class="btn primary" data-fo="pontoLanca" id="pnOk" hidden>Lançar</button>');
   // vários arquivos: os espelhos diários em PDF (um por colaborador) viram uma tabela só
   $('pnArq').onchange=async()=>{const fs=[...$('pnArq').files];if(!fs.length)return;let f=fs[0];$('foErr').hidden=true;
     try{
@@ -2380,6 +2396,8 @@ $('folPonto').onclick=()=>{
       if(/\.pdf$/i.test(f.name)){const ts=[];for(f of fs)ts.push(await pdfTabela(await f.arrayBuffer()));
         if(ts.length>1&&!ts.every(t=>t.diario))return foErro('Vários arquivos de uma vez só funciona com o espelho de ponto mensal (dia a dia) de cada colaborador.');
         const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ts.flatMap((t,i)=>i?t.linhas.slice(1):t.linhas)),ts[0].diario?'Espelho diário':'PDF');PNT.wb=wb}
+      // CSV lido como texto: o SheetJS leria 06/10 como 10 de junho (formato americano)
+      else if(/\.csv$/i.test(f.name))PNT.wb=XLSX.read(await f.text(),{type:'string',raw:true});
       else PNT.wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
       pontoAba(PNT.wb.SheetNames[0])}
     catch(ex){console.error(ex);foErro(/\.pdf$/i.test(f.name)?`Não consegui ler o PDF ${f.name}. Ele precisa ser gerado pelo sistema de ponto (não escaneado).`:'Não consegui ler o arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo.')}};
@@ -2445,7 +2463,7 @@ function pontoAba(aba){
   PNT.h=h;const cab=PNT.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`);
   const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],
     ...(colsDe(FOL.cli).includes('ajuda_dia')&&FOL.comp<=SAB_ATE.slice(0,7)+'-01'?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),
-    ...(colsDe(FOL.cli).includes('observacoes')?[['atest','Atestados (zera a assiduidade)',/atestado/]]:[]),...PNT.cols];
+    ['atest','Atestados (zera a assiduidade)',/atestado/],...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
@@ -2503,27 +2521,80 @@ function pontoPrev(){
     const ant=td.querySelector('input');if(ant)PNT.g[i].sab=+ant.value||0;td.innerHTML=sabCel(PNT.g[i],i,s.value)});
 }
 FOLACAO.pontoLanca=async b=>{
-  const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO};
+  // Oliveira lança a falta pela data do dia (coluna faltas_data); as demais, em dias com DSR
+  const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO},cs=colsDe(FOL.cli),
+    porData=cs.includes('faltas_data')&&!cs.includes('faltas_dias'),noMes=d=>d&&d.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d<=fimMes(FOL.comp);
   document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
-    g.dias.forEach(d=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:d.data&&d.data.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d.data<=fimMes(FOL.comp)?d.data:null,texto:'dsr'}));
+    g.dias.forEach(d=>regs.push(porData?{...base,funcionario_id:f,coluna:'faltas_data',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:noMes(d.data)?null:`${d.n} ${d.n===1?'dia':'dias'}`}
+      :{...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:'dsr'}));
     // quem não pode fazer HE: as horas extras abatem as horas de falta (Carol, 25/10); o que sobrar vira só alerta
     const heBloq=semHE(f)?Object.entries(g.v).filter(([k])=>HE_COLS.includes(k)).reduce((t,[,mi])=>t+mi,0):0,
       abate=heBloq?Math.min(heBloq,g.v.faltas_horas||0):0,v={...g.v};if(abate){v.faltas_horas-=abate;if(v.faltas_horas<10)delete v.faltas_horas}
     Object.entries(v).forEach(([k,mi])=>{if(!(heBloq&&HE_COLS.includes(k))&&Math.round(mi)>0)regs.push({...base,funcionario_id:f,coluna:k,quantidade:Math.round(mi)})});
-    if(g.atest&&colsDe(FOL.cli).includes('observacoes'))regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Atestado: ${g.atest.filter(Boolean).map(d=>dBR(d).slice(0,5)).join(', ')||g.atest.length+' dia(s)'}`});
+    // o atestado fica guardado mesmo sem a coluna Observações na folha: o pedido de benefícios usa
+    if(g.atest)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Atestado: ${g.atest.filter(Boolean).map(d=>dBR(d).slice(0,5)).join(', ')||g.atest.length+' dia(s)'}`});
     if(heBloq&&colsDe(FOL.cli).includes('observacoes'))regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`⚠ ALERTA: fez ${hhmm(heBloq)} de hora extra no ponto, mas não pode fazer HE (menor de idade, jornada de 6h).${abate?` ${hhmm(abate)} abatida das horas de falta.`:''}${heBloq>abate?` ${hhmm(heBloq-abate)} não lançada.`:''}`});
     const sab=+document.querySelector(`[data-ps="${s.dataset.pg}"]`)?.value||0;if(sab>0)regs.push({...base,funcionario_id:f,coluna:'ajuda_dia',quantidade:sab})});
-  const novosSab=[...new Set(regs.filter(r=>r.coluna==='ajuda_dia').map(r=>r.funcionario_id))].map(id=>FOL.func.find(x=>x.id===id)).filter(x=>x&&!ffNum(x,'ajuda_sabado'));
+  const novosSab=!ehEsc()?[]:[...new Set(regs.filter(r=>r.coluna==='ajuda_dia').map(r=>r.funcionario_id))].map(id=>FOL.func.find(x=>x.id===id)).filter(x=>x&&!ffNum(x,'ajuda_sabado'));
   if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
   b.disabled=true;
   try{
     const {error:e1}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);if(e1)throw e1;
     const {error:e2}=await sb.from('folha_lancamentos').insert(regs);if(e2)throw e2;
     for(const x of novosSab){const {error:e3}=await sb.from('funcionarios').update({folha_fixos:{...(x.folha_fixos||{}),ajuda_sabado:SAB_PADRAO}}).eq('id',x.id);if(e3)throw e3}
-    dlgFol.close();toast(`Espelho de ponto lançado: ${regs.length} lançamentos`);renderFolha();
+    dlgFol.close();toast(`Espelho de ponto lançado: ${regs.length} lançamentos`);(VIEW==='ponto'?renderPonto:renderFolha)();
   }catch(ex){console.error(ex);foErro(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
   finally{b.disabled=false}
 };
+
+// RH › Espelho de ponto (v39): seção própria, com acesso separado no quadro Acessos, para que quem faz o pedido
+// de benefícios importe o ponto sem precisar da folha (Carol, 26/10). A importação grava os lançamentos "Espelho de ponto"
+// na folha do mês; a folha desse mês e o pedido de benefícios do mês seguinte leem dali.
+let PT_MES=null;
+function initPonto(){
+  if(!$('ptMes').options.length){$('ptMes').innerHTML=mesesOpts(addDias(TODAY,31).slice(0,7));$('ptMes').value=TODAY.slice(0,7)}
+  if(PT_MES){$('ptMes').value=PT_MES;PT_MES=null}
+  renderPonto();
+}
+$('ptMes').onchange=()=>renderPonto();
+async function renderPonto(){
+  const cli=cliAtual();FOL.cli=cli;
+  const vazio=t=>{$('ptRes').innerHTML=`<tbody><tr><td class="l muted">${t}</td></tr></tbody>`;$('ptBar').innerHTML='';$('ptImp').hidden=true};
+  if(!cli){vazio('Nenhuma empresa liberada.');return}
+  const comp=FOL.comp=$('ptMes').value+'-01',fim=fimMes(comp),seg=addMes(comp,1);
+  const [rf,rm,rl,rr]=await Promise.all([sb.from('funcionarios').select('*').eq('cliente_id',cli.id).order('nome'),
+    sb.from('folha_meses').select('*').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
+    sb.from('folha_lancamentos').select('*').eq('cliente_id',cli.id).eq('competencia',comp).order('data').order('criado_em'),
+    sb.from('folha_rescisoes').select('*').eq('cliente_id',cli.id).gte('data_demissao',comp).lte('data_demissao',fim)]);
+  const er=[rf,rm,rl,rr].find(x=>x.error)?.error;
+  if(er){console.error(er);vazio('<span class="neg">Erro ao carregar. Verifique a internet e tente de novo.</span>');return}
+  FOL={...FOL,func:rf.data||[],mes:rm.data,lanc:rl.data||[],resc:rr.data||[],aj:{}};
+  const pl=FOL.lanc.filter(l=>l.descricao===PONTO),aberta=!FOL.mes||FOL.mes.status==='Aberta',lanca=podeLancar(cli.id,'ponto')&&aberta;
+  const quando=pl.reduce((m,l)=>l.criado_em>m?l.criado_em:m,''),nm=c=>MESES[+c.slice(5,7)-1].toLowerCase();
+  $('ptImp').hidden=!lanca;$('ptImp').textContent=pl.length?'Importar de novo':'Importar espelho de ponto';
+  $('ptBar').innerHTML=`${pl.length?`<span class="chip c-ok">✓ Importado${quando?' em '+dBR(quando.slice(0,10))+' às '+new Date(quando).toTimeString().slice(0,5):''}</span>`:`<span class="chip c-warn">Ponto de ${nm(comp)} ainda não importado</span>`}
+    ${aberta?'':'<span class="chip c-done">Folha conferida pelo escritório: importação travada</span>'}
+    <span class="note">Entra na folha de ${nm(comp)} e no pedido de benefícios de ${nm(seg)}.</span>
+    <span class="spacer"></span>${pl.length&&lanca?'<button class="btn small ghost" id="ptApaga">Apagar importação</button>':''}
+    ${temAcesso('beneficios')&&eqPode('ben')?`<button class="btn small" id="ptBen">Pedido de benefícios de ${nm(seg)} ›</button>`:''}`;
+  // resumo por colaborador do que a importação lançou
+  const por=new Map();pl.forEach(l=>{const g=por.get(l.funcionario_id)||{f:[],fn:0,hf:0,he:0,sab:0,at:[],obs:[]};
+    if(l.coluna==='faltas_dias'||l.coluna==='faltas_data'){g.fn+=+l.quantidade||1;if(l.data)g.f.push(dBR(l.data).slice(0,5))}
+    else if(l.coluna==='faltas_horas')g.hf+=+l.quantidade||0;else if(HE_COLS.includes(l.coluna))g.he+=+l.quantidade||0;
+    else if(l.coluna==='ajuda_dia')g.sab+=+l.quantidade||0;
+    else if(l.coluna==='observacoes')(/^\W*atestado/i.test(l.texto||'')?g.at:g.obs).push((l.texto||'').replace(/^\W*atestado:?\s*/i,''));
+    por.set(l.funcionario_id,g)});
+  const nome=id=>FOL.func.find(f=>f.id===id)?.nome||'?',ids=[...por.keys()].sort((a,b)=>nome(a).localeCompare(nome(b)));
+  $('ptRes').innerHTML=!pl.length?`<tbody><tr><td class="l muted">Nada importado em ${nm(comp)}. Clique em “Importar espelho de ponto”.</td></tr></tbody>`
+    :`<thead><tr><th class="l">Colaborador</th><th>Faltas (dias)</th><th class="l">Atestados</th><th>Faltas e atrasos (horas)</th><th>Horas extras</th><th>Sábados trabalhados</th><th class="l">Alertas</th></tr></thead><tbody>${
+      ids.map(id=>{const g=por.get(id);return `<tr><td class="l"><b>${esc(nome(id))}</b></td><td>${g.fn?`<span class="neg">${g.fn}</span>${g.f.length?` <span class="muted">(${g.f.join(', ')})</span>`:''}`:''}</td><td class="l">${esc(g.at.join('; '))}</td><td>${g.hf?hhmm(g.hf):''}</td><td>${g.he?hhmm(g.he):''}</td><td>${g.sab||''}</td><td class="l">${esc(g.obs.join(' '))}</td></tr>`}).join('')}</tbody>`;
+}
+$('ptBar').addEventListener('click',async ev=>{
+  if(ev.target.id==='ptBen'){const c=addMes(FOL.comp,1).slice(0,7);if(!$('bnMes').options.length)$('bnMes').innerHTML=mesesOpts(addMes(TODAY,2).slice(0,7));
+    if(![...$('bnMes').options].some(o=>o.value===c))$('bnMes').insertAdjacentHTML('afterbegin',`<option value="${c}">${MESES[+c.slice(5)-1]} ${c.slice(0,4)}</option>`);$('bnMes').value=c;go('ben');return}
+  if(ev.target.id!=='ptApaga'||!confirm('Apagar tudo o que o espelho de ponto lançou neste mês?'))return;
+  const {error}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);
+  if(error)fail(error,'Não foi possível apagar');else{toast('Importação apagada');renderPonto()}});
 
 // Edição direta das células (escritório): o valor vale só para este mês e fica guardado como ajuste.
 // Os fixos do cadastro continuam iguais; para mudar de vez, use “Colaboradores e valores fixos”.
@@ -2663,7 +2734,7 @@ async function renderBen(){
     sb.from('beneficios_pedidos').select('*').eq('cliente_id',cli.id).eq('competencia',comp),
     sb.from('beneficios_meses').select('*').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
     sb.from('beneficios_pendencias').select('*').eq('cliente_id',cli.id).order('criado_em'),
-    sb.from('folha_lancamentos').select('funcionario_id,coluna,quantidade,data,texto').eq('cliente_id',cli.id).eq('competencia',ant).in('coluna',['faltas_dias','faltas_data','observacoes']),
+    sb.from('folha_lancamentos').select('funcionario_id,coluna,quantidade,data,texto,descricao,criado_em').eq('cliente_id',cli.id).eq('competencia',ant).in('coluna',['faltas_dias','faltas_data','observacoes']),
     sb.from('feriados').select('data,uf,municipio').gte('data',comp).lte('data',fim),
     sb.from('v_ferias_parcelas').select('nome,matricula,inicio,fim_real,status').eq('cliente_id',cli.id).lte('inicio',fim).gte('fim_real',comp)]);
   const er=[rf,rp,rm,rpe].find(x=>x.error)?.error;
@@ -2685,9 +2756,18 @@ async function renderBen(){
     :BEN.func.filter(f=>f.situacao!=='Desligado').flatMap(f=>{const fa=falta(f),o=[],vt=ff(f,'vt_tipo');
       if(vt==='vt'||vt==='comb'&&R.combustivel)o.push(benLinha(f,vt,fa));if(ff(f,'va_tipo'))o.push(benLinha(f,'va',fa));return o});
   const C=BEN.cal,st=BEN.mes?.status||'Rascunho',[y,m]=comp.split('-');
+  // ponto importado (ou falta lançada) depois de salvar o pedido: o rascunho pega as faltas novas sozinho; o pedido feito só avisa
+  const ultLanc=(rl.data||[]).reduce((x,l)=>l.criado_em>x?l.criado_em:x,''),salvoEm=(rp.data||[]).reduce((x,r)=>!x||r.criado_em<x?r.criado_em:x,''),
+    temPonto=(rl.data||[]).some(l=>l.descricao===PONTO);let mudou=0;
+  if(BEN.salvo&&ultLanc>salvoEm)BEN.rows.forEach(r=>{const f=BEN.func.find(x=>x.id===r.funcionario_id),fa=f&&falta(f);
+    if(!fa||+r.faltas===fa.n&&+(r.faltas_injust||0)===fa.inj)return;mudou++;
+    if(st!=='Pedido feito'){r.faltas=fa.n;r.faltas_injust=fa.inj;r.obs=fa.t||null;benCalc(r)}});
+  const irPonto=temAcesso('ponto')&&eqPode('ponto')?`<button class="btn small" data-bn="ponto">${temPonto?'Ver':'Importar'} o ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()} ›</button>`:'';
   $('bnBar').innerHTML=`<span class="chip ${st==='Pedido feito'?'c-done':BEN.salvo?'c-warn':'c-none'}">${st==='Pedido feito'?'Pedido feito'+(BEN.mes?.pedido_em?' em '+dBR(BEN.mes.pedido_em.slice(0,10)):''):BEN.salvo?'Salvo, falta fazer o pedido':'Ainda não salvo'}</span>
     <label class="f" style="margin:0" title="Segunda a sexta, menos feriados. Mude se a empresa tiver outro calendário.">Dias úteis de ${MESES[+m-1].toLowerCase()}<input id="bnUteis" type="number" min="0" max="31" value="${C.uteis}" style="max-width:70px"${lanca?'':' disabled'}></label>
     <span class="note">${C.ferDatas.length?'Feriados: '+C.ferDatas.map(d=>dBR(d).slice(0,5)).join(', ')+'. ':''}${C.sabs.length} sábados. Faltas e atestados do ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()}.</span>
+    ${temPonto?'':`<span class="chip c-warn">Ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()} ainda não importado</span>`}${irPonto}
+    ${mudou?st==='Pedido feito'?`<span class="chip c-bad">O ponto mudou depois do pedido: ${mudou} ${mudou===1?'linha':'linhas'} com outras faltas. Use “Voltar para rascunho” para atualizar.</span>`:`<span class="chip c-warn">Faltas atualizadas pelo ponto em ${mudou} ${mudou===1?'linha':'linhas'}: salve o pedido</span>`:''}
     <span class="spacer"></span>${R.desconta?`<span class="chip ${R.confirmado?'c-warn':'c-bad'}">Desconta na folha: 6% de VT e R$ 1,00 de VA${R.confirmado?'':' (regra padrão: conferir)'}</span>${!R.confirmado&&e?'<button class="btn small" data-bn="regra">Confirmar regra</button><button class="btn small ghost" data-bn="naodesc">Não desconta</button>':''}`:'<span class="chip c-ok">Não desconta VT e VA na folha</span>'}
     ${lanca&&BEN.salvo?st==='Pedido feito'?'<button class="btn small ghost" data-bn="reabrir">Voltar para rascunho</button>':'<button class="btn small" data-bn="feito">Marcar pedido como feito</button>':''}
     ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelo ponto (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
@@ -2752,7 +2832,9 @@ $('bnSalvar').onclick=async ev=>{
   }catch(ex){console.error(ex);toast(/sab_datas|dias_uteis|faltas_injust|assid/.test(ex.message||'')?'Falta rodar a atualização v35 do banco no Supabase.':'Não foi possível salvar. Verifique a internet e tente de novo.')}finally{b.disabled=false}
 };
 $('bnBar').addEventListener('click',async ev=>{
-  const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn;b.disabled=true;let error;
+  const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn;
+  if(a==='ponto'){PT_MES=addMes(BEN.comp,-1).slice(0,7);go('ponto');return}
+  b.disabled=true;let error;
   if(a==='feito'||a==='reabrir')({error}=await sb.from('beneficios_meses').upsert({cliente_id:BEN.cli.id,competencia:BEN.comp,status:a==='feito'?'Pedido feito':'Rascunho',pedido_em:a==='feito'?new Date().toISOString():null},{onConflict:'cliente_id,competencia'}));
   else if(a==='refazer'){if(!confirm('Montar o pedido de novo pelo cadastro e pelo ponto? O que foi mudado à mão neste mês se perde.')){b.disabled=false;return}
     ({error}=await sb.from('beneficios_pedidos').delete().eq('cliente_id',BEN.cli.id).eq('competencia',BEN.comp))}
