@@ -689,10 +689,15 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Tarefas e Avisos são de toda a equipe
 const SEMPRE=['tarefas','avisos'];
 const eqPode=k=>!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k);
-const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados'};
+const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
+// seções agrupadas no quadro Acessos
+const MODGRUPOS=[['Financeiro',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','premio','beneficios','colab']],['Comunicação',['tarefas']]];
+// os dados da folha e das férias também servem às seções que dependem deles (igual ao banco, v38)
+const MODEQ={folha:['folha','premio','beneficios','colab'],ferias:['ferias','colab']};
+const temEm=(cli,m)=>ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
-const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
-const podeLancar=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m&&a.nivel==='lancamento');
+const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo));
+const podeLancar=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo)&&a.nivel==='lancamento');
 const ICO={
   caixa:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h18M8 4h8v3H8z"/>',
   pagar:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
@@ -718,8 +723,8 @@ const NAV=[
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
   {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
-  {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',ok:()=>temAcesso('folha')},
-  {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('folha')||temAcesso('ferias')},
+  {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',ok:()=>temAcesso('beneficios')},
+  {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('colab')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',ok:()=>temAcesso('tarefas')},
@@ -746,14 +751,15 @@ function empresasDe(m){
   return so?l.filter(c=>so.includes(c.id)):l;
 }
 function empresasMod(m){
-  if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:podeVer(c.id,'folha')||podeVer(c.id,'ferias')));
+  if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:temEm(c.id,'colab')));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
-  if(m==='premio')return empresasDe('folha').filter(c=>c.folha_modelo?.premiacao?.length);
+  if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
   if(m==='tarefas')return CLIENTES.filter(c=>c.ativo!==false&&podeVer(c.id,'tarefas'));
   const mod=m==='rh'?'ferias':m==='premio'||m==='ben'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
-  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):podeVer(c.id,mod)));
+  // o cliente vê só as empresas em que tem a seção liberada (Benefícios é seção própria)
+  return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':mod)));
 }
 const escCli=$('escCli');
 function fillClientes(){
@@ -1536,7 +1542,7 @@ async function renderCadastro(){
   if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
-  $('acMod').innerHTML=Object.entries(MODNOME).map(([k,t])=>`<label><input type="checkbox" value="${k}"> ${t}</label>`).join('');
+  $('acMod').innerHTML=MODGRUPOS.map(([g,ks])=>`<div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center"><b style="font-size:13px;min-width:130px">${g}</b>${ks.map(k=>`<label><input type="checkbox" value="${k}"> ${MODNOME[k].replace(' (RH)','')}</label>`).join('')}</div>`).join('');
   renderAcessos();
 }
 async function renderAcessos(){
