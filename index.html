@@ -365,6 +365,25 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <p class="note" id="gxNote"></p>
   </section>
 
+  <!-- GESTÃO FINANCEIRA › CONCILIAÇÃO BANCÁRIA (escritório) -->
+  <section id="viewGC" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Conciliação bancária</h1><p class="sub">Importe o OFX do banco e ligue cada linha a um lançamento do sistema. O que o sistema reconhece chega como sugestão, só para aprovar.</p></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="gcAprovaTodas" hidden></button><span class="btn primary fotobtn" id="gcImp" hidden>Importar OFX<input type="file" id="gcArq" accept=".ofx,.OFX,application/x-ofx,text/plain" aria-label="Importar arquivo OFX"></span></div>
+    </div>
+    <div class="toolbar">
+      <label class="f">Conta<select id="gcConta"></select></label>
+      <label class="f">De<input type="date" id="gcIni"></label>
+      <label class="f">Até<input type="date" id="gcFim"></label>
+      <label class="f">Mostrar<select id="gcFiltro"><option value="pend">Pendentes</option><option value="sug">Com sugestão</option><option value="sem">Sem lançamento</option><option value="conc">Conciliadas</option><option value="ign">Ignoradas</option><option value="todas">Todas</option></select></label>
+      <input id="gcBusca" placeholder="Buscar no histórico ou valor" style="max-width:240px">
+    </div>
+    <div class="tiles" id="gcTiles"></div>
+    <div class="alerta" id="gcBulk" hidden><span id="gcBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small primary" data-gb="lanca">Lançar juntas</button><button type="button" class="btn small" data-gb="aprova">Aprovar sugestões</button><button type="button" class="btn small" data-gb="ignora">Ignorar</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
+    <div class="card tablebox"><table><thead id="gcHead"></thead><tbody id="gcBody"></tbody></table></div>
+    <p class="note" id="gcNote"></p>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › CADASTROS (escritório) -->
   <section id="viewGF" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -817,6 +836,7 @@ const ICO={
   gfpagar:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 13v4M10 15l2 2 2-2"/>',
   gfrec:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 17v-4M10 15l2-2 2 2"/>',
   gfext:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  gfconc:'<path d="M4 7h11l-3-3M20 17H9l3 3"/><path d="M17 7l3 0M4 17h1"/>',
   gfcad:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
@@ -829,6 +849,7 @@ const NAV=[
   {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',ok:ehEsc},
   {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',ok:ehEsc},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',ok:ehEsc},
+  {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',ok:ehEsc},
   {k:'gfcad',t:'Cadastros',g:'Gestão financeira',ok:ehEsc},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
@@ -889,7 +910,7 @@ function go(v){if(!eqPode(v))return;const antes=VIEW;VIEW=v;renderNav();fillClie
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -911,6 +932,7 @@ function openView(){
   else if(VIEW==='gfcad'){$('viewGF').hidden=false;renderGF()}
   else if(VIEW==='gfpagar'||VIEW==='gfrec'){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
+  else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
   avBanner();
 }
 function show(view){
@@ -4080,6 +4102,7 @@ dlgGT.addEventListener('click',async ev=>{const b=ev.target.closest('[data-act]'
   b.disabled=true;try{await gtAcao(a,b)}finally{b.disabled=false}});
 async function gtAcao(a,b){
   if(a.startsWith('av_'))return gxAcao(a,b);
+  if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=gtP(),cli=cliAtual(),t=GTR;
   if(a==='salvar'){
     const val=k=>($('gt_'+k)?.value||'').trim()||null,nome=val('pessoa'),valor=parseMoney($('gt_valor').value);
@@ -4166,7 +4189,7 @@ function gxDesenha(){
   const antes=isoLocal(new Date(dObj(GX.ini).getTime()-864e5));
   $('gxHead').innerHTML='<tr><th>Data</th><th class="l">Descrição</th><th class="l">Fornecedor ou cliente</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>';
   $('gxBody').innerHTML=`<tr><td>${dBR(antes)}</td><td class="l muted" colspan="5">Saldo anterior</td><td class="${GX.ant<0?'neg':''}"><b>${fm(GX.ant)}</b></td></tr>`
-    +L.map(x=>x.m?`<tr${x.m.titulo_id?'':` class="click" data-id="${x.m.id}" tabindex="0"`}><td>${dBR(x.m.data)}</td><td class="l">${esc(x.m.descricao||'')||mu('—')}${x.m.transf_id?` ${mu('· transferência')}`:x.m.titulo_id?'':` ${mu('· avulso')}`}${x.m.categoria?`<br>${mu(esc(x.m.categoria))}`:''}</td><td class="l">${esc(x.m.pessoa_nome||'')}</td><td class="l">${esc(x.m.documento||'')}</td><td class="pos">${x.m.tipo==='entrada'?fm(x.m.valor):''}</td><td class="neg">${x.m.tipo==='saida'?fm(x.m.valor):''}</td><td class="muted">${fm(x.saldo)}</td></tr>`
+    +L.map(x=>x.m?`<tr${x.m.titulo_id?'':` class="click" data-id="${x.m.id}" tabindex="0"`}><td>${dBR(x.m.data)}</td><td class="l">${esc(x.m.descricao||'')||mu('—')}${x.m.transf_id?` ${mu('· transferência')}`:x.m.titulo_id?'':` ${mu('· avulso')}`}${x.m.ofx_id?` <span class="pos" title="Conciliado com o extrato do banco">✓</span>`:''}${x.m.categoria?`<br>${mu(esc(x.m.categoria))}`:''}</td><td class="l">${esc(x.m.pessoa_nome||'')}</td><td class="l">${esc(x.m.documento||'')}</td><td class="pos">${x.m.tipo==='entrada'?fm(x.m.valor):''}</td><td class="neg">${x.m.tipo==='saida'?fm(x.m.valor):''}</td><td class="muted">${fm(x.saldo)}</td></tr>`
       :`<tr style="background:var(--sunk)"><td><b>${dBR(x.dia)}</b></td><td class="l" colspan="3"><b>Total do dia</b></td><td><b>${x.ent?fm(x.ent):''}</b></td><td><b>${x.sai?fm(x.sai):''}</b></td><td class="${x.saldo<0?'neg':''}"><b>${fm(x.saldo)}</b></td></tr>`).join('')
     +(GX.per.length?'':`<tr><td class="l muted" colspan="7">Nenhuma entrada ou saída no período.</td></tr>`);
   $('gxTiles').innerHTML=[['Saldo anterior',fm(GX.ant),'em '+dBR(antes)],['Entradas',fm(E),GX.per.filter(m=>m.tipo==='entrada').length+' lançamentos'],['Saídas',fm(S),GX.per.filter(m=>m.tipo==='saida').length+' lançamentos'],['Saldo final',fm(F),'em '+dBR(GX.fim)]]
@@ -4232,6 +4255,225 @@ async function gxAcao(a){
   }else ({error}=await sb.from('fin_movimentos').insert({...base,cliente_id:cli.id,conta_id:c.id,tipo}));
   if(error){console.error(error);return gtErr(v45(error)?v45Msg:error.message||'Não foi possível salvar.')}
   toast('Lançamento salvo');dlgGT.close();renderGX();
+}
+// ---------- Gestão financeira › Conciliação bancária pelo OFX (v47) ----------
+// Cada linha do extrato do banco (fin_ofx) é ligada a um lançamento do sistema (fin_movimentos.ofx_id).
+// Sugestões, nesta ordem: lançamento já feito com o mesmo valor (até 3 dias), conta a pagar/receber em aberto
+// com o mesmo valor (até 10 dias do vencimento) e as regras aprendidas pelo texto do banco (fin_conc_regras).
+const GC={conta:null,linhas:[],movs:[],tits:[],pago:{},regras:[],sug:{},conc:{},sel:new Set(),aviso:''};
+let GCDLG=null;
+const v47=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||e.code==='PGRST204'||/fin_ofx|fin_conc_regras|ofx_id|ofx_conta|ofx_banco/.test(e.message||''));
+const v47Msg='Esta tela precisa da atualização v47 do banco. Rode o SQL no Supabase.';
+// histórico sem acentos e sem números: "PAGAMENTO PIX-PIX_DEB 619... ESPAÇO" -> "PAGAMENTO PIX-PIX_DEB # ESPACO"
+const padraoDe=t=>chave(t).toUpperCase().replace(/\d+/g,'#').replace(/[^\w#/:*\- ]+/g,' ').replace(/\s+/g,' ').trim();
+const histDe=l=>[l.memo,l.nome&&!(l.memo||'').toLowerCase().includes(l.nome.toLowerCase())?l.nome:''].filter(Boolean).join(' · ');
+const difDias=(a,b)=>Math.round((dObj(a)-dObj(b))/864e5);
+function lerOFX(txt){
+  const tag=(b,t)=>{const m=b.match(new RegExp('<'+t+'>([^<\\r\\n]*)','i'));return m?m[1].trim():''};
+  const num=s=>{s=s.replace(/\s/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Number(s)};
+  const dt=s=>/^\d{8}/.test(s)?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:null;
+  const linhas=txt.split(/<STMTTRN>/i).slice(1).map(b=>b.split(/<\/STMTTRN>/i)[0])
+    .map(b=>({fitid:tag(b,'FITID'),data:dt(tag(b,'DTPOSTED')),valor:r2(num(tag(b,'TRNAMT'))),memo:tag(b,'MEMO'),nome:tag(b,'NAME')}))
+    .filter(l=>l.data&&l.valor&&!Number.isNaN(l.valor));
+  const lb=txt.split(/<LEDGERBAL>/i)[1]||'';
+  return {banco:tag(txt,'BANKID'),conta:tag(txt,'ACCTID'),ini:dt(tag(txt,'DTSTART')),fim:dt(tag(txt,'DTEND')),
+    saldo:lb?num(tag(lb,'BALAMT')):null,saldoEm:lb?dt(tag(lb,'DTASOF')):null,linhas};
+}
+function gcVazio(t,cl){$('gcHead').innerHTML='';$('gcTiles').innerHTML='';$('gcBulk').hidden=true;$('gcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gcNote').textContent=''}
+async function renderGC(recarrega=true){
+  const cli=cliAtual();$('gcImp').hidden=true;
+  if(!cli)return gcVazio('Escolha uma empresa.');
+  if(!$('gcIni').value){$('gcIni').value=TODAY.slice(0,8)+'01';$('gcFim').value=fimMes(TODAY)}
+  let contas;try{contas=await gfContasDe(cli.id,true)}catch(e){console.error(e);return gcVazio('Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  const sel=$('gcConta'),cur=sel.value,vis=contas.filter(c=>c.ativo!==false);
+  sel.innerHTML=vis.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma conta</option>';
+  if(vis.some(c=>c.id===cur))sel.value=cur;
+  const c=vis.find(x=>x.id===sel.value);GC.conta=c||null;
+  if(!c)return gcVazio('Nenhuma conta bancária cadastrada nesta empresa. Cadastre em Gestão financeira › Cadastros.');
+  $('gcImp').hidden=false;
+  const ini=$('gcIni').value,fim=$('gcFim').value;if(!ini||!fim||fim<ini)return gcVazio('Escolha o período.');
+  if(recarrega){
+    gcVazio('Carregando…');
+    const de=isoLocal(new Date(dObj(ini).getTime()-60*864e5)),ate=isoLocal(new Date(dObj(fim).getTime()+60*864e5));
+    try{
+      const [l,m,t,mt,rg]=await Promise.all([
+        todas(()=>sb.from('fin_ofx').select('*').eq('conta_id',c.id).gte('data',ini).lte('data',fim).order('data').order('valor')),
+        todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',de).lte('data',ate).order('data')),
+        todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),
+        todas(()=>sb.from('fin_movimentos').select('titulo_id,valor,juros,desconto').eq('cliente_id',cli.id).not('titulo_id','is',null)),
+        todas(()=>sb.from('fin_conc_regras').select('*').eq('cliente_id',cli.id))]);
+      GC.linhas=l;GC.movs=m;GC.regras=rg;GC.pago={};mt.forEach(x=>GC.pago[x.titulo_id]=r2((GC.pago[x.titulo_id]||0)+abat(x)));
+      GC.tits=t.filter(x=>r2(x.valor-(GC.pago[x.id]||0))>0.004);GC.sel.clear();
+    }catch(e){console.error(e);return gcVazio(v47(e)?v47Msg:v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  }
+  gcSugestoes();gcDesenha();
+}
+// uma passada só, para duas linhas não ficarem com o mesmo lançamento ou a mesma conta
+function gcSugestoes(){
+  GC.conc={};GC.movs.forEach(m=>{if(m.ofx_id)GC.conc[m.ofx_id]=m});GC.sug={};
+  const usadosM=new Set(),usadosT=new Set();
+  for(const l of GC.linhas){if(GC.conc[l.id]||l.ignorado)continue;
+    const tipo=l.valor>0?'entrada':'saida',v=Math.abs(l.valor),perto=(a,b)=>Math.abs(difDias(a,l.data))-Math.abs(difDias(b,l.data));
+    const m=GC.movs.filter(x=>!x.ofx_id&&!usadosM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
+    if(m){usadosM.add(m.id);GC.sug[l.id]={k:'mov',mov:m,txt:`Já lançado: ${m.descricao||m.pessoa_nome||'lançamento'} (${dBR(m.data)})`};continue}
+    const t=GC.tits.filter(x=>!usadosT.has(x.id)&&x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(r2(x.valor-(GC.pago[x.id]||0))-v)<0.005&&Math.abs(difDias(x.vencimento,l.data))<=10).sort((a,b)=>perto(a.vencimento,b.vencimento))[0];
+    if(t){usadosT.add(t.id);GC.sug[l.id]={k:'tit',tit:t,txt:`${t.tipo==='pagar'?'Pagar':'Receber'}: ${t.pessoa_nome||''}${t.descricao?' · '+t.descricao:''} (venc. ${dBR(t.vencimento)})`};continue}
+    const r=GC.regras.filter(x=>x.tipo===tipo&&l.padrao&&l.padrao.includes(x.padrao)).sort((a,b)=>b.padrao.length-a.padrao.length)[0];
+    if(r)GC.sug[l.id]={k:'regra',regra:r,txt:r.conta_destino?`Transferência ${tipo==='saida'?'para':'de'} ${contaNome(r.conta_destino)||'outra conta'}`:[r.descricao,r.categoria].filter(Boolean).join(' · ')||'Lançamento da regra'};
+  }
+}
+const gcSit=l=>GC.conc[l.id]?'conc':l.ignorado?'ign':GC.sug[l.id]?'sug':'sem';
+function gcFiltradas(){
+  const f=$('gcFiltro').value,q=chave($('gcBusca').value);
+  return GC.linhas.filter(l=>{const s=gcSit(l);
+    if(f==='pend'&&(s==='conc'||s==='ign')||f!=='pend'&&f!=='todas'&&s!==f)return false;
+    return !q||chave(histDe(l)).includes(q)||String(Math.abs(l.valor)).includes(q.replace(',','.'))});
+}
+function gcDesenha(){
+  const rows=gcFiltradas(),MAX=300,mu=t=>`<span class="muted">${t}</span>`;
+  const ok=a=>`<button type="button" class="btn small" data-gc="${a}">`;
+  $('gcHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="gcTodas" style="width:auto" title="Selecionar todas as linhas do filtro"${rows.length&&rows.every(l=>GC.sel.has(l.id))?' checked':''}></th><th>Data</th><th class="l">Histórico do banco</th><th>Valor</th><th class="l">Lançamento no sistema</th><th></th></tr>`;
+  $('gcBody').innerHTML=rows.slice(0,MAX).map(l=>{const s=gcSit(l),m=GC.conc[l.id],g=GC.sug[l.id];
+    const cel=s==='conc'?`<span class="chip c-ok">✓ Conciliada</span> ${esc(m.descricao||m.pessoa_nome||'')}${m.categoria?' '+mu('· '+esc(m.categoria)):''}`
+      :s==='ign'?'<span class="chip c-none">Ignorada</span>'
+      :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
+    const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
+      :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> ${ok('ignora')}Ignorar</button>`;
+    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
+    ||`<tr><td></td><td class="l muted" colspan="5">${GC.linhas.length?'Nada neste filtro.':'Nenhuma linha do banco neste período. Use “Importar OFX”.'}</td></tr>`;
+  const n=s=>GC.linhas.filter(l=>gcSit(l)===s).length,E=r2(GC.linhas.filter(l=>l.valor>0).reduce((x,l)=>x+(+l.valor),0)),S=r2(GC.linhas.filter(l=>l.valor<0).reduce((x,l)=>x-l.valor,0));
+  const ini=$('gcIni').value,fim=$('gcFim').value,sis=r2(GC.movs.filter(m=>m.data>=ini&&m.data<=fim).reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)),dif=r2(E-S-sis);
+  $('gcTiles').innerHTML=[['Linhas do banco',String(GC.linhas.length),`entradas ${fm(E)} · saídas ${fm(S)}`],['Conciliadas',String(n('conc')),n('ign')?n('ign')+' ignoradas':'ligadas a um lançamento'],
+    ['Com sugestão',String(n('sug')),'é só aprovar'],['Sem lançamento',String(n('sem')),'lance ou ignore'],['Banco × sistema',fm(dif),n('sug')+n('sem')?`ainda faltam ${n('sug')+n('sem')} linhas`:Math.abs(dif)<0.005?'o período bate':'diferença no período']]
+    .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===4&&Math.abs(dif)>=0.005&&!(n('sug')+n('sem'))||i===3&&n('sem')?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('gcAprovaTodas').hidden=!n('sug');$('gcAprovaTodas').textContent=`Aprovar todas as sugestões (${n('sug')})`;
+  const ns=GC.sel.size;$('gcBulk').hidden=!ns;$('gcBulkTxt').textContent=`${ns} ${ns===1?'linha selecionada':'linhas selecionadas'}`;
+  $('gcNote').innerHTML=(GC.aviso?`<b>${esc(GC.aviso)}</b><br>`:'')+(rows.length>MAX?`Mostrando ${MAX} de ${rows.length}. Use a busca ou selecione todas pela caixa do cabeçalho. `:'')
+    +'Ao lançar uma linha, marque “Lembrar”: as próximas linhas com o mesmo texto do banco já chegam com o lançamento sugerido. A diferença “banco × sistema” compara o extrato do banco com o Extrato da conta no mesmo período.';
+}
+['gcConta','gcIni','gcFim'].forEach(id=>$(id).onchange=()=>{GC.aviso='';renderGC()});
+$('gcFiltro').onchange=()=>gcDesenha();$('gcBusca').oninput=()=>{clearTimeout(gcDesenha.t);gcDesenha.t=setTimeout(gcDesenha,200)};
+$('gcHead').addEventListener('change',e=>{if(e.target.id!=='gcTodas')return;const rows=gcFiltradas().filter(l=>gcSit(l)!=='conc');rows.forEach(l=>e.target.checked?GC.sel.add(l.id):GC.sel.delete(l.id));gcDesenha()});
+$('gcBody').addEventListener('change',e=>{if(!e.target.classList.contains('gcck'))return;const id=e.target.closest('tr').dataset.id;e.target.checked?GC.sel.add(id):GC.sel.delete(id);gcDesenha()});
+$('gcBody').addEventListener('click',async e=>{const b=e.target.closest('[data-gc]');if(!b)return;const l=GC.linhas.find(x=>x.id===b.closest('tr').dataset.id),a=b.dataset.gc;
+  if(a==='lanca')return abrirGC([l]);
+  b.disabled=true;
+  try{
+    if(a==='aprova')await gcAprovar([l]);
+    else if(a==='ignora'||a==='volta'){const {error}=await sb.from('fin_ofx').update({ignorado:a==='ignora'}).eq('id',l.id);if(error)throw error;l.ignorado=a==='ignora'}
+    else if(a==='desfaz')await gcDesfazer(l);
+  }catch(err){fail(err,'Não foi possível salvar')}
+  b.disabled=false;gcSugestoes();gcDesenha();
+});
+$('gcAprovaTodas').onclick=async()=>{const ls=GC.linhas.filter(l=>gcSit(l)==='sug');if(!confirm(`Aprovar as ${ls.length} sugestões? Confira antes as que não tiver certeza (filtro “Com sugestão”).`))return;
+  $('gcAprovaTodas').disabled=true;try{await gcAprovar(ls)}catch(err){fail(err,'Não foi possível aprovar')}$('gcAprovaTodas').disabled=false;renderGC()};
+$('gcBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-gb]');if(!b)return;const ls=GC.linhas.filter(l=>GC.sel.has(l.id)&&gcSit(l)!=='conc');if(!ls.length)return;
+  if(b.dataset.gb==='lanca')return abrirGC(ls.filter(l=>gcSit(l)!=='ign'));
+  if(b.dataset.gb==='limpa'){GC.sel.clear();return gcDesenha()}
+  b.disabled=true;
+  try{if(b.dataset.gb==='aprova')await gcAprovar(ls.filter(l=>gcSit(l)==='sug'));
+    else{const ig=b.dataset.gb==='ignora';for(let i=0;i<ls.length;i+=200){const {error}=await sb.from('fin_ofx').update({ignorado:ig}).in('id',ls.slice(i,i+200).map(l=>l.id));if(error)throw error}}
+  }catch(err){fail(err,'Não foi possível salvar')}
+  b.disabled=false;renderGC()});
+// movimento criado a partir de uma linha do banco
+function gcMov(l,f){const c=GC.conta;return {cliente_id:c.cliente_id,conta_id:c.id,data:l.data,tipo:l.valor>0?'entrada':'saida',valor:Math.abs(l.valor),ofx_id:l.id,conciliado:true,...f}}
+async function gcInserir(rows){for(let i=0;i<rows.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(rows.slice(i,i+500));if(error)throw error}}
+async function gcAprovar(ls){
+  const novos=[],usos={};let n=0;
+  for(const l of ls){const g=GC.sug[l.id];if(!g)continue;
+    if(g.k==='mov'){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',g.mov.id);if(error)throw error;n++}
+    else if(g.k==='tit'){const t=g.tit;novos.push(gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria}));
+      if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}
+    else{const r=g.regra;usos[r.id]=(usos[r.id]||0)+1;
+      if(r.conta_destino){const tid=crypto.randomUUID(),base={descricao:r.descricao||'Transferência entre contas',transf_id:tid};
+        novos.push(gcMov(l,base),{...gcMov(l,base),conta_id:r.conta_destino,tipo:l.valor>0?'saida':'entrada',ofx_id:null,conciliado:false})}
+      else novos.push(gcMov(l,{descricao:r.descricao||histDe(l),categoria:r.categoria,pessoa_nome:r.pessoa_nome,documento:l.documento}))}
+  }
+  await gcInserir(novos);
+  for(const [id,k] of Object.entries(usos)){const r=GC.regras.find(x=>x.id===id);await sb.from('fin_conc_regras').update({usos:(r.usos||0)+k,atualizado_em:new Date().toISOString()}).eq('id',id)}
+  toast(`${ls.length} ${ls.length===1?'linha conciliada':'linhas conciliadas'}`);
+  if(ls.length===1){const {data}=await sb.from('fin_movimentos').select('*').or(`ofx_id.eq.${ls[0].id},id.eq.${GC.sug[ls[0].id]?.mov?.id||ls[0].id}`);(data||[]).forEach(m=>{const i=GC.movs.findIndex(x=>x.id===m.id);i>=0?GC.movs[i]=m:GC.movs.push(m)})}
+}
+async function gcDesfazer(l){
+  const m=GC.conc[l.id];if(!m)return;
+  const apaga=!m.titulo_id?confirm('Apagar também o lançamento ligado a esta linha?\n\nOK = apagar o lançamento\nCancelar = só desfazer a ligação (o lançamento continua no extrato da conta)'):confirm('Desfazer a baixa da conta a '+(m.tipo==='saida'?'pagar':'receber')+' feita por esta linha? A conta volta a ficar em aberto.');
+  if(apaga){const {error}=m.transf_id?await sb.from('fin_movimentos').delete().eq('transf_id',m.transf_id):await sb.from('fin_movimentos').delete().eq('id',m.id);if(error)throw error;
+    GC.movs=GC.movs.filter(x=>x.id!==m.id&&!(m.transf_id&&x.transf_id===m.transf_id));
+    if(m.titulo_id){GC.pago[m.titulo_id]=r2((GC.pago[m.titulo_id]||0)-abat(m));const t=GC.tits.find(x=>x.id===m.titulo_id);
+      if(!t){const {data}=await sb.from('fin_titulos').select('*').eq('id',m.titulo_id).maybeSingle();if(data){GC.tits.push(data);if(data.origem_id)await sb.from('contas_pagar').update({conferido:false,pago_em:null}).eq('id',data.origem_id)}}}}
+  else if(!m.titulo_id){const {error}=await sb.from('fin_movimentos').update({ofx_id:null,conciliado:false}).eq('id',m.id);if(error)throw error;m.ofx_id=null}
+  else return;
+}
+// importar o arquivo OFX
+$('gcArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!GC.conta)return;
+  const buf=await f.arrayBuffer();let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch{txt=new TextDecoder('windows-1252').decode(buf)}
+  const o=lerOFX(txt);if(!o.linhas.length)return toast('Não achei lançamentos neste arquivo. Confira se é um OFX.');
+  const cli=cliAtual();let c=GFC.lista.find(x=>x.ofx_conta&&x.ofx_conta===o.conta);
+  if(!c){c=GC.conta;
+    if(c.ofx_conta&&!confirm(`Este arquivo é da conta ${o.conta} (banco ${o.banco}), mas ${c.nome} recebe o OFX da conta ${c.ofx_conta}. Importar mesmo assim em ${c.nome}?`))return;
+    if(!c.ofx_conta){if(!confirm(`Importar o extrato da conta ${o.conta} (banco ${o.banco}) em “${c.nome}”? Daqui em diante, os arquivos desta conta vão direto para ela.`))return;
+      const {error}=await sb.from('fin_contas').update({ofx_banco:o.banco||null,ofx_conta:o.conta||null}).eq('id',c.id);if(error){console.error(error);return toast(v47(error)?v47Msg:'Não foi possível salvar.')}c.ofx_conta=o.conta}
+  }
+  const cont={},rows=o.linhas.map(l=>{const h=histDe(l),base=[l.data,l.valor.toFixed(2),chave(h)].join('|');cont[base]=(cont[base]||0)+1;
+    return {cliente_id:cli.id,conta_id:c.id,chave:base+'|'+cont[base],fitid:l.fitid||null,data:l.data,valor:l.valor,memo:l.memo||null,nome:l.nome||null,
+      documento:(h.match(/(?<!\d)(\d{14}|\d{11})(?!\d)/)||[])[1]||null,padrao:padraoDe(h)}});
+  toast('Importando…');let novas=0;
+  try{for(let i=0;i<rows.length;i+=500){const {data,error}=await sb.from('fin_ofx').upsert(rows.slice(i,i+500),{onConflict:'conta_id,chave',ignoreDuplicates:true}).select('id');if(error)throw error;novas+=(data||[]).length}}
+  catch(err){console.error(err);return toast(v47(err)?v47Msg:'Não foi possível importar. Verifique a internet e tente de novo.')}
+  const ds=o.linhas.map(l=>l.data).sort();
+  GC.aviso=`${f.name}: ${novas} ${novas===1?'linha nova':'linhas novas'} de ${rows.length}${rows.length>novas?' (as outras já tinham sido importadas)':''}.`+(o.saldo!=null&&o.saldo!==0?` Saldo informado pelo banco${o.saldoEm?' em '+dBR(o.saldoEm):''}: ${fm(o.saldo)}.`:'');
+  $('gcConta').value=c.id;$('gcIni').value=o.ini&&o.ini<=ds[0]?o.ini:ds[0];$('gcFim').value=o.fim&&o.fim>=ds[ds.length-1]?o.fim:ds[ds.length-1];$('gcFiltro').value='pend';
+  renderGC();
+};
+// lançar uma ou várias linhas: lançamento novo, transferência entre contas ou baixa de uma conta em aberto
+async function abrirGC(ls){
+  if(!ls.length)return;const tipo=ls[0].valor>0?'entrada':'saida';
+  if(ls.some(l=>(l.valor>0?'entrada':'saida')!==tipo))return toast('Selecione só entradas ou só saídas para lançar juntas.');
+  GCDLG=ls;const cli=cliAtual(),c=GC.conta,um=ls.length===1,l=ls[0],tot=r2(ls.reduce((x,y)=>x+Math.abs(y.valor),0));
+  let pes=[];try{pes=await gfPessoasDe(cli.id,tipo==='saida'?'fornecedor':'cliente');if(!PCAT.ok)await loadCats()}catch(e){console.error(e)}
+  const cats=PCAT.plano.map(x=>x.categoria),outras=GFC.lista.filter(x=>x.id!==c.id&&x.ativo!==false);
+  const tits=um?GC.tits.filter(t=>t.tipo===(tipo==='saida'?'pagar':'receber')).sort((a,b)=>Math.abs(r2(a.valor-(GC.pago[a.id]||0))-tot)-Math.abs(r2(b.valor-(GC.pago[b.id]||0))-tot)||Math.abs(difDias(a.vencimento,l.data))-Math.abs(difDias(b.vencimento,l.data))).slice(0,30):[];
+  const comum=ls.every(x=>x.padrao===l.padrao)?l.padrao:'';
+  const doc=l.documento&&pes.find(p=>soDig(p.documento)===l.documento);
+  $('gtdTitle').textContent=um?`${tipo==='entrada'?'Entrada':'Saída'} de ${fm(Math.abs(l.valor))} em ${dBR(l.data)}`:`${ls.length} ${tipo==='entrada'?'entradas':'saídas'} (${fm(tot)})`;$('gtdChip').innerHTML='';
+  $('gtdBody').innerHTML=`<p class="note" style="margin:0">${um?'Banco: '+esc(histDe(l)):'Mesmo lançamento para as '+ls.length+' linhas selecionadas.'}</p>
+    <datalist id="gcPesList">${pes.map(p=>`<option value="${esc(p.nome)}"></option>`).join('')}</datalist>
+    <div class="fields">
+      <label class="f wide">O que é<select id="gc_modo"><option value="novo">Lançamento novo (${tipo==='entrada'?'receita':'despesa'}, tarifa, etc.)</option>${outras.length?`<option value="transf">Transferência ${tipo==='saida'?'para':'de'} outra conta da empresa</option>`:''}${tits.length?`<option value="tit">Baixa de uma conta a ${tipo==='saida'?'pagar':'receber'} em aberto</option>`:''}</select></label>
+      <label class="f wide" id="gc_titBox" hidden>Conta em aberto<select id="gc_tit">${tits.map(t=>`<option value="${t.id}">${esc(t.pessoa_nome||'')} · ${esc(t.descricao||'')} · venc. ${dBR(t.vencimento)} · falta ${fm(r2(t.valor-(GC.pago[t.id]||0)))}</option>`).join('')}</select></label>
+      <label class="f" id="gc_destBox" hidden>Outra conta<select id="gc_dest">${outras.map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></label>
+      <label class="f wide" id="gc_descBox">Descrição *<input id="gc_desc" value="${esc(um?(l.nome||l.memo||''):'')}"></label>
+      <label class="f" data-novo>Categoria<select id="gc_cat"><option value=""></option>${cats.map(x=>`<option${sugerirCat(l.nome||'',l.memo)===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="f" data-novo>${tipo==='saida'?'Fornecedor':'Cliente'}<input id="gc_pes" list="gcPesList" value="${esc(doc?.nome||'')}"></label>
+      <label class="wide" id="gc_lembraBox" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="gc_lembra" style="width:auto"${comum?' checked':''}> Lembrar: as próximas linhas do banco com o texto</label>
+      <label class="f wide" id="gc_padBox">Texto que identifica (pode encurtar)<input id="gc_pad" value="${esc(comum)}"></label>
+    </div><p class="err" id="gtErr" hidden></p>`;
+  const modo=()=>{const v=$('gc_modo').value;$('gc_titBox').hidden=v!=='tit';$('gc_destBox').hidden=v!=='transf';$('gtdBody').querySelectorAll('[data-novo]').forEach(x=>x.hidden=v!=='novo');
+    $('gc_lembraBox').hidden=$('gc_padBox').hidden=$('gc_descBox').hidden=v==='tit';if(v==='transf'&&!$('gc_desc').value)$('gc_desc').value='Transferência entre contas'};
+  $('gc_modo').onchange=modo;modo();
+  $('gtdFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="gc_salvar">Salvar e conciliar</button>`;
+  dlgGT.showModal();
+}
+async function gcSalvar(){
+  const ls=GCDLG,l=ls[0],tipo=l.valor>0?'entrada':'saida',modo=$('gc_modo').value,cli=cliAtual();
+  if(modo==='tit'){const t=GC.tits.find(x=>x.id===$('gc_tit').value),v=Math.abs(l.valor),falta=r2(t.valor-(GC.pago[t.id]||0));
+    // diferença: a mais = juros/multa; a menos = desconto (a conta fica paga) ou pagamento parcial
+    let juros=0,desconto=0;if(v>falta)juros=r2(v-falta);else if(v<falta&&confirm(`O banco mostra ${fm(v)} e falta ${fm(falta)} desta conta. Foi desconto? (OK = desconto, a conta fica quitada; Cancelar = pagamento parcial)`))desconto=r2(falta-v);
+    await gcInserir([gcMov(l,{titulo_id:t.id,juros,desconto,descricao:t.descricao||(tipo==='saida'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})]);
+    if(t.origem_id&&v-juros+desconto>=falta-0.004){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}
+  }else{
+    const desc=$('gc_desc').value.trim(),cat=$('gc_cat').value||null,pes=$('gc_pes').value.trim()||null,dest=modo==='transf'?$('gc_dest').value:null;
+    if(!desc)return gtErr('Informe a descrição.');
+    const lembra=$('gc_lembra').checked,pad=padraoDe($('gc_pad').value);
+    if(lembra&&pad.length<4)return gtErr('Informe o texto que identifica estas linhas no extrato do banco.');
+    if(lembra&&ls.some(x=>!(x.padrao||'').includes(pad)))return gtErr('O texto que identifica precisa aparecer em todas as linhas selecionadas.');
+    const novos=[];
+    for(const x of ls){if(dest){const tid=crypto.randomUUID(),b={descricao:desc,transf_id:tid};novos.push(gcMov(x,b),{...gcMov(x,b),conta_id:dest,tipo:tipo==='saida'?'entrada':'saida',ofx_id:null,conciliado:false})}
+      else novos.push(gcMov(x,{descricao:desc,categoria:cat,pessoa_nome:pes,documento:x.documento}))}
+    await gcInserir(novos);
+    if(lembra){const {error}=await sb.from('fin_conc_regras').upsert({cliente_id:cli.id,padrao:pad,tipo,descricao:desc,categoria:dest?null:cat,pessoa_nome:dest?null:pes,conta_destino:dest,usos:ls.length,atualizado_em:new Date().toISOString()},{onConflict:'cliente_id,padrao,tipo'});if(error)console.error(error)}
+  }
+  toast(ls.length>1?ls.length+' linhas conciliadas':'Linha conciliada');dlgGT.close();GC.sel.clear();renderGC();
 }
 async function renderRep(){
   const e=ehEsc(),ids=pIds(),todas=escCli.value==='*';
