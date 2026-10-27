@@ -448,6 +448,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <form class="card row" id="pcForm" hidden style="padding:16px 18px;margin-top:16px;align-items:flex-end">
       <label class="f">Código<input id="pcCod" placeholder="Ex.: 2.1.05" style="max-width:130px"></label>
       <label class="f" style="flex:1 1 220px">Categoria<input id="pcCat" placeholder="Nome da categoria"></label>
+      <label class="f">Grupo na DRE<input id="pcGrupo" list="pcGrupos" placeholder="Ex.: DESPESAS FIXAS"></label>
       <label class="f">Tipo<select id="pcTipo"><option>Despesa</option><option>Receita</option></select></label>
       <button class="btn primary" type="submit">Adicionar categoria</button>
     </form>
@@ -4212,11 +4213,18 @@ $('gtImp').onclick=async()=>{
     const acha=r=>pes.find(p=>r.fornecedor_bc&&p.fornecedor_bc===r.fornecedor_bc)||pes.find(p=>chave(p.nome)===chave(r.fornecedor)||chave(p.fantasia)===chave(r.fornecedor));
     const rows=ls.map(r=>{const p=acha(r);return {cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||r.fornecedor,descricao:r.sobre||null,documento:r.documento||null,
       categoria:r.categoria_ok?r.categoria:null,vencimento:r.vencimento,valor:r.valor,forma:'Boleto',linha_digitavel:r.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:r.id,obs:r.obs||null}});
-    const {error}=await sb.from('fin_titulos').insert(rows);if(error)throw error;
-    toast(`${rows.length} ${rows.length===1?'conta trazida':'contas trazidas'} para o contas a pagar`);
+    // o boleto que chega no lugar de uma conta prevista (mesmo fornecedor, vencimento até 20 dias de diferença) atualiza a prevista
+    const prev=GT.lista.filter(t=>t.previsto&&t.tipo==='pagar'&&!(GT.movs[t.id]||[]).length),novos=[];let subst=0;
+    for(const r of rows){const i=prev.findIndex(t=>(r.pessoa_id&&t.pessoa_id===r.pessoa_id||chave(t.pessoa_nome)===chave(r.pessoa_nome))&&Math.abs(dObj(t.vencimento)-dObj(r.vencimento))<=20*864e5);
+      if(i<0){novos.push(r);continue}
+      const t=prev.splice(i,1)[0],{error}=await sb.from('fin_titulos').update({...r,categoria:r.categoria||t.categoria,conta_id:t.conta_id,descricao:r.descricao||t.descricao,previsto:false,obs:r.obs}).eq('id',t.id);if(error)throw error;subst++}
+    if(novos.length){const {error}=await sb.from('fin_titulos').insert(novos);if(error)throw error}
+    toast(`${rows.length} ${rows.length===1?'conta trazida':'contas trazidas'} para o contas a pagar`+(subst?` (${subst} no lugar de ${subst===1?'conta prevista':'contas previstas'})`:''));
   }catch(e){fail(e,'Não foi possível trazer os boletos')}
   $('gtImp').disabled=false;GT.key='';renderGT();
 };
+// conta prevista pelo histórico: avisa até chegar o boleto ou a nota
+const prevTxt=t=>t.forma==='Boleto'?'Falta o boleto':t.categoria==='Salário'?'Previsto: confirmar valor':'Falta o boleto ou a nota';
 const gtFalta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
 function gtDesenha(){
   $('gtCal').hidden=GT.modo!=='gfagenda';
@@ -4237,13 +4245,14 @@ function gtDesenha(){
   else{const noMes=r2(Object.values(GT.movs).flat().filter(m=>m.data.startsWith(mes)).reduce((x,m)=>x+(+m.valor),0));
     tiles=[['Em aberto',soma(ab),qt(ab)],['Vencidas',soma(venc),qt(venc),venc.length?'neg':''],['Próximos 7 dias',soma(prox),qt(prox)+' a vencer'],[P?'Pago no mês':'Recebido no mês',fm(noMes),MESES[+mes.slice(5)-1]]]}
   $('gtTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  $('gtNote').textContent='Clique numa conta para ver, corrigir ou registrar o '+(MV?'pagamento ou o recebimento.':P?'pagamento.':'recebimento.');
+  const sd=GT.lista.filter(t=>t.previsto&&gtSit(t)[2]!=='baixada'&&t.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+10*864e5)));
+  $('gtNote').textContent=(sd.length?`Atenção: ${sd.length} ${sd.length===1?'conta prevista vence':'contas previstas vencem'} nos próximos 10 dias e ainda não ${sd.length===1?'tem':'têm'} o boleto ou a nota. `:'')+'Clique numa conta para ver, corrigir ou registrar o '+(MV?'pagamento ou o recebimento.':P?'pagamento.':'recebimento.');
 }
 // tabela comum às telas (contas a pagar, a receber, movimentação e o dia escolhido na agenda)
 function gtTabela(rows,vazio){
   const MV=GT.tipo==='mov',P=gtP(),mu=t=>`<span class="muted">${t}</span>`;
   $('gtHead').innerHTML=`<tr><th>Vencimento</th>${MV?'<th class="l">Tipo</th>':''}<th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Descrição</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="${MV?10:9}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td></td></tr>`
@@ -4323,6 +4332,7 @@ async function abrirGT(t,tipo){
     <label class="f wide">Observação<textarea id="gt_obs" rows="2">${v('obs')}</textarea></label>
   </div>`;
   if(t?.parcelas>1)h+=`<p class="note" style="margin:0">Parcela ${t.parcela} de ${t.parcelas}. A correção vale só para esta parcela.</p>`;
+  if(t?.previsto)h+=`<label class="alerta" style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="gt_prevok" style="width:auto"> <span><b>Conta prevista pelo histórico.</b> ${esc(t.obs||'')} Marque quando o boleto ou a nota chegar e o valor estiver conferido (colar a linha digitável também tira o alerta).</span></label>`;
   if(t?.origem_id)h+=`<div id="gtDocs" class="note" style="margin:0">Documentos enviados pelo cliente: carregando…</div>`;
   if(t){
     h+=`<h3 style="margin:8px 0 0">${P?'Pagamentos':'Recebimentos'}</h3>`+(movs.length?`<div class="tablebox" style="margin:0"><table><thead><tr><th>Data</th><th class="l">Conta</th><th>Valor</th><th>Juros/multa</th><th>Desconto</th><th></th></tr></thead><tbody>${movs.map(m=>`<tr><td>${dBR(m.data)}</td><td class="l">${esc(contaNome(m.conta_id))}</td><td>${fm(m.valor)}</td><td>${+m.juros?fm(m.juros):mu('—')}</td><td>${+m.desconto?fm(m.desconto):mu('—')}</td><td><button type="button" class="btn small ghost" data-act="desfaz" data-id="${m.id}">Desfazer</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">Nenhum ${P?'pagamento':'recebimento'} registrado.</p>`);
@@ -4367,6 +4377,7 @@ async function gtAcao(a,b){
     const row={pessoa_id:p?.id||null,pessoa_nome:p?.nome||nome,descricao:val('descricao'),documento:val('documento'),categoria:val('categoria'),
       competencia:val('competencia')?val('competencia')+'-01':null,vencimento:val('vencimento'),conta_id:val('conta_id'),forma:val('forma'),
       linha_digitavel:P?(val('linha_digitavel')||'').replace(/\D/g,'')||null:null,pix_chave:P?val('pix_chave')||p?.pix_chave||null:null,obs:val('obs')};
+    if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
     let error;
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
       ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id))}
@@ -4740,8 +4751,12 @@ function relDre(){
   const linha=(n,v,cl,b)=>`<tr${b?' style="background:var(--sunk)"':''}><td class="l">${b?`<b>${esc(n)}</b>`:esc(n)}</td>${ms.map(x=>cvl(v[x],cl)).join('')}${cvl(soma(v),cl)}</tr>`;
   const RES=Object.fromEntries(ms.map(x=>[x,r2(TR[x]-TD[x])]));
   $('relHead').innerHTML=`<tr><th class="l">Categoria</th>${ms.map(x=>`<th>${mesCurto(x)}</th>`).join('')}<th>Total</th></tr>`;
-  $('relBody').innerHTML=linha('Receitas',TR,'pos',true)+R.map(([k,v])=>linha(lab(k),v)).join('')
-    +linha('Despesas',TD,'neg',true)+D.map(([k,v])=>linha(lab(k),v)).join('')
+  // dentro de receitas e despesas, um subtotal por grupo do plano de contas (ex.: DESPESAS FIXAS)
+  const grp=c=>REL.plano.find(p=>p.categoria===c)?.grupo||'',porGrupo=L=>{if(!L.some(([k])=>grp(k)))return L.map(([k,v])=>linha(lab(k),v)).join('');
+    const gs=[];L.forEach(([k,v])=>{const g=grp(k)||'Sem grupo';let o=gs.find(x=>x[0]===g);if(!o)gs.push(o=[g,[]]);o[1].push([k,v])});
+    return gs.map(([g,ls])=>`<tr><td class="l" style="padding-left:12px"><b>${esc(g)}</b></td>${ms.map(x=>cvl(r2(ls.reduce((s,[,v])=>s+v[x],0)))).join('')}${cvl(r2(ls.reduce((s,[,v])=>s+soma(v),0)))}</tr>`+ls.map(([k,v])=>linha(lab(k),v).replace('<td class="l">','<td class="l" style="padding-left:26px">')).join('')).join('')};
+  $('relBody').innerHTML=linha('Receitas',TR,'pos',true)+porGrupo(R)
+    +linha('Despesas',TD,'neg',true)+porGrupo(D)
     +linha('Resultado (receitas menos despesas)',RES,'',true)
     +`<tr><td class="l">Margem</td>${ms.map(x=>`<td>${TR[x]?Math.round(RES[x]/TR[x]*100)+'%':'—'}</td>`).join('')}<td>${soma(TR)?Math.round(soma(RES)/soma(TR)*100)+'%':'—'}</td></tr>`;
   $('relFoot').innerHTML='';
@@ -5020,20 +5035,16 @@ async function renderPC(){
   pcVazio('Carregando…');
   let ls;try{delete PLANOS[cli.id];ls=await planoDe(cli)}catch(e){console.error(e);return pcVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(cliAtual()?.id!==cli.id||VIEW!=='gfplano')return;
-  $('pcForm').hidden=!pr;$('pcXls').hidden=!ls.length;
+  $('pcForm').hidden=false;$('pcXls').hidden=!ls.length;
   const f=$('pcFiltro').value,q=chave($('pcBusca').value);
-  const rows=ordPlano(ls).filter(p=>(f==='todos'||(f==='ativos')===(p.ativo!==false))&&(!q||chave((p.codigo||'')+' '+p.categoria).includes(q)));
-  if(pr){
-    $('pcHead').innerHTML='<tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Tipo</th><th class="l">Ativa</th><th></th></tr>';
-    $('pcBody').innerHTML=rows.map(p=>`<tr data-id="${p.id}"><td class="l"><input data-k="codigo" value="${esc(p.codigo||'')}" style="max-width:110px"></td><td class="l"><input data-k="categoria" value="${esc(p.categoria)}" style="min-width:240px"></td><td class="l"><select data-k="tipo"><option${p.tipo==='Despesa'?' selected':''}>Despesa</option><option${p.tipo==='Receita'?' selected':''}>Receita</option></select></td><td class="l"><input type="checkbox" data-k="ativo" style="width:auto"${p.ativo!==false?' checked':''}></td><td><button type="button" class="btn small ghost" data-del="${p.id}">Apagar</button></td></tr>`).join('')
-      ||`<tr><td class="l muted" colspan="5">${ls.length?'Nenhuma categoria neste filtro.':'Nenhuma categoria. Adicione acima.'}</td></tr>`;
-    $('pcNote').textContent=`${ls.length} categorias neste plano. Cada alteração é salva sozinha. Ao renomear, os lançamentos desta empresa com o nome antigo passam para o novo. Categoria já usada não pode ser apagada: desmarque “Ativa”.`;
-  }else{
-    $('pcHead').innerHTML='<tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Tipo</th><th class="l">Situação</th></tr>';
-    $('pcBody').innerHTML=rows.map(p=>`<tr><td class="l">${esc(p.codigo||'')||'<span class="muted">—</span>'}</td><td class="l">${esc(p.categoria)}</td><td class="l">${esc(p.tipo||'Despesa')}</td><td class="l">${p.ativo===false?'<span class="chip">Inativa</span>':'<span class="chip c-ok">Ativa</span>'}</td></tr>`).join('')
-      ||`<tr><td class="l muted" colspan="4">${ls.length?'Nenhuma categoria neste filtro.':'O plano padrão está vazio. Cadastre em Configurações › Categorias.'}</td></tr>`;
-    $('pcNote').textContent=`Esta empresa usa o plano padrão (${ls.length} categorias), o mesmo das outras empresas que não têm plano próprio.`;
-  }
+  const rows=ordPlano(ls).filter(p=>(f==='todos'||(f==='ativos')===(p.ativo!==false))&&(!q||chave((p.codigo||'')+' '+p.categoria+' '+(p.grupo||'')).includes(q)));
+  // o padrão vale para todas as empresas que não têm plano próprio; o próprio só para esta
+  const grupos=[...new Set(ls.map(p=>p.grupo).filter(Boolean))].sort();
+  $('pcHead').innerHTML=`<tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Grupo na DRE</th><th class="l">Tipo</th><th class="l">Ativa</th>${pr?'<th></th>':''}</tr>`;
+  $('pcBody').innerHTML=`<datalist id="pcGrupos">${grupos.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>`+rows.map(p=>`<tr data-id="${esc(pr?p.id:p.categoria)}"><td class="l"><input data-k="codigo" value="${esc(p.codigo||'')}" style="max-width:100px"></td><td class="l">${pr?`<input data-k="categoria" value="${esc(p.categoria)}" style="min-width:220px">`:esc(p.categoria)}</td><td class="l"><input data-k="grupo" list="pcGrupos" value="${esc(p.grupo||'')}" style="min-width:170px"></td><td class="l"><select data-k="tipo"><option${p.tipo!=='Receita'?' selected':''}>Despesa</option><option${p.tipo==='Receita'?' selected':''}>Receita</option></select></td><td class="l"><input type="checkbox" data-k="ativo" style="width:auto"${p.ativo!==false?' checked':''}></td>${pr?`<td><button type="button" class="btn small ghost" data-del="${p.id}">Apagar</button></td>`:''}</tr>`).join('')
+    ||`<tr><td class="l muted" colspan="6">${ls.length?'Nenhuma categoria neste filtro.':'Nenhuma categoria. Adicione acima.'}</td></tr>`;
+  $('pcNote').textContent=pr?`Plano próprio de ${cli.nome}: ${ls.length} categorias. Cada alteração é salva sozinha. Ao renomear, os lançamentos desta empresa com o nome antigo passam para o novo. Categoria já usada não pode ser apagada: desmarque “Ativa”.`
+    :`Plano padrão: ${ls.length} categorias, o mesmo para todas as empresas que não têm plano próprio. Mudanças aqui valem para todas elas. Para renomear ou tirar uma categoria do padrão, use Configurações › Categorias.`;
 }
 $('pcFiltro').onchange=renderPC;$('pcBusca').oninput=()=>{clearTimeout(renderPC.t);renderPC.t=setTimeout(renderPC,250)};
 $('pcModo').addEventListener('change',async e=>{
@@ -5041,7 +5052,7 @@ $('pcModo').addEventListener('change',async e=>{
   if(pr&&!confirm(`Usar um plano de contas próprio em ${cli.nome}? Ele começa como uma cópia do plano padrão.`)||!pr&&!confirm(`Voltar ${cli.nome} para o plano padrão? O plano próprio fica guardado, mas deixa de ser usado. Os lançamentos continuam com as categorias que já têm.`))return renderPC();
   try{
     if(pr){const {count,error}=await sb.from('fin_plano').select('id',{count:'exact',head:true}).eq('cliente_id',cli.id);if(error)throw error;
-      if(!count){if(!PCAT.ok)await loadCats();const rows=PCAT.plano.map(p=>({cliente_id:cli.id,codigo:p.codigo||null,categoria:p.categoria,tipo:p.tipo||'Despesa',ativo:p.ativo!==false}));
+      if(!count){if(!PCAT.ok)await loadCats();const rows=PCAT.plano.map(p=>({cliente_id:cli.id,codigo:p.codigo||null,categoria:p.categoria,grupo:p.grupo||null,tipo:p.tipo||'Despesa',ativo:p.ativo!==false}));
         if(rows.length){const {error:e2}=await sb.from('fin_plano').insert(rows);if(e2)throw e2}}}
     const {error}=await sb.from('clientes').update({plano_proprio:pr}).eq('id',cli.id);if(error)throw error;
     cli.plano_proprio=pr;delete PLANOS[cli.id];toast(pr?'Plano próprio ativado':'Voltou para o plano padrão');
@@ -5049,15 +5060,18 @@ $('pcModo').addEventListener('change',async e=>{
   renderPC();
 });
 $('pcForm').addEventListener('submit',async e=>{e.preventDefault();
-  const cli=cliAtual(),cat=$('pcCat').value.trim(),cod=$('pcCod').value.trim()||null;if(!cli||!cat)return toast('Digite o nome da categoria.');
-  if((PLANOS[cli.id]||[]).some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
-  const {error}=await sb.from('fin_plano').insert({cliente_id:cli.id,codigo:cod,categoria:cat,tipo:$('pcTipo').value,ativo:true});
+  const cli=cliAtual(),cat=$('pcCat').value.trim(),cod=$('pcCod').value.trim()||null,pr=!!cli?.plano_proprio;if(!cli||!cat)return toast('Digite o nome da categoria.');
+  if((await planoDe(cli)).some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
+  const {error}=pr?await sb.from('fin_plano').insert({cliente_id:cli.id,codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true})
+    :await sb.from('plano_contas').insert({codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true});
+  if(!pr)PCAT.ok=false;
   if(error)return fail(error,'Não foi possível adicionar');$('pcCat').value='';$('pcCod').value='';toast('Categoria adicionada');renderPC();
 });
 $('pcBody').addEventListener('change',async e=>{
   const el=e.target.closest('[data-k]'),tr=e.target.closest('tr[data-id]'),cli=cliAtual();if(!el||!tr||!cli)return;
-  const p=(PLANOS[cli.id]||[]).find(x=>x.id===tr.dataset.id),k=el.dataset.k;if(!p)return;
-  let v=k==='ativo'?el.checked:el.value.trim();if(k==='codigo')v=v||null;
+  const pr=!!cli.plano_proprio,p=pr?(PLANOS[cli.id]||[]).find(x=>x.id===tr.dataset.id):PCAT.plano.find(x=>x.categoria===tr.dataset.id),k=el.dataset.k;if(!p)return;
+  let v=k==='ativo'?el.checked:el.value.trim();if(k==='codigo'||k==='grupo')v=v||null;
+  if(!pr){const {error}=await sb.from('plano_contas').update({[k]:v}).eq('categoria',p.categoria);if(error){el.value=p[k]??'';return fail(error)}p[k]=v;return toast('Plano padrão salvo (vale para todas as empresas que usam o padrão)')}
   if(k==='categoria'){if(!v){el.value=p.categoria;return toast('O nome não pode ficar vazio.')}
     if(PLANOS[cli.id].some(x=>x.id!==p.id&&chave(x.categoria)===chave(v))){el.value=p.categoria;return toast('Já existe uma categoria com esse nome.')}}
   const {error}=await sb.from('fin_plano').update({[k]:v}).eq('id',p.id);if(error){el.value=p[k]??'';return fail(error)}
