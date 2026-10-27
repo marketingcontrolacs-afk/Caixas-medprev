@@ -366,6 +366,23 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="row" id="grFoot" style="margin-top:12px"></div>
   </section>
 
+  <!-- GESTÃO FINANCEIRA › RELATÓRIOS (escritório) -->
+  <section id="viewRel" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1 id="relTitle"></h1><p class="sub" id="relSub"></p></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="relXls">Baixar Excel</button><button class="btn primary" id="relSalvar" hidden>Salvar orçamento</button></div>
+    </div>
+    <div class="toolbar">
+      <label class="f" id="relIniBox">De<input type="date" id="relIni"></label>
+      <label class="f" id="relFimBox">até<input type="date" id="relFim"></label>
+      <label class="f" id="relSemBox" hidden>Semestre<select id="relSem"></select></label>
+      <label class="f" id="relBaseBox" hidden>Considerar<select id="relBase"><option value="pago">O que foi pago no período</option><option value="venc">O que vence no período</option></select></label>
+    </div>
+    <div class="tiles" id="relTiles"></div>
+    <div class="card tablebox" style="overflow-x:auto"><table id="relTable"><thead id="relHead"></thead><tbody id="relBody"></tbody><tfoot id="relFoot"></tfoot></table></div>
+    <p class="note" id="relNote"></p>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › EXTRATO DA CONTA (escritório) -->
   <section id="viewGX" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -851,6 +868,13 @@ const ICO={
   gfconc:'<path d="M4 7h11l-3-3M20 17H9l3 3"/><path d="M17 7l3 0M4 17h1"/>',
   gfpes:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
   gfcontas:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
+  gfresumo:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15l3-3 3 2 4-5"/>',
+  gffluxo:'<path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/>',
+  gforc:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  gfdre:'<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  gfdcat:'<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
+  gfdforn:'<path d="M3 21V9l9-5 9 5v12"/><path d="M9 21v-6h6v6"/>',
+  gfdforma:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
   gfmov:'<path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3"/>',
   gfinad:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>',
   gfagenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M12 14h2M16 14h1M8 17h2"/>',
@@ -873,7 +897,14 @@ const NAV=[
   {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  {k:'gforc',t:'Previsão orçamentária',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  {k:'gfdre',t:'DRE gerencial',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  {k:'gfdcat',t:'Despesas por categoria',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  {k:'gfdforn',t:'Despesas por fornecedor',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  {k:'gfdforma',t:'Despesas por forma de pagamento',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfpes',t:'Clientes e fornecedores',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
   {k:'gfcontas',t:'Contas bancárias',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
@@ -937,7 +968,7 @@ escCli.onchange=()=>{guardaEmp();openView()};
 function go(v){if(!eqPode(v))return;VIEW=v;renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR','viewRel'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -959,6 +990,7 @@ function openView(){
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfremessa'||VIEW==='gfretorno'){$('viewGR').hidden=false;renderGR()}
+  else if(RELMODOS[VIEW]){$('viewRel').hidden=false;renderRel()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
   avBanner();
@@ -4511,6 +4543,156 @@ async function rmRetorno(f){
     GT.key='';await renderGR(html);
   }catch(e){console.error(e);$('rmRet').innerHTML=`<p class="err">${esc(v48(e)?v48Msg:e.message||'Não foi possível ler o retorno.')}</p>`}
 }
+
+// ---------- Gestão financeira › Relatórios (resumo, fluxo de caixa, previsão orçamentária, DRE e despesas) ----------
+// Tudo sai do que está na Gestão financeira: fin_movimentos (o realizado) e fin_titulos (o previsto).
+// As transferências entre contas da própria empresa não entram como entrada nem saída.
+const RELMODOS={
+  gfresumo:['Resumo da empresa','Saldo das contas, o que falta pagar e receber e o resultado do mês.'],
+  gffluxo:['Fluxo de caixa','O que entrou e saiu (realizado) e o que vai entrar e sair (previsto), com o saldo acumulado.'],
+  gforc:['Previsão orçamentária','Preencha o orçamento do semestre por categoria e compare com o realizado.'],
+  gfdre:['DRE gerencial','Receitas e despesas por categoria, mês a mês, pelo regime de caixa (data do pagamento ou recebimento).'],
+  gfdcat:['Despesas por categoria','Quanto a empresa gastou em cada categoria no período.'],
+  gfdforn:['Despesas por fornecedor','Quanto a empresa pagou a cada fornecedor no período.'],
+  gfdforma:['Despesas por forma de pagamento','Quanto a empresa pagou por boleto, Pix, transferência, cartão e outras formas.']};
+const REL={};
+const relSemTr=m=>!m.transf_id;   // fora as transferências entre contas
+const mesesEntre=(a,b)=>{const out=[];let [y,m]=a.split('-').map(Number);const [y2,m2]=b.split('-').map(Number);while(y<y2||y===y2&&m<=m2){out.push(`${y}-${String(m).padStart(2,'0')}`);if(++m>12){m=1;y++}}return out};
+const mesCurto=ym=>MESES[+ym.slice(5)-1].slice(0,3)+'/'+ym.slice(2,4);
+const cvl=(v,cl)=>`<td data-v="${r2(v)}" class="${cl||''}">${fm(r2(v))}</td>`;
+async function renderRel(){
+  const M=VIEW,cli=cliAtual();
+  $('relTitle').textContent=RELMODOS[M][0];$('relSub').textContent=RELMODOS[M][1];
+  $('relIniBox').hidden=$('relFimBox').hidden=M==='gfresumo'||M==='gforc';$('relSemBox').hidden=M!=='gforc';
+  $('relBaseBox').hidden=!['gfdcat','gfdforn','gfdforma'].includes(M);$('relSalvar').hidden=M!=='gforc';
+  if(REL.modo!==M){REL.modo=M;const m1=TODAY.slice(0,8)+'01';   // período padrão de cada relatório
+    $('relIni').value=M==='gfdre'?TODAY.slice(0,5)+'01-01':m1;$('relFim').value=fimMes(M==='gffluxo'?somaMes(m1,1):TODAY)}
+  if(!$('relSem').options.length){const y=+TODAY.slice(0,4);$('relSem').innerHTML=[y-1,y,y+1].flatMap(a=>[1,2].map(s=>`<option value="${a}-${s}">${s}º semestre de ${a}</option>`)).join('');$('relSem').value=`${y}-${+TODAY.slice(5,7)<=6?1:2}`}
+  const vazio=(t,cl)=>{$('relHead').innerHTML='';$('relFoot').innerHTML='';$('relTiles').innerHTML='';$('relBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('relNote').textContent=''};
+  if(!cli)return vazio('Escolha uma empresa.');
+  vazio('Carregando…');
+  try{
+    const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
+    if(!PCAT.ok)await loadCats();
+    REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
+    movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
+    if(M==='gforc'){const {data,error}=await sb.from('fin_orcamento').select('*').eq('cliente_id',cli.id);if(error)throw error;REL.orc=data||[]}
+  }catch(e){console.error(e);return vazio(e&&/fin_orcamento/.test(e.message||'')||e?.code==='42P01'&&M==='gforc'?'A previsão orçamentária precisa da atualização v50 do banco. Rode o SQL no Supabase.':v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  if(VIEW!==M||cliAtual()?.id!==cli.id)return;
+  ({gfresumo:relResumo,gffluxo:relFluxo,gforc:relOrc,gfdre:relDre,gfdcat:relDesp,gfdforn:relDesp,gfdforma:relDesp})[M]();
+}
+['relIni','relFim','relSem','relBase'].forEach(id=>$(id).onchange=renderRel);
+const relFalta=t=>Math.max(0,r2(t.valor-(REL.pago[t.id]||0)));
+const sgn=m=>(m.tipo==='entrada'?1:-1)*m.valor;
+function saldoConta(c,ate){ // saldo no fim do dia "ate"
+  return r2(+c.saldo_inicial+REL.movs.filter(m=>m.conta_id===c.id&&m.data<=ate&&(!c.saldo_data||m.data>=c.saldo_data)).reduce((x,m)=>x+sgn(m),0))}
+const tileH=ts=>ts.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+function relResumo(){
+  const cs=REL.contas.filter(c=>c.ativo!==false),sal=cs.map(c=>[c,saldoConta(c,TODAY)]),tot=r2(sal.reduce((x,s)=>x+s[1],0));
+  const ab=REL.tits.filter(t=>relFalta(t)>0.004),ar=ab.filter(t=>t.tipo==='receber'),ap=ab.filter(t=>t.tipo==='pagar'),som=l=>r2(l.reduce((x,t)=>x+relFalta(t),0));
+  const em30=isoLocal(new Date(dObj(TODAY).getTime()+30*864e5)),r30=som(ar.filter(t=>t.vencimento<=em30)),p30=som(ap.filter(t=>t.vencimento<=em30));
+  const mes=TODAY.slice(0,7),mm=REL.movs.filter(m=>m.data.startsWith(mes)&&relSemTr(m)),ent=r2(mm.filter(m=>m.tipo==='entrada').reduce((x,m)=>x+(+m.valor),0)),sai=r2(mm.filter(m=>m.tipo==='saida').reduce((x,m)=>x+(+m.valor),0));
+  $('relTiles').innerHTML=tileH([['Saldo nas contas',fm(tot),'hoje, '+cs.length+(cs.length===1?' conta':' contas'),tot<0?'neg':''],['A receber em aberto',fm(som(ar)),'vencido: '+fm(som(ar.filter(t=>t.vencimento<TODAY))),'pos'],['A pagar em aberto',fm(som(ap)),'vencido: '+fm(som(ap.filter(t=>t.vencimento<TODAY))),'neg'],['Resultado do mês',fm(r2(ent-sai)),MESES[+mes.slice(5)-1]+': entradas menos saídas',ent-sai<0?'neg':'pos']]);
+  $('relHead').innerHTML='<tr><th class="l">Conta</th><th class="l">Tipo</th><th>Saldo hoje</th></tr>';
+  $('relBody').innerHTML=sal.map(([c,v])=>`<tr><td class="l"><b>${esc(c.nome)}</b></td><td class="l">${esc(c.tipo||'')}</td>${cvl(v,v<0?'neg':'')}</tr>`).join('')
+    +`<tr style="background:var(--sunk)"><td class="l"><b>Total nas contas</b></td><td></td>${cvl(tot)}</tr>`
+    +`<tr><td class="l">A receber até ${dBR(em30)} (com os vencidos)</td><td></td>${cvl(r30,'pos')}</tr><tr><td class="l">A pagar até ${dBR(em30)} (com os vencidos)</td><td></td>${cvl(-p30,'neg')}</tr>`
+    +`<tr style="background:var(--sunk)"><td class="l"><b>Saldo projetado em ${dBR(em30)}</b></td><td></td>${cvl(r2(tot+r30-p30),tot+r30-p30<0?'neg':'')}</tr>`;
+  $('relFoot').innerHTML='';
+  $('relNote').textContent='O saldo de cada conta é o saldo inicial do cadastro mais as entradas e saídas lançadas. Confira com o extrato do banco na Conciliação bancária.';
+}
+function relFluxo(){
+  const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return $('relBody').innerHTML='<tr><td class="l muted">Escolha o período.</td></tr>';
+  const dia=dObj(fim)-dObj(ini)<=62*864e5,bk=d=>dia?d:d.slice(0,7);
+  const antes=isoLocal(new Date(dObj(ini).getTime()-864e5)),cs=REL.contas;
+  const s0=r2(cs.reduce((x,c)=>x+saldoConta(c,antes),0));
+  const B={},b=k=>B[k]||={e:0,s:0,pr:0,pp:0};
+  REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relSemTr(m)).forEach(m=>{const x=b(bk(m.data));m.tipo==='entrada'?x.e+=+m.valor:x.s+=+m.valor});
+  REL.tits.forEach(t=>{const f=relFalta(t);if(f<=0.004)return;const d=t.vencimento<TODAY?TODAY:t.vencimento;if(d<ini||d>fim)return;const x=b(bk(d));t.tipo==='receber'?x.pr+=f:x.pp+=f});
+  let sal=s0;const ks=Object.keys(B).sort();
+  $('relHead').innerHTML=`<tr><th>${dia?'Data':'Mês'}</th><th>Entradas realizadas</th><th>Saídas realizadas</th><th>A receber (previsto)</th><th>A pagar (previsto)</th><th>Saldo do ${dia?'dia':'mês'}</th><th>Saldo acumulado</th></tr>`;
+  $('relBody').innerHTML=`<tr style="background:var(--sunk)"><td>${dBR(antes)}</td><td colspan="5" class="l muted">Saldo inicial (todas as contas)</td>${cvl(s0)}</tr>`
+    +ks.map(k=>{const x=B[k],d=r2(x.e-x.s+x.pr-x.pp);sal=r2(sal+d);return `<tr><td>${dia?dBR(k):mesCurto(k)}</td>${cvl(x.e,'pos')}${cvl(x.s,'neg')}${cvl(x.pr,'pos')}${cvl(x.pp,'neg')}${cvl(d,d<0?'neg':'')}${cvl(sal,sal<0?'neg':'')}</tr>`}).join('')
+    ||'<tr><td class="l muted" colspan="7">Nada no período.</td></tr>';
+  const T=k=>r2(ks.reduce((x,kk)=>x+B[kk][k],0));
+  $('relFoot').innerHTML=ks.length?`<tr><td class="l">Total</td>${cvl(T('e'))}${cvl(T('s'))}${cvl(T('pr'))}${cvl(T('pp'))}<td></td>${cvl(sal)}</tr>`:'';
+  $('relTiles').innerHTML=tileH([['Saldo inicial',fm(s0),'em '+dBR(antes)],['Realizado',fm(r2(T('e')-T('s'))),'entradas menos saídas'],['Previsto',fm(r2(T('pr')-T('pp'))),'a receber menos a pagar'],['Saldo final',fm(sal),'em '+dBR(fim),sal<0?'neg':'']]);
+  $('relNote').textContent='As contas vencidas e não pagas entram como previstas para hoje. '+(dia?'':'Período longo: agrupado por mês.');
+}
+function relDre(){
+  const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return;
+  const ms=mesesEntre(ini.slice(0,7),fim.slice(0,7)),mv=REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relSemTr(m));
+  const cod=c=>PCAT.plano.find(p=>p.categoria===c)?.codigo||'',lab=c=>(cod(c)?cod(c)+' · ':'')+c;
+  const grupo=tp=>{const g={};mv.filter(m=>m.tipo===tp).forEach(m=>{const k=m.categoria||'Sem categoria';(g[k]||=Object.fromEntries(ms.map(x=>[x,0])))[m.data.slice(0,7)]+=+m.valor});
+    return Object.entries(g).sort((a,b)=>(cod(a[0])||'zz').localeCompare(cod(b[0])||'zz',undefined,{numeric:true})||a[0].localeCompare(b[0]))};
+  const R=grupo('entrada'),D=grupo('saida'),tot=l=>Object.fromEntries(ms.map(x=>[x,r2(l.reduce((s,[,v])=>s+v[x],0))])),TR=tot(R),TD=tot(D),soma=o=>r2(Object.values(o).reduce((a,b)=>a+b,0));
+  const linha=(n,v,cl,b)=>`<tr${b?' style="background:var(--sunk)"':''}><td class="l">${b?`<b>${esc(n)}</b>`:esc(n)}</td>${ms.map(x=>cvl(v[x],cl)).join('')}${cvl(soma(v),cl)}</tr>`;
+  const RES=Object.fromEntries(ms.map(x=>[x,r2(TR[x]-TD[x])]));
+  $('relHead').innerHTML=`<tr><th class="l">Categoria</th>${ms.map(x=>`<th>${mesCurto(x)}</th>`).join('')}<th>Total</th></tr>`;
+  $('relBody').innerHTML=linha('Receitas',TR,'pos',true)+R.map(([k,v])=>linha(lab(k),v)).join('')
+    +linha('Despesas',TD,'neg',true)+D.map(([k,v])=>linha(lab(k),v)).join('')
+    +linha('Resultado (receitas menos despesas)',RES,'',true)
+    +`<tr><td class="l">Margem</td>${ms.map(x=>`<td>${TR[x]?Math.round(RES[x]/TR[x]*100)+'%':'—'}</td>`).join('')}<td>${soma(TR)?Math.round(soma(RES)/soma(TR)*100)+'%':'—'}</td></tr>`;
+  $('relFoot').innerHTML='';
+  $('relTiles').innerHTML=tileH([['Receitas',fm(soma(TR)),ms.length+(ms.length===1?' mês':' meses'),'pos'],['Despesas',fm(soma(TD)),D.length+' categorias','neg'],['Resultado',fm(soma(RES)),'receitas menos despesas',soma(RES)<0?'neg':'pos'],['Margem',soma(TR)?Math.round(soma(RES)/soma(TR)*100)+'%':'—','resultado sobre receitas']]);
+  const sc=mv.filter(m=>!m.categoria).length;
+  $('relNote').textContent=(sc?`${sc} ${sc===1?'lançamento está':'lançamentos estão'} sem categoria: classifique nas contas a pagar e a receber ou no extrato. `:'')+'Pelo regime de caixa: entra no mês em que foi pago ou recebido. Transferências entre contas não entram.';
+}
+function relDesp(){
+  const M=VIEW,ini=$('relIni').value,fim=$('relFim').value,base=$('relBase').value;if(!ini||!fim||fim<ini)return;
+  const chaveDe=M==='gfdcat'?(x=>x.categoria||'Sem categoria'):M==='gfdforn'?(x=>x.pessoa_nome||'Sem fornecedor'):(x=>x.forma||'Não informada');
+  const itens=base==='pago'?REL.movs.filter(m=>m.tipo==='saida'&&m.data>=ini&&m.data<=fim&&relSemTr(m)).map(m=>{const t=REL.tit[m.titulo_id];return {categoria:m.categoria,pessoa_nome:m.pessoa_nome,forma:t?t.forma:'Lançamento avulso',valor:+m.valor}})
+    :REL.tits.filter(t=>t.tipo==='pagar'&&t.vencimento>=ini&&t.vencimento<=fim).map(t=>({categoria:t.categoria,pessoa_nome:t.pessoa_nome,forma:t.forma,valor:+t.valor,aberto:relFalta(t)}));
+  const g={};itens.forEach(x=>{const k=chaveDe(x),o=g[k]||={n:0,v:0,a:0};o.n++;o.v+=x.valor;o.a+=x.aberto||0});
+  const ls=Object.entries(g).sort((a,b)=>b[1].v-a[1].v),T=r2(ls.reduce((s,[,o])=>s+o.v,0)),mx=ls[0]?.[1].v||1,V=base==='venc';
+  const nome={gfdcat:'Categoria',gfdforn:'Fornecedor',gfdforma:'Forma de pagamento'}[M];
+  $('relHead').innerHTML=`<tr><th class="l">${nome}</th><th>Lançamentos</th><th>${V?'Valor das contas':'Total pago'}</th>${V?'<th>Ainda em aberto</th>':''}<th>% do total</th><th class="l" style="min-width:140px"></th></tr>`;
+  $('relBody').innerHTML=ls.map(([k,o])=>`<tr><td class="l"><b>${esc(k)}</b></td><td>${o.n}</td>${cvl(o.v)}${V?cvl(o.a,o.a>0.004?'neg':''):''}<td>${T?(o.v/T*100).toFixed(1).replace('.',',')+'%':'—'}</td><td class="l"><div style="height:8px;border-radius:4px;background:var(--bad);opacity:.75;width:${Math.max(2,o.v/mx*100)}%"></div></td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="6">Nenhuma despesa no período.</td></tr>';
+  $('relFoot').innerHTML=ls.length?`<tr><td class="l">Total</td><td>${itens.length}</td>${cvl(T)}${V?cvl(r2(ls.reduce((s,[,o])=>s+o.a,0))):''}<td>100%</td><td></td></tr>`:'';
+  $('relTiles').innerHTML=tileH([[V?'Despesas que vencem no período':'Total pago no período',fm(T),itens.length+' lançamentos','neg'],['Maior '+nome.toLowerCase(),ls[0]?esc(ls[0][0]).slice(0,28):'—',ls[0]?fm(ls[0][1].v):''],[nome==='Categoria'?'Categorias':nome==='Fornecedor'?'Fornecedores':'Formas',String(ls.length),'no período'],['Média por lançamento',fm(itens.length?r2(T/itens.length):0),'']]);
+  $('relNote').textContent=V?'Considera as contas a pagar pelo vencimento, pagas ou não.':'Considera o que saiu das contas no período (pagamentos e lançamentos avulsos). Transferências entre contas não entram.';
+}
+// previsão orçamentária: orçado por categoria e mês (6 meses) × realizado
+function relOrc(){
+  const [y,s]=$('relSem').value.split('-').map(Number),ms=[...Array(6).keys()].map(i=>`${y}-${String((s-1)*6+i+1).padStart(2,'0')}`);
+  const cats=PCAT.plano.filter(p=>p.ativo!==false).sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
+  const orc=(c,m)=>REL.orc.find(o=>o.categoria===c&&o.mes.slice(0,7)===m)?.valor;
+  const real=(c,tp,m)=>r2(REL.movs.filter(x=>x.categoria===c&&x.data.startsWith(m)&&relSemTr(x)&&x.tipo===(tp==='Receita'?'entrada':'saida')).reduce((a,x)=>a+(+x.valor),0));
+  let tO={Receita:0,Despesa:0},tR={Receita:0,Despesa:0},tipo=null;
+  $('relHead').innerHTML=`<tr><th class="l">Categoria</th>${ms.map(m=>`<th>${mesCurto(m)}<br><span class="muted" style="font-weight:400">orçado / real</span></th>`).join('')}<th>Orçado</th><th>Realizado</th><th>Diferença</th><th>% usado</th></tr>`;
+  $('relBody').innerHTML=cats.map(p=>{let h='';if(p.tipo!==tipo){tipo=p.tipo;h=`<tr style="background:var(--sunk)"><td class="l" colspan="${ms.length+5}"><b>${tipo==='Receita'?'Receitas':'Despesas'}</b></td></tr>`}
+    let o=0,r=0;const cel=ms.map(m=>{const ov=orc(p.categoria,m),rv=real(p.categoria,p.tipo,m);o+=+(ov||0);r+=rv;
+      return `<td><input class="money orc" data-c="${esc(p.categoria)}" data-m="${m}" value="${ov!=null?showMoney(ov):''}" placeholder="0,00" inputmode="decimal" style="width:92px;text-align:right"><br><span class="muted" style="font-size:12px">${rv?fm(rv):'—'}</span></td>`}).join('');
+    o=r2(o);r=r2(r);tO[p.tipo]+=o;tR[p.tipo]+=r;const d=r2(o-r),ruim=p.tipo==='Receita'?r<o:r>o;
+    return h+`<tr><td class="l">${p.codigo?`<span class="muted">${esc(p.codigo)}</span> `:''}${esc(p.categoria)}</td>${cel}${cvl(o)}${cvl(r)}${cvl(d,o&&ruim?'neg':'')}<td class="${o&&ruim?'neg':''}">${o?Math.round(r/o*100)+'%':'—'}</td></tr>`}).join('')
+    ||'<tr><td class="l muted">Nenhuma categoria no plano de contas. Cadastre em Configurações › Categorias.</td></tr>';
+  $('relFoot').innerHTML='';
+  const rO=r2(tO.Receita-tO.Despesa),rR=r2(tR.Receita-tR.Despesa);
+  $('relTiles').innerHTML=tileH([['Receitas orçadas',fm(r2(tO.Receita)),'realizado '+fm(r2(tR.Receita)),'pos'],['Despesas orçadas',fm(r2(tO.Despesa)),'realizado '+fm(r2(tR.Despesa)),'neg'],['Resultado orçado',fm(rO),'receitas menos despesas'],['Resultado realizado',fm(rR),rO?(rR>=rO?'cumpriu o orçamento':'abaixo do orçado'):'',rR<rO?'neg':'pos']]);
+  $('relNote').textContent='Digite o orçado de cada mês e clique em “Salvar orçamento”. Em vermelho: despesa acima do orçado ou receita abaixo. O realizado vem dos pagamentos e recebimentos da Gestão financeira.';
+}
+$('relSalvar').onclick=async()=>{
+  const cli=cliAtual();if(!cli)return;const rows=[],del=[];
+  for(const i of $('relBody').querySelectorAll('input.orc')){const v=parseMoney(i.value);if(Number.isNaN(v))return toast('Valor inválido em '+i.dataset.c);
+    const ex=REL.orc.find(o=>o.categoria===i.dataset.c&&o.mes.slice(0,7)===i.dataset.m);
+    if(i.value.trim()===''||!v){if(ex)del.push(ex.id);continue}
+    if(!ex||+ex.valor!==r2(v))rows.push({cliente_id:cli.id,mes:i.dataset.m+'-01',categoria:i.dataset.c,valor:r2(v)})}
+  if(!rows.length&&!del.length)return toast('Nada mudou no orçamento');
+  $('relSalvar').disabled=true;
+  try{if(rows.length){const {error}=await sb.from('fin_orcamento').upsert(rows,{onConflict:'cliente_id,mes,categoria'});if(error)throw error}
+    if(del.length){const {error}=await sb.from('fin_orcamento').delete().in('id',del);if(error)throw error}
+    toast('Orçamento salvo');renderRel()}catch(e){fail(e,'Não foi possível salvar o orçamento')}
+  $('relSalvar').disabled=false};
+// baixar em Excel o que está na tela (valores como número)
+$('relXls').onclick=()=>{
+  const cli=cliAtual(),aoa=[[$('relTitle').textContent+' · '+(cli?.nome||'')],[$('relIni').closest('label').hidden?($('relSem').closest('label').hidden?'Em '+dBR(TODAY):$('relSem').selectedOptions[0].text):`Período: ${dBR($('relIni').value)} a ${dBR($('relFim').value)}`],[]];
+  $('relTable').querySelectorAll('tr').forEach(tr=>aoa.push([...tr.children].map(td=>{const i=td.querySelector('input');if(i)return parseMoney(i.value)||'';return td.dataset.v!=null?+td.dataset.v:td.innerText.replace(/\s+/g,' ').trim()})));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:40},...Array(14).fill({wch:15})];
+  Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n')ws[k].z='#,##0.00'});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Relatório');
+  XLSX.writeFile(wb,`${$('relTitle').textContent} ${cli?.nome||''} ${TODAY}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
+};
 
 // ---------- Extrato da conta: saldo anterior, entradas e saídas e saldo de cada dia ----------
 const GX={conta:null,ant:0,per:[],ini:'',fim:''};
