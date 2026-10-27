@@ -3081,9 +3081,10 @@ function pontoAba(aba){
   const txt=r=>r.filter(v=>typeof v==='string'&&v.trim()).length;
   let h=PNT.txt.findIndex(r=>txt(r)>=2&&r.some(v=>/nome|funcion|colab|empreg/i.test(v)));if(h<0)h=PNT.txt.findIndex(r=>txt(r)>=3);if(h<0)h=0;
   PNT.h=h;const cab=PNT.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`);
+  // a assiduidade só zera na folha de quem tem a coluna (Oliveira); na Viva ela fica no VA do pedido de benefícios (Carol, 27/10)
   const alvo=[['nome','Colaborador',/nome|funcion|colab|empreg/],['data','Data (se for uma linha por dia)',/^data$|^dia$|^data /],
     ...(colsDe(FOL.cli).includes('ajuda_dia')&&FOL.comp<=SAB_ATE.slice(0,7)+'-01'?[['sab','Sábados trabalhados',/s[aá]bado/]]:[]),
-    ['atest','Atestados (zera a assiduidade)',/atestado/],...PNT.cols];
+    ['atest',colsDe(FOL.cli).includes('assiduidade')?'Atestados (zera a assiduidade)':'Atestados',/atestado/],...PNT.cols];
   const usado=new Set(),chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
