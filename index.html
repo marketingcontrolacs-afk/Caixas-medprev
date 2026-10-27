@@ -4114,7 +4114,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
   const tb=contas?'fin_contas':'fin_pessoas';
   const {error}=GFR?await sb.from(tb).update(row).eq('id',GFR.id):await sb.from(tb).insert(row);
   $('gfSave').disabled=false;
-  if(error){console.error(error);return err(v51(error)?v51Msg:v48(error)?v48Msg:/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')?'O endereço e a situação na Receita precisam da atualização v49 do banco. Rode o SQL no Supabase.':error.message||'Não foi possível salvar.')}
+  if(error){console.error(error);return err(v52(error)?v52Msg:v48(error)?v48Msg:/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')?'O endereço e a situação na Receita precisam da atualização v49 do banco. Rode o SQL no Supabase.':error.message||'Não foi possível salvar.')}
   toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';GFP.key='';GFC.cid='';renderGF();
 });
 $('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já tiver lançamentos, prefira desmarcar “Ativo”.`))return;
@@ -4673,7 +4673,7 @@ async function renderRel(){
   try{
     const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
     REL.plano=await planoDe(cli);
-    REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v51 não existe
+    REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
     REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
     REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
     movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
@@ -4805,13 +4805,13 @@ $('relXls').onclick=()=>{
   XLSX.writeFile(wb,`${$('relTitle').textContent} ${cli?.nome||''} ${TODAY}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
 };
 
-// ---------- Gestão financeira › Fatura do cartão de crédito (v51) ----------
+// ---------- Gestão financeira › Fatura do cartão de crédito (v52) ----------
 // O cartão é uma conta (fin_contas.tipo = 'Cartão de crédito'). Cada compra é uma saída nele, com o mês da
 // fatura (fin_movimentos.fatura); estorno ou crédito é uma entrada. Ao fechar, a soma tem de bater com a
 // fatura do banco: grava fin_faturas e gera a conta a pagar (fin_titulos.fatura_id). O pagamento da
 // fatura é uma transferência da conta bancária para o cartão, para a despesa não contar duas vezes.
-const v51=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||/fin_faturas|fin_plano|plano_proprio|fatura|cartao_|grupo_id|parcela/.test(e.message||''));
-const v51Msg='Esta parte precisa da atualização v51 do banco. Rode o SQL no Supabase.';
+const v52=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||/fin_faturas|fin_plano|plano_proprio|fatura|cartao_|grupo_id|parcela/.test(e.message||''));
+const v52Msg='Esta parte precisa da atualização v52 do banco. Rode o SQL no Supabase.';
 const FT={conta:null,cartoes:[],movs:[],fats:[],tit:null,pagoTit:0,notas:[],key:''};
 let FTR=null;
 const mesTxt=ym=>MESES[+ym.slice(5,7)-1]+'/'+ym.slice(0,4);
@@ -4848,7 +4848,7 @@ async function renderFat(){
     const f=fats.find(x=>x.mes===mes);FT.tit=null;FT.pagoTit=0;
     if(f){const {data:ts,error}=await sb.from('fin_titulos').select('*').eq('fatura_id',f.id);if(error)throw error;FT.tit=(ts||[])[0]||null;
       if(FT.tit){const {data:pg,error:e2}=await sb.from('fin_movimentos').select('*').eq('titulo_id',FT.tit.id);if(e2)throw e2;FT.pagoTit=r2((pg||[]).reduce((x,m)=>x+abat(m),0))}}
-  }catch(e){console.error(e);return ftVazio(v51(e)?v51Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  }catch(e){console.error(e);return ftVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(VIEW!=='gffatura'||cliAtual()?.id!==cli.id)return;
   ftDesenha();
 }
@@ -4904,7 +4904,7 @@ async function ftFecharFatura(){
       obs:`Fatura conferida: ${FT.movs.length} lançamentos. As despesas estão no cartão, com as categorias de cada compra.`});
     if(e2){await sb.from('fin_faturas').delete().eq('id',f.id);throw e2}
     toast('Fatura fechada. Ela está em Contas a pagar.');GT.key='';
-  }catch(e){console.error(e);err(v51(e)?v51Msg:/duplicate|unique/i.test(e.message||'')?'Esta fatura já foi fechada. Atualize a página.':e.message||'Não foi possível fechar.');$('ftFechar').disabled=false;return}
+  }catch(e){console.error(e);err(v52(e)?v52Msg:/duplicate|unique/i.test(e.message||'')?'Esta fatura já foi fechada. Atualize a página.':e.message||'Não foi possível fechar.');$('ftFechar').disabled=false;return}
   renderFat();
 }
 async function ftReabrir(){
@@ -4965,7 +4965,7 @@ async function ftAcao(a){
     const fx=rows.find(r=>ftFechada(r.fatura));if(fx)return gtErr(`A fatura de ${mesTxt(fx.fatura)} já está fechada. Escolha uma fatura aberta.`);
     ({error}=await sb.from('fin_movimentos').insert(rows));
   }
-  if(error){console.error(error);return gtErr(v51(error)?v51Msg:error.message||'Não foi possível salvar.')}
+  if(error){console.error(error);return gtErr(v52(error)?v52Msg:error.message||'Não foi possível salvar.')}
   toast(m?'Correção salva':'Lançado no cartão');dlgGT.close();renderFat();
 }
 // notas do cartão enviadas pelo cliente (Financeiro › Cartão de crédito) que ainda não estão em nenhuma fatura
@@ -4980,7 +4980,7 @@ $('ftImp').onclick=async()=>{
   if(!confirm(`Trazer ${ls.length-fora.length} ${ls.length-fora.length===1?'nota enviada':'notas enviadas'} pelo cliente para o cartão ${c.nome}? Cada uma cai na fatura certa pela data da compra, com as parcelas.${fora.length?` ${fora.length} ficam de fora porque caem em fatura já fechada.`:''}`))return;
   $('ftImp').disabled=true;
   const {error}=await sb.from('fin_movimentos').insert(rows);$('ftImp').disabled=false;
-  if(error){console.error(error);return toast(v51(error)?v51Msg:'Não foi possível trazer as notas.')}
+  if(error){console.error(error);return toast(v52(error)?v52Msg:'Não foi possível trazer as notas.')}
   toast('Notas trazidas para o cartão');renderFat();
 };
 $('ftXls').onclick=()=>{
@@ -5001,7 +5001,7 @@ async function pernasFatura(t,mov){
     descricao:'Pagamento da '+(t.descricao||'fatura').replace(/^Fatura/,'fatura'),pessoa_nome:t.pessoa_nome}];
 }
 
-// ---------- Gestão financeira › Plano de contas da empresa (v51) ----------
+// ---------- Gestão financeira › Plano de contas da empresa (v52) ----------
 // Cada empresa usa o plano padrão (plano_contas, o mesmo para todas) ou um plano próprio (fin_plano).
 const PLANOS={};
 async function planoDe(cli){
@@ -5018,7 +5018,7 @@ async function renderPC(){
   $('pcSub').textContent=`Categorias usadas nas contas a pagar e a receber, no cartão, no extrato e nos relatórios de ${cli.nome}.`;
   $('pcModo').hidden=false;document.querySelectorAll('[name=pcModo]').forEach(r=>r.checked=r.value===(pr?'proprio':'padrao'));
   pcVazio('Carregando…');
-  let ls;try{delete PLANOS[cli.id];ls=await planoDe(cli)}catch(e){console.error(e);return pcVazio(v51(e)?v51Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  let ls;try{delete PLANOS[cli.id];ls=await planoDe(cli)}catch(e){console.error(e);return pcVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(cliAtual()?.id!==cli.id||VIEW!=='gfplano')return;
   $('pcForm').hidden=!pr;$('pcXls').hidden=!ls.length;
   const f=$('pcFiltro').value,q=chave($('pcBusca').value);
@@ -5045,7 +5045,7 @@ $('pcModo').addEventListener('change',async e=>{
         if(rows.length){const {error:e2}=await sb.from('fin_plano').insert(rows);if(e2)throw e2}}}
     const {error}=await sb.from('clientes').update({plano_proprio:pr}).eq('id',cli.id);if(error)throw error;
     cli.plano_proprio=pr;delete PLANOS[cli.id];toast(pr?'Plano próprio ativado':'Voltou para o plano padrão');
-  }catch(err){console.error(err);toast(v51(err)?v51Msg:'Não foi possível mudar o plano.')}
+  }catch(err){console.error(err);toast(v52(err)?v52Msg:'Não foi possível mudar o plano.')}
   renderPC();
 });
 $('pcForm').addEventListener('submit',async e=>{e.preventDefault();

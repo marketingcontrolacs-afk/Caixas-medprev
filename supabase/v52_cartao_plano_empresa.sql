@@ -1,7 +1,7 @@
 -- =====================================================================
--- v51 · Gestão financeira: fatura do cartão de crédito e plano de contas por empresa
+-- v52 · Gestão financeira: fatura do cartão de crédito e plano de contas por empresa
 -- =====================================================================
--- Rode no SQL Editor do Supabase depois do v50. Pode rodar mais de uma vez.
+-- Rode no SQL Editor do Supabase depois do v51. Pode rodar mais de uma vez.
 -- Pedido da Carol (27/10/2026):
 --   1) Cartão de crédito: uma conta do tipo "Cartão de crédito" só nas empresas que têm cartão.
 --      Tudo o que foi pago com o cartão é lançado nela (fin_movimentos, com o mês da fatura).
@@ -61,4 +61,4 @@ drop policy if exists esc_tudo on public.fin_plano;
 create policy esc_tudo on public.fin_plano   for all using (eh_escritorio()) with check (eh_escritorio());
 grant select, insert, update, delete on public.fin_faturas, public.fin_plano to authenticated;
 
-select 'Atualização v51 (cartão de crédito e plano de contas por empresa) concluída' as resultado;
+select 'Atualização v52 (cartão de crédito e plano de contas por empresa) concluída' as resultado;
