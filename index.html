@@ -336,7 +336,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewGT" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="gtTitle"></h1><p class="sub" id="gtSub"></p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="gtImp" hidden></button><button class="btn primary" id="gtNovo"></button></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn primary" id="gtNovo"></button></div>
     </div>
     <div class="tiles" id="gtTiles"></div>
     <div class="toolbar">
@@ -3892,6 +3892,7 @@ function abrirGF(r){
     $('gfTitle').textContent=r?r.nome:'Nova conta · '+(cli?.nome||'');
     h=inp('nome','Nome da conta *','Ex.: Sicredi 12345-6')+sel('tipo','Tipo',GFTIPOS,'Conta corrente')+inp('banco','Banco','Ex.: Sicredi')+inp('agencia','Agência')+inp('conta','Conta','com o dígito')
       +inp('conta_bc','Nome no Bom Controle','como está no BC')
+      +inp('cnab_convenio','Convênio de pagamentos (CNAB)','código do banco, ex.: 3KMS')+`<label class="f">Nº da última remessa<input id="gf_cnab_seq" type="number" min="0" value="${r?.cnab_seq??''}" placeholder="0"></label>`
       +`<label class="f">Saldo inicial<input id="gf_saldo_inicial" class="money" inputmode="decimal" value="${r?showMoney(r.saldo_inicial):''}" placeholder="0,00"></label>`
       +`<label class="f">Saldo no início do dia<input type="date" id="gf_saldo_data" value="${v('saldo_data')}"></label>`+obs+ativo;
   }else{
@@ -3918,6 +3919,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
   if(contas){
     const s=parseMoney($('gf_saldo_inicial').value);if(Number.isNaN(s))return err('Saldo inicial inválido.');
     row={nome:val('nome'),tipo:val('tipo')||'Conta corrente',banco:val('banco'),agencia:val('agencia'),conta:val('conta'),conta_bc:val('conta_bc'),saldo_inicial:r2(s||0),saldo_data:val('saldo_data'),obs:val('obs'),ativo:$('gf_ativo').checked};
+    if(val('cnab_convenio')||GFR?.cnab_convenio!=null)Object.assign(row,{cnab_convenio:val('cnab_convenio'),cnab_seq:parseInt(val('cnab_seq'))||0});
     if(GFL.some(x=>x.id!==GFR?.id&&x.nome.toLowerCase()===row.nome.toLowerCase()))return err('Já existe uma conta com esse nome nesta empresa.');
   }else{
     row={nome:val('nome'),fantasia:val('fantasia'),documento:val('documento'),papel:val('papel'),grupo:val('grupo'),telefone:val('telefone'),email:val('email'),cidade:val('cidade'),
@@ -3934,7 +3936,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
   const tb=contas?'fin_contas':'fin_pessoas';
   const {error}=GFR?await sb.from(tb).update(row).eq('id',GFR.id):await sb.from(tb).insert(row);
   $('gfSave').disabled=false;
-  if(error){console.error(error);return err(error.message||'Não foi possível salvar.')}
+  if(error){console.error(error);return err(v48(error)?v48Msg:error.message||'Não foi possível salvar.')}
   toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';GFP.key='';GFC.cid='';renderGF();
 });
 $('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já tiver lançamentos, prefira desmarcar “Ativo”.`))return;
@@ -3944,7 +3946,7 @@ $('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já
 // ---------- Gestão financeira › Contas a pagar e a receber e Extrato da conta (v45) ----------
 // fin_titulos = o que vence (uma linha por parcela); fin_movimentos = o que já entrou ou saiu da conta.
 // A baixa de um título gera o movimento; o extrato da conta é a lista dos movimentos, dia a dia.
-const GT={tipo:'pagar',lista:[],pago:{},movs:{},key:''};
+const GT={tipo:'pagar',lista:[],pago:{},movs:{},rem:{},key:''};
 let GTR=null,GFC={cid:'',lista:[]},GFP={key:'',lista:[]};
 const GTFORMAS=['Boleto','Pix','Transferência','Débito automático','Cartão','Dinheiro'];
 const gtP=()=>GT.tipo==='pagar';
@@ -3958,7 +3960,7 @@ async function gfContasDe(cid,forcar){
 }
 async function gfPessoasDe(cid,papel){
   const key=cid+'|'+papel;
-  if(GFP.key!==key){GFP={key,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave').or(`cliente_id.eq.${cid},cliente_id.is.null`).in('papel',[papel,'ambos']).eq('ativo',true).order('nome'))}}
+  if(GFP.key!==key){GFP={key,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo').or(`cliente_id.eq.${cid},cliente_id.is.null`).in('papel',[papel,'ambos']).eq('ativo',true).order('nome'))}}
   return GFP.lista;
 }
 const contaNome=id=>GFC.lista.find(c=>c.id===id)?.nome||'';
@@ -3977,7 +3979,7 @@ async function renderGT(){
     :'Tudo o que a empresa tem para receber. Ao registrar o recebimento, o valor entra no extrato da conta.';
   $('gtNovo').textContent=P?'+ Nova conta a pagar':'+ Nova conta a receber';
   $('gtFiltro').options[2].textContent=P?'Pagas':'Recebidas';
-  $('gtNovo').hidden=!cli;$('gtImp').hidden=true;
+  $('gtNovo').hidden=!cli;$('gtImp').hidden=true;$('gtRem').hidden=!cli||!P;
   if(!cli)return gtVazio('Escolha uma empresa.');
   const key=GT.tipo+'|'+cli.id;
   if(key!==GT.key){
@@ -3985,7 +3987,7 @@ async function renderGT(){
     try{
       const [lista,movs]=await Promise.all([todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).eq('tipo',GT.tipo).order('vencimento').order('criado_em')),
         todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).not('titulo_id','is',null).order('data')),gfContasDe(cli.id,true)]);
-      GT.lista=lista;GT.movs={};GT.pago={};
+      GT.lista=lista;GT.movs={};GT.pago={};GT.rem=P?await rmItensDe(cli.id):{};
       movs.forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
       GT.key=key;
     }catch(e){console.error(e);GT.key='';return gtVazio(v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
@@ -4023,7 +4025,7 @@ function gtDesenha(){
     return !q||chave([t.pessoa_nome,t.descricao,t.documento,t.categoria].join(' ')).includes(q)});
   const mu=t=>`<span class="muted">${t}</span>`,falta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
   $('gtHead').innerHTML=`<tr><th>Vencimento</th><th class="l">${P?'Fornecedor':'Cliente'}</th><th class="l">Descrição</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th><th>${P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td><td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(falta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span></td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td><td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(falta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="9">${GT.lista.length?'Nada neste filtro.':`Nenhuma conta a ${P?'pagar':'receber'} lançada. Use “${$('gtNovo').textContent.slice(2)}” para começar.`}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(falta))}</td><td></td></tr>`:'';
@@ -4041,6 +4043,7 @@ $('gtIni').onchange=gtDesenha;$('gtFim').onchange=gtDesenha;$('gtBusca').oninput
 $('gtBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirGT(GT.lista.find(t=>t.id===tr.dataset.id))});
 $('gtBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirGT(GT.lista.find(t=>t.id===tr.dataset.id))}});
 $('gtNovo').onclick=()=>abrirGT(null);
+$('gtRem').onclick=async()=>{const cli=cliAtual();if(!cli)return;try{await gfPessoasDe(cli.id,'fornecedor')}catch(e){console.error(e)}abrirRemessa()};
 const dlgGT=$('dlgGT');
 async function abrirGT(t){
   GTR=t;const P=gtP(),cli=cliAtual();if(!cli)return;
@@ -4102,6 +4105,7 @@ dlgGT.addEventListener('click',async ev=>{const b=ev.target.closest('[data-act]'
   b.disabled=true;try{await gtAcao(a,b)}finally{b.disabled=false}});
 async function gtAcao(a,b){
   if(a.startsWith('av_'))return gxAcao(a,b);
+  if(a.startsWith('rm_'))return rmAcao(a,b);
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=gtP(),cli=cliAtual(),t=GTR;
   if(a==='salvar'){
@@ -4154,6 +4158,226 @@ async function gtAcao(a,b){
     const {error}=await sb.from('fin_titulos').delete().in('id',ids);if(error)return fail(error,'Não foi possível apagar');
     toast(ids.length>1?ids.length+' parcelas apagadas':'Conta apagada');dlgGT.close();GT.key='';renderGT();
   }
+}
+
+// ---------- Remessa de pagamentos CNAB 240 (Sicredi) e leitura do retorno (v48) ----------
+// Layout "Pagamento a Fornecedor CNAB 240" do Sicredi (manual v1.2 e arquivo modelo PAGFOR):
+// boletos (segmentos J e J-52), contas de consumo e tributos com código de barras (O) e Pix por chave (A e B).
+const v48=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||/fin_remessa|cnab_/.test(e.message||''));
+const v48Msg='A remessa precisa da atualização v48 do banco. Rode o SQL no Supabase.';
+const RMSTATUS={enviado:['c-none','Na remessa'],agendado:['c-warn','Agendado no banco'],pago:['c-done','Pago pelo banco'],recusado:['c-bad','Recusado pelo banco'],excluido:['c-none','Excluído da remessa']};
+const OCOR={'00':'pago','01':'saldo insuficiente','02':'cancelado pelo pagador','03':'pago (autorizado pela agência)','11':'agência ou conta do favorecido inválida',
+  AA:'arquivo duplicado',AB:'tipo de operação inválido',AC:'tipo de serviço inválido',AD:'forma de lançamento inválida',AE:'CNPJ ou CPF inválido',AF:'convênio inválido',
+  AG:'agência ou conta do favorecido inválida',AL:'banco do favorecido inválido',AM:'agência do favorecido inválida',AN:'conta do favorecido inválida',AO:'nome do favorecido não informado',
+  AP:'data inválida ou fora do horário',AR:'valor inválido',AT:'CPF ou CNPJ do favorecido inválido',BB:'pagamento em duplicidade',BC:'nosso número inválido',
+  BD:'agendado',BE:'alteração aceita',BF:'excluído',BG:'conta do favorecido bloqueada',CA:'código de barras inválido',CB:'código de barras inválido',CC:'código de barras inválido (dígito)',
+  CD:'valor do código de barras não confere',CE:'código de barras inválido',CF:'valor do documento inválido',HA:'lote não aceito',HB:'CNPJ da empresa inválido para o convênio',
+  HC:'convênio inválido',HD:'agência ou conta da empresa inválida',HE:'serviço não contratado no convênio',HF:'saldo insuficiente na conta',HG:'lote fora de sequência',HI:'arquivo não aceito',
+  PA:'Pix não efetivado',PB:'Pix interrompido no banco do recebedor',PC:'conta do recebedor encerrada',PF:'CPF ou CNPJ não confere com a conta do Pix',PG:'CPF ou CNPJ do recebedor incorreto',
+  PH:'Pix rejeitado pelo banco do recebedor',PJ:'chave Pix não cadastrada',PM:'chave Pix inválida',PN:'chave Pix não informada',TA:'totais do lote com diferença',
+  YA:'boleto não encontrado',ZE:'boleto bloqueado',ZG:'boleto vencido',ZI:'beneficiário divergente',ZK:'boleto já pago'};
+const ocorTxt=cs=>cs.map(c=>OCOR[c]?`${c} (${OCOR[c]})`:c).join(', ');
+// campos do CNAB: numérico à direita com zeros; texto à esquerda com brancos, maiúsculo e sem acento
+const cN=(v,n)=>String(v??'').replace(/\D/g,'').slice(-n).padStart(n,'0');
+const tiraAcento=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const cX=(s,n)=>tiraAcento(s).toUpperCase().replace(/[^0-9A-Z !*\-$()[\]{},.;:/\\#%&@+=?_]/g,' ').slice(0,n).padEnd(n,' ');
+const cV=(v,n)=>cN(Math.round(Math.abs(+v||0)*100),n);
+const cD=iso=>iso?iso.slice(8,10)+iso.slice(5,7)+iso.slice(0,4):'00000000';
+const cB=n=>' '.repeat(n);
+// agência e conta como foram cadastradas ("0101", "12345-6"): sem hífen, o último número é o dígito
+function agConta(c){const ag=soDig(c.agencia),ct=String(c.conta||'').trim(),m=ct.match(/^(.*\d)\s*[-.\s]\s*([0-9xX])$/);
+  const num=m?soDig(m[1]):soDig(ct).slice(0,-1),dv=m?m[2].toUpperCase():soDig(ct).slice(-1);
+  return {ag:ag.slice(0,5),agdv:'0',conta:num,dv:dv||'0'}}
+const cpfOk=d=>{if(d.length!==11||/^(\d)\1+$/.test(d))return false;const dv=n=>{let s=0;for(let i=0;i<n;i++)s+=+d[i]*(n+1-i);const r=s*10%11;return r===10?0:r};return dv(9)===+d[9]&&dv(10)===+d[10]};
+// tipo da chave Pix no layout: 01 telefone, 02 e-mail, 03 CPF/CNPJ, 04 aleatória
+function pixDe(chave,tipoCad){const s=String(chave||'').trim(),d=soDig(s);if(!s)return null;
+  const t={'Telefone':'01','E-mail':'02','CPF':'03','CNPJ':'03','Aleatória':'04'}[tipoCad]
+    ||(/@/.test(s)?'02':/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(s)?'04':/^\+/.test(s)?'01'
+      :d.length===14&&!/[a-z]/i.test(s)?'03':d.length===11&&cpfOk(d)?'03':d.length>=10&&d.length<=13?'01':null);
+  if(t==='01'){const f=d.startsWith('55')&&d.length>=12?d:'55'+d;return f.length>=12&&f.length<=13?{tipo:t,chave:'+'+f}:null}
+  if(t==='02')return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)?{tipo:t,chave:tiraAcento(s).toLowerCase()}:null;
+  if(t==='03')return d.length===11||d.length===14?{tipo:t,chave:d}:null;
+  if(t==='04'){const h=s.replace(/-/g,'').toLowerCase();return /^[0-9a-f]{32}$/.test(h)?{tipo:t,chave:h.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/,'$1-$2-$3-$4-$5')}:null}
+  return null}
+// como cada conta a pagar vai no arquivo: boleto, conta de consumo/tributo ou Pix
+function rmForma(t,pes){
+  const lin=soDig(t.linha_digitavel);
+  if(lin){const b=boletoDe(lin);if(!b)return {erro:'linha digitável não confere'};
+    return b.tipo==='conc'?{forma:'consumo',barra:b.barra,nominal:b.valor}:{forma:'boleto',barra:b.barra,nominal:b.valor,venc:b.venc,banco:b.barra.slice(0,3)}}
+  const chave=t.pix_chave||pes?.pix_chave;
+  if(chave){const p=pixDe(chave,pes?.pix_chave===chave?pes?.pix_tipo:null);return p?{forma:'pix',...p}:{erro:'chave Pix inválida: '+chave}}
+  return {erro:'sem linha digitável nem chave Pix'};
+}
+const RMNOME={boleto:'Boleto',consumo:'Conta de consumo ou tributo',pix:'Pix'};
+// monta o arquivo; itens: {forma,seu,valor,dataPag,venc,nome,doc,barra,nominal,banco,tipo,chave}
+function cnabSicredi({conta,empresa,nsa,agora,itens}){
+  const a=agConta(conta),cnpj=soDig(empresa.cnpj),ti=cnpj.length===11?'1':'2',conv=conta.cnab_convenio;
+  const L=[],lin=s=>{if(s.length!==240)throw new Error('Linha do CNAB com '+s.length+' posições');L.push(s)};
+  const hh=agora.toTimeString().slice(0,8).replace(/:/g,''),hoje=isoLocal(agora);
+  lin('748'+'0000'+'0'+cB(9)+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+cX(a.agdv,1)+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cX('SICREDI',30)+cB(10)
+    +'1'+cD(hoje)+hh+cN(nsa,6)+'082'+'01600'+cB(20)+cB(20)+cB(29));
+  const grupos=[['03','30',i=>i.forma==='boleto'&&i.banco==='748'],['03','31',i=>i.forma==='boleto'&&i.banco!=='748'],['22','11',i=>i.forma==='consumo'],['20','45',i=>i.forma==='pix']];
+  let lote=0;
+  for(const [serv,forma,f] of grupos){const its=itens.filter(f);if(!its.length)continue;lote++;
+    const lt=cN(lote,4),ini=L.length;let seq=0,soma=0;const sq=()=>cN(++seq,5);
+    lin('748'+lt+'1'+'C'+serv+forma+'042'+' '+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+cX(a.agdv,1)+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cB(40)
+      +cB(30)+cN(0,5)+cB(15)+cB(20)+cN(0,5)+cN(0,3)+cB(2)+cB(8)+cB(10));
+    for(const i of its){soma+=Math.round(i.valor*100);
+      if(i.forma==='boleto'){
+        const nom=i.nominal||i.valor,dif=r2(i.valor-nom),dn=i.doc?soDig(i.doc):'';
+        lin('748'+lt+'3'+sq()+'J'+'0'+'00'+cX(i.barra,44)+cX(i.nome,30)+cD(i.venc)+cV(nom,15)+cV(dif<0?-dif:0,15)+cV(dif>0?dif:0,15)+cD(i.dataPag)+cV(i.valor,15)+cN(0,15)+cX(i.seu,20)+cB(20)+'09'+cB(6)+cB(10));
+        lin('748'+lt+'3'+sq()+'J'+' '+'01'+'52'+ti+cN(cnpj,15)+cX(empresa.nome,40)+(dn.length===11?'1':'2')+cN(dn,15)+cX(i.nome,40)+'0'+cN(0,15)+cB(40)+cB(53));
+      }else if(i.forma==='consumo'){
+        lin('748'+lt+'3'+sq()+'O'+'0'+'00'+cX(i.barra,44)+cX(i.nome,30)+cD(i.venc)+cD(i.dataPag)+cV(i.valor,15)+cX(i.seu,20)+cB(20)+cB(68)+cB(10));
+      }else{
+        const dn=soDig(i.tipo==='03'?i.chave:i.doc||''),tin=dn.length===11?'1':dn.length===14?'2':'0';
+        lin('748'+lt+'3'+sq()+'A'+'0'+'00'+'009'+'000'+cN(0,5)+' '+cN(0,12)+' '+' '+cX(i.nome,30)+cX(i.seu,20)+cD(i.dataPag)+'BRL'+cN(0,15)+cV(i.valor,15)+cB(20)+cN(0,8)+cN(0,15)
+          +cB(40)+cB(2)+cB(5)+cB(2)+cB(3)+'0'+cB(10));
+        lin('748'+lt+'3'+sq()+'B'+i.tipo+' '+tin+cN(dn,14)+cB(30)+cB(65)+(i.tipo==='03'?cB(99):(i.chave+cB(99)).slice(0,99))+cB(6)+cN(0,8));
+      }
+    }
+    lin('748'+lt+'5'+cB(9)+cN(L.length-ini+1,6)+cN(soma,18)+cN(0,18)+cB(6)+cB(165)+cB(10));
+  }
+  lin('748'+'9999'+'9'+cB(9)+cN(lote,6)+cN(L.length+1,6)+cN(0,6)+cB(205));
+  return L.join('\r\n')+'\r\n';
+}
+// nome pedido pelo Sicredi: CCCCDDSS.REM (convênio de 4) ou CCCDDMSS.REM (convênio de 3)
+function rmArquivo(conv,iso,ordem){const c=String(conv||'').toUpperCase(),dd=iso.slice(8,10),m='123456789OND'[+iso.slice(5,7)-1],ss=String(ordem).padStart(2,'0');
+  return (c.length<=3?c.padStart(3,'0')+dd+m:c.slice(0,4)+dd)+ss+'.REM'}
+function rmBaixar(nome,txt){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download=nome;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+
+// ---- tela da remessa (abre no diálogo das contas a pagar) ----
+const RM={conta:'',lista:[],rems:[]};
+async function rmItensDe(cid){ // situação de cada conta a pagar nas remessas (a mais recente vale)
+  const {data,error}=await sb.from('fin_remessa_itens').select('titulo_id,status,ocorrencia,remessa_id,data_pagamento,atualizado_em').eq('cliente_id',cid).order('atualizado_em');
+  if(error){if(!v48(error))console.error(error);return {}}
+  const m={};(data||[]).forEach(i=>{if(i.titulo_id)m[i.titulo_id]=i});return m;
+}
+async function abrirRemessa(retHtml){
+  const cli=cliAtual();if(!cli)return;
+  let contas=[];try{contas=await gfContasDe(cli.id,true)}catch(e){console.error(e)}
+  const comConv=contas.filter(c=>c.ativo!==false&&c.cnab_convenio);
+  $('gtdTitle').textContent='Remessa de pagamentos ao banco · '+cli.nome;$('gtdChip').innerHTML='';
+  let rems=[];
+  const r=await sb.from('fin_remessas').select('id,conta_id,nsa,arquivo,qtd,valor,gerado_em,retorno_em').eq('cliente_id',cli.id).order('gerado_em',{ascending:false}).limit(15);
+  if(r.error&&v48(r.error)){$('gtdBody').innerHTML=`<p class="err">${v48Msg}</p>`;$('gtdFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>';return dlgGT.showModal()}
+  rems=r.data||[];RM.rems=rems;
+  const dataPag=TODAY;
+  $('gtdBody').innerHTML=(comConv.length?`<div class="fields">
+      <label class="f">Conta que paga<select id="rm_conta">${comConv.map(c=>`<option value="${c.id}"${c.id===RM.conta?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>
+      <label class="f">Data do pagamento<input type="date" id="rm_data" value="${dataPag}" min="${TODAY}"></label>
+      <label class="f">Contas que vencem até<input type="date" id="rm_ate" value="${dataPag}"></label>
+    </div>
+    <div class="tablebox" style="margin:0;max-height:46vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="rm_todas" style="width:auto" aria-label="Marcar todas"></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Como paga</th><th>Valor</th></tr></thead><tbody id="rmBody"></tbody></table></div>
+    <p class="note" id="rmNote" style="margin:0"></p>`
+    :`<p class="note" style="margin:0">Nenhuma conta com convênio de pagamentos. Em Gestão financeira › Cadastros › Contas bancárias, abra a conta do Sicredi e preencha o “Convênio de pagamentos (CNAB)”, o código que o banco passou.</p>`)
+    +`<h3 style="margin:8px 0 0">Remessas geradas</h3>`+(rems.length?`<div class="tablebox" style="margin:0;overflow-x:auto"><table><thead><tr><th>Nº</th><th class="l">Arquivo</th><th class="l">Conta</th><th>Gerada em</th><th>Pagamentos</th><th>Valor</th><th class="l">Retorno</th><th></th></tr></thead><tbody>${rems.map(x=>`<tr><td>${x.nsa}</td><td class="l">${esc(x.arquivo)}</td><td class="l">${esc(contaNome(x.conta_id))}</td><td>${new Date(x.gerado_em).toLocaleString('pt-BR').slice(0,17)}</td><td>${x.qtd}</td><td>${fm(x.valor)}</td><td class="l">${x.retorno_em?'✓ lido':'<span class="muted">aguardando</span>'}</td><td><button type="button" class="btn small ghost" data-act="rm_baixar" data-id="${x.id}">Baixar</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:0">Nenhuma remessa gerada ainda.</p>')
+    +`<div id="rmRet">${retHtml||''}</div><p class="err" id="gtErr" hidden></p>`;
+  $('gtdFoot').innerHTML=`<span class="btn ghost fotobtn">Ler arquivo de retorno<input type="file" id="rm_ret" accept=".ret,.RET,.txt,text/plain" aria-label="Ler arquivo de retorno do banco"></span><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${comConv.length?'<button type="button" class="btn primary" data-act="rm_gerar">Gerar arquivo</button>':''}`;
+  $('rm_ret').onchange=e=>{const f=e.target.files?.[0];e.target.value='';if(f)rmRetorno(f)};
+  if(comConv.length){
+    ['rm_conta','rm_data','rm_ate'].forEach(id=>$(id).onchange=()=>{if(id==='rm_data'&&$('rm_ate').value<$('rm_data').value)$('rm_ate').value=$('rm_data').value;rmDesenha()});
+    $('rm_todas').onchange=()=>{$('rmBody').querySelectorAll('input[data-id]:not(:disabled)').forEach(x=>x.checked=$('rm_todas').checked);rmTotal()};
+    $('rmBody').onchange=rmTotal;
+    rmDesenha();
+  }
+  if(!dlgGT.open)dlgGT.showModal();
+}
+function rmDesenha(){
+  RM.conta=$('rm_conta').value;const ate=$('rm_ate').value,mu=t=>`<span class="muted">${t}</span>`;
+  const pes=GFP.lista,falta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
+  const ab=GT.lista.filter(t=>falta(t)>0.004&&(!ate||t.vencimento<=ate));
+  RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),f=rmForma(t,p),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
+    return {t,p,f,ja,it,valor:falta(t)}});
+  $('rmBody').innerHTML=RM.lista.map((x,i)=>{const ok=!x.f.erro&&!x.ja;
+    return `<tr><td><input type="checkbox" data-id="${i}" style="width:auto"${ok?' checked':' disabled'}></td><td class="${x.t.vencimento<TODAY?'neg':''}">${dBR(x.t.vencimento)}</td><td class="l"><b>${esc(x.t.pessoa_nome||'')}</b>${x.t.descricao?`<br>${mu(esc(x.t.descricao))}`:''}</td><td class="l">${x.f.erro?`<span class="neg">${esc(x.f.erro)}</span>`:RMNOME[x.f.forma]+(x.f.forma==='pix'?`<br>${mu(esc(x.f.chave))}`:'')}${x.ja?`<br><span class="chip ${RMSTATUS[x.it.status][0]}">${RMSTATUS[x.it.status][1]}</span>`:''}</td><td>${fm(x.valor)}</td></tr>`}).join('')
+    ||`<tr><td class="l muted" colspan="5">Nenhuma conta a pagar em aberto com vencimento até ${dBR(ate)}.</td></tr>`;
+  rmTotal();
+}
+function rmTotal(){const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
+  const semDoc=sel.filter(x=>x.f.forma==='boleto'&&!soDig(x.p?.documento)).length,venc=sel.filter(x=>x.t.vencimento<$('rm_data').value).length;
+  $('rmNote').textContent=`${sel.length} ${sel.length===1?'pagamento marcado':'pagamentos marcados'}: ${fm(r2(sel.reduce((s,x)=>s+x.valor,0)))}. `
+    +(venc?`${venc} já ${venc===1?'estará vencida':'estarão vencidas'} na data do pagamento: o banco pode recusar ou cobrar juros. `:'')
+    +(semDoc?`${semDoc} ${semDoc===1?'boleto sem':'boletos sem'} CNPJ do fornecedor no cadastro (vai em branco). `:'')
+    +'O arquivo vai para o internet banking do Sicredi (Pagamentos › Troca de arquivos). Depois de enviar, leia aqui o arquivo de retorno.'}
+async function rmAcao(a,b){
+  const cli=cliAtual();
+  if(a==='rm_baixar'){const {data,error}=await sb.from('fin_remessas').select('arquivo,conteudo').eq('id',b.dataset.id).single();if(error)return fail(error,'Não foi possível baixar');return rmBaixar(data.arquivo,data.conteudo)}
+  if(a!=='rm_gerar')return;
+  const conta=GFC.lista.find(c=>c.id===$('rm_conta').value),dataPag=$('rm_data').value;
+  const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
+  if(!conta)return gtErr('Escolha a conta.');if(!dataPag||dataPag<TODAY)return gtErr('A data do pagamento não pode ser anterior a hoje.');
+  if(!sel.length)return gtErr('Marque ao menos uma conta para pagar.');
+  if(!soDig(cli.cnpj))return gtErr('A empresa está sem CNPJ. Preencha em Configurações › Empresas.');
+  if(!agConta(conta).conta)return gtErr('A conta está sem número. Preencha a agência e a conta em Cadastros.');
+  if(!confirm(`Gerar a remessa com ${sel.length} ${sel.length===1?'pagamento':'pagamentos'} (${fm(r2(sel.reduce((s,x)=>s+x.valor,0)))}) para ${dBR(dataPag)}?`))return;
+  try{
+    const {data:c2,error:e1}=await sb.from('fin_contas').select('cnab_seq').eq('id',conta.id).single();if(e1)throw e1;
+    const nsa=(c2.cnab_seq||0)+1,agora=new Date(),hoje=isoLocal(agora);
+    const {count}=await sb.from('fin_remessas').select('id',{count:'exact',head:true}).eq('conta_id',conta.id).gte('gerado_em',hoje+'T00:00:00');
+    const seu=i=>`R${nsa}-${i+1}`;
+    const itens=sel.map((x,i)=>({forma:x.f.forma,seu:seu(i),valor:x.valor,dataPag,venc:x.f.venc||x.t.vencimento,nome:x.t.pessoa_nome||x.p?.nome||'',doc:x.p?.documento||'',
+      barra:x.f.barra,nominal:x.f.nominal,banco:x.f.banco,tipo:x.f.tipo,chave:x.f.chave}));
+    const txt=cnabSicredi({conta,empresa:{cnpj:cli.cnpj,nome:cli.nome},nsa,agora,itens}),arquivo=rmArquivo(conta.cnab_convenio,hoje,count||0);
+    const {error:e2}=await sb.from('fin_contas').update({cnab_seq:nsa}).eq('id',conta.id);if(e2)throw e2;
+    const {data:rem,error:e3}=await sb.from('fin_remessas').insert({cliente_id:cli.id,conta_id:conta.id,nsa,arquivo,conteudo:txt,qtd:itens.length,valor:r2(itens.reduce((s,i)=>s+i.valor,0))}).select().single();if(e3)throw e3;
+    const {error:e4}=await sb.from('fin_remessa_itens').insert(sel.map((x,i)=>({remessa_id:rem.id,cliente_id:cli.id,conta_id:conta.id,titulo_id:x.t.id,seu_numero:seu(i),forma:x.f.forma,favorecido:itens[i].nome,valor:x.valor,data_pagamento:dataPag})));if(e4)throw e4;
+    rmBaixar(arquivo,txt);toast(`Remessa nº ${nsa} gerada: ${arquivo}`);
+    dlgGT.close();GT.key='';renderGT();
+  }catch(e){console.error(e);gtErr(v48(e)?v48Msg:e.message||'Não foi possível gerar a remessa.')}
+}
+// arquivo de retorno: a situação de cada pagamento volta nas posições 231-240 (até 5 códigos de 2 letras)
+function lerRetorno(txt){
+  const ls=txt.split(/\r?\n/).filter(l=>l.length>=240),out={itens:[],lotes:[],conv:''};
+  for(const l of ls){
+    const tipo=l[7],seg=l[13],oc=l.slice(230,240).match(/../g).map(s=>s.trim()).filter(Boolean),dt=s=>/^\d{8}$/.test(s)&&s!=='00000000'?s.slice(4)+'-'+s.slice(2,4)+'-'+s.slice(0,2):null;
+    if(tipo==='0')out.conv=l.slice(32,36).trim();
+    else if(tipo==='1'&&oc.length)out.lotes.push({lote:+l.slice(3,7),oc});
+    else if(tipo==='3'){
+      if(seg==='J'&&l.slice(17,19)==='52'&&l[14]===' ')continue;
+      if(seg==='J')out.itens.push({seu:l.slice(182,202).trim(),nome:l.slice(61,91).trim(),data:dt(l.slice(144,152)),valor:+l.slice(152,167)/100,oc});
+      else if(seg==='A')out.itens.push({seu:l.slice(73,93).trim(),nome:l.slice(43,73).trim(),data:dt(l.slice(154,162))||dt(l.slice(93,101)),valor:(+l.slice(162,177)||+l.slice(119,134))/100,oc});
+      else if(seg==='O')out.itens.push({seu:l.slice(122,142).trim(),nome:l.slice(61,91).trim(),data:dt(l.slice(99,107)),valor:+l.slice(107,122)/100,oc});
+    }
+  }
+  return out;
+}
+const rmStatusDe=oc=>oc.some(c=>c==='00'||c==='03')?'pago':oc.includes('BF')?'excluido':oc.some(c=>c==='BD'||c==='BE')||!oc.length?'agendado':'recusado';
+async function rmRetorno(f){
+  const cli=cliAtual();$('rmRet').innerHTML='<p class="note">Lendo o retorno…</p>';
+  try{
+    const buf=await f.arrayBuffer(),txt=new TextDecoder('windows-1252').decode(buf),r=lerRetorno(txt);
+    if(!r.itens.length&&!r.lotes.length)throw new Error('Este arquivo não parece um retorno CNAB 240.');
+    const {data:its,error}=await sb.from('fin_remessa_itens').select('*').eq('cliente_id',cli.id);if(error)throw error;
+    const contas=GFC.lista,cv=contas.filter(c=>(c.cnab_convenio||'').toUpperCase()===r.conv.toUpperCase()).map(c=>c.id);
+    const doArq=its.filter(i=>!cv.length||cv.includes(i.conta_id));
+    const res=[],remIds=new Set();let pagos=0;
+    for(const x of r.itens){
+      const it=doArq.find(i=>i.seu_numero===x.seu),st=rmStatusDe(x.oc);
+      if(!it){res.push([x.nome,x.seu,'—','Não achei este pagamento nas remessas desta empresa',x.oc]);continue}
+      remIds.add(it.remessa_id);
+      const t=GT.lista.find(y=>y.id===it.titulo_id);
+      if(st==='pago'&&it.status!=='pago'&&t){
+        const falta=r2(t.valor-(GT.pago[t.id]||0)),valor=r2(x.valor||it.valor);
+        if(falta>0.004){const juros=Math.max(0,r2(valor-falta));
+          const {error:e2}=await sb.from('fin_movimentos').insert({cliente_id:cli.id,conta_id:it.conta_id,data:x.data||it.data_pagamento,tipo:'saida',valor,juros,desconto:0,titulo_id:t.id,
+            descricao:(t.descricao||'Pagamento')+' · remessa',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria});if(e2)throw e2;
+          GT.pago[t.id]=r2((GT.pago[t.id]||0)+valor-juros);pagos++;
+          if(t.origem_id&&valor-juros>=falta-0.004){const c=contas.find(y=>y.id===it.conta_id);
+            const {error:e3}=await sb.from('contas_pagar').update({conferido:true,pago_em:x.data||it.data_pagamento,banco:c?.conta_bc||c?.nome||null}).eq('id',t.origem_id);if(e3)console.error(e3)}}
+      }
+      if(it.status!==st||it.ocorrencia!==x.oc.join(' ')){const {error:e4}=await sb.from('fin_remessa_itens').update({status:st,ocorrencia:x.oc.join(' '),atualizado_em:new Date().toISOString()}).eq('id',it.id);if(e4)throw e4}
+      res.push([it.favorecido||x.nome,x.seu,fm(it.valor),RMSTATUS[st][1],x.oc]);
+    }
+    if(remIds.size){const {error:e5}=await sb.from('fin_remessas').update({retorno_em:new Date().toISOString()}).in('id',[...remIds]);if(e5)console.error(e5)}
+    const rec=res.filter(x=>x[3]===RMSTATUS.recusado[1]).length;
+    const html=`<h3 style="margin:8px 0 0">Retorno lido</h3>`
+      +(r.lotes.length?`<p class="neg" style="margin:0">O banco apontou no lote: ${esc(r.lotes.map(l=>'lote '+l.lote+': '+ocorTxt(l.oc)).join('; '))}.</p>`:'')
+      +`<div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Favorecido</th><th class="l">Nº</th><th>Valor</th><th class="l">Situação</th><th class="l">Códigos do banco</th></tr></thead><tbody>${res.map(x=>`<tr><td class="l">${esc(x[0])}</td><td class="l">${esc(x[1])}</td><td>${x[2]}</td><td class="l${x[3]===RMSTATUS.recusado[1]?' neg':''}">${esc(x[3])}</td><td class="l">${esc(ocorTxt(x[4]))||'<span class="muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>`
+      +`<p class="note" style="margin:0">${pagos?`${pagos} ${pagos===1?'pagamento foi registrado':'pagamentos foram registrados'} nas contas a pagar e no extrato da conta. `:''}${rec?`${rec} ${rec===1?'foi recusado':'foram recusados'}: corrija e gere outra remessa. `:''}</p>`;
+    GT.key='';await renderGT();await abrirRemessa(html);
+  }catch(e){console.error(e);$('rmRet').innerHTML=`<p class="err">${esc(v48(e)?v48Msg:e.message||'Não foi possível ler o retorno.')}</p>`}
 }
 
 // ---------- Extrato da conta: saldo anterior, entradas e saídas e saldo de cada dia ----------
