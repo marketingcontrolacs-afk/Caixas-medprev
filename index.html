@@ -225,7 +225,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewOp" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Fechamento do caixa</h1><p class="sub" id="opSub"></p><p class="note" id="opEscAviso" hidden style="margin:4px 0 0">Você está na mesma tela que o operador usa. O que salvar aqui vale como lançamento da empresa. Para conferir, use Escritório › Conferência de caixa.</p></div>
-      <label class="f" style="min-width:170px">Dia do fechamento<input type="date" id="opData"></label>
+      <div class="row" style="align-items:flex-end;gap:10px"><label class="f" id="opCaixaBox" hidden style="min-width:120px">Caixa<select id="opCaixa"></select></label><label class="f" style="min-width:170px">Dia do fechamento<input type="date" id="opData"></label></div>
     </div>
     <div class="grid-op">
       <form class="card" id="opForm" novalidate>
@@ -858,16 +858,24 @@ $('btnSair').onclick=async()=>{await sb.auth.signOut();location.reload()};
 // =====================================================================
 let OPCLI=null, cur=null, draftSaidas=[], draftAnexos=[], previews={};
 const NUM=['din_sis','din_cont','deb_sis','deb_maq','cred_sis','cred_maq'];
+// mais de um caixa por dia (v43): cada caixa tem o próprio fechamento; sem a v43, um só
+const V43=c=>!!c&&'caixas' in c;
+const nCx=c=>Math.max(1,Math.min(9,+(c&&c.caixas)||1));
+const cxNome=(c,f)=>nCx(c)>1||(f&&f.caixa>1)?'Caixa '+(f?f.caixa||1:1):'';
+const opCx=()=>+$('opCaixa').value||1;
 function initOp(cli){
   OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!ehEsc();
+  const n=nCx(cli),atual=Math.min(opCx(),n);$('opCaixaBox').hidden=n<2;
+  $('opCaixa').innerHTML=Array.from({length:n},(_,i)=>`<option value="${i+1}">Caixa ${i+1}</option>`).join('');$('opCaixa').value=atual;
   if(!$('opData').value)$('opData').value=TODAY;
   loadDay();renderHist();
 }
 const diaUtil=s=>dObj(s).getDay()!==0||OPCLI&&OPCLI.abre_domingo;
 async function loadDay(){
   const data=$('opData').value;
-  $('opSub').textContent=`${OPCLI.nome} · ${DOW[dObj(data).getDay()]}, ${dBR(data)}`;
-  const {data:f,error}=await sb.from('fechamentos').select('*, saidas(*), anexos(*)').eq('cliente_id',OPCLI.id).eq('data',data).maybeSingle();
+  $('opSub').textContent=`${OPCLI.nome} · ${DOW[dObj(data).getDay()]}, ${dBR(data)}`+(nCx(OPCLI)>1?' · Caixa '+opCx():'');
+  let q=sb.from('fechamentos').select('*, saidas(*), anexos(*)').eq('cliente_id',OPCLI.id).eq('data',data);if(V43(OPCLI))q=q.eq('caixa',opCx());
+  const {data:f,error}=await q.maybeSingle();
   if(error){fail(error,'Erro ao carregar o dia');return}
   cur=f;
   NUM.forEach(k=>$(k).value=f?showMoney(f[k]):'');
@@ -956,8 +964,8 @@ $('opForm').addEventListener('submit',async e=>{
   err.hidden=true;$('btnEnviar').disabled=true;
   try{
     const row={cliente_id:OPCLI.id,data:$('opData').value,obs:d.obs||null,enviado_em:new Date().toISOString()};
-    NUM.forEach(k=>row[k]=r2(d[k]));
-    const {data:f,error:e1}=await sb.from('fechamentos').upsert(row,{onConflict:'cliente_id,data'}).select().single();if(e1)throw e1;
+    NUM.forEach(k=>row[k]=r2(d[k]));if(V43(OPCLI))row.caixa=opCx();
+    const {data:f,error:e1}=await sb.from('fechamentos').upsert(row,{onConflict:V43(OPCLI)?'cliente_id,data,caixa':'cliente_id,data'}).select().single();if(e1)throw e1;
     // saídas: apaga as removidas, atualiza as existentes e cria as novas
     const keep=d.saidas.filter(s=>s.id).map(s=>s.id);
     let q=sb.from('saidas').delete().eq('fechamento_id',f.id);if(keep.length)q=q.not('id','in',`(${keep.join(',')})`);
@@ -971,21 +979,22 @@ $('opForm').addEventListener('submit',async e=>{
       if(s.anexo)anexosRows.push({fechamento_id:f.id,saida_id:sv.id,categoria:'Comprovante da saída',nome_arquivo:s.anexo.nome_arquivo,caminho:s.anexo.caminho});
     }
     if(anexosRows.length){const {error:e4}=await sb.from('anexos').insert(anexosRows);if(e4)throw e4}
-    toast('Fechamento de '+dBR(row.data)+' enviado');
+    toast('Fechamento de '+dBR(row.data)+(row.caixa&&nCx(OPCLI)>1?' (Caixa '+row.caixa+')':'')+' enviado');
     await loadDay();renderHist();
   }catch(ex){fail(ex);$('btnEnviar').disabled=false}
 });
 async function renderHist(){
   const ini=isoLocal(new Date(Date.now()-35*864e5));
   const {data}=await sb.from('fechamentos').select('*, saidas(valor)').eq('cliente_id',OPCLI.id).gte('data',ini).order('data',{ascending:false});
-  const by=Object.fromEntries((data||[]).map(f=>[f.data,f]));
+  const n=nCx(OPCLI),tem=new Set((data||[]).map(f=>f.data+'|'+(f.caixa||1))),cx=k=>n>1?' · Cx '+k:'';
   const pend=[];const d=dObj(TODAY);d.setDate(d.getDate()-14);
-  while(isoLocal(d)<=TODAY){const s=isoLocal(d);if(diaUtil(s)&&!by[s])pend.push(s);d.setDate(d.getDate()+1)}
-  $('hist').innerHTML=pend.slice(-4).reverse().map(s=>`<button type="button" data-d="${s}"><span>${dLabel(s)}</span>${chip('none')}</button>`).join('')+
-    (data||[]).slice(0,6).map(x=>`<button type="button" data-d="${x.data}"><span>${dLabel(x.data)}</span>${chip(calc(x).status)}</button>`).join('');
+  while(isoLocal(d)<=TODAY){const s=isoLocal(d);if(diaUtil(s))for(let k=1;k<=n;k++)if(!tem.has(s+'|'+k))pend.push([s,k]);d.setDate(d.getDate()+1)}
+  $('hist').innerHTML=pend.slice(-4).reverse().map(([s,k])=>`<button type="button" data-d="${s}" data-cx="${k}"><span>${dLabel(s)}${cx(k)}</span>${chip('none')}</button>`).join('')+
+    (data||[]).slice(0,6).map(x=>`<button type="button" data-d="${x.data}" data-cx="${x.caixa||1}"><span>${dLabel(x.data)}${cx(x.caixa||1)}</span>${chip(calc(x).status)}</button>`).join('');
 }
-$('hist').addEventListener('click',e=>{const b=e.target.closest('button');if(b){$('opData').value=b.dataset.d;loadDay()}});
+$('hist').addEventListener('click',e=>{const b=e.target.closest('button');if(b){$('opData').value=b.dataset.d;if(nCx(OPCLI)>1)$('opCaixa').value=b.dataset.cx;loadDay()}});
 $('opData').addEventListener('change',()=>{if($('opData').value)loadDay()});
+$('opCaixa').addEventListener('change',()=>{if($('opData').value)loadDay()});
 
 // =====================================================================
 // ESCRITÓRIO
@@ -1019,23 +1028,26 @@ async function loadPeriodo(ini,fim){
   let {data,error}=await q(TEM_AJ?', caixa_ajustes(*), caixa_original(*)':'');
   if(error&&TEM_AJ){console.warn('v42 ainda não rodada',error);TEM_AJ=false;({data,error}=await q(''))}
   if(error){fail(error,'Erro ao carregar');return []}
-  return data.map(f=>({...f,conf:one(f.conferencias),orig:one(f.caixa_original)||null,ajustes:(f.caixa_ajustes||[]).sort((a,b)=>a.ajustado_em<b.ajustado_em?-1:1)}));
+  return data.sort((a,b)=>a.data<b.data?-1:a.data>b.data?1:(a.caixa||1)-(b.caixa||1)).map(f=>({...f,conf:one(f.conferencias),orig:one(f.caixa_original)||null,ajustes:(f.caixa_ajustes||[]).sort((a,b)=>a.ajustado_em<b.ajustado_em?-1:1)}));
 }
 function monthRange(k){const [y,m]=k.split('-').map(Number);const last=new Date(y,m,0).getDate();return [`${k}-01`,`${k}-${pad(last)}`]}
 async function renderPainel(){
   if(!escCli.value){$('tbDias').innerHTML='<tr><td class="l muted" colspan="9">Nenhuma empresa liberada.</td></tr>';$('tiles').innerHTML='';$('tfDias').innerHTML='';return}
   const [ini,fim]=monthRange(escMes.value);MES=await loadPeriodo(ini,fim);
-  const by=Object.fromEntries(MES.map(f=>[f.data,f]));const cli=cliAtual();
-  const days=[];const d=dObj(ini);while(isoLocal(d)<=fim&&isoLocal(d)<=TODAY){const s=isoLocal(d);if(d.getDay()!==0||cli.abre_domingo||by[s])days.push(s);d.setDate(d.getDate()+1)}
+  const by={};MES.forEach(f=>(by[f.data]||=[]).push(f));const cli=cliAtual(),n=nCx(cli);
+  // uma linha por caixa de cada dia (com um caixa só, uma por dia como antes)
+  const days=[];const d=dObj(ini);while(isoLocal(d)<=fim&&isoLocal(d)<=TODAY){const s=isoLocal(d);if(d.getDay()!==0||cli.abre_domingo||by[s]){
+    const fs=by[s]||[];for(let k=1;k<=Math.max(n,...fs.map(f=>f.caixa||1));k++){const f=fs.find(x=>(x.caixa||1)===k);if(f||k<=n)days.push([s,k,f])}}d.setDate(d.getDate()+1)}
   const T={din:0,sai:0,fs:0,deb:0,difDeb:0,cred:0,juros:0};let nAlert=0,nPend=0,nConf=0,nSem=0;
   const cls=v=>v<-0.004?'neg':v>0.004?'pos':'muted';
-  $('tbDias').innerHTML=days.map(s=>{const f=by[s];
-    if(!f){nSem++;return `<tr><td>${dLabel(s)}</td><td colspan="7" class="l muted">Ainda não lançado</td><td class="l">${chip('none')}</td></tr>`}
+  const lbl=(s,k)=>dLabel(s)+(n>1||k>1?` <span class="muted">· Cx ${k}</span>`:'');
+  $('tbDias').innerHTML=days.map(([s,k,f])=>{
+    if(!f){nSem++;return `<tr><td>${lbl(s,k)}</td><td colspan="7" class="l muted">Ainda não lançado</td><td class="l">${chip('none')}</td></tr>`}
     const c=calc(f);T.din+=+f.din_sis;T.sai+=c.sai;T.fs+=c.fs;T.deb+=+f.deb_maq;T.difDeb+=c.difDeb;T.cred+=+f.cred_maq;T.juros+=c.juros;
     if(f.conferido)nConf++;else{nPend++;if(c.alerta)nAlert++}
     const clip=(f.anexos||[]).length?` <span class="muted" title="Comprovantes">📎${f.anexos.length}</span>`:'';
     const aj=(f.ajustes||[]).length?` <span class="muted" title="Valores corrigidos pelo escritório">✎${f.ajustes.length}</span>`:'';
-    return `<tr class="click${aConferir(f)?' pend':''}" data-d="${s}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${dLabel(s)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}${aj}</td></tr>`}).join('')
+    return `<tr class="click${aConferir(f)?' pend':''}" data-id="${f.id}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${lbl(s,k)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}${aj}</td></tr>`}).join('')
     ||'<tr><td class="l muted" colspan="9">Nenhum dia neste mês até hoje.</td></tr>';
   $('tfDias').innerHTML=MES.length?`<tr><td>Total</td><td>${fm(T.din)}</td><td>${fm(T.sai)}</td><td>${fsign(T.fs)}</td><td>${fm(T.deb)}</td><td>${fsign(T.difDeb)}</td><td>${fm(T.cred)}</td><td>${fm(T.juros)}</td><td></td></tr>`:'';
   $('tiles').innerHTML=`
@@ -1044,8 +1056,8 @@ async function renderPainel(){
     <div class="card tile"><div class="k">Juros de parcelamento</div><div class="v">${fm(T.juros)}</div><div class="n">crédito da máquina acima do sistema</div></div>
     <div class="card tile"><div class="k">A conferir</div><div class="v">${nPend}</div><div class="n">${nAlert} com diferença · ${nConf} conferidos · ${nSem} sem lançamento</div></div>`;
 }
-$('tbDias').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openDay(tr.dataset.d)});
-$('tbDias').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDay(tr.dataset.d)}});
+$('tbDias').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openDay(tr.dataset.id)});
+$('tbDias').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDay(tr.dataset.id)}});
 const dlg=$('dlg');let dlgF=null,dlgEd=null;
 $('dBody').addEventListener('click',e=>{if(e.target.matches('.fotos img'))e.target.classList.toggle('big')});
 const AJLAB={din_sis:'Dinheiro do sistema',din_cont:'Dinheiro contado',deb_sis:'Débito (sistema)',deb_maq:'Débito (máquina)',cred_sis:'Crédito (sistema)',cred_maq:'Crédito (máquina)'};
@@ -1053,15 +1065,15 @@ const saidaTxt=x=>[x.tipo,x.tipo==='Repasse'?(x.parceiro?'parceiro '+x.parceiro:
 const dtHr=t=>new Date(t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
 // o dia como o operador lançou (fica guardado antes da primeira correção do escritório)
 const fotoDia=f=>({...Object.fromEntries(NUM.map(k=>[k,r2(f[k])])),obs:f.obs||null,enviado_em:f.enviado_em,saidas:(f.saidas||[]).map(x=>({id:x.id,tipo:x.tipo,guia:x.guia,parceiro:x.parceiro,descricao:x.descricao,valor:r2(x.valor)}))});
-async function openDay(s,edit){
-  const f=MES.find(x=>x.data===s);if(!f)return;dlgF=f;const c=calc(f);
+async function openDay(id,edit){
+  const f=MES.find(x=>x.id===id);if(!f)return;dlgF=f;const c=calc(f),s=f.data,cx=cxNome(cliAtual(),f);
   dlgEd=edit?{...fotoDia(f),saidas:fotoDia(f).saidas.map(x=>({...x}))}:null;
   const urls=await signed((f.anexos||[]).map(a=>a.caminho));
   const L=(a,b,cl)=>`<div class="sline"><span>${a}</span><b class="${cl||''}">${b}</b></div>`;
   const cls=v=>v<-0.004?'neg':v>0.004?'pos':'';
   const anxSaida=id=>(f.anexos||[]).find(a=>a.saida_id===id);
   const anxDia=(f.anexos||[]).filter(a=>!a.saida_id);
-  $('dTitle').textContent=`${DOW[dObj(s).getDay()]}, ${dBR(s)}`+(edit?' · corrigindo':'');$('dChip').innerHTML=chip(c.status);
+  $('dTitle').textContent=`${DOW[dObj(s).getDay()]}, ${dBR(s)}`+(cx?' · '+cx:'')+(edit?' · corrigindo':'');$('dChip').innerHTML=chip(c.status);
   const docs=`${f.saidas.some(x=>anxSaida(x.id))?`<div><h3 style="margin-bottom:6px">Comprovantes das saídas</h3><div class="fotos">${f.saidas.map(x=>anxSaida(x.id)).filter(Boolean).map(a=>anexoView(a,urls[a.caminho])).join('')}</div></div>`:''}
     <div><h3 style="margin-bottom:6px">Comprovantes do dia</h3>${anxDia.length?`<div class="fotos">${anxDia.map(a=>`<div style="display:grid;gap:4px;max-width:100%"><span class="note">${esc(a.categoria)}</span>${anexoView(a,urls[a.caminho])}</div>`).join('')}</div>`:'<p class="neg" style="margin:0">Nenhum relatório anexado.</p>'}</div>
     <div><h3 style="margin-bottom:6px">Observação do operador</h3><p style="margin:0">${f.obs?esc(f.obs):'<span class="muted">Sem observação</span>'}</p></div>`;
@@ -1152,16 +1164,16 @@ async function salvarAjustes(){
   ok(await sb.from('caixa_ajustes').insert(aj.map(a=>({...a,fechamento_id:f.id,motivo,ajustado_nome:ME.nome||ME.email}))));
   return aj.length;
 }
-async function reabrirDia(s,edit){await renderPainel();if(MES.some(x=>x.data===s))openDay(s,edit);else dlg.close()}
+async function reabrirDia(id,edit){await renderPainel();if(MES.some(x=>x.id===id))openDay(id,edit);else dlg.close()}
 $('dClose').onclick=()=>dlg.close();
 dlg.addEventListener('close',()=>{dlgEd=null;dlg.classList.remove('edit')});
-$('dEdit').onclick=()=>openDay(dlgF.data,!dlgEd);
+$('dEdit').onclick=()=>openDay(dlgF.id,!dlgEd);
 $('dSave').onclick=async()=>{
   const b=$('dSave');b.disabled=true;
   try{const n=await salvarAjustes();if(n===false)return;
-    if(n===true){toast('Nenhum valor foi alterado.');openDay(dlgF.data,false);return}
-    toast(n+(n===1?' ajuste salvo':' ajustes salvos'));await reabrirDia(dlgF.data,false)}
-  catch(ex){fail(ex);await reabrirDia(dlgF.data,false)}finally{b.disabled=false}
+    if(n===true){toast('Nenhum valor foi alterado.');openDay(dlgF.id,false);return}
+    toast(n+(n===1?' ajuste salvo':' ajustes salvos'));await reabrirDia(dlgF.id,false)}
+  catch(ex){fail(ex);await reabrirDia(dlgF.id,false)}finally{b.disabled=false}
 };
 $('dConf').onclick=async()=>{
   const f=dlgF,nota=$('confNota').value,novo=!f.conferido||!!dlgEd;$('dConf').disabled=true;
@@ -1170,22 +1182,22 @@ $('dConf').onclick=async()=>{
     if(novo){const {error}=await sb.from('conferencias').upsert({fechamento_id:f.id,nota,conferido_em:new Date().toISOString(),conferido_por:(await sb.auth.getUser()).data.user.id});if(error)throw error}
     else{const {error}=await sb.from('conferencias').delete().eq('fechamento_id',f.id);if(error)throw error}
     const {error}=await sb.from('fechamentos').update({conferido:novo}).eq('id',f.id);if(error)throw error;
-    dlg.close();toast(novo?'Dia '+dBR(f.data)+' conferido':'Conferência desfeita');renderPainel();
-  }catch(ex){fail(ex);if(dlgEd)await reabrirDia(f.data,false)}finally{$('dConf').disabled=false}
+    dlg.close();toast(novo?'Dia '+dBR(f.data)+(cxNome(cliAtual(),f)?' ('+cxNome(cliAtual(),f)+')':'')+' conferido':'Conferência desfeita');renderPainel();
+  }catch(ex){fail(ex);if(dlgEd)await reabrirDia(f.id,false)}finally{$('dConf').disabled=false}
 };
 $('btnPlanMes').onclick=()=>{
   const cli=cliAtual();if(!cli||!MES.length){toast('Não há lançamentos neste mês.');return}
   const H=['Data','Dia','Dinheiro (sistema)','Saídas','Dinheiro esperado','Dinheiro contado','Falta(-)/Sobra(+)','Débito (sistema)','Débito (máquina)','Diferença débito','Crédito (sistema)','Crédito (máquina)','Juros de parcelamento','Observações','Situação','Nota da conferência','Ajustes do escritório'];
-  const rows=MES.map(f=>{const c=calc(f);return [dObj(f.data),DOW[dObj(f.data).getDay()],+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'',(f.ajustes||[]).map(a=>a.campo+': '+(a.antes||'—')+' → '+(a.depois||'removida')).join(' | ')]});
-  const S=[['Tipo','Nº guia / documento','Parceiro','Descrição','Valor','Data']];
-  MES.forEach(f=>f.saidas.forEach(s=>S.push([s.tipo,s.guia||'',s.parceiro||'',s.descricao||'',+s.valor,dObj(f.data)])));
+  const rows=MES.map(f=>{const c=calc(f),cx=cxNome(cli,f);return [dObj(f.data),DOW[dObj(f.data).getDay()]+(cx?' · '+cx:''),+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'',(f.ajustes||[]).map(a=>a.campo+': '+(a.antes||'—')+' → '+(a.depois||'removida')).join(' | ')]});
+  const S=[['Tipo','Nº guia / documento','Parceiro','Descrição','Valor','Data','Caixa']];
+  MES.forEach(f=>f.saidas.forEach(s=>S.push([s.tipo,s.guia||'',s.parceiro||'',s.descricao||'',+s.valor,dObj(f.data),cxNome(cli,f)])));
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet([H,...rows],{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=H.map((h,i)=>({wch:i===13||i===15?40:i===16?60:i===14?22:i===1?6:14}));
+  const ws=XLSX.utils.aoa_to_sheet([H,...rows],{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=H.map((h,i)=>({wch:i===13||i===15?40:i===16?60:i===14?22:i===1?(nCx(cli)>1?16:6):14}));
   xTabela(ws,{money:[2,3,4,5,6,7,8,9,10,11,12],neg:[6,9],texto:[13,15,16]});
   // situação do dia com a cor da tela (vermelho: conferir; verde: OK ou conferido)
   rows.forEach((x,i)=>{const t=x[14];xSt(ws,i+1,14,/⚠/.test(t)?XS.alerta:/OK|Conferido/.test(t)?{font:{bold:true,color:{rgb:XC.okInk}}}:null)});
   XLSX.utils.book_append_sheet(wb,ws,'Lançamentos');
-  const wsS=XLSX.utils.aoa_to_sheet(S,{cellDates:true,dateNF:'dd/mm/yyyy'});wsS['!cols']=[{wch:16},{wch:18},{wch:26},{wch:40},{wch:14},{wch:12}];xTabela(wsS,{money:[4],texto:[2,3]});
+  const wsS=XLSX.utils.aoa_to_sheet(S,{cellDates:true,dateNF:'dd/mm/yyyy'});wsS['!cols']=[{wch:16},{wch:18},{wch:26},{wch:40},{wch:14},{wch:12},{wch:10}];xTabela(wsS,{money:[4],texto:[2,3]});
   XLSX.utils.book_append_sheet(wb,wsS,'Saídas');
   XLSX.writeFile(wb,`Caixa ${cli.nome} ${escMes.value}.xlsx`);
 };
@@ -1244,12 +1256,12 @@ async function exportRows(){
   if(orig==='caixa'){
     const dias=(await loadPeriodo(exIni.value,exFim.value)).filter(d=>!exSo.checked||d.conferido);
     // tudo do caixa é dinheiro e vai na conta Tesouraria da empresa; nas receitas a observação fica em branco
-    dias.forEach(d=>{const c=calc(d);const br=dBR(d.data);const o=x=>`Caixa ${br} - ${x}`+(d.obs?' | '+d.obs:'');
+    dias.forEach(d=>{const c=calc(d);const br=dBR(d.data),cx=cxNome(cli,d),nc=cx||'Caixa';const o=x=>`${nc} ${br} - ${x}`+(d.obs?' | '+d.obs:'');
       push('Venda em dinheiro',d.data,d.din_sis,{conta:contaTes,obs:o('Venda em dinheiro')});
       // débito e crédito ficam fora por enquanto: na Tesouraria só entra dinheiro (falta conciliar com o relatório da adquirente)
       push('Falta de caixa',d.data,Math.max(-c.fs,0),{conta:contaTes,obs:o('Falta de caixa')});
       push('Sobra de caixa',d.data,Math.max(c.fs,0),{conta:contaTes,obs:o('Sobra de caixa')});
-      d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,{conta:contaTes,obs:`Saída caixa ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),doc:s.tipo==='Repasse'?'':s.guia,nome:s.tipo==='Repasse'?s.parceiro:''}));
+      d.saidas.forEach(s=>push(s.tipo,d.data,s.valor,{conta:contaTes,obs:`Saída ${cx||'caixa'} ${br} - ${s.tipo}`+(s.parceiro?' | Parceiro: '+s.parceiro:'')+(s.descricao?' | '+s.descricao:''),doc:s.tipo==='Repasse'?'':s.guia,nome:s.tipo==='Repasse'?s.parceiro:''}));
     });
   }else if(orig==='tesouraria'){
     const tes=await loadMod('tesouraria','data');
@@ -1647,8 +1659,8 @@ const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Administração C
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th><th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   // permissões de cada usuário do cliente: empresa › módulos (nível)
   const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Tudo, inclusive as tarefas restritas';
@@ -1693,7 +1705,8 @@ $('formAc').addEventListener('submit',async e=>{
 $('acTodas').onclick=()=>{const bs=[...$('acCli').querySelectorAll('input')],v=bs.some(b=>!b.checked);bs.forEach(b=>b.checked=v)};
 $('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-u]');if(!tr||!e.target.closest('button'))return;
   const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
-$('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;const v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
+$('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;let v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
+  if(k==='caixas')e.target.value=v=Math.max(1,Math.min(9,parseInt(v)||1));
   const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);c[k]=v}});
 // senha provisória fácil de ditar: 4 letras + 4 números
 const senhaNova=()=>{const L='abcdefghjkmnpqrstuvwxyz',a=new Uint32Array(8);crypto.getRandomValues(a);return [...a].map((x,i)=>i<4?L[x%L.length]:String(x%10)).join('')};
@@ -2052,7 +2065,9 @@ async function tcCarrega(cli,data){
     sb.from('tesouraria').select('id,data,tipo,descricao,valor,obs,conferido').eq('cliente_id',cli.id).gt('data',desde).lte('data',data).order('data').limit(3000),
     sb.from('fechamentos').select('data,din_cont').eq('cliente_id',cli.id).gt('data',desde).lte('data',data).order('data')]);
   if(error)throw error;
-  return {cli:cli.id,data,saldo,regs:regs||[],fechs:fechs||[]};
+  // empresa com mais de um caixa: o dinheiro do dia é a soma dos caixas
+  const dia={};(fechs||[]).forEach(f=>dia[f.data]=r2((dia[f.data]||0)+Number(f.din_cont)));
+  return {cli:cli.id,data,saldo,regs:regs||[],fechs:Object.entries(dia).map(([d,v])=>({data:d,din_cont:v}))};
 }
 function tcResHtml(D,itens,saldo,fis){
   const ok=Math.abs(D)<0.01;
