@@ -108,7 +108,7 @@ tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
 tfoot td{font-weight:700;background:var(--sunk)}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
-.fin{display:flex;align-items:center;gap:2px}.fin input{min-width:90px;width:100%;padding:4px 6px;font-size:13px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}td.fpend{background:var(--bad-soft)}td.fpend input,td.fpend{color:var(--bad);font-weight:600}.fadto{display:inline-flex;gap:2px;margin-left:2px}.fadto button{border:1px solid var(--line);background:var(--surface);border-radius:4px;cursor:pointer;font-size:12px;padding:1px 5px;line-height:1.4}.fadto button[data-adto=ok]{color:var(--ok)}.fadto button[data-adto=x]{color:var(--bad)}td.fpend{white-space:nowrap}#folGrid td.fpend .fin{display:inline-flex;width:auto;vertical-align:middle}#folGrid td.fpend .fin input{width:90px}.fadto{vertical-align:middle}
+.fin{display:flex;align-items:center;gap:2px}.fin input{min-width:90px;width:100%;padding:4px 6px;font-size:13px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.ffixo{border:0;background:none;cursor:pointer;font-size:12px;padding:2px;opacity:.3;filter:grayscale(1)}.ffixo:hover{opacity:.8}.ffixo.on{opacity:1;filter:none}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}td.fpend{background:var(--bad-soft)}td.fpend input,td.fpend{color:var(--bad);font-weight:600}.fadto{display:inline-flex;gap:2px;margin-left:2px}.fadto button{border:1px solid var(--line);background:var(--surface);border-radius:4px;cursor:pointer;font-size:12px;padding:1px 5px;line-height:1.4}.fadto button[data-adto=ok]{color:var(--ok)}.fadto button[data-adto=x]{color:var(--bad)}td.fpend{white-space:nowrap}#folGrid td.fpend .fin{display:inline-flex;width:auto;vertical-align:middle}#folGrid td.fpend .fin input{width:90px}.fadto{vertical-align:middle}
 .fdet{display:block;padding:16px 18px;min-width:0}.fdet>*+*{margin-top:12px}.fdet summary{cursor:pointer}
 dialog::backdrop{background:rgba(10,20,22,.45)}
 dialog[open].cheia{width:calc(100vw - 16px)!important;max-width:none;height:calc(100vh - 16px);max-height:none;display:flex;flex-direction:column}dialog.cheia .db{flex:1;min-height:0}
@@ -2639,7 +2639,7 @@ const FCOL={
     fixo:f=>{const v=ffNum(f,'assiduidade');if(v==null||f.situacao==='Afastado')return null;
       return FOL.lanc.some(l=>l.funcionario_id===f.id&&(['faltas_data','faltas_dias'].includes(l.coluna)||l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')))?0:v}},
   // valor por dia × 22 dias fixos (transporte, Carol 25/10), mais os sábados trabalhados (lançados no mês) × valor do sábado
-  ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money']]},
+  ajuda_dia:{t:'Ajuda de Custo',g:'P',k:'money',lanca:'dias',rotulo:'Sábados trabalhados',nome:'Ajuda de custo por dia útil',fx:[['ff.ajuda_dia','Ajuda por dia R$','money'],['ff.ajuda_mes','Ajuda fixa no mês R$','money'],['ff.ajuda_sabado','Sábado R$','money'],['ff.sem_sabado','Sábado não conta (ajuda fixa)','bool']]},
   he65:{t:'HE 65%',g:'P',k:'horas',lanca:'horas',fx:[['ff.sem_he','Não pode fazer hora extra','bool']]},
   he100:{t:'HE 100%',g:'P',k:'horas',lanca:'horas'},
   observacoes:{t:'Observações',g:'O',k:'texto',lanca:'texto',fixo:f=>ff(f,'observacoes'),fx:[['ff.observacoes','Observação fixa','texto']]},
@@ -2681,7 +2681,7 @@ function folCelula(f,c){
   if(c==='dsr'&&FOL.lanc.some(l=>l.funcionario_id===f.id&&FCOL[l.coluna]?.dsr&&l.texto==='dsr'))textos.unshift('Sim');
   if(c==='observacoes'&&f.situacao==='Afastado'&&f.motivo_afastamento)textos.unshift(f.motivo_afastamento);
   // quem tem ajuda de custo e sábado no mês: lembrete de que o sábado está somado na ajuda (Carol, 25/10)
-  if(c==='observacoes'&&colsDe(FOL.cli).includes('ajuda_dia')&&FOL.aj[f.id+'|ajuda_dia']===undefined){
+  if(c==='observacoes'&&colsDe(FOL.cli).includes('ajuda_dia')&&FOL.aj[f.id+'|ajuda_dia']===undefined&&!semSab(f)){
     const sab=FOL.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna==='ajuda_dia').reduce((s,l)=>s+(+l.quantidade||0),0),x=sab?ajudaDia(f,[]):null;
     if(sab&&x.v){const vs=ffNum(f,'ajuda_sabado')||0;textos.push(`Ajuda de custo ${fm(x.v)} + ${sab} ${sab===1?'sábado':'sábados'} × ${fm(vs)} = ${fm(r2(x.v+sab*vs))} (sábado somado na ajuda)`)}}
   if(c==='dif_salario'){const n=diasSemRegistro(f);if(n)textos.unshift(`${n} ${n===1?'dia':'dias'}`)}
@@ -2704,8 +2704,10 @@ function folCelula(f,c){
   return {v:tot,z:'"R$" #,##0.00',txt:fm(tot),pend,dica:pend?`${ADTO} de ${fm(fx)} a confirmar`:undefined};
 }
 // Ajuda de custo por dia: 22 dias fixos × valor do dia + sábados lançados × valor do sábado (vai com a fórmula, como na planilha)
+// ajuda de custo fixa no mês (ex.: Luana, R$ 150): a regra do sábado não vale (Carol, 27/10)
+const semSab=f=>!!ff(f,'sem_sabado')||ffNum(f,'ajuda_mes')>0&&!ffNum(f,'ajuda_dia');
 function ajudaDia(f,ls){
-  const dia=ffNum(f,'ajuda_dia'),mes=ffNum(f,'ajuda_mes'),sab=ls.reduce((s,l)=>s+(+l.quantidade||0),0),vs=ffNum(f,'ajuda_sabado')||0;
+  const dia=ffNum(f,'ajuda_dia'),mes=ffNum(f,'ajuda_mes'),sab=semSab(f)?0:ls.reduce((s,l)=>s+(+l.quantidade||0),0),vs=ffNum(f,'ajuda_sabado')||0;
   if(!dia&&!mes&&!sab)return {v:null,txt:''};
   const a=dia?r2(FOL.du*dia):mes||0,b=r2(sab*vs),tot=r2(a+b),pt=[dia?`${FOL.du}*${dia}`:mes?String(mes):'',b?String(b):''].filter(Boolean);
   return {v:tot,z:'"R$" #,##0.00',f:pt.length>1?`(${pt[0]})+${pt[1]}`:pt[0],txt:fm(tot),
@@ -3078,7 +3080,8 @@ function pontoPrev(){
   PNT.g=[...por.values()].filter(g=>g.dias.length||Object.keys(g.v).length||g.atest||(temSab&&g.f&&(g.sab||g.he>SAB_HE)));
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
   // quem não tem valor de sábado no cadastro é de contrato antigo (seg a sex): R$ 50 por sábado, que fica gravado no cadastro ao lançar
-  const sabCel=(g,i,id)=>{const vs=vsDe(id);if(!id||(!vs&&!g.sab&&g.he<=SAB_HE))return '<span class="muted">–</span>';
+  const sabCel=(g,i,id)=>{const vs=vsDe(id),fu=fs.find(x=>x.id===id);if(fu&&semSab(fu))return '<span class="muted">– (ajuda de custo fixa: sábado não conta)</span>';
+    if(!id||(!vs&&!g.sab&&g.he<=SAB_HE))return '<span class="muted">–</span>';
     return `<input data-ps="${i}" type="number" min="0" max="6" value="${g.sab||''}" placeholder="0" style="width:56px"> × ${fm(vs||SAB_PADRAO)}${vs?'':' <span class="muted">(contrato antigo)</span>'}${!g.sab&&m.sab<0&&g.he>SAB_HE?' <span class="chip c-warn">⚠ mais de 4h extras: confira os sábados</span>':''}`};
   PNT.sabCel=sabCel;
   $('pnPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${usa.map(([k,t])=>`<th>${esc(t)}</th>`).join('')}${temSab?'<th class="l">Sábados trabalhados</th>':''}${m.atest>=0?'<th class="l">Atestado</th>':''}</tr></thead><tbody>${
@@ -3168,22 +3171,46 @@ $('ptBar').addEventListener('click',async ev=>{
 
 // Edição direta das células (escritório): o valor vale só para este mês e fica guardado como ajuste.
 // Os fixos do cadastro continuam iguais; para mudar de vez, use “Colaboradores e valores fixos”.
-const folInput=(f,c,x)=>`<span class="fin"><input data-f="${f.id}" data-c="${c}" value="${esc(x.txt)}" placeholder="–" aria-label="${esc(f.nome+' · '+FNOME(c))}" title="${x.aj?'Alterado neste mês. ':''}Altere aqui para este mês">${x.aj?`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`:''}</span>`;
+// 📌 ao lado do valor: marcado = fixo no cadastro (entra todo mês); clicar marca ou desmarca (Carol, 27/10)
+const folTemFixo=(f,c)=>{const k=fixoCampo(c),v=k&&fxLer(f,k);return v!=null&&v!==''&&v!==false};
+const folFixoBtn=(f,c)=>{const on=folTemFixo(f,c);return `<button type="button" class="ffixo${on?' on':''}" data-f="${f.id}" data-c="${c}" title="${on?'Fixo: entra todo mês. Clique para deixar de ser fixo':'Marcar como fixo: o valor entra todo mês'}" aria-label="${on?'Fixo (clique para tirar)':'Marcar como fixo'}" aria-pressed="${on}">📌</button>`};
+const folInput=(f,c,x)=>`<span class="fin"><input data-f="${f.id}" data-c="${c}" value="${esc(x.txt)}" placeholder="–" aria-label="${esc(f.nome+' · '+FNOME(c))}" title="${x.aj?'Alterado neste mês. ':''}Altere aqui para este mês">${x.aj?`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`:''}${fixoCampo(c)&&(x.txt||folTemFixo(f,c))?folFixoBtn(f,c):''}</span>`;
 $('folGrid').addEventListener('change',async ev=>{
   const i=ev.target.closest('.fin input');if(!i)return;const f=FOL.func.find(x=>x.id===i.dataset.f),c=i.dataset.c,k=f.id+'|'+c,v=i.value.trim();
   if(FOL.aj[k]===undefined&&v===folCelula(f,c).txt)return;
+  folAjusta(f,c,v,i);
+});
+async function folAjusta(f,c,v,i){
+  const k=f.id+'|'+c;if(!v&&FOL.aj[k]===undefined)return;
   const {error}=await sb.from('folha_ajustes').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,funcionario_id:f.id,coluna:c,valor:v},{onConflict:'cliente_id,competencia,funcionario_id,coluna'});
   if(error){fail(error);return}
   FOL.aj[k]=v;const x=folCelula(f,c),td=i.closest('td');td.classList.add('fadj');
   if(document.activeElement!==i)i.value=x.txt;
   if(!td.querySelector('.fvolta'))i.insertAdjacentHTML('afterend',`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`);
+  if(!td.querySelector('.ffixo')&&fixoCampo(c))td.querySelector('.fin').insertAdjacentHTML('beforeend',folFixoBtn(f,c));
   toast('Alterado só neste mês');
-});
+}
 $('folGrid').addEventListener('click',async ev=>{
   const b=ev.target.closest('.fvolta');if(!b)return;const f=FOL.func.find(x=>x.id===b.dataset.f),c=b.dataset.c;
   const {error}=await sb.from('folha_ajustes').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('funcionario_id',f.id).eq('coluna',c);
   if(error){fail(error);return}
   delete FOL.aj[f.id+'|'+c];const td=b.closest('td');td.classList.remove('fadj');td.querySelector('input').value=folCelula(f,c).txt;b.remove();toast('Voltou ao valor calculado');
+});
+$('folGrid').addEventListener('click',async ev=>{
+  const b=ev.target.closest('.ffixo');if(!b)return;const f=FOL.func.find(x=>x.id===b.dataset.f),c=b.dataset.c,fk=fixoCampo(c),on=folTemFixo(f,c);
+  const tp=(FCOL[c].fx||[]).find(x=>x[0]===fk)?.[2]||'money',v=b.closest('.fin').querySelector('input').value.trim();let val=null;
+  if(on){if(!confirm(`${FNOME(c)} de ${f.nome} deixa de ser fixo? Os próximos meses não terão mais esse valor.`))return}
+  else{if(!v){toast('Digite o valor antes de marcar como fixo');return}
+    if(FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna===c)){toast('Esta célula tem lançamentos do mês: grave o fixo em “Colaboradores e valores fixos”');return}
+    val=v;if(tp==='money'){val=parseMoney(v);if(!isFinite(val)||!val){toast('Valor inválido');return}}
+    else if(tp==='livre'){const n=/^[R$\s\d.,-]+$/.test(v)?parseMoney(v):NaN;val=isFinite(n)&&n?n:v}}
+  const fx={...(f.folha_fixos||{})};if(fk.startsWith('ff.')){if(on)delete fx[fk.slice(3)];else fx[fk.slice(3)]=val}
+  b.disabled=true;
+  const {error}=await sb.from('funcionarios').update(fk.startsWith('ff.')?{folha_fixos:fx}:{[fk]:on?null:val}).eq('id',f.id);
+  // ao virar fixo, o ajuste do mês sai (o fixo já vale neste mês)
+  if(!error&&!on&&FOL.aj[f.id+'|'+c]!==undefined)await sb.from('folha_ajustes').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('funcionario_id',f.id).eq('coluna',c);
+  b.disabled=false;if(error){fail(error);return}
+  toast(on?`${FNOME(c)} de ${f.nome} não é mais fixo`:`${FNOME(c)} de ${f.nome} fixo: entra todo mês`);renderFolha();
 });
 // adiantamento salarial a confirmar: ✓ confirma, ✎ muda o valor (até R$ 830), ✗ exclui do mês
 const folAdtoBtns=f=>`<span class="fadto"><button type="button" data-adto="ok" data-f="${f.id}" title="Confirmar o adiantamento">✓</button><button type="button" data-adto="ed" data-f="${f.id}" title="Mudar o valor">✎</button><button type="button" data-adto="x" data-f="${f.id}" title="Excluir o adiantamento deste mês">✗</button></span>`;
