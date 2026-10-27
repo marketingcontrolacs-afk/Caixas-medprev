@@ -3692,7 +3692,7 @@ function pciAba(aba){
   const cab=PCI.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`),usado=new Set();
   const chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const alvo=[['func','Funcionário (quem tem o desconto)',/funcion|colab/],['data','Data (impressão ou emissão)',/data|impress|emiss/],['guia','Nº da guia',/guia|numero|^n[º°]/],
-    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelas (Parcelado, Observação: "5 vezes", "3x")',/parcel|vezes|obs/]];
+    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelado (Sim/Não ou nº de parcelas)',/parcel/],['obs','Observação das parcelas ("5 vezes", "3x")',/obs|vezes/]];
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   $('pciMap').innerHTML=`${PCI.wb.SheetNames.length>1?`<label class="f">Aba<select id="pciAba">${PCI.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pci="${k}"><option value="-1">${k==='func'||k==='total'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>`;
@@ -3702,7 +3702,7 @@ function pciAba(aba){
 // "3x", "3 parcelas", "Sim" (usa o padrão), "Não"/vazio = à vista (1 parcela)
 // também lê a observação: "em 5 vezes", "5x", "3 parcelas" (Carol, 27/10: a Fernanda veio em 1 vez)
 const pciN=(v,sim)=>{const t=String(v??'').trim().toLowerCase();if(!t||/^n(ao|ão)?$|vista/.test(t))return 1;
-  const m=t.match(/(\d+)\s*(x\b|x$|vez|parc)/)||t.match(/^(\d+)$/);if(m)return Math.max(1,Math.min(36,+m[1]));return /^s(im)?$|parcel/.test(t)?sim:1};
+  const m=t.match(/(\d+)\s*(x\b|x$|vez|parc)/)||t.match(/(?:parc|vez)\D{0,15}(\d+)/)||t.match(/^(\d+)$/);if(m)return Math.max(1,Math.min(36,+m[1]));return /^s(im)?$|parcel/.test(t)?sim:1};
 function pciPrev(){
   const m={};$('pciMap').querySelectorAll('[data-pci]').forEach(x=>m[x.dataset.pci]=+x.value);PCI.m=m;
   if(m.func<0||m.total<0){$('pciPrev').innerHTML='<p class="note">Escolha as colunas do funcionário e do total.</p>';$('pciOk').hidden=true;return}
@@ -3715,7 +3715,8 @@ function pciPrev(){
   for(let r=PCI.h+1;r<PCI.txt.length;r++){const tx=PCI.txt[r],rw=PCI.raw[r],nome=String(tx[m.func]||'').trim();if(!nome||/^tota(l|is)\b/i.test(nome))continue;
     const total=typeof rw[m.total]==='number'?r2(rw[m.total]):parseMoney(String(tx[m.total]||''));if(!(total>0))continue;
     const em=m.data>=0?pontoData(rw[m.data]):null,guia=m.guia>=0?String(tx[m.guia]||'').trim():'',usuario=m.usuario>=0?String(tx[m.usuario]||'').trim():'';
-    const n=m.parc>=0?pciN(tx[m.parc],sim):1,f=acha(nome),origem=['imp',col,guia||'',em||'',normNome(nome).join(' '),total.toFixed(2)].join('|');
+    // a observação ("em 5 vezes") vale mais que o Sim/Não da coluna Parcelado
+    const no=m.obs>=0?pciN(tx[m.obs],0):0,n=no>1?no:m.parc>=0?pciN(tx[m.parc],sim):1,f=acha(nome),origem=['imp',col,guia||'',em||'',normNome(nome).join(' '),total.toFixed(2)].join('|');
     // já lançado: importado antes (mesma linha) ou lançado à mão (mesmo colaborador e mesma guia, ou mesma data e total)
     const mao=f&&PCI.parc.some(p=>p.funcionario_id===f.id&&(guia&&p.guia?String(p.guia).trim()===guia:p.emissao===em&&Math.abs(+p.valor_total-total)<0.01));
     // já importado com outro nº de parcelas: oferece corrigir (refaz as parcelas a partir do mesmo 1º mês)
