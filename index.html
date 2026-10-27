@@ -2667,7 +2667,7 @@ const FCOL={
   vt:{t:'VT',g:'D',k:'simnao',fixo:f=>folBen(f,'vt')??f.folha_vt,fx:[['folha_vt','VT','bool']]},
   descontos_diversos:{t:'Descontos Diversos',g:'D',k:'money',lanca:'money'},
   quebra_cx_desc:{t:'Quebra de CX',g:'D',k:'money',lanca:'money',nome:'Quebra de CX (desconto)'},
-  faltas_horas:{t:'Faltas/ Horas',g:'D',k:'horas',lanca:'horas',dsr:true},
+  faltas_horas:{t:'Faltas/ Horas',g:'D',k:'horas',lanca:'horas',dsr:true,parc:true},
   faltas_dias:{t:'Faltas/ Dias',g:'D',k:'dias',lanca:'dias',dsr:true},
   dsr:{t:'DSR',g:'D',k:'texto',lanca:'texto',dica:'Ex.: Sim'},
   vale_mp:{t:'Vale (Atendimentos MP)',g:'D',k:'money',lanca:'money',parc:true},
@@ -2980,8 +2980,11 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('folGrid').parent
 const PONTO='Espelho de ponto',SAB_PADRAO=50,HE_COLS=['he65','he100','he50','he75','horas_extras'];
 // quem não pode fazer hora extra (menor de idade, jornada de 6h): a HE do ponto não é lançada, vira um alerta nas observações
 // Viva (Matriz e Filial) tem banco de horas (Carol, 27/10): hora extra não é paga na folha, e o que manda é o
-// "Saldo do banco de horas" do espelho, que já abate os atrasos. Saldo positivo: nada a lançar. Saldo negativo: na
-// importação ela diz quanto descontar, e o resto (banco de horas ou desconto parcelado) vira observação.
+// espelho separa o que entrou no banco (H.E e atrasos) do que foi cadastrado como falta para descontar em folha:
+// a coluna "Folha" (no resumo, "H. Faltantes Folha"). Só ela vai para a folha, já preenchida para a Carol validar
+// (ex.: Jussara, 10/2026: 36:00 na coluna Folha, banco −0:28 que não se lança); o que ela tirar fica para o banco ou
+// parcelado e vira observação. Os dias de falta ficam como observação (o pedido de benefícios conta), sem desconto em
+// dias, para não descontar duas vezes. Sem a coluna Folha, vale o saldo negativo do banco (Carol, 27/10).
 // O controle do banco de horas fica no sistema de ponto: o saldo volta no espelho do mês seguinte.
 const bancoHoras=cli=>!!cli&&(cli.folha_modelo?.banco_horas??/viva|simon/i.test(cli.nome||''));
 const semHE=id=>{const f=FOL.func.find(x=>x.id===id);return !!(f&&ff(f,'sem_he'))};
@@ -3010,7 +3013,7 @@ $('folPonto').onclick=()=>{PT_MES=folMes.value;go('ponto')};
 // as faltas em dias sempre entram (o pedido de benefícios usa), mesmo que a planilha da folha não tenha a coluna
 $('ptImp').onclick=()=>{
   const bh=bancoHoras(FOL.cli);
-  PNT={bh,cols:[...(bh?[['saldo','Saldo do banco de horas',/saldo|banco/]]:[]),...PONTO_COLS.filter(x=>x[0]==='faltas_dias'||colsDe(FOL.cli).includes(x[0])||bh&&x[0]==='faltas_horas')
+  PNT={bh,cols:[...(bh?[['folha_h','Falta para a folha (coluna Folha, fora do banco)',/^folha$|faltantes folha/],['saldo','Saldo do banco de horas (só informação)',/saldo|banco.*final|^b\.? ?total/]]:[]),...PONTO_COLS.filter(x=>x[0]==='faltas_dias'||colsDe(FOL.cli).includes(x[0])||bh&&x[0]==='faltas_horas')
     .map(x=>bh&&HE_COLS.includes(x[0])?[x[0],'Horas extras (só informação: banco de horas)',x[2]]:x)]};
   folDlg(`Importar espelho de ponto · ${MESES[+FOL.comp.slice(5,7)-1]} ${FOL.comp.slice(0,4)}`,
     `<p class="note" style="margin-top:0">Envie o resumo do espelho de ponto em PDF (gerado pelo sistema de ponto, não escaneado), Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
@@ -3062,24 +3065,28 @@ async function pdfTabela(buf){
 // a partir de 16/02/2027 a escala passa a 5x2 e ninguém trabalha no sábado: a regra do sábado vale até 15/02/2027
 const SAB_HE=4*60,SAB_ATE='2027-02-15',DIA_RE=/^(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d\d)\/(\d\d)\/(\d\d)/i,FALTA_DIA=9*60;
 function espelhoDiario(pags){
-  const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados','Atestado']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
-  let nome='',col=null,sem={f:[],hf:0,he:0,sab:null};
+  // Folha e B.Total: espelho com banco de horas (Viva): a falta fora do banco, somada no mês, e o saldo final do banco
+  const out=[['Colaborador','Data','Faltas','H.F','H.E','Sábados','Atestado','Folha','Saldo banco de horas']],num=s=>{const m=lerHoras(String(s||'').replace(/^-/,''));return isFinite(m)&&m>0?m:0};
+  let nome='',col=null,sem={f:[],hf:0,he:0,sab:null},bh={fo:0,bt:''};
+  const fechaBh=()=>{if(nome&&(bh.fo||bh.bt))out.push([nome,'',0,'','','','',bh.fo?hhmm(bh.fo):'',bh.bt]);bh={fo:0,bt:''}};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
     if(sem.sab&&sem.he>SAB_HE&&sem.sab.split('/').reverse().join('-')<=SAB_ATE)out.push([nome,sem.sab,0,'','',1]);
     const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
   for(const ls of pags)for(const l of ls){
     const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
-    if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();nome=v}continue}
-    if(l.its.some(i=>i.s==='H.F')&&l.its.some(i=>i.s==='H.E')){col={he:l.its.find(i=>i.s==='H.E').cx,hf:l.its.find(i=>i.s==='H.F').cx,td:l.its.find(i=>i.s==='T.Dia')?.cx};continue}
+    if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();fechaBh();nome=v}continue}
+    if(l.its.some(i=>i.s==='H.F')&&l.its.some(i=>i.s==='H.E')){col={he:l.its.find(i=>i.s==='H.E').cx,hf:l.its.find(i=>i.s==='H.F').cx,td:l.its.find(i=>i.s==='T.Dia')?.cx,
+      fo:l.its.find(i=>/^folha$/i.test(i.s))?.cx,bt:l.its.find(i=>/^b\.?\s*total$/i.test(i.s))?.cx};continue}
     const m=DIA_RE.exec(l.its[0].s);if(!m||!col)continue;
     const em=cx=>l.its.find(i=>Math.abs(i.cx-cx)<10)?.s,dia=`${m[2]}/${m[3]}/20${m[4]}`;
     if(l.its.some(i=>/^falta$/i.test(i.s)))sem.f.push(dia);
     if(l.its.some(i=>/atestado/i.test(i.s)))out.push([nome,dia,0,'','','',1]);
     if(/^s[aá]b/i.test(m[1])&&col.td&&num(em(col.td)))sem.sab=dia;
     sem.hf+=num(em(col.hf));sem.he+=num(em(col.he));
+    if(col.fo)bh.fo+=num(em(col.fo));if(col.bt){const v=em(col.bt);if(v&&/\d:\d/.test(v))bh.bt=v}
     if(/^dom/i.test(m[1]))fecha();
   }
-  fecha();return out;
+  fecha();fechaBh();return out;
 }
 function pontoAba(aba){
   const ws=PNT.wb.Sheets[aba];PNT.aba=aba;
@@ -3146,31 +3153,37 @@ function pontoPrev(){
     PNT.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l"><select data-pg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></td>${
       usa.map(([k])=>`<td>${k==='saldo'?(g.saldo==null?'':`<b class="${g.saldo<0?'neg':''}">${g.saldo>0?'+':''}${hhmm(g.saldo)}</b>`):PNT.bh&&(k==='faltas_horas'||HE_COLS.includes(k))?(g.v[k]?`<span class="muted">${hhmm(g.v[k])}</span>`:''):k==='faltas_horas'&&g.v[k]&&g.f&&semHE(g.f.id)&&HE_COLS.some(x=>g.v[x])?(r=>`<b>${r>=10?hhmm(r):'–'}</b> <span class="muted">(${hhmm(g.v[k])} − ${hhmm(Math.min(g.v[k],HE_COLS.reduce((t,x)=>t+(g.v[x]||0),0)))} de HE)</span>`)(g.v[k]-Math.min(g.v[k],HE_COLS.reduce((t,x)=>t+(g.v[x]||0),0))):HE_COLS.includes(k)&&g.v[k]&&g.f&&semHE(g.f.id)?`<s>${hhmm(g.v[k])}</s> <span class="chip c-warn">⚠ não pode fazer HE: abate das faltas, o resto vai como alerta</span>`:k==='faltas_dias'?(g.dias.length?`${g.dias.reduce((s,d)=>s+d.n,0)}${g.dias.some(d=>d.data)?` <span class="muted">(${g.dias.filter(d=>d.data).map(d=>dBR(d.data).slice(0,5)).join(', ')})</span>`:''}`:''):g.v[k]?hhmm(g.v[k]):''}</td>`).join('')}${temSab?`<td class="l" data-pst="${i}">${sabCel(g,i,g.f?.id)}</td>`:''}${m.atest>=0?`<td class="l">${g.atest?`${g.atest.filter(Boolean).map(d=>dBR(d).slice(0,5)).join(', ')||g.atest.length}${colsDe(FOL.cli).includes('assiduidade')?' <span class="chip c-warn">zera a assiduidade</span>':''}`:''}</td>`:''}${PNT.bh?`<td class="l">${pontoBhCel(g,i,m)}</td>`:''}</tr>`).join('')
     ||`<tr><td class="l muted" colspan="${usa.length+2+temSab}">Nenhuma falta ou hora extra encontrada nas colunas escolhidas.</td></tr>`}</tbody></table></div>
-    ${PNT.bh?`<p class="note"><b>Banco de horas:</b> horas extras e atrasos não vão para a folha.${m.saldo>=0?' Saldo positivo: nada a lançar. Saldo negativo:':' Escolha a coluna “Saldo do banco de horas” (ele já abate os atrasos). Sem ela, em cada falta em horas'} diga quantas horas descontar na folha (0:00 se nada) e o que fazer com o resto, que vira uma observação.</p>`:''}
-    <p class="note">Falta do dia inteiro entra com DSR; falta em horas, sem DSR. Totais abaixo de 10 minutos não são lançados. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
+    ${PNT.bh?`<p class="note"><b>Banco de horas:</b> horas extras e atrasos não vão para a folha.${m.folha_h>=0?' Vai para a folha só a coluna Folha (falta cadastrada no ponto para descontar, fora do banco), já preenchida: confira, mude as horas se quiser e, se o desconto for parcelado, diga em quantas vezes (as parcelas entram sozinhas na folha dos meses seguintes). Os dias de falta ficam como observação.':m.saldo>=0?' Saldo positivo: nada a lançar. Saldo negativo:':' Escolha a coluna “Folha” (falta fora do banco). Sem ela, em cada falta em horas'}${m.folha_h>=0?'':' diga quantas horas descontar na folha (0:00 se nada) e o que fazer com o resto, que vira uma observação.'}</p>`:''}
+    <p class="note">${PNT.bh&&m.folha_h>=0?'':'Falta do dia inteiro entra com DSR; falta em horas, sem DSR.'} Totais abaixo de 10 minutos não são lançados. ${PNT.g.filter(g=>!g.f).length?`<b>${PNT.g.filter(g=>!g.f).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''} Se já importou este mês, a importação anterior é trocada por esta.</p>`;
   $('pnOk').hidden=!PNT.g.length;
   if(temSab)$('pnPrev').querySelectorAll('[data-pg]').forEach(s=>s.onchange=()=>{const i=+s.dataset.pg,td=$('pnPrev').querySelector(`[data-pst="${i}"]`);
     const ant=td.querySelector('input');if(ant)PNT.g[i].sab=+ant.value||0;td.innerHTML=sabCel(PNT.g[i],i,s.value)});
 }
 // banco de horas: o que está negativo (saldo do banco, ou as horas de falta se não houver a coluna do saldo)
-const pontoBhNeg=(g,m)=>m.saldo>=0?(g.saldo<0?-g.saldo:0):g.v.faltas_horas||0;
+const pontoBhNeg=(g,m)=>m.folha_h>=0?g.v.folha_h||0:m.saldo>=0?(g.saldo<0?-g.saldo:0):g.v.faltas_horas||0;
 // quanto descontar agora e o destino do resto
 const pontoBhCel=(g,i,m)=>{const n=pontoBhNeg(g,m);if(!n)return '<span class="muted">nada a descontar</span>';
-  return `<div style="white-space:nowrap">Negativo: <b class="neg">${hhmm(n)}</b> · descontar <input data-pbh="${i}" placeholder="h:mm" inputmode="numeric" style="width:64px"></div>
-  <select data-pbd="${i}" style="margin-top:4px;width:auto"><option value="banco">resto: banco de horas</option><option value="parc">resto: parcelar</option></select>`};
+  return `<div style="white-space:nowrap">${m.folha_h>=0?'Fora do banco':'Negativo'}: <b class="neg">${hhmm(n)}</b> · descontar <input data-pbh="${i}" value="${m.folha_h>=0?hhmm(n):''}" placeholder="h:mm" inputmode="numeric" style="width:64px"></div>
+  <div style="white-space:nowrap;margin-top:4px">Parcelar o desconto? em <input data-pbn="${i}" type="number" min="1" max="36" value="1" style="width:56px"> vez(es)</div>`};
 FOLACAO.pontoLanca=async b=>{
   // Oliveira lança a falta pela data do dia (coluna faltas_data); as demais, em dias com DSR
   const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO},cs=colsDe(FOL.cli),
     porData=cs.includes('faltas_data')&&!cs.includes('faltas_dias'),noMes=d=>d&&d.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d<=fimMes(FOL.comp);
-  let falta=null;
+  let falta=null;const parcs=[];
   document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
     if(PNT.bh){
       const hf=pontoBhNeg(g,PNT.m),inp=document.querySelector(`[data-pbh="${s.dataset.pg}"]`);
       let d=0;if(hf){const t=inp.value.trim();d=t===''?null:/^0+$/.test(t)?0:lerHoras(t);if(d==null||!isFinite(d)||d<0){falta=falta||g.nome;return}}
-      g.dias.forEach(x=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:x.n,data:noMes(x.data)?x.data:null,texto:'dsr'}));
-      if(d>0)regs.push({...base,funcionario_id:f,coluna:'faltas_horas',quantidade:Math.round(d)});
-      const resto=hf-d,dest=document.querySelector(`[data-pbd="${s.dataset.pg}"]`)?.value==='parc'?'descontar parcelado nos próximos meses':'banco de horas';
-      if(hf)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Banco de horas: ${PNT.m.saldo>=0?'saldo':'faltas'} −${hhmm(hf)} no ponto, ${d?hhmm(d)+' descontadas na folha':'nada descontado na folha'}${resto>0?`; restam ${hhmm(resto)} (${dest})`:''}.`});
+      if(PNT.m.folha_h>=0){const n=g.dias.reduce((t,x)=>t+x.n,0),ds=g.dias.filter(x=>x.data).map(x=>dBR(x.data).slice(0,5));
+        if(n)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Faltas: ${n} ${n===1?'dia':'dias'}${ds.length?' ('+ds.join(', ')+')':''}, descontadas em horas`})}
+      else g.dias.forEach(x=>regs.push({...base,funcionario_id:f,coluna:'faltas_dias',quantidade:x.n,data:noMes(x.data)?x.data:null,texto:'dsr'}));
+      // parcelado: a 1ª parcela cai neste mês e as outras nos seguintes, como desconto parcelado em horas (folha_parcelamentos)
+      const np=Math.max(1,Math.min(36,parseInt(document.querySelector(`[data-pbn="${s.dataset.pg}"]`)?.value,10)||1)),dm=Math.round(d);
+      if(dm>0&&np>1){const ps=parcGerarH(dm,np,FOL.comp.slice(0,7));parcs.push({cliente_id:FOL.cli.id,funcionario_id:f,coluna:'faltas_horas',emissao:FOL.comp,valor_total:dm,parcelas:ps,
+        descricao:'Faltas fora do banco de horas (espelho de ponto)',origem:`ponto|${FOL.comp.slice(0,7)}|${f}`})}
+      else if(dm>0)regs.push({...base,funcionario_id:f,coluna:'faltas_horas',quantidade:dm});
+      const resto=hf-d,dest='banco de horas',pp=np>1&&dm>0?parcGerarH(dm,np,FOL.comp.slice(0,7)):null;
+      if(hf)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`${PNT.m.folha_h>=0?`Falta fora do banco de horas: ${hhmm(hf)} no ponto`:`Banco de horas: ${PNT.m.saldo>=0?'saldo':'faltas'} −${hhmm(hf)} no ponto`}, ${!d?'nada descontado na folha':pp?`desconto de ${hhmm(d)} em ${np}x (${hhmm(pp[0].v)} por mês, ${ymTxt(pp[0].c)} a ${ymTxt(pp[np-1].c)})`:hhmm(d)+' descontadas na folha'}${resto>0?`; ${hhmm(resto)} não descontadas (${dest})`:''}.`});
       if(g.atest)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Atestado: ${g.atest.filter(Boolean).map(x=>dBR(x).slice(0,5)).join(', ')||g.atest.length+' dia(s)'}`});
       return}
     g.dias.forEach(d=>regs.push(porData?{...base,funcionario_id:f,coluna:'faltas_data',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:noMes(d.data)?null:`${d.n} ${d.n===1?'dia':'dias'}`}
@@ -3185,11 +3198,14 @@ FOLACAO.pontoLanca=async b=>{
     const sab=+document.querySelector(`[data-ps="${s.dataset.pg}"]`)?.value||0;if(sab>0)regs.push({...base,funcionario_id:f,coluna:'ajuda_dia',quantidade:sab})});
   const novosSab=!ehEsc()?[]:[...new Set(regs.filter(r=>r.coluna==='ajuda_dia').map(r=>r.funcionario_id))].map(id=>FOL.func.find(x=>x.id===id)).filter(x=>x&&!ffNum(x,'ajuda_sabado'));
   if(falta)return foErro(`Diga quantas horas descontar na folha de ${falta} (0:00 se nada).`);
-  if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
+  if(!regs.length&&!parcs.length)return foErro('Nenhum colaborador escolhido para lançar.');
   b.disabled=true;
   try{
     const {error:e1}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);if(e1)throw e1;
     const {error:e2}=await sb.from('folha_lancamentos').insert(regs);if(e2)throw e2;
+    // importar de novo troca também os parcelamentos de horas criados por esta importação
+    if(PNT.bh){const {error:e4}=await sb.from('folha_parcelamentos').delete().eq('cliente_id',FOL.cli.id).like('origem',`ponto|${FOL.comp.slice(0,7)}|%`);if(e4)throw e4;
+      if(parcs.length){const {error:e5}=await sb.from('folha_parcelamentos').insert(parcs);if(e5)throw e5}}
     for(const x of novosSab){const {error:e3}=await sb.from('funcionarios').update({folha_fixos:{...(x.folha_fixos||{}),ajuda_sabado:SAB_PADRAO}}).eq('id',x.id);if(e3)throw e3}
     dlgFol.close();toast(`Espelho de ponto lançado: ${regs.length} lançamentos`);(VIEW==='ponto'?renderPonto:renderFolha)();
   }catch(ex){console.error(ex);foErro(/row-level|policy/i.test(ex.message||'')?'Este mês já foi conferido. Peça ao escritório para reabrir.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
@@ -3242,7 +3258,8 @@ $('ptBar').addEventListener('click',async ev=>{
   if(ev.target.id==='ptBen'){const c=addMes(FOL.comp,1).slice(0,7);if(!$('bnMes').options.length)$('bnMes').innerHTML=mesesOpts(addMes(TODAY,2).slice(0,7));
     if(![...$('bnMes').options].some(o=>o.value===c))$('bnMes').insertAdjacentHTML('afterbegin',`<option value="${c}">${MESES[+c.slice(5)-1]} ${c.slice(0,4)}</option>`);$('bnMes').value=c;go('ben');return}
   if(ev.target.id!=='ptApaga'||!confirm('Apagar tudo o que o espelho de ponto lançou neste mês?'))return;
-  const {error}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);
+  let {error}=await sb.from('folha_lancamentos').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('descricao',PONTO);
+  if(!error&&bancoHoras(FOL.cli))({error}=await sb.from('folha_parcelamentos').delete().eq('cliente_id',FOL.cli.id).like('origem',`ponto|${FOL.comp.slice(0,7)}|%`));
   if(error)fail(error,'Não foi possível apagar');else{toast('Importação apagada');renderPonto()}});
 
 // Edição direta das células (escritório): o valor vale só para este mês e fica guardado como ajuste.
@@ -3424,6 +3441,8 @@ async function renderBen(){
   const nomeIg=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().split(/\s+/).slice(0,2).join(' ');
   const falta=f=>{const ls=(rl.data||[]).filter(l=>l.funcionario_id===f.id),t=[];let n=0,inj=0;
     ls.filter(l=>l.coluna==='faltas_dias'||l.coluna==='faltas_data').forEach(l=>{const k=+l.quantidade||1;n+=k;inj+=k;t.push(`falta ${l.data?dBR(l.data).slice(0,5):''}`.trim())});
+    // banco de horas (Viva): os dias de falta vêm do ponto como observação "Faltas: N dias (dd/mm, ...)"
+    ls.filter(l=>l.coluna==='observacoes'&&/^\W*faltas:/i.test(l.texto||'')).forEach(l=>{const k=+((l.texto.match(/(\d+)\s*dia/)||[])[1]||1);n+=k;inj+=k;t.push('falta '+(l.texto.match(/\d{2}\/\d{2}/g)||[]).join(', '))});
     ls.filter(l=>l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')).forEach(l=>{const ds=(l.texto.match(/\d{2}\/\d{2}/g)||[]);n+=ds.length||1;t.push('atestado '+ds.join(', '))});
     (rv.data||[]).filter(x=>x.status!=='Devolvida'&&(x.matricula&&f.matricula?String(x.matricula)===String(f.matricula):nomeIg(x.nome)===nomeIg(f.nome))).forEach(x=>{const k=benUteis(x.inicio,x.fim_real,comp,fer);if(k){n+=k;t.push(`férias ${dBR(x.inicio).slice(0,5)} a ${dBR(x.fim_real).slice(0,5)} (${k} ${k===1?'dia':'dias'})`)}});
     return {n,inj,t:t.join('; ')}};
@@ -3601,7 +3620,7 @@ const parcRest=p=>r2((p.parcelas||[]).filter(x=>x.c>FOL.comp.slice(0,7)).reduce(
 function renderFolParc(cols,lanca){
   const pc=cols.filter(c=>FCOL[c].parc);
   $('folParcBox').hidden=!pc.length;if(!pc.length)return;
-  FOL.parcCols=pc;$('folParcAdd').hidden=$('folParcImp').hidden=!lanca||FOL.semParc;
+  FOL.parcCols=[...pc.filter(c=>!parcH(c)),...pc.filter(parcH)];$('folParcAdd').hidden=$('folParcImp').hidden=!lanca||FOL.semParc;
   if(FOL.semParc){$('folParc').innerHTML='<tbody><tr><td class="l neg">Os descontos parcelados precisam da atualização v19 do banco. Rode o SQL no Supabase.</td></tr></tbody>';return}
   const ym=FOL.comp.slice(0,7),todos=$('folParcTodos').checked,nome=id=>FOL.func.find(f=>f.id===id)?.nome||'',sit=id=>FOL.func.find(f=>f.id===id)?.situacao;
   // filtro por funcionário: mostra todos os lançamentos dele, inclusive os quitados (Carol, 27/10)
@@ -3611,7 +3630,7 @@ function renderFolParc(cols,lanca){
   $('folParc').innerHTML=ls.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Desconta em</th><th>Emissão</th><th class="l">Guia</th><th class="l">Usuário</th><th>Total</th><th>Parcelas</th><th>Neste mês</th><th>Falta depois</th><th></th></tr></thead><tbody>${
     (FOL.parcLista=ls).map(p=>{const ps=p.parcelas||[],i=ps.findIndex(x=>x.c===ym),rest=parcRest(p);
       return `<tr><td class="l">${esc(nome(p.funcionario_id))}${sit(p.funcionario_id)==='Desligado'&&rest>0?' <span class="chip c-warn">Desligado: descontar na rescisão</span>':''}</td><td class="l">${esc(FCOL[p.coluna]?.t||p.coluna)}</td><td>${p.emissao?dBR(p.emissao):''}</td><td class="l">${esc(p.guia||'')}</td><td class="l">${esc(p.usuario||'')}</td>
-        <td>${fm(p.valor_total)}</td><td>${ps.length}x ${ps.length?`<span class="muted">(${ymTxt(ps[0].c)} a ${ymTxt(ps[ps.length-1].c)})</span>`:''}</td><td>${i>=0?`<b>${fm(ps[i].v)}</b> <span class="muted">${i+1}/${ps.length}</span>`:'<span class="muted">–</span>'}</td><td>${rest?fm(rest):'<span class="muted">quitado</span>'}</td>
+        <td>${parcFm(p.coluna,p.valor_total)}</td><td>${ps.length}x ${ps.length?`<span class="muted">(${ymTxt(ps[0].c)} a ${ymTxt(ps[ps.length-1].c)})</span>`:''}</td><td>${i>=0?`<b>${parcFm(p.coluna,ps[i].v)}</b> <span class="muted">${i+1}/${ps.length}</span>`:'<span class="muted">–</span>'}</td><td>${rest?parcFm(p.coluna,rest):'<span class="muted">quitado</span>'}</td>
         <td><button class="btn small" data-fpc="${p.id}">Abrir</button></td></tr>`}).join('')}</tbody>`
     :`<tbody><tr><td class="l muted">Nenhum desconto parcelado em aberto.${lanca?' Use “+ Desconto parcelado” para lançar um vale ou adiantamento em parcelas.':''}</td></tr></tbody>`;
 }
@@ -3621,9 +3640,10 @@ function parcRel(){
   const ym=FOL.comp.slice(0,7),nome=id=>FOL.func.find(f=>f.id===id)?.nome||'',fv=$('folParcFunc').value;
   const ls=FOL.parcLista||[],H=['Colaborador','Desconta em','Emissão','Guia','Usuário','Total','Parcelas','Neste mês','Falta depois','Parcela a parcela'];
   const rows=ls.map(p=>{const ps=p.parcelas||[],i=ps.findIndex(x=>x.c===ym);
-    return [nome(p.funcionario_id),FCOL[p.coluna]?.t||p.coluna,p.emissao?dBR(p.emissao):'',p.guia||'',p.usuario||'',+p.valor_total||0,`${ps.length}x`,i>=0?+ps[i].v:'',parcRest(p),ps.map((x,k)=>`${k+1}ª ${ymTxt(x.c)} ${fm(x.v)}`).join(' · ')]});
+    const h=parcH(p.coluna),q=v=>h?hhmm(v):v;
+    return [nome(p.funcionario_id),FCOL[p.coluna]?.t||p.coluna,p.emissao?dBR(p.emissao):'',p.guia||'',p.usuario||'',q(+p.valor_total||0),`${ps.length}x`,i>=0?q(+ps[i].v):'',q(parcRest(p)),ps.map((x,k)=>`${k+1}ª ${ymTxt(x.c)} ${parcFm(p.coluna,x.v)}`).join(' · ')]});
   const tit=`Descontos parcelados · ${FOL.cli.folha_modelo?.titulo||FOL.cli.nome}`,sub=`Folha de ${MESES[+ym.slice(5)-1]} ${ym.slice(0,4)}${fv?' · '+nome(fv):$('folParcTodos').checked?' · com os quitados':' · em aberto'}`;
-  return {ls,H,rows,tit,sub,tot:[r2(rows.reduce((t,r)=>t+r[5],0)),r2(rows.reduce((t,r)=>t+(+r[7]||0),0)),r2(rows.reduce((t,r)=>t+r[8],0))]};
+  return {ls,H,rows,tit,sub,tot:[r2(rows.reduce((t,r)=>t+(typeof r[5]==='number'?r[5]:0),0)),r2(rows.reduce((t,r)=>t+(typeof r[7]==='number'?r[7]:0),0)),r2(rows.reduce((t,r)=>t+(typeof r[8]==='number'?r[8]:0),0))]};
 }
 $('folParcXls').onclick=()=>{
   const R=parcRel();if(!R.rows.length){toast('Nada para exportar');return}
@@ -3653,10 +3673,13 @@ $('folParcAdd').onclick=()=>abrirParc(null);
 $('folParc').addEventListener('click',ev=>{const b=ev.target.closest('[data-fpc]');if(b)abrirParc(FOL.parc.find(p=>p.id===b.dataset.fpc))});
 // 1º desconto: emissão até o dia de corte entra no mesmo mês; depois, no mês seguinte
 const parcInicio=(em,cli)=>{const c=(cli?cli.folha_modelo?.corte:folModelo().corte)||20;return em?(+em.slice(8,10)>c?addMes(em,1):em.slice(0,7)+'-01').slice(0,7):FOL.comp.slice(0,7)};
+// desconto parcelado em horas (faltas fora do banco de horas, Viva): total e parcelas em minutos
+const parcH=c=>FCOL[c]?.k==='horas',parcFm=(c,v)=>parcH(c)?hhmm(v):fm(v),parcShow=(c,v)=>parcH(c)?(v?hhmm(v):''):showMoney(v),parcLe=(c,t)=>parcH(c)?(/^\s*0*\s*$/.test(t)?0:lerHoras(t)):parseMoney(t);
+function parcGerarH(total,n,ini){const v=Math.floor(total/n),ps=[];for(let i=0;i<n;i++)ps.push({c:addMes(ini+'-01',i).slice(0,7),v:i<n-1?v:total-v*(n-1)});return ps}
 function parcGerar(total,n,ini){const v=r2(total/n),ps=[];for(let i=0;i<n;i++)ps.push({c:addMes(ini+'-01',i).slice(0,7),v:i<n-1?v:r2(total-v*(n-1))});return ps}
 function abrirParc(p){
   const edita=podeLancar(FOL.cli.id,'folha'),dis=edita?'':' disabled',fs=FOL.func.filter(f=>f.situacao!=='Desligado'||p&&f.id===p.funcionario_id).sort((a,b)=>a.nome.localeCompare(b.nome));
-  const v=p||{coluna:FOL.parcCols[0],emissao:TODAY,parcelas:[]};FOLACAO.parcCtx=p;
+  const v=p||{coluna:FOL.parcCols[0],emissao:TODAY,parcelas:[]};FOLACAO.parcCtx=p;const col=()=>$('fpC').value;
   const mopts=sel=>{const o=[];for(let i=-12;i<=12;i++){const ym=addMes(FOL.comp,i).slice(0,7);o.push(`<option value="${ym}"${ym===sel?' selected':''}>${MESES[+ym.slice(5)-1]} ${ym.slice(0,4)}</option>`)}return o.join('')};
   folDlg(p?'Desconto parcelado':'Novo desconto parcelado',`<div class="fields">
       <label class="f wide">Colaborador<select id="fpF"${dis}>${p?'':'<option value="">Escolha</option>'}${fs.map(f=>`<option value="${f.id}"${v.funcionario_id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select></label>
@@ -3664,23 +3687,24 @@ function abrirParc(p){
       <label class="f">Emissão<input type="date" id="fpE" value="${v.emissao||''}"${dis}></label>
       <label class="f">Guia<input id="fpG" value="${esc(v.guia||'')}"${dis}></label>
       <label class="f">Usuário (quem usou)<input id="fpU" value="${esc(v.usuario||'')}"${dis}></label>
-      <label class="f">Valor total (R$)<input id="fpV" class="money" value="${showMoney(v.valor_total)}"${dis}></label>
+      <label class="f"><span id="fpVt">${parcH(v.coluna)?'Total (horas)':'Valor total (R$)'}</span><input id="fpV" class="money" value="${parcShow(v.coluna,v.valor_total)}"${dis}></label>
       <label class="f">Parcelas<input id="fpN" type="number" min="1" max="36" value="${(v.parcelas||[]).length||1}"${dis}></label>
       <label class="f">1º desconto em<select id="fpI"${dis}>${mopts(v.parcelas?.[0]?.c||parcInicio(v.emissao))}</select></label>
       <label class="f wide">Descrição (opcional)<input id="fpO" value="${esc(v.descricao||'')}"${dis}></label></div>
     <h3>Parcelas</h3><div id="fpPs" class="fields"></div><p class="note" id="fpSoma" style="margin:0"></p>`,
     (p&&edita?'<button type="button" class="btn ghost" data-fo="parcDel">Apagar</button>':'')+(edita?'<button type="button" class="btn primary" data-fo="parcSalva">Salvar</button>':''));
-  const mostra=ps=>{$('fpPs').innerHTML=ps.map((x,i)=>`<label class="f">${i+1}ª · ${MESES[+x.c.slice(5)-1]} ${x.c.slice(0,4)}<input class="money" data-pc="${x.c}" value="${showMoney(x.v)}"${dis}></label>`).join('');soma()};
-  const soma=()=>{const t=parseMoney($('fpV').value)||0,sm=r2([...document.querySelectorAll('[data-pc]')].reduce((s,i)=>s+(parseMoney(i.value)||0),0));
-    $('fpSoma').textContent=`Soma das parcelas: ${fm(sm)}`+(Math.abs(sm-t)>0.009?` · diferença de ${fm(r2(t-sm))} para o total`:'')};
-  const gera=()=>{const t=parseMoney($('fpV').value),n=parseInt($('fpN').value,10);if(t>0&&n>0)mostra(parcGerar(t,n,$('fpI').value))};
+  const mostra=ps=>{$('fpPs').innerHTML=ps.map((x,i)=>`<label class="f">${i+1}ª · ${MESES[+x.c.slice(5)-1]} ${x.c.slice(0,4)}<input class="money" data-pc="${x.c}" value="${parcShow(col(),x.v)}"${dis}></label>`).join('');soma()};
+  const soma=()=>{const t=parcLe(col(),$('fpV').value)||0,sm=r2([...document.querySelectorAll('[data-pc]')].reduce((s,i)=>s+(parcLe(col(),i.value)||0),0));
+    $('fpSoma').textContent=`Soma das parcelas: ${parcFm(col(),sm)}`+(Math.abs(sm-t)>0.009?` · diferença de ${parcFm(col(),r2(t-sm))} para o total`:'')};
+  const gera=()=>{const t=parcLe(col(),$('fpV').value),n=parseInt($('fpN').value,10);if(t>0&&n>0)mostra((parcH(col())?parcGerarH:parcGerar)(t,n,$('fpI').value))};
   mostra(v.parcelas||[]);if(!p)gera();
-  if(edita){['fpV','fpN','fpI'].forEach(x=>$(x).onchange=gera);$('fpE').onchange=()=>{$('fpI').value=parcInicio($('fpE').value);gera()};$('fpPs').oninput=soma}
+  if(edita){['fpV','fpN','fpI'].forEach(x=>$(x).onchange=gera);
+    $('fpC').onchange=()=>{$('fpVt').textContent=parcH(col())?'Total (horas)':'Valor total (R$)';$('fpV').value='';$('fpPs').innerHTML='';soma()};$('fpE').onchange=()=>{$('fpI').value=parcInicio($('fpE').value);gera()};$('fpPs').oninput=soma}
 }
 FOLACAO.parcSalva=async b=>{
-  const p=FOLACAO.parcCtx,parcelas=[...document.querySelectorAll('[data-pc]')].map(i=>({c:i.dataset.pc,v:r2(parseMoney(i.value))}));
+  const c=$('fpC').value,p=FOLACAO.parcCtx,parcelas=[...document.querySelectorAll('[data-pc]')].map(i=>({c:i.dataset.pc,v:r2(parcLe(c,i.value))}));
   const reg={cliente_id:FOL.cli.id,funcionario_id:$('fpF').value,coluna:$('fpC').value,emissao:$('fpE').value||null,guia:$('fpG').value.trim()||null,usuario:$('fpU').value.trim()||null,
-    valor_total:parseMoney($('fpV').value),descricao:$('fpO').value.trim()||null,parcelas};
+    valor_total:parcLe(c,$('fpV').value),descricao:$('fpO').value.trim()||null,parcelas};
   if(!reg.funcionario_id)return foErro('Escolha o colaborador.');if(!(reg.valor_total>0))return foErro('Informe o valor total.');
   if(!parcelas.length||parcelas.some(x=>!isFinite(x.v)||x.v<0))return foErro('Confira o valor das parcelas.');
   b.disabled=true;const {error}=p?await sb.from('folha_parcelamentos').update(reg).eq('id',p.id):await sb.from('folha_parcelamentos').insert(reg);b.disabled=false;
