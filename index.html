@@ -121,6 +121,8 @@ dialog[open].cheia{width:calc(100vw - 16px)!important;max-width:none;height:calc
 #ccDoc img{max-width:100%;border:1px solid var(--line);border-radius:8px}#ccDoc iframe{width:100%;height:68vh;border:1px solid var(--line);border-radius:8px;background:#fff} #dlgRep .db>*{min-width:0}
 .alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
 .alerta b{color:var(--warn)}
+.alerta.bad{border-color:var(--bad);background:var(--bad-soft)}.alerta.bad b{color:var(--bad)}
+.tcres{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:8px}.tcres ul{margin:0;padding-left:20px;display:grid;gap:6px}
 .rat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:10px}
 .rat .opts{display:flex;gap:14px;flex-wrap:wrap;font-weight:600;font-size:14px}.rat .opts label{display:flex;gap:6px;align-items:center}.rat .opts input{width:auto}
 .rat table td{padding:5px 8px}.rat table input{max-width:140px;text-align:right}
@@ -311,6 +313,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="mFiltro"></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
     </div>
     <div class="tiles" id="mTiles"></div>
+    <div id="mConf"></div>
     <div class="card tablebox"><table><thead id="mHead"></thead><tbody id="mBody"></tbody><tfoot id="mFoot"></tfoot></table></div>
     <p class="note" id="mNote"></p>
   </section>
@@ -569,6 +572,13 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="df"><button type="button" class="btn ghost" id="rDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="rClose">Fechar</button><button type="button" class="btn" id="rConf"></button><button type="submit" class="btn primary" id="rSave">Salvar</button></div>
   </form>
 </dialog>
+<dialog id="dlgTC">
+  <form id="tcForm" novalidate>
+    <div class="dh"><h2 id="tcTitle">Conferência física da tesouraria</h2><span class="spacer"></span><span id="tcChip"></span></div>
+    <div class="db"><div class="fields" id="tcFields"></div><div id="tcRes"></div><p class="err" id="tcErr" hidden></p></div>
+    <div class="df"><button type="button" class="btn ghost" id="tcDel" hidden>Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="tcClose">Fechar</button><button type="submit" class="btn primary" id="tcSave">Salvar conferência</button></div>
+  </form>
+</dialog>
 <dialog id="dlgFer">
   <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
   <div class="db" id="feBody"></div>
@@ -752,7 +762,7 @@ function renderNav(){
   const itens=NAV.filter(n=>n.ok()&&eqPode(n.k));
   ['Comunicação','Financeiro','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
     if(grp(n)!==g){g=grp(n);h+=`<div class="navgrp">${g}</div>`}
-    h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}${NAVBADGE[n.k]?`<span class="nbadge" title="Com novidade">${NAVBADGE[n.k]}</span>`:''}</button>`;
+    h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}${NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':'Com novidade'}">${NAVBADGE[n.k]}</span>`:''}</button>`;
   });
   $('nav').innerHTML=h;
 }
@@ -831,7 +841,7 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   show('app');go(first.k);
-  const novid=()=>{tNovidades();avNovidades()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{tNovidades();avNovidades();tcAtrasos()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -1685,6 +1695,7 @@ function initMod(m){
 mFiltro.onchange=()=>renderMod();
 async function renderMod(){
   const cfg=MODCFG[MOD],cli=cliAtual();
+  if(!cli||!window.V2)$('mConf').innerHTML='';
   if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   let q=sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
@@ -1733,6 +1744,7 @@ async function renderMod(){
   if(MOD==='tesouraria'&&!REGS.length)body='';
   $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste mês'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  if(MOD==='tesouraria')renderTC(cli);else $('mConf').innerHTML='';
   $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
 }
 $('mNovo').onclick=()=>openReg(null);
@@ -1828,6 +1840,175 @@ $('rConf').onclick=async()=>{
   const {error}=await sb.from(MODCFG[MOD].tabela).update(upd).eq('id',r.id);
   $('rConf').disabled=false;
   if(error)fail(error);else{dlgReg.close();toast(novo?MODCFG[MOD].okTxt:'Desfeito');renderMod()}
+};
+
+// ---------- Tesouraria › conferência física do saldo ----------
+// O responsável conta o dinheiro e informa o valor; o portal compara com o saldo do sistema na data,
+// aponta os lançamentos que podem explicar a diferença e mostra alerta vermelho depois de 7 dias sem conferir.
+const TC_PRAZO=7;
+let TCL=[], TCR=null, TCD=null;
+const tcDias=c=>c?Math.round((dObj(TODAY)-dObj(c.data))/864e5):null;
+const tcAtrasada=c=>!c||tcDias(c)>TC_PRAZO;
+const tcChip=c=>Math.abs(Number(c.diferenca))<0.01?'<span class="chip c-ok">✔ Confere</span>':`<span class="chip c-bad">${c.diferenca>0?'Sobra':'Falta'} de ${fm(Math.abs(c.diferenca))}</span>`;
+// saldo da tesouraria até a data (inclusive), com tudo que foi lançado, conferido ou não
+async function tcSaldo(cliId,ate){
+  let s=0;
+  for(let i=0;;i+=1000){
+    const {data,error}=await sb.from('tesouraria').select('tipo,valor').eq('cliente_id',cliId).lte('data',ate).order('id').range(i,i+999);
+    if(error)throw error;
+    (data||[]).forEach(r=>s+=(r.tipo==='Suprimento'?1:-1)*r.valor);
+    if(!data||data.length<1000)break;
+  }
+  return r2(s);
+}
+// última conferência de cada empresa que o usuário vê; o número de atrasadas vai no menu
+async function tcAtrasos(){
+  if(!window.V2||!temAcesso('tesouraria'))return null;
+  const {data,error}=await sb.from('tesouraria_conferencias').select('cliente_id,data').order('data',{ascending:false}).limit(5000);
+  if(error)return null;
+  const u={};(data||[]).forEach(c=>{if(!u[c.cliente_id])u[c.cliente_id]=c});
+  const n=empresasDe('tesouraria').filter(c=>tcAtrasada(u[c.id])).length;
+  if((NAVBADGE.tesouraria||0)!==n){NAVBADGE.tesouraria=n;renderNav()}
+  return u;
+}
+async function renderTC(cli){
+  const {data,error}=await sb.from('tesouraria_conferencias').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).order('conferido_em',{ascending:false}).limit(30);
+  if(MOD!=='tesouraria'||cliAtual()?.id!==cli.id)return;
+  const box=$('mConf');
+  if(error){box.innerHTML=ehEsc()?'<div class="alerta"><b>Conferência física da tesouraria</b><span>Rode a atualização v41 no Supabase para ligar a conferência.</span></div>':'';return}
+  TCL=data||[];
+  const ult=TCL[0],dias=tcDias(ult),btn=podeLancar(cli.id,'tesouraria')?`<button type="button" class="btn small${tcAtrasada(ult)?' primary':''}" id="tcNova">Conferir o dinheiro agora</button>`:'';
+  let h=tcAtrasada(ult)
+    ?`<div class="alerta bad"><b>⚠ ${ult?dias+' dias sem conferência física da tesouraria':'Nenhuma conferência física da tesouraria registrada'}</b><span>${ult?'A última foi em '+dBR(ult.data)+'. ':''}O dinheiro precisa ser contado e conferido com o sistema pelo menos uma vez por semana.</span>${btn?`<div class="row">${btn}</div>`:''}</div>`
+    :`<div class="card row" style="margin-top:16px;padding:12px 18px"><span><b>Conferência física</b> · última em ${dBR(ult.data)} (${dias===0?'hoje':dias===1?'ontem':'há '+dias+' dias'})</span>${tcChip(ult)}<span class="spacer"></span>${btn}</div>`;
+  if(TCL.length)h+=`<details style="margin-top:8px"><summary class="note">Histórico das conferências físicas (${TCL.length})</summary><div class="card tablebox" style="margin-top:8px"><table><thead><tr><th>Data</th><th>Dinheiro contado</th><th>Saldo do sistema</th><th>Diferença</th><th class="l">Situação</th></tr></thead><tbody>${
+    TCL.map(c=>`<tr class="click" data-tc="${c.id}" tabindex="0"><td>${dBR(c.data)}</td><td>${fm(c.valor_fisico)}</td><td>${fm(c.saldo_sistema)}</td><td class="${Math.abs(c.diferenca)>=0.01?'neg':''}">${fm(c.diferenca)}</td><td class="l">${tcChip(c)}</td></tr>`).join('')}</tbody></table></div></details>`;
+  box.innerHTML=h;
+  // outras empresas atrasadas, para quem cuida de mais de uma
+  const u=await tcAtrasos();
+  if(!u||MOD!=='tesouraria'||cliAtual()?.id!==cli.id)return;
+  const outras=empresasDe('tesouraria').filter(c=>c.id!==cli.id&&tcAtrasada(u[c.id]));
+  if(outras.length)box.insertAdjacentHTML('beforeend',`<div class="alerta bad" style="margin-top:10px"><b>Outras empresas sem conferência física há mais de ${TC_PRAZO} dias</b><div class="row" style="gap:8px">${outras.map(c=>`<button type="button" class="btn small" data-tcc="${c.id}">${esc(c.nome)} · ${u[c.id]?tcDias(u[c.id])+' dias':'nunca conferida'}</button>`).join('')}</div></div>`);
+}
+$('mConf').addEventListener('click',e=>{
+  if(e.target.closest('#tcNova'))return tcAbrir(null);
+  const t=e.target.closest('[data-tc]');if(t)return tcAbrir(TCL.find(c=>c.id===t.dataset.tc));
+  const b=e.target.closest('[data-tcc]');if(b&&escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;openView()}
+});
+$('mConf').addEventListener('keydown',e=>{const t=e.target.closest('[data-tc]');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tcAbrir(TCL.find(c=>c.id===t.dataset.tc))}});
+
+// o valor certo pode ser o digitado com dois algarismos vizinhos trocados ou com a vírgula no lugar errado
+function tcDigitacao(a,b){
+  const ca=Math.round(a*100),cb=Math.round(b*100);if(ca===cb||cb<=0)return false;
+  if(ca===cb*10||cb===ca*10||ca===cb*100||cb===ca*100)return true;
+  const x=String(ca),y=String(cb);if(x.length!==y.length)return false;
+  for(let i=0;i<x.length-1;i++)if(x[i]!==x[i+1]&&x.slice(0,i)+x[i+1]+x[i]+x.slice(i+2)===y)return true;
+  return false;
+}
+// Possíveis erros que explicam a diferença D (dinheiro contado − saldo do sistema), nos lançamentos desde a conferência anterior.
+// Sobra (D > 0): saída lançada a mais ou entrada não lançada. Falta (D < 0): entrada lançada a mais ou saída não lançada.
+function tcAnalise(D,T){
+  const abs=Math.abs(D),sobra=D>0,eq=(a,b)=>Math.abs(a-b)<0.005,itens=[],vistos=new Set();
+  if(abs<0.01)return [];
+  const sai=r=>r.tipo!=='Suprimento',L=r=>`${r.tipo} de ${dBR(r.data)} (${r.descricao}, ${fm(r.valor)})`;
+  const add=(p,t,r)=>{if(r){if(vistos.has(r.id))return;vistos.add(r.id)}if(!itens.some(x=>x.t===t))itens.push({p,t})};
+  // lançado duas vezes: mesmo tipo, valor e data
+  const g={};T.regs.forEach(r=>{const k=r.tipo+'|'+r2(r.valor)+'|'+r.data;(g[k]=g[k]||[]).push(r)});
+  Object.values(g).filter(x=>x.length>1&&sai(x[0])===sobra).forEach(x=>{const ex=eq(x[0].valor*(x.length-1),abs);
+    add(ex?0:2,`${L(x[0])} aparece ${x.length} vezes. Pode ter sido lançado em duplicidade`+(ex?'; o valor repetido é exatamente a diferença.':'.'),x[0]);x.slice(1).forEach(r=>vistos.add(r.id))});
+  T.regs.forEach(r=>{
+    // mesmo valor da diferença
+    if(eq(r.valor,abs)&&sai(r)===sobra)add(0,sobra?`${L(r)} tem o mesmo valor da sobra. Confira se o dinheiro saiu mesmo${r.tipo==='Depósito bancário'?' (o depósito foi feito?)':''} ou se foi lançado sem ter sido pago.`
+      :`${L(r)} tem o mesmo valor da falta. Confira se esse dinheiro chegou mesmo na tesouraria.`,r);
+    // tipo trocado: muda o saldo em duas vezes o valor
+    else if(eq(r.valor*2,abs)&&sai(r)===sobra)add(0,sobra?`${L(r)} vale metade da sobra. Se na verdade foi uma entrada (Suprimento), o tipo foi trocado e isso explica a diferença.`
+      :`${L(r)} vale metade da falta. Se na verdade foi uma despesa ou um depósito, o tipo foi trocado e isso explica a diferença.`,r);
+    // erro de digitação
+    else{const certo=r2(sai(r)?r.valor-D:r.valor+D);if(tcDigitacao(r.valor,certo))add(0,`${L(r)}: se o valor certo for ${fm(certo)} (erro de digitação), a diferença fecha.`,r)}
+  });
+  // dinheiro do caixa x suprimentos lançados
+  const sup={};T.regs.filter(r=>!sai(r)).forEach(r=>sup[r.data]=r2((sup[r.data]||0)+r.valor));
+  const cx=T.fechs.filter(f=>Number(f.din_cont)>0);
+  if(sobra){
+    const sem=cx.filter(f=>!sup[f.data]),tot=r2(sem.reduce((a,f)=>a+Number(f.din_cont),0));
+    sem.filter(f=>eq(f.din_cont,abs)).forEach(f=>add(0,`O dinheiro do caixa de ${dBR(f.data)} (${fm(f.din_cont)}) não aparece como suprimento na tesouraria e é exatamente a sobra.`));
+    if(sem.length&&!sem.some(f=>eq(f.din_cont,abs)))add(eq(tot,abs)?0:2,`${sem.length===1?'O caixa de':'Os caixas de'} ${sem.slice(0,6).map(f=>dBR(f.data).slice(0,5)).join(', ')}${sem.length>6?' e outros':''} não ${sem.length===1?'tem':'têm'} suprimento lançado na tesouraria (total ${fm(tot)}).`+(eq(tot,abs)?' Esse total é exatamente a sobra.':''));
+  }else cx.forEach(f=>{const d=r2((sup[f.data]||0)-f.din_cont);if(d>=0.01)add(eq(d,abs)?0:2,`Os suprimentos de ${dBR(f.data)} somam ${fm(sup[f.data])}, mais que o dinheiro contado no caixa do dia (${fm(f.din_cont)}).`+(eq(d,abs)?' A diferença é exatamente a falta.':''))});
+  const pend=T.regs.filter(aConferir).length;
+  if(pend)add(1,`${pend} ${pend===1?'lançamento do período está marcado':'lançamentos do período estão marcados'} como “precisa ser conferido”.`);
+  if(Math.round(abs*100)%9===0&&!itens.some(x=>x.p===0))add(3,'A diferença é divisível por 9, o que costuma indicar algarismos trocados na digitação (ex.: 54 lançado como 45). Confira os valores lançados com os documentos.');
+  const dicas=sobra?['suprimento (dinheiro do caixa) que entrou e ainda não foi lançado','despesa lançada com valor maior que o pago','depósito lançado que ainda não foi feito']
+    :['despesa paga com o dinheiro da tesouraria e ainda não lançada','depósito no banco feito e ainda não lançado','suprimento lançado com valor maior que o recebido','dinheiro guardado em outro lugar (envelope, cofre, troco do caixa)'];
+  add(9,(itens.length?'Se nada acima explicar, confira também: ':'Não encontrei um lançamento que explique a diferença sozinho. Confira: ')+dicas.join('; ')+'.');
+  return itens.sort((a,b)=>a.p-b.p).map(x=>x.t);
+}
+const dlgTC=$('dlgTC');
+// lançamentos e caixas desde a conferência anterior (ou dos últimos 45 dias) e o saldo do sistema na data
+async function tcCarrega(cli,data){
+  const ant=TCL.find(c=>c.data<data),desde=ant?ant.data:isoLocal(new Date(dObj(data).getTime()-45*864e5));
+  const [saldo,{data:regs,error},{data:fechs}]=await Promise.all([tcSaldo(cli.id,data),
+    sb.from('tesouraria').select('id,data,tipo,descricao,valor,obs,conferido').eq('cliente_id',cli.id).gt('data',desde).lte('data',data).order('data').limit(3000),
+    sb.from('fechamentos').select('data,din_cont').eq('cliente_id',cli.id).gt('data',desde).lte('data',data).order('data')]);
+  if(error)throw error;
+  return {cli:cli.id,data,saldo,regs:regs||[],fechs:fechs||[]};
+}
+function tcResHtml(D,itens,saldo,fis){
+  const ok=Math.abs(D)<0.01;
+  return `<div class="tcres">${saldo!=null?`<span>Saldo do sistema: <b>${fm(saldo)}</b> · Dinheiro contado: <b>${fm(fis)}</b></span>`:''}
+    <b class="${ok?'':'neg'}">${ok?'✔ O dinheiro contado confere com o sistema.':(D>0?'Sobra':'Falta')+' de '+fm(Math.abs(D))+(D>0?': tem mais dinheiro do que o sistema mostra.':': tem menos dinheiro do que o sistema mostra.')}</b>
+    ${!ok&&itens.length?`<span class="note">Onde pode estar o erro:</span><ul>${itens.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}</div>`;
+}
+function tcAbrir(c){
+  const cli=cliAtual();TCR=c||null;TCD=null;$('tcErr').hidden=true;
+  if(c){
+    $('tcTitle').textContent='Conferência física de '+dBR(c.data);$('tcChip').innerHTML=tcChip(c);$('tcSave').hidden=true;
+    $('tcFields').innerHTML=`<div class="cmp wide" style="grid-column:1/-1"><div><span class="note">Dinheiro contado</span><br><b>${fm(c.valor_fisico)}</b></div><div><span class="note">Saldo do sistema na data</span><br><b>${fm(c.saldo_sistema)}</b></div><div><span class="note">Registrada em</span><br><b>${new Date(c.conferido_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</b></div></div>`+(c.obs?`<p class="wide" style="margin:0;grid-column:1/-1"><b>Observação:</b> ${esc(c.obs)}</p>`:'');
+    $('tcRes').innerHTML=tcResHtml(Number(c.diferenca),(c.analise||'').split('\n').filter(Boolean));
+    const meu=c.conferido_por===ME.user_id&&Date.now()-new Date(c.conferido_em).getTime()<864e5&&podeLancar(cli.id,'tesouraria');
+    $('tcDel').hidden=!(ehEsc()||meu);
+  }else{
+    $('tcTitle').textContent='Conferência física da tesouraria';$('tcChip').innerHTML='';$('tcSave').hidden=false;$('tcDel').hidden=true;
+    $('tcFields').innerHTML=`<label class="f">Data da contagem<input type="date" id="tcData" value="${TODAY}" max="${TODAY}"></label><label class="f">Dinheiro contado na tesouraria<input class="money" id="tcValor" inputmode="decimal" placeholder="0,00"></label><label class="f wide">Observação (opcional)<textarea id="tcObs" placeholder="Ex.: contado às 18h, junto com o envelope do depósito de amanhã"></textarea></label>`;
+    $('tcRes').innerHTML='<p class="note" style="margin:0">Conte todo o dinheiro da tesouraria (notas e moedas) e informe o total. Antes, lance as despesas, os depósitos e os suprimentos até a data da contagem.</p>';
+  }
+  dlgTC.showModal();
+  if(!c){$('tcValor').focus();tcAtualiza()}
+}
+async function tcAtualiza(){
+  if(TCR||!dlgTC.open)return;
+  const cli=cliAtual(),data=$('tcData').value,v=parseMoney($('tcValor').value),tk=tcAtualiza.n=(tcAtualiza.n||0)+1;
+  if(!data||data>TODAY){$('tcRes').innerHTML='<p class="note" style="margin:0">Escolha a data da contagem (hoje ou antes).</p>';return}
+  if(!TCD||TCD.data!==data||TCD.cli!==cli.id){
+    $('tcRes').innerHTML='<p class="note" style="margin:0">Calculando o saldo do sistema…</p>';
+    try{const d=await tcCarrega(cli,data);if(tk!==tcAtualiza.n)return;TCD=d}catch(e){fail(e,'Erro ao calcular o saldo');return}
+  }
+  if(tk!==tcAtualiza.n)return;
+  if(v==null||isNaN(v)){$('tcRes').innerHTML=`<div class="tcres"><span>Saldo do sistema em ${dBR(data)}: <b>${fm(TCD.saldo)}</b></span><span class="note">Informe o dinheiro contado para comparar.</span></div>`;return}
+  const D=r2(v-TCD.saldo);$('tcRes').innerHTML=tcResHtml(D,tcAnalise(D,TCD),TCD.saldo,v);
+}
+$('tcFields').addEventListener('change',()=>tcAtualiza());
+$('tcFields').addEventListener('input',e=>{if(e.target.id==='tcValor'){clearTimeout(tcAtualiza.t);tcAtualiza.t=setTimeout(tcAtualiza,400)}});
+$('tcFields').addEventListener('focusout',e=>{if(e.target.classList.contains('money')){const n=parseMoney(e.target.value);if(n!=null&&!isNaN(n))e.target.value=showMoney(n)}});
+$('tcClose').onclick=()=>dlgTC.close();
+$('tcForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(TCR)return;
+  const cli=cliAtual(),data=$('tcData').value,v=parseMoney($('tcValor').value),err=$('tcErr');let m='';
+  if(!data||data>TODAY)m='Informe a data da contagem (hoje ou antes).';else if(v==null||isNaN(v)||v<0)m='Informe o dinheiro contado, por exemplo 1.234,56.';
+  if(m){err.textContent=m;err.hidden=false;return}
+  err.hidden=true;$('tcSave').disabled=true;
+  try{
+    if(!TCD||TCD.data!==data||TCD.cli!==cli.id)TCD=await tcCarrega(cli,data);
+    const D=r2(v-TCD.saldo),an=tcAnalise(D,TCD);
+    const {error}=await sb.from('tesouraria_conferencias').insert({cliente_id:cli.id,data,valor_fisico:r2(v),saldo_sistema:TCD.saldo,analise:an.join('\n')||null,obs:$('tcObs').value.trim()||null,conferido_por:ME.user_id});
+    if(error)throw error;
+    dlgTC.close();toast(Math.abs(D)<0.01?'Conferência salva: o dinheiro confere':'Conferência salva com '+(D>0?'sobra':'falta')+' de '+fm(Math.abs(D)));renderTC(cli);
+  }catch(ex){fail(ex)}finally{$('tcSave').disabled=false}
+});
+$('tcDel').onclick=async()=>{
+  if(!TCR||!confirm('Apagar esta conferência física? Não dá para desfazer.'))return;
+  const {data,error}=await sb.from('tesouraria_conferencias').delete().eq('id',TCR.id).select('id');
+  if(error||!data?.length){fail(error||new Error('sem permissão'),'Não foi possível apagar');return}
+  dlgTC.close();toast('Conferência apagada');renderTC(cliAtual());
 };
 
 // =====================================================================
