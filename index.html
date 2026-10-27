@@ -332,6 +332,22 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <p class="note" id="pNote"></p>
   </section>
 
+  <!-- GESTÃO FINANCEIRA › CADASTROS (escritório) -->
+  <section id="viewGF" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Cadastros</h1><p class="sub" id="gfSub"></p></div>
+      <button class="btn primary" id="gfNovo"></button>
+    </div>
+    <div class="tabs" role="tablist" id="tabsGF">
+      <button role="tab" aria-selected="true" data-tab="contas">Contas bancárias</button>
+      <button role="tab" aria-selected="false" data-tab="cliente">Clientes</button>
+      <button role="tab" aria-selected="false" data-tab="fornecedor">Fornecedores</button>
+    </div>
+    <div class="toolbar"><input id="gfBusca" placeholder="Buscar por nome, CNPJ/CPF ou banco" style="max-width:300px"><label class="f">Mostrar<select id="gfFiltro"><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></label></div>
+    <div class="card tablebox"><table><thead id="gfHead"></thead><tbody id="gfBody"></tbody></table></div>
+    <p class="note" id="gfNote"></p>
+  </section>
+
   <!-- AVISOS E NOTÍCIAS -->
   <section id="viewAv" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -367,7 +383,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label class="f">Origem<select id="exOrig">
         <option value="caixa">Caixa</option>
         <option value="tesouraria">Tesouraria</option>
-        <option value="pagar">Contas a pagar</option>
+        <option value="pagar">Boletos e notas fiscais a pagar</option>
         <option value="cartao">Cartão de crédito</option>
       </select></label>
       <label class="f">De<input type="date" id="exIni"></label>
@@ -620,6 +636,13 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="foBody"></div>
   <div class="df" id="foFoot"></div>
 </dialog>
+<dialog id="dlgGF">
+  <form id="gfForm" novalidate>
+    <div class="dh"><h2 id="gfTitle"></h2></div>
+    <div class="db"><div class="fields" id="gfFields"></div><p class="err" id="gfErr" hidden></p></div>
+    <div class="df"><button type="button" class="btn ghost" id="gfDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="gfClose">Fechar</button><button type="submit" class="btn primary" id="gfSave">Salvar</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -728,7 +751,7 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Tarefas e Avisos são de toda a equipe
 const SEMPRE=['tarefas','avisos'];
 const eqPode=k=>!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k);
-const MODNOME={caixa:'Caixa',pagar:'Contas a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
+const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Financeiro',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas']]];
 // os dados da folha e das férias também servem às seções que dependem deles (igual ao banco, v38)
@@ -753,13 +776,16 @@ const ICO={
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
+  gfcad:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
   {k:'caixa',t:'Caixa',g:'Financeiro',ok:()=>temAcesso('caixa')},
-  {k:'pagar',t:'Contas a pagar',g:'Financeiro',ok:()=>temAcesso('pagar')},
+  {k:'pagar',t:'Boletos e notas fiscais a pagar',g:'Financeiro',ok:()=>temAcesso('pagar')},
   {k:'tesouraria',t:'Tesouraria',g:'Financeiro',ok:()=>temAcesso('tesouraria')},
   {k:'cartao',t:'Cartão de crédito',g:'Financeiro',ok:()=>temAcesso('cartao')},
+  // Gestão financeira (fase 1: cadastros); por enquanto só o escritório
+  {k:'gfcad',t:'Cadastros',g:'Gestão financeira',ok:ehEsc},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
   {k:'ponto',t:'Espelho de ponto',g:'Recursos humanos',ok:()=>temAcesso('ponto')},
@@ -779,7 +805,7 @@ function renderNav(){
   let g=null,h='';
   const grp=n=>typeof n.g==='function'?n.g():n.g;
   const itens=NAV.filter(n=>n.ok()&&eqPode(n.k));
-  ['Comunicação','Financeiro','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
+  ['Comunicação','Financeiro','Gestão financeira','Recursos humanos','Escritório'].flatMap(x=>itens.filter(n=>grp(n)===x)).forEach(n=>{
     if(grp(n)!==g){g=grp(n);h+=`<div class="navgrp">${g}</div>`}
     h+=`<button class="navbtn" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[n.k]}</svg>${n.t}${n.soon?'<span class="soon">em breve</span>':''}${NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':'Com novidade'}">${NAVBADGE[n.k]}</span>`:''}</button>`;
   });
@@ -819,7 +845,7 @@ function go(v){if(!eqPode(v))return;const antes=VIEW;VIEW=v;renderNav();fillClie
   openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -838,6 +864,7 @@ function openView(){
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos()}
+  else if(VIEW==='gfcad'){$('viewGF').hidden=false;renderGF()}
   avBanner();
 }
 function show(view){
@@ -1330,7 +1357,7 @@ $('btnBaixarBC').onclick=()=>{
   const aoa=[HEAD,...lastRows.map(r=>r.map((v,i)=>[8,9,13].includes(i)&&v?dObj(v):v))];
   const ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=HEAD.map(()=>({wch:18}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Importação');
-  XLSX.writeFile(wb,`Bom Controle ${({caixa:'Caixa',tesouraria:'Tesouraria',pagar:'Contas a pagar',cartao:'Cartão'})[exOrig.value]} ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
+  XLSX.writeFile(wb,`Bom Controle ${({caixa:'Caixa',tesouraria:'Tesouraria',pagar:'Boletos e NF a pagar',cartao:'Cartão'})[exOrig.value]} ${cliAtual()?.nome||''} ${exIni.value} a ${exFim.value}.xlsx`);
 };
 
 // ---------- fornecedores do Bom Controle ----------
@@ -1747,7 +1774,7 @@ const dlgPerm=$('dlgPerm');let PERMU=null;
 function abrirPermissoes(u){
   PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
   const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Escritório':n.g;
-  const grupos=['Financeiro','Recursos humanos','Escritório'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
+  const grupos=['Financeiro','Gestão financeira','Recursos humanos','Escritório'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
   const ck=(n)=>`<label><input type="checkbox" value="${n.k}"${!ms||ms.includes(n.k)?' checked':''}> ${n.t}</label>`;
   $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe.</p>
     <div class="pick" id="pmMods" style="max-height:none"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
@@ -1794,7 +1821,7 @@ $('tbCfg').addEventListener('change',async e=>{const id=e.target.closest('tr').d
 // CONTAS A PAGAR, CARTÃO DE CRÉDITO E TESOURARIA
 // =====================================================================
 const MODCFG={
-  pagar:{titulo:'Contas a pagar',tabela:'contas_pagar',dataK:'vencimento',
+  pagar:{titulo:'Boletos e notas fiscais a pagar',tabela:'contas_pagar',dataK:'vencimento',
     sub:'Envie o boleto e a nota fiscal de cada conta. A Controlacs faz o pagamento.',
     campos:[['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
     cats:['Boleto','Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe o boleto ou a nota fiscal.',
@@ -3651,6 +3678,119 @@ function copiar(t,msg){navigator.clipboard.writeText(t).then(()=>toast(msg||'Cop
 const pIds=()=>{const lista=empresasDe('repasse');return escCli.value==='*'?lista.map(c=>c.id):escCli.value?[escCli.value]:[]};
 const pDescaveis=()=>PARC.filter(p=>p.ativo&&podeLancar(p.cliente_id,'repasse'));
 const pLancaEm=()=>empresasDe('repasse').filter(c=>podeLancar(c.id,'repasse'));
+// ---------- Gestão financeira › Cadastros (contas bancárias, clientes e fornecedores; v44) ----------
+// contas bancárias por empresa; clientes e fornecedores por empresa ou para todas (cliente_id vazio).
+// Os fornecedores começam com a lista do Bom Controle (fornecedor_bc = chave em fornecedores_bc).
+let gfTab='contas',GFL=[],GFKEY='',GFR=null;
+const GFTIPOS=['Conta corrente','Poupança','Aplicação','Conta de pagamento','Caixa / tesouraria'];
+const GFGRUPOS=['Convênio','Empresa','Particular','Outros'];
+const gfDig=s=>String(s||'').replace(/\D/g,'');
+document.querySelectorAll('#tabsGF button').forEach(b=>b.onclick=()=>{gfTab=b.dataset.tab;document.querySelectorAll('#tabsGF button').forEach(x=>x.setAttribute('aria-selected',x===b));$('gfBusca').value='';renderGF()});
+async function renderGF(){
+  const cli=cliAtual(),contas=gfTab==='contas';
+  $('gfNovo').textContent=contas?'+ Nova conta':gfTab==='cliente'?'+ Novo cliente':'+ Novo fornecedor';
+  $('gfSub').textContent=contas?'Contas bancárias da empresa. Elas serão usadas nas contas a pagar e a receber e na conciliação do extrato (OFX).'
+    :gfTab==='cliente'?'Quem paga a empresa: convênios, empresas e particulares. Serão usados nas contas a receber.'
+    :'Fornecedores da empresa e os do Bom Controle, que valem para todas as empresas. Serão usados nas contas a pagar.';
+  $('gfNovo').hidden=!cli;
+  if(!cli){gfVazio('Escolha uma empresa.');return}
+  const key=gfTab+'|'+cli.id;
+  if(key!==GFKEY){
+    $('gfBody').innerHTML='<tr><td class="l muted">Carregando…</td></tr>';
+    let lista=[],error=null;
+    if(contas)({data:lista,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cli.id).order('nome'));
+    else for(let i=0;;i+=1000){
+      const r=await sb.from('fin_pessoas').select('*').or(`cliente_id.eq.${cli.id},cliente_id.is.null`).in('papel',[gfTab,'ambos']).order('nome').range(i,i+999);
+      if(r.error){error=r.error;break}lista.push(...r.data);if(r.data.length<1000)break}
+    if(error){console.error(error);gfVazio(error.code==='42P01'||error.code==='PGRST205'||/fin_/.test(error.message||'')?'Este módulo precisa da atualização v44 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');GFKEY='';return}
+    GFL=lista||[];GFKEY=key;
+  }
+  gfDesenha();
+}
+function gfVazio(t,cl){$('gfHead').innerHTML='';$('gfBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gfNote').textContent=''}
+function gfDesenha(){
+  const contas=gfTab==='contas',f=$('gfFiltro').value,q=$('gfBusca').value.trim().toLowerCase(),qd=gfDig(q);
+  const rows=GFL.filter(r=>(f==='todos'||(f==='ativos')===(r.ativo!==false))
+    &&(!q||[r.nome,r.fantasia,r.banco,r.conta_bc,r.grupo].some(x=>(x||'').toLowerCase().includes(q))||qd.length>=3&&gfDig(r.documento||r.conta).includes(qd)));
+  const MAX=300,vis=rows.slice(0,MAX),mu=t=>`<span class="muted">${t}</span>`;
+  const sit=r=>r.ativo===false?'<span class="chip">Inativo</span>':'<span class="chip c-ok">Ativo</span>';
+  if(contas){
+    $('gfHead').innerHTML='<tr><th class="l">Conta</th><th class="l">Tipo</th><th class="l">Banco · agência · conta</th><th class="l">Nome no Bom Controle</th><th>Saldo inicial</th><th class="l">Situação</th></tr>';
+    $('gfBody').innerHTML=vis.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td class="l"><b>${esc(r.nome)}</b></td><td class="l">${esc(r.tipo)}</td><td class="l">${r.banco||r.conta?`${esc(r.banco||'')}<br>${mu(`Ag. ${esc(r.agencia||'—')} · ${esc(r.conta||'—')}`)}`:mu('—')}</td><td class="l">${esc(r.conta_bc||'')||mu('—')}</td><td>${fm(r.saldo_inicial)}${r.saldo_data?`<br>${mu('em '+dBR(r.saldo_data))}`:''}</td><td class="l">${sit(r)}</td></tr>`).join('')
+      ||`<tr><td class="l muted" colspan="6">${GFL.length?'Nenhuma conta neste filtro.':'Nenhuma conta cadastrada. Use “Nova conta” para começar.'}</td></tr>`;
+  }else{
+    const cl=gfTab==='cliente';
+    $('gfHead').innerHTML=`<tr><th class="l">Nome</th><th class="l">CNPJ/CPF</th>${cl?'<th class="l">Grupo</th>':''}<th class="l">Contato</th><th class="l">Vale para</th><th class="l">Situação</th></tr>`;
+    $('gfBody').innerHTML=vis.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td class="l"><b>${esc(r.nome)}</b>${r.fantasia&&r.fantasia!==r.nome?`<br>${mu(esc(r.fantasia))}`:''}</td><td class="l">${esc(r.documento||'')||mu('—')}</td>${cl?`<td class="l">${esc(r.grupo||'')||mu('—')}</td>`:''}<td class="l">${[r.telefone,r.email].filter(Boolean).map(esc).join('<br>')||mu('—')}</td><td class="l">${r.cliente_id?'Esta empresa':'Todas as empresas'}${r.fornecedor_bc?`<br>${mu('Bom Controle')}`:''}</td><td class="l">${sit(r)}</td></tr>`).join('')
+      ||`<tr><td class="l muted" colspan="6">${GFL.length?'Ninguém neste filtro.':`Nenhum ${cl?'cliente':'fornecedor'} cadastrado. Use “${$('gfNovo').textContent.slice(2)}” para começar.`}</td></tr>`;
+  }
+  $('gfNote').textContent=(rows.length>MAX?`Mostrando ${MAX} de ${rows.length}. Use a busca para achar os outros. `:rows.length?`${rows.length} ${rows.length===1?'cadastro':'cadastros'}. `:'')+'Clique numa linha para ver ou editar.';
+}
+$('gfFiltro').onchange=gfDesenha;$('gfBusca').oninput=()=>{clearTimeout(gfDesenha.t);gfDesenha.t=setTimeout(gfDesenha,200)};
+$('gfBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirGF(GFL.find(r=>r.id===tr.dataset.id))});
+$('gfBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirGF(GFL.find(r=>r.id===tr.dataset.id))}});
+$('gfNovo').onclick=()=>abrirGF(null);
+const dlgGF=$('dlgGF');
+function abrirGF(r){
+  GFR=r;const contas=gfTab==='contas',cli=cliAtual(),v=k=>esc(r?.[k]??'');
+  const inp=(k,t,ph,x)=>`<label class="f${x?' '+x:''}">${t}<input id="gf_${k}" value="${v(k)}"${ph?` placeholder="${ph}"`:''}></label>`;
+  const sel=(k,t,ops,def)=>`<label class="f">${t}<select id="gf_${k}">${ops.map(o=>{const [val,txt]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${(r?.[k]??def??'')===val?' selected':''}>${esc(txt)}</option>`}).join('')}</select></label>`;
+  const ativo=`<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px"><input type="checkbox" id="gf_ativo" style="width:auto"${r?.ativo===false?'':' checked'}> Ativo</label>`;
+  const obs=`<label class="f wide">Observação<textarea id="gf_obs" rows="2">${v('obs')}</textarea></label>`;
+  let h;
+  if(contas){
+    $('gfTitle').textContent=r?r.nome:'Nova conta · '+(cli?.nome||'');
+    h=inp('nome','Nome da conta *','Ex.: Sicredi 12345-6')+sel('tipo','Tipo',GFTIPOS,'Conta corrente')+inp('banco','Banco','Ex.: Sicredi')+inp('agencia','Agência')+inp('conta','Conta','com o dígito')
+      +inp('conta_bc','Nome no Bom Controle','como está no BC')
+      +`<label class="f">Saldo inicial<input id="gf_saldo_inicial" class="money" inputmode="decimal" value="${r?showMoney(r.saldo_inicial):''}" placeholder="0,00"></label>`
+      +`<label class="f">Saldo em<input type="date" id="gf_saldo_data" value="${v('saldo_data')}"></label>`+obs+ativo;
+  }else{
+    const cl=gfTab==='cliente';
+    $('gfTitle').textContent=r?r.nome:cl?'Novo cliente':'Novo fornecedor';
+    h=inp('nome',(cl?'Nome ou razão social':'Razão social')+' *')+inp('fantasia','Nome fantasia')+inp('documento','CNPJ/CPF')
+      +sel('papel','É',[['cliente','Cliente'],['fornecedor','Fornecedor'],['ambos','Cliente e fornecedor']],gfTab)
+      +sel('vale','Vale para',[['esta','Só '+(cli?.nome||'esta empresa')],['todas','Todas as empresas']],r&&!r.cliente_id?'todas':'esta')
+      +(cl?sel('grupo','Grupo',['',...GFGRUPOS],''):'')
+      +inp('telefone','Telefone')+inp('email','E-mail')+inp('cidade','Cidade/UF')
+      +sel('pix_tipo','Tipo da chave Pix',['',...PIXTIPOS],'')+inp('pix_chave','Chave Pix')+inp('banco','Banco')+inp('agencia','Agência')+inp('conta','Conta','com o dígito')+obs+ativo
+      +(r?.fornecedor_bc?`<p class="note wide" style="margin:0">Veio da lista de fornecedores do Bom Controle. Na exportação para o BC continuam valendo o nome e o CNPJ de lá.</p>`:'');
+  }
+  $('gfFields').innerHTML=h;$('gfErr').hidden=true;
+  // fornecedor do BC não é apagado (voltaria na próxima carga): use "Ativo"
+  $('gfDel').hidden=!r||!!r.fornecedor_bc;
+  dlgGF.showModal();$('gf_nome').focus();
+}
+$('gfClose').onclick=()=>dlgGF.close();
+$('gfForm').addEventListener('submit',async e=>{e.preventDefault();
+  const err=t=>{$('gfErr').textContent=t;$('gfErr').hidden=false},val=k=>($('gf_'+k)?.value||'').trim()||null;
+  const contas=gfTab==='contas',cli=cliAtual();let row;
+  if(!val('nome'))return err('Preencha o nome.');
+  if(contas){
+    const s=parseMoney($('gf_saldo_inicial').value);if(Number.isNaN(s))return err('Saldo inicial inválido.');
+    row={nome:val('nome'),tipo:val('tipo')||'Conta corrente',banco:val('banco'),agencia:val('agencia'),conta:val('conta'),conta_bc:val('conta_bc'),saldo_inicial:r2(s||0),saldo_data:val('saldo_data'),obs:val('obs'),ativo:$('gf_ativo').checked};
+    if(GFL.some(x=>x.id!==GFR?.id&&x.nome.toLowerCase()===row.nome.toLowerCase()))return err('Já existe uma conta com esse nome nesta empresa.');
+  }else{
+    row={nome:val('nome'),fantasia:val('fantasia'),documento:val('documento'),papel:val('papel'),grupo:val('grupo'),telefone:val('telefone'),email:val('email'),cidade:val('cidade'),
+      pix_tipo:val('pix_tipo'),pix_chave:val('pix_chave'),banco:val('banco'),agencia:val('agencia'),conta:val('conta'),obs:val('obs'),ativo:$('gf_ativo').checked,
+      cliente_id:val('vale')==='todas'?null:(GFR?.cliente_id||cli.id)};
+    if(gfTab==='fornecedor')delete row.grupo;
+    const d=gfDig(row.documento);
+    if(d&&d.length!==11&&d.length!==14)return err('O CNPJ tem 14 números e o CPF tem 11.');
+    const dup=d&&GFL.find(x=>x.id!==GFR?.id&&gfDig(x.documento)===d);
+    if(dup)return err(`Já existe um cadastro com esse CNPJ/CPF: ${dup.nome}.`);
+  }
+  if(!GFR&&contas)row.cliente_id=cli.id;
+  $('gfSave').disabled=true;
+  const tb=contas?'fin_contas':'fin_pessoas';
+  const {error}=GFR?await sb.from(tb).update(row).eq('id',GFR.id):await sb.from(tb).insert(row);
+  $('gfSave').disabled=false;
+  if(error){console.error(error);return err(error.message||'Não foi possível salvar.')}
+  toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';renderGF();
+});
+$('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já tiver lançamentos, prefira desmarcar “Ativo”.`))return;
+  const {error}=await sb.from(gfTab==='contas'?'fin_contas':'fin_pessoas').delete().eq('id',GFR.id);
+  if(error)return fail(error,'Não foi possível apagar');
+  toast('Cadastro apagado');dlgGF.close();GFKEY='';renderGF()};
 async function renderRep(){
   const e=ehEsc(),ids=pIds(),todas=escCli.value==='*';
   const vazio=(t,cl)=>{$('pHead').innerHTML='';$('pBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pTiles').innerHTML='';$('pAlerta').hidden=true;$('pNote').textContent=''};
