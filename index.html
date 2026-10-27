@@ -1564,7 +1564,7 @@ async function abrirCC(i){
     :'<div class="alerta" style="margin:0"><b>Nenhum documento anexado</b><span>Peça o documento ao cliente antes de confirmar.</span></div>';
   const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));
   const emps=empresasDe(orig);
-  $('ccDados').innerHTML=`<label class="f">Empresa<select id="ccEmp">${emps.map(c=>`<option value="${c.id}"${c.id===r.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label><div class="fields">${cfg.campos.filter(([k])=>k!=='tipo').map(([k,t,tp])=>{const v=r[k];
+  $('ccDados').innerHTML=`<label class="f">Empresa<select id="ccEmp">${emps.map(c=>`<option value="${c.id}"${c.id===r.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label><div class="fields">${cfg.campos.filter(([k,,tp])=>k!=='tipo'&&tp!=='linha').map(([k,t,tp])=>{const v=r[k];
       if(tp==='textarea')return `<label class="f wide">${t}<textarea data-k="${k}" rows="2">${esc(v||'')}</textarea></label>`;
       if(tp==='parc')return `<label class="f">${t}<input value="${v}x" disabled></label>`;
       if(tp==='money')return `<label class="f">${t}<input class="money" data-k="${k}" inputmode="decimal" value="${showMoney(v)}"></label>`;
@@ -1869,7 +1869,7 @@ $('tbCfg').addEventListener('change',async e=>{const id=e.target.closest('tr').d
 const MODCFG={
   pagar:{titulo:'Boletos e notas fiscais a pagar',tabela:'contas_pagar',dataK:'vencimento',
     sub:'Envie o boleto e a nota fiscal de cada conta. A Controlacs faz o pagamento.',
-    campos:[['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
+    campos:[['linha_digitavel','Linha digitável do boleto','linha',0],['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
     cats:['Boleto','Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe o boleto ou a nota fiscal.',
     conf:['Marcar como paga','Desfazer pagamento'],okTxt:'Paga',novo:'Nova conta'},
   cartao:{titulo:'Cartão de crédito',tabela:'cartao_notas',dataK:'data',
@@ -1978,6 +1978,8 @@ async function openReg(r){
     if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento','Depósito bancário'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
     if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+    // boleto: colar a linha digitável (ou anexar o PDF) preenche valor e vencimento; a chave da NF-e vai junto, escondida
+    if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label><div class="note wide" id="rLeitura" style="margin-top:-6px"></div>`;
     if(tp==='sobre')return `<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
   }).join('');
@@ -2011,6 +2013,7 @@ $('rForm').addEventListener('submit',async e=>{
   const row={cliente_id:cli.id};
   $('rFields').querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;row[k]=el.classList.contains('money')?parseMoney(el.value):k==='parcelas'?+el.value:el.value.trim()||null});
   let m='';
+  if('linha_digitavel' in row)row.linha_digitavel=soDig(row.linha_digitavel)||null;
   if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else delete row.conta_destino}
   const falta=!m&&cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
   if(falta)m='Preencha: '+falta[1]+'.';
@@ -2022,13 +2025,92 @@ $('rForm').addEventListener('submit',async e=>{
   try{
     row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
     await moverDocs(RDOCS,cli.id);
-    const {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();if(e1)throw e1;
+    let {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();
+    // banco ainda sem o v46: salva sem a linha digitável e a chave da nota
+    if(e1&&/linha_digitavel|nfe_chave/.test(e1.message||'')){delete row.linha_digitavel;delete row.nfe_chave;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
+    if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
     if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
     const outra=cli.id!==escCli.value;
     dlgReg.close();toast((REG?'Correção salva':'Lançamento enviado')+(outra?' em '+cli.nome:''));renderMod();
   }catch(ex){fail(ex)}finally{$('rSave').disabled=false}
 });
+// ---------- Leitura do boleto e da nota fiscal (v46) ----------
+// Sem IA e sem custo: a linha digitável (ou o código de barras) do boleto traz o valor e o vencimento;
+// a chave de acesso da NF-e traz o CNPJ do emitente e o número da nota. Lê o texto do PDF ou o que for colado.
+const soDig=s=>String(s||'').replace(/\D/g,'');
+function mod10(n){let s=0,p=2;for(let i=n.length-1;i>=0;i--){const v=+n[i]*p;s+=v>9?v-9:v;p=p===2?1:2}return (10-s%10)%10}
+function soma11(n){let s=0,p=2;for(let i=n.length-1;i>=0;i--){s+=+n[i]*p;p=p===9?2:p+1}return s}
+const dvBanco=n=>{const r=11-soma11(n)%11;return r===0||r>9?1:r};            // DV geral do boleto bancário
+const dvConc=n=>{const r=soma11(n)%11;return r===0||r===1?0:r===10?1:11-r};   // DV das contas de consumo (luz, água...)
+const dvNFe=n=>{const r=soma11(n)%11;return r<2?0:11-r};
+const diasDe=(base,n)=>isoLocal(new Date(dObj(base).getTime()+n*864e5));
+// o fator de vencimento recomeçou em 1000 em 22/02/2025; fica a data mais perto de hoje
+function fatorData(f){if(!f)return null;const c=[diasDe('1997-10-07',f)];if(f>=1000)c.push(diasDe('2025-02-22',f-1000));
+  return c.sort((a,b)=>Math.abs(dObj(a)-dObj(TODAY))-Math.abs(dObj(b)-dObj(TODAY)))[0]}
+function boletoDe(digitos){
+  const d=soDig(digitos);let bc;
+  if(d[0]==='8'){ // contas de consumo e tributos: 48 dígitos (4 blocos de 11 + DV) ou código de barras de 44
+    bc=d.length===48?[0,12,24,36].map(i=>d.slice(i,i+11)).join(''):d.length===44?d:null;
+    if(d.length===48&&[0,12,24,36].some(i=>(/[67]/.test(d[2])?mod10(d.slice(i,i+11)):dvConc(d.slice(i,i+11)))!==+d[i+11]))return null;
+    if(!bc||!/[6-9]/.test(bc[2]))return null;
+    const sem=bc.slice(0,3)+bc.slice(4);if((/[67]/.test(bc[2])?mod10(sem):dvConc(sem))!==+bc[3])return null;
+    return {tipo:'conc',linha:d.length===48?d:null,barra:bc,valor:+bc.slice(4,15)/100||null,venc:null};
+  }
+  if(d.length===47){
+    if([[0,9],[10,20],[21,31]].some(([a,b])=>mod10(d.slice(a,b))!==+d[b]))return null;
+    bc=d.slice(0,4)+d[32]+d.slice(33,47)+d.slice(4,9)+d.slice(10,20)+d.slice(21,31);
+  }else if(d.length===44)bc=d;else return null;
+  if(dvBanco(bc.slice(0,4)+bc.slice(5))!==+bc[4])return null;
+  const c1=bc.slice(0,4)+bc.slice(19,24),c2=bc.slice(24,34),c3=bc.slice(34,44);
+  const linha=c1+mod10(c1)+c2+mod10(c2)+c3+mod10(c3)+bc[4]+bc.slice(5,19);
+  return {tipo:'banco',linha,barra:bc,valor:+bc.slice(9,19)/100||null,venc:fatorData(+bc.slice(5,9))};
+}
+function nfeDe(digitos){const d=soDig(digitos);
+  if(d.length!==44||!/^(55|65)$/.test(d.slice(20,22))||+d.slice(0,2)<11||+d.slice(0,2)>53||dvNFe(d.slice(0,43))!==+d[43])return null;
+  return {chave:d,cnpj:d.slice(6,20),numero:String(+d.slice(25,34))};
+}
+// procura no texto: sequências de números separados por espaço, ponto ou hífen
+function lerTextoDoc(txt){
+  const seqs=(String(txt).match(/\d[\d .\-]{40,80}\d/g)||[]).map(soDig);
+  const janelas=n=>seqs.flatMap(s=>s.length<n?[]:[...Array(s.length-n+1).keys()].map(i=>s.slice(i,i+n)));
+  let nfe=null;for(const w of janelas(44)){nfe=nfeDe(w);if(nfe)break}
+  let bol=null;
+  for(const n of [47,48,44])for(const w of bol?[]:janelas(n)){if(n===44&&nfe&&w===nfe.chave)continue;const b=boletoDe(w);
+    // só o código de barras (44 números) confere 1 vez em 10 por acaso: exige valor e vencimento plausíveis
+    if(b&&n===44&&!(b.valor&&(b.tipo==='conc'||b.venc&&Math.abs(dObj(b.venc)-dObj(TODAY))<3*365*864e5)))continue;
+    if(b&&(b.valor||b.tipo==='banco')){bol=b;break}}
+  return {bol,nfe};
+}
+async function pdfTexto(file){
+  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
+  const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let t='';
+  for(let p=1;p<=Math.min(doc.numPages,4);p++){const c=await (await doc.getPage(p)).getTextContent();t+=c.items.map(i=>i.str).join(' ')+'\n'}
+  return t;
+}
+// Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
+const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
+async function aplicarLeitura({bol,nfe},origem){
+  const avisos=[],lidos=[];
+  const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
+    const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
+    if(atual==null||atual===''||Number.isNaN(atual)){el.value=el.classList.contains('money')?showMoney(v):v;lidos.push(txt+' '+(fmt?fmt(v):v))}
+    else if(String(el.classList.contains('money')?r2(atual):atual)!==String(v))avisos.push(`${txt} no ${origem}: ${fmt?fmt(v):v}, diferente do digitado`)};
+  if(bol){const el=rCampo('linha_digitavel');if(el&&!soDig(el.value))el.value=bol.linha||bol.barra;
+    poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR)}
+  if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº');
+    const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:nfe.cnpj}).then(r=>r,()=>({data:null}));
+    if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
+  const box=$('rLeitura');if(!box)return;
+  box.innerHTML=!bol&&!nfe?'':(lidos.length?`<span class="pos">✓ Lido ${origem==='PDF'?'do PDF':'da linha digitável'}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${origem==='PDF'?'do PDF':'da linha digitável'}; os campos já estavam preenchidos.</span> `)
+    +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'');
+}
+$('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf$/i.test(f.type||f.name)||!regEditavel())return;
+  try{const r=lerTextoDoc(await pdfTexto(f));if(r.bol||r.nfe)await aplicarLeitura(r,'PDF');else if($('rLeitura')&&!soDig(rCampo('linha_digitavel')?.value))$('rLeitura').innerHTML='<span class="muted">Não achei a linha digitável neste PDF. Se for boleto, cole a linha digitável acima.</span>'}
+  catch(err){console.error(err)}});
+$('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitavel')return;const d=soDig(e.target.value),box=$('rLeitura');
+  if(d.length<44){if(box)box.innerHTML='';return}
+  const b=boletoDe(d);if(b)aplicarLeitura({bol:b},'linha');else if(box)box.innerHTML='<span class="neg">Esta linha digitável não confere. Verifique os números.</span>'});
 // o cliente apaga enquanto está aberto; o escritório apaga sempre (lançamento errado ou que não devia existir)
 async function excluirLanc(mod,r,docs){
   if(!confirm((r.conferido?'Este lançamento já foi '+MODCFG[mod].okTxt.toLowerCase()+'. ':'')+'Excluir este lançamento e os documentos dele? Não dá para desfazer.'))return false;
@@ -3905,7 +3987,7 @@ $('gtImp').onclick=async()=>{
     const pes=await gfPessoasDe(cli.id,'fornecedor');
     const acha=r=>pes.find(p=>r.fornecedor_bc&&p.fornecedor_bc===r.fornecedor_bc)||pes.find(p=>chave(p.nome)===chave(r.fornecedor)||chave(p.fantasia)===chave(r.fornecedor));
     const rows=ls.map(r=>{const p=acha(r);return {cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||r.fornecedor,descricao:r.sobre||null,documento:r.documento||null,
-      categoria:r.categoria_ok?r.categoria:null,vencimento:r.vencimento,valor:r.valor,forma:'Boleto',pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:r.id,obs:r.obs||null}});
+      categoria:r.categoria_ok?r.categoria:null,vencimento:r.vencimento,valor:r.valor,forma:'Boleto',linha_digitavel:r.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:r.id,obs:r.obs||null}});
     const {error}=await sb.from('fin_titulos').insert(rows);if(error)throw error;
     toast(`${rows.length} ${rows.length===1?'conta trazida':'contas trazidas'} para o contas a pagar`);
   }catch(e){fail(e,'Não foi possível trazer os boletos')}
@@ -3982,6 +4064,10 @@ async function abrirGT(t){
   h+=`<p class="err" id="gtErr" hidden></p>`;
   $('gtdBody').innerHTML=h;
   $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`;
+  // colar a linha digitável preenche o vencimento e o valor que estiverem vazios
+  $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
+    if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
+    if(P&&!$('gt_forma').value)$('gt_forma').value='Boleto'});
   dlgGT.showModal();if(!t)$('gt_pessoa').focus();
   if(t?.origem_id){
     const {data}=await sb.from('documentos').select('*').eq('registro_id',t.origem_id);const urls=await signed((data||[]).map(d=>d.caminho));
