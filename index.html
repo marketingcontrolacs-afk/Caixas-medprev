@@ -418,6 +418,45 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <p class="note" id="gcNote"></p>
   </section>
 
+  <!-- GESTÃO FINANCEIRA › FATURA DO CARTÃO DE CRÉDITO (escritório) -->
+  <section id="viewFat" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Fatura do cartão de crédito</h1><p class="sub">Tudo o que foi pago com o cartão é lançado aqui, na fatura em que vai cair. No fim do mês, confira com a fatura do banco e feche: ela vira uma conta a pagar.</p></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="ftImp" hidden></button><button class="btn" id="ftXls" hidden>Baixar Excel</button><button class="btn primary" id="ftNovo" hidden>+ Lançamento no cartão</button></div>
+    </div>
+    <div class="toolbar">
+      <label class="f">Cartão<select id="ftConta"></select></label>
+      <label class="f">Fatura de<input type="month" id="ftMes"></label>
+      <input id="ftBusca" placeholder="Buscar" style="max-width:240px">
+    </div>
+    <div class="tiles" id="ftTiles"></div>
+    <div class="card tablebox"><table><thead id="ftHead"></thead><tbody id="ftBody"></tbody><tfoot id="ftFoot"></tfoot></table></div>
+    <div class="card" id="ftFecha" hidden style="padding:16px 18px;margin-top:16px;display:grid;gap:12px"></div>
+    <p class="note" id="ftNote"></p>
+  </section>
+
+  <!-- GESTÃO FINANCEIRA › PLANO DE CONTAS DA EMPRESA (escritório) -->
+  <section id="viewPC" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Plano de contas</h1><p class="sub" id="pcSub"></p></div>
+      <button class="btn" id="pcXls" hidden>Baixar Excel</button>
+    </div>
+    <div class="card" id="pcModo" hidden style="padding:16px 18px;margin-top:16px;display:grid;gap:10px">
+      <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="padrao" style="width:auto;margin-top:4px"><span><b>Usar o plano padrão</b><br><span class="muted">O mesmo para todas as empresas. Ele é editado em Configurações › Categorias.</span></span></label>
+      <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="proprio" style="width:auto;margin-top:4px"><span><b>Usar um plano próprio desta empresa</b><br><span class="muted">Começa como uma cópia do padrão. Depois pode incluir, renomear e desativar categorias só para esta empresa.</span></span></label>
+    </div>
+    <form class="card row" id="pcForm" hidden style="padding:16px 18px;margin-top:16px;align-items:flex-end">
+      <label class="f">Código<input id="pcCod" placeholder="Ex.: 2.1.05" style="max-width:130px"></label>
+      <label class="f" style="flex:1 1 220px">Categoria<input id="pcCat" placeholder="Nome da categoria"></label>
+      <label class="f">Grupo na DRE<input id="pcGrupo" list="pcGrupos" placeholder="Ex.: DESPESAS FIXAS"></label>
+      <label class="f">Tipo<select id="pcTipo"><option>Despesa</option><option>Receita</option></select></label>
+      <button class="btn primary" type="submit">Adicionar categoria</button>
+    </form>
+    <div class="toolbar"><input id="pcBusca" placeholder="Buscar categoria ou código" style="max-width:260px"><label class="f">Mostrar<select id="pcFiltro"><option value="ativos">Ativas</option><option value="inativos">Inativas</option><option value="todos">Todas</option></select></label></div>
+    <div class="card tablebox"><table><thead id="pcHead"></thead><tbody id="pcBody"></tbody></table></div>
+    <p class="note" id="pcNote"></p>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › CADASTROS (escritório) -->
   <section id="viewGF" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -880,6 +919,8 @@ const ICO={
   gfagenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M12 14h2M16 14h1M8 17h2"/>',
   gfremessa:'<path d="M12 15V3M8 7l4-4 4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
   gfretorno:'<path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
+  gffatura:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M8 15l2 2 4-4"/>',
+  gfplano:'<path d="M4 5h16M4 12h16M4 19h16"/><circle cx="8" cy="5" r="1.5"/><circle cx="14" cy="12" r="1.5"/><circle cx="10" cy="19" r="1.5"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
@@ -897,6 +938,7 @@ const NAV=[
   {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
@@ -906,7 +948,8 @@ const NAV=[
   {k:'gfdforn',t:'Despesas por fornecedor',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfdforma',t:'Despesas por forma de pagamento',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfpes',t:'Clientes e fornecedores',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
-  {k:'gfcontas',t:'Contas bancárias',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
+  {k:'gfcontas',t:'Contas bancárias e cartões',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
+  {k:'gfplano',t:'Plano de contas',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
   {k:'rh',t:'Férias',g:'Recursos humanos',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',ok:()=>temAcesso('folha')},
   {k:'ponto',t:'Espelho de ponto',g:'Recursos humanos',ok:()=>temAcesso('ponto')},
@@ -968,7 +1011,7 @@ escCli.onchange=()=>{guardaEmp();openView()};
 function go(v){if(!eqPode(v))return;VIEW=v;renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR','viewRel'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -993,6 +1036,8 @@ function openView(){
   else if(RELMODOS[VIEW]){$('viewRel').hidden=false;renderRel()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
+  else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
+  else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   avBanner();
 }
 function show(view){
@@ -3919,15 +3964,16 @@ const pLancaEm=()=>empresasDe('repasse').filter(c=>podeLancar(c.id,'repasse'));
 // contas bancárias por empresa; clientes e fornecedores por empresa ou para todas (cliente_id vazio).
 // Os fornecedores começam com a lista do Bom Controle (fornecedor_bc = chave em fornecedores_bc).
 let gfTab='contas',GFL=[],GFKEY='',GFR=null;
-const GFTIPOS=['Conta corrente','Poupança','Aplicação','Conta de pagamento','Caixa / tesouraria'];
+const GFTIPOS=['Conta corrente','Poupança','Aplicação','Conta de pagamento','Caixa / tesouraria','Cartão de crédito'];
+const ehCartao=c=>c?.tipo==='Cartão de crédito';
 const GFGRUPOS=['Convênio','Empresa','Particular','Outros'];
 const gfDig=s=>String(s||'').replace(/\D/g,'');
 const PAPEL={cliente:'Cliente',fornecedor:'Fornecedor',ambos:'Cliente e fornecedor'};
 async function renderGF(){
   const cli=cliAtual(),contas=gfTab==='contas';
-  $('gfH1').textContent=contas?'Contas bancárias':'Clientes e fornecedores';$('gfPapelBox').hidden=contas;
+  $('gfH1').textContent=contas?'Contas bancárias e cartões':'Clientes e fornecedores';$('gfPapelBox').hidden=contas;
   $('gfNovo').textContent=contas?'+ Nova conta':'+ Novo cadastro';
-  $('gfSub').textContent=contas?'Contas bancárias da empresa. Elas são usadas nas contas a pagar e a receber, na conciliação do extrato (OFX) e na remessa ao banco.'
+  $('gfSub').textContent=contas?'Contas bancárias da empresa, usadas nas contas a pagar e a receber, na conciliação do extrato (OFX) e na remessa ao banco. Se a empresa tem cartão de crédito, cadastre-o aqui com o tipo “Cartão de crédito”.'
     :'Quem paga e quem recebe da empresa. Os fornecedores do Bom Controle valem para todas as empresas. Ao digitar o CNPJ, os dados vêm da Receita; ao digitar o CEP, o endereço vem dos Correios.';
   $('gfNovo').hidden=!cli;
   if(!cli){gfVazio('Escolha uma empresa.');return}
@@ -3953,7 +3999,7 @@ function gfDesenha(){
   const sit=r=>r.ativo===false?'<span class="chip">Inativo</span>':'<span class="chip c-ok">Ativo</span>';
   if(contas){
     $('gfHead').innerHTML='<tr><th class="l">Conta</th><th class="l">Tipo</th><th class="l">Banco · agência · conta</th><th class="l">Nome no Bom Controle</th><th>Saldo inicial</th><th class="l">Situação</th></tr>';
-    $('gfBody').innerHTML=vis.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td class="l"><b>${esc(r.nome)}</b></td><td class="l">${esc(r.tipo)}</td><td class="l">${r.banco||r.conta?`${esc(r.banco||'')}<br>${mu(`Ag. ${esc(r.agencia||'—')} · ${esc(r.conta||'—')}`)}`:mu('—')}</td><td class="l">${esc(r.conta_bc||'')||mu('—')}</td><td>${fm(r.saldo_inicial)}${r.saldo_data?`<br>${mu('em '+dBR(r.saldo_data))}`:''}</td><td class="l">${sit(r)}</td></tr>`).join('')
+    $('gfBody').innerHTML=vis.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td class="l"><b>${esc(r.nome)}</b></td><td class="l">${esc(r.tipo)}</td><td class="l">${ehCartao(r)?`${esc(r.banco||'')}${r.conta?' final '+esc(r.conta):''}<br>${mu(`fecha dia ${r.cartao_fechamento||'—'} · vence dia ${r.cartao_vencimento||'—'}`)}`:r.banco||r.conta?`${esc(r.banco||'')}<br>${mu(`Ag. ${esc(r.agencia||'—')} · ${esc(r.conta||'—')}`)}`:mu('—')}</td><td class="l">${esc(r.conta_bc||'')||mu('—')}</td><td>${fm(r.saldo_inicial)}${r.saldo_data?`<br>${mu('em '+dBR(r.saldo_data))}`:''}</td><td class="l">${sit(r)}</td></tr>`).join('')
       ||`<tr><td class="l muted" colspan="6">${GFL.length?'Nenhuma conta neste filtro.':'Nenhuma conta cadastrada. Use “Nova conta” para começar.'}</td></tr>`;
   }else{
     const rf=r=>r.situacao_receita?`<br><span class="chip ${/ATIVA/i.test(r.situacao_receita)?'c-ok':'c-bad'}" title="Consultado na Receita${r.situacao_em?' em '+dBR(r.situacao_em):''}">${esc(r.situacao_receita)}</span>`:'';
@@ -3978,7 +4024,13 @@ function abrirGF(r){
   let h;
   if(contas){
     $('gfTitle').textContent=r?r.nome:'Nova conta · '+(cli?.nome||'');
-    h=inp('nome','Nome da conta *','Ex.: Sicredi 12345-6')+sel('tipo','Tipo',GFTIPOS,'Conta corrente')+inp('banco','Banco','Ex.: Sicredi')+inp('agencia','Agência')+inp('conta','Conta','com o dígito')
+    const pagadoras=GFL.filter(c=>c.id!==r?.id&&!ehCartao(c)&&(c.ativo!==false||c.id===r?.cartao_conta_pag)).map(c=>[c.id,c.nome]);
+    h=inp('nome','Nome da conta *','Ex.: Sicredi 12345-6')+sel('tipo','Tipo',GFTIPOS,'Conta corrente')+inp('banco','Banco','Ex.: Sicredi')+inp('agencia','Agência')+inp('conta','Conta','com o dígito; no cartão, o final')
+      +`<div class="fields wide" id="gf_cartaoBox" style="background:var(--sunk);padding:12px;border-radius:10px"${ehCartao(r)?'':' hidden'}>
+        <label class="f">Dia em que a fatura fecha *<input id="gf_cartao_fechamento" type="number" min="1" max="31" value="${r?.cartao_fechamento??''}" placeholder="Ex.: 25"></label>
+        <label class="f">Dia do vencimento *<input id="gf_cartao_vencimento" type="number" min="1" max="31" value="${r?.cartao_vencimento??''}" placeholder="Ex.: 5"></label>
+        ${sel('cartao_conta_pag','Conta que paga a fatura',[['','—'],...pagadoras],'')}
+        <p class="note wide" style="margin:0">Compras feitas a partir do dia do fechamento caem na fatura seguinte. Para o saldo inicial do cartão, use zero na data da primeira fatura lançada aqui.</p></div>`
       +inp('conta_bc','Nome no Bom Controle','como está no BC')
       +inp('cnab_convenio','Convênio de pagamentos (CNAB)','código do banco, ex.: 3KMS')+`<label class="f">Nº da última remessa<input id="gf_cnab_seq" type="number" min="0" value="${r?.cnab_seq??''}" placeholder="0"></label>`
       +`<label class="f">Saldo inicial<input id="gf_saldo_inicial" class="money" inputmode="decimal" value="${r?showMoney(r.saldo_inicial):''}" placeholder="0,00"></label>`
@@ -3998,6 +4050,7 @@ function abrirGF(r){
       +(r?.fornecedor_bc?`<p class="note wide" style="margin:0">Veio da lista de fornecedores do Bom Controle. Na exportação para o BC continuam valendo o nome e o CNPJ de lá.</p>`:'');
   }
   $('gfFields').innerHTML=h;$('gfErr').hidden=true;
+  if(contas)$('gf_tipo').onchange=()=>$('gf_cartaoBox').hidden=!ehCartao({tipo:$('gf_tipo').value});
   if(!contas){$('gfReceita').onclick=()=>gfReceita(true);$('gf_documento').addEventListener('change',()=>gfReceita(false));$('gf_cep').addEventListener('change',gfCep)}
   // fornecedor do BC não é apagado (voltaria na próxima carga): use "Ativo"
   $('gfDel').hidden=!r||!!r.fornecedor_bc;
@@ -4041,6 +4094,10 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
     const s=parseMoney($('gf_saldo_inicial').value);if(Number.isNaN(s))return err('Saldo inicial inválido.');
     row={nome:val('nome'),tipo:val('tipo')||'Conta corrente',banco:val('banco'),agencia:val('agencia'),conta:val('conta'),conta_bc:val('conta_bc'),saldo_inicial:r2(s||0),saldo_data:val('saldo_data'),obs:val('obs'),ativo:$('gf_ativo').checked};
     if(val('cnab_convenio')||GFR?.cnab_convenio!=null)Object.assign(row,{cnab_convenio:val('cnab_convenio'),cnab_seq:parseInt(val('cnab_seq'))||0});
+    if(ehCartao(row)){const fe=parseInt(val('cartao_fechamento')),ve=parseInt(val('cartao_vencimento'));
+      if(!(fe>=1&&fe<=31&&ve>=1&&ve<=31))return err('No cartão de crédito, informe o dia do fechamento e o dia do vencimento da fatura (1 a 31).');
+      Object.assign(row,{cartao_fechamento:fe,cartao_vencimento:ve,cartao_conta_pag:val('cartao_conta_pag')})}
+    else if(GFR?.cartao_fechamento!=null)Object.assign(row,{cartao_fechamento:null,cartao_vencimento:null,cartao_conta_pag:null});
     if(GFL.some(x=>x.id!==GFR?.id&&x.nome.toLowerCase()===row.nome.toLowerCase()))return err('Já existe uma conta com esse nome nesta empresa.');
   }else{
     row={nome:val('nome'),fantasia:val('fantasia'),documento:val('documento'),papel:val('papel'),grupo:val('papel')==='fornecedor'?null:val('grupo'),telefone:val('telefone'),email:val('email'),cidade:val('cidade'),
@@ -4058,7 +4115,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
   const tb=contas?'fin_contas':'fin_pessoas';
   const {error}=GFR?await sb.from(tb).update(row).eq('id',GFR.id):await sb.from(tb).insert(row);
   $('gfSave').disabled=false;
-  if(error){console.error(error);return err(v48(error)?v48Msg:/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')?'O endereço e a situação na Receita precisam da atualização v49 do banco. Rode o SQL no Supabase.':error.message||'Não foi possível salvar.')}
+  if(error){console.error(error);return err(v52(error)?v52Msg:v48(error)?v48Msg:/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')?'O endereço e a situação na Receita precisam da atualização v49 do banco. Rode o SQL no Supabase.':error.message||'Não foi possível salvar.')}
   toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';GFP.key='';GFC.cid='';renderGF();
 });
 $('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já tiver lançamentos, prefira desmarcar “Ativo”.`))return;
@@ -4086,7 +4143,20 @@ async function gfPessoasDe(cid,papel){
   if(GFP.key!==key){GFP={key,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo').or(`cliente_id.eq.${cid},cliente_id.is.null`).in('papel',[papel,'ambos']).eq('ativo',true).order('nome'))}}
   return GFP.lista;
 }
-const contaNome=id=>GFC.lista.find(c=>c.id===id)?.nome||'';
+const contaNome=id=>GFC.lista.find(c=>c.id===id)?.nome||(c=>c?c.nome+' · '+(CLIENTES.find(x=>x.id===c.cliente_id)?.nome||''):'')(CGRUPO.find(c=>c.id===id));
+// transferência entre contas da empresa ou para conta de outra empresa do grupo (todas as contas que o escritório cuida)
+let CGRUPO=[];
+async function contasGrupo(cli){
+  const {data,error}=await sb.from('fin_contas').select('id,nome,tipo,cliente_id,ativo').eq('ativo',true).order('nome');if(error)throw error;
+  CGRUPO=data||[];return CGRUPO.filter(c=>c.cliente_id===cli?.id).concat(CGRUPO.filter(c=>c.cliente_id!==cli?.id));
+}
+const cliDaConta=(id,def)=>CGRUPO.find(c=>c.id===id)?.cliente_id||def;
+function optContas(ls,cli){
+  const da=ls.filter(c=>c.cliente_id===cli?.id),por={};ls.filter(c=>c.cliente_id!==cli?.id).forEach(c=>(por[c.cliente_id]||=[]).push(c));
+  const op=c=>`<option value="${c.id}">${esc(c.nome)}</option>`;
+  return (da.length?`<optgroup label="${esc(cli?.nome||'Esta empresa')}">${da.map(op).join('')}</optgroup>`:'')
+    +Object.entries(por).map(([id,cs])=>`<optgroup label="${esc(CLIENTES.find(x=>x.id===id)?.nome||'Outra empresa')}">${cs.map(op).join('')}</optgroup>`).join('');
+}
 const somaMes=(iso,n)=>{const [y,m,d]=iso.split('-').map(Number),u=new Date(y,m-1+n+1,0).getDate();return isoLocal(new Date(y,m-1+n,Math.min(d,u),12))};
 function gtSit(t){const pg=GT.pago[t.id]||0,sd=r2(t.valor-pg);
   if(sd<=0.004)return ['c-done',t.tipo==='pagar'?'✓ Pago':'✓ Recebido','baixada'];
@@ -4143,11 +4213,18 @@ $('gtImp').onclick=async()=>{
     const acha=r=>pes.find(p=>r.fornecedor_bc&&p.fornecedor_bc===r.fornecedor_bc)||pes.find(p=>chave(p.nome)===chave(r.fornecedor)||chave(p.fantasia)===chave(r.fornecedor));
     const rows=ls.map(r=>{const p=acha(r);return {cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||r.fornecedor,descricao:r.sobre||null,documento:r.documento||null,
       categoria:r.categoria_ok?r.categoria:null,vencimento:r.vencimento,valor:r.valor,forma:'Boleto',linha_digitavel:r.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:r.id,obs:r.obs||null}});
-    const {error}=await sb.from('fin_titulos').insert(rows);if(error)throw error;
-    toast(`${rows.length} ${rows.length===1?'conta trazida':'contas trazidas'} para o contas a pagar`);
+    // o boleto que chega no lugar de uma conta prevista (mesmo fornecedor, vencimento até 20 dias de diferença) atualiza a prevista
+    const prev=GT.lista.filter(t=>t.previsto&&t.tipo==='pagar'&&!(GT.movs[t.id]||[]).length),novos=[];let subst=0;
+    for(const r of rows){const i=prev.findIndex(t=>(r.pessoa_id&&t.pessoa_id===r.pessoa_id||chave(t.pessoa_nome)===chave(r.pessoa_nome))&&Math.abs(dObj(t.vencimento)-dObj(r.vencimento))<=20*864e5);
+      if(i<0){novos.push(r);continue}
+      const t=prev.splice(i,1)[0],{error}=await sb.from('fin_titulos').update({...r,categoria:r.categoria||t.categoria,conta_id:t.conta_id,descricao:r.descricao||t.descricao,previsto:false,obs:r.obs}).eq('id',t.id);if(error)throw error;subst++}
+    if(novos.length){const {error}=await sb.from('fin_titulos').insert(novos);if(error)throw error}
+    toast(`${rows.length} ${rows.length===1?'conta trazida':'contas trazidas'} para o contas a pagar`+(subst?` (${subst} no lugar de ${subst===1?'conta prevista':'contas previstas'})`:''));
   }catch(e){fail(e,'Não foi possível trazer os boletos')}
   $('gtImp').disabled=false;GT.key='';renderGT();
 };
+// conta prevista pelo histórico: avisa até chegar o boleto ou a nota
+const prevTxt=t=>t.forma==='Boleto'?'Falta o boleto':t.categoria==='Salário'?'Previsto: confirmar valor':'Falta o boleto ou a nota';
 const gtFalta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
 function gtDesenha(){
   $('gtCal').hidden=GT.modo!=='gfagenda';
@@ -4168,13 +4245,14 @@ function gtDesenha(){
   else{const noMes=r2(Object.values(GT.movs).flat().filter(m=>m.data.startsWith(mes)).reduce((x,m)=>x+(+m.valor),0));
     tiles=[['Em aberto',soma(ab),qt(ab)],['Vencidas',soma(venc),qt(venc),venc.length?'neg':''],['Próximos 7 dias',soma(prox),qt(prox)+' a vencer'],[P?'Pago no mês':'Recebido no mês',fm(noMes),MESES[+mes.slice(5)-1]]]}
   $('gtTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  $('gtNote').textContent='Clique numa conta para ver, corrigir ou registrar o '+(MV?'pagamento ou o recebimento.':P?'pagamento.':'recebimento.');
+  const sd=GT.lista.filter(t=>t.previsto&&gtSit(t)[2]!=='baixada'&&t.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+10*864e5)));
+  $('gtNote').textContent=(sd.length?`Atenção: ${sd.length} ${sd.length===1?'conta prevista vence':'contas previstas vencem'} nos próximos 10 dias e ainda não ${sd.length===1?'tem':'têm'} o boleto ou a nota. `:'')+'Clique numa conta para ver, corrigir ou registrar o '+(MV?'pagamento ou o recebimento.':P?'pagamento.':'recebimento.');
 }
 // tabela comum às telas (contas a pagar, a receber, movimentação e o dia escolhido na agenda)
 function gtTabela(rows,vazio){
   const MV=GT.tipo==='mov',P=gtP(),mu=t=>`<span class="muted">${t}</span>`;
   $('gtHead').innerHTML=`<tr><th>Vencimento</th>${MV?'<th class="l">Tipo</th>':''}<th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Descrição</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="${MV?10:9}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td></td></tr>`
@@ -4227,10 +4305,11 @@ const dlgGT=$('dlgGT');
 async function abrirGT(t,tipo){
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
   let pes=[],contas=GFC.lista;
-  try{[pes,contas]=await Promise.all([gfPessoasDe(cli.id,P?'fornecedor':'cliente'),gfContasDe(cli.id)]);if(!PCAT.ok)await loadCats()}catch(e){console.error(e)}
+  let plano=[];try{[pes,contas,plano]=await Promise.all([gfPessoasDe(cli.id,P?'fornecedor':'cliente'),gfContasDe(cli.id),planoDe(cli)])}catch(e){console.error(e)}
   const v=k=>esc(t?.[k]??''),mu=x=>`<span class="muted">${x}</span>`;
   const opt=(ls,cur,vazio)=>`<option value="">${vazio||''}</option>`+ls.map(o=>{const [val,txt]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${cur===val?' selected':''}>${esc(txt)}</option>`}).join('');
-  const cats=PCAT.plano.map(c=>c.categoria);if(t?.categoria&&!cats.includes(t.categoria))cats.unshift(t.categoria);
+  const doTipo=plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')===(P?'Despesa':'Receita'));
+  const cats=(doTipo.length?doTipo:plano.filter(c=>c.ativo!==false)).map(c=>c.categoria);if(t?.categoria&&!cats.includes(t.categoria))cats.unshift(t.categoria);
   const ativas=contas.filter(c=>c.ativo!==false||c.id===t?.conta_id).map(c=>[c.id,c.nome]);
   const movs=t?GT.movs[t.id]||[]:[],pago=t?GT.pago[t.id]||0:0,falta=t?Math.max(0,r2(t.valor-pago)):0;
   $('gtdTitle').textContent=t?(t.pessoa_nome||(P?'Conta a pagar':'Conta a receber')):(P?'Nova conta a pagar':'Nova conta a receber')+' · '+cli.nome;
@@ -4253,6 +4332,7 @@ async function abrirGT(t,tipo){
     <label class="f wide">Observação<textarea id="gt_obs" rows="2">${v('obs')}</textarea></label>
   </div>`;
   if(t?.parcelas>1)h+=`<p class="note" style="margin:0">Parcela ${t.parcela} de ${t.parcelas}. A correção vale só para esta parcela.</p>`;
+  if(t?.previsto)h+=`<label class="alerta" style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="gt_prevok" style="width:auto"> <span><b>Conta prevista pelo histórico.</b> ${esc(t.obs||'')} Marque quando o boleto ou a nota chegar e o valor estiver conferido (colar a linha digitável também tira o alerta).</span></label>`;
   if(t?.origem_id)h+=`<div id="gtDocs" class="note" style="margin:0">Documentos enviados pelo cliente: carregando…</div>`;
   if(t){
     h+=`<h3 style="margin:8px 0 0">${P?'Pagamentos':'Recebimentos'}</h3>`+(movs.length?`<div class="tablebox" style="margin:0"><table><thead><tr><th>Data</th><th class="l">Conta</th><th>Valor</th><th>Juros/multa</th><th>Desconto</th><th></th></tr></thead><tbody>${movs.map(m=>`<tr><td>${dBR(m.data)}</td><td class="l">${esc(contaNome(m.conta_id))}</td><td>${fm(m.valor)}</td><td>${+m.juros?fm(m.juros):mu('—')}</td><td>${+m.desconto?fm(m.desconto):mu('—')}</td><td><button type="button" class="btn small ghost" data-act="desfaz" data-id="${m.id}">Desfazer</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">Nenhum ${P?'pagamento':'recebimento'} registrado.</p>`);
@@ -4285,6 +4365,7 @@ dlgGT.addEventListener('click',async ev=>{const b=ev.target.closest('[data-act]'
 async function gtAcao(a,b){
   if(a.startsWith('av_'))return gxAcao(a,b);
   if(a.startsWith('rm_'))return rmAcao(a,b);
+  if(a.startsWith('ct_'))return ftAcao(a,b);
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=dP(),cli=cliAtual(),t=GTR;
   if(a==='salvar'){
@@ -4296,6 +4377,7 @@ async function gtAcao(a,b){
     const row={pessoa_id:p?.id||null,pessoa_nome:p?.nome||nome,descricao:val('descricao'),documento:val('documento'),categoria:val('categoria'),
       competencia:val('competencia')?val('competencia')+'-01':null,vencimento:val('vencimento'),conta_id:val('conta_id'),forma:val('forma'),
       linha_digitavel:P?(val('linha_digitavel')||'').replace(/\D/g,'')||null:null,pix_chave:P?val('pix_chave')||p?.pix_chave||null:null,obs:val('obs')};
+    if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
     let error;
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
       ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id))}
@@ -4316,8 +4398,8 @@ async function gtAcao(a,b){
     const falta=r2(t.valor-(GT.pago[t.id]||0)),ab=r2(valor-juros+desconto);
     if(ab>falta+0.004)return gtErr(`Com esses valores, a baixa (${fm(ab)}) passa do que falta (${fm(falta)}). Se teve juros ou multa, informe no campo ao lado.`);
     if(ab<=0)return gtErr('O desconto e os juros não fecham com o valor.');
-    const {error}=await sb.from('fin_movimentos').insert({cliente_id:cli.id,conta_id:conta,data,tipo:P?'saida':'entrada',valor:r2(valor),juros:r2(juros),desconto:r2(desconto),titulo_id:t.id,
-      descricao:t.descricao||(P?'Pagamento':'Recebimento')+(t.parcelas>1?` ${t.parcela}/${t.parcelas}`:''),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria});
+    let error;try{({error}=await sb.from('fin_movimentos').insert(await pernasFatura(t,{cliente_id:cli.id,conta_id:conta,data,tipo:P?'saida':'entrada',valor:r2(valor),juros:r2(juros),desconto:r2(desconto),titulo_id:t.id,
+      descricao:t.descricao||(P?'Pagamento':'Recebimento')+(t.parcelas>1?` ${t.parcela}/${t.parcelas}`:''),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:t.forma||null})))}catch(e){error=e}
     if(error){console.error(error);return gtErr(error.message||'Não foi possível registrar.')}
     // o boleto enviado pelo cliente também fica como pago (vale para a Exportação do Bom Controle)
     if(t.origem_id&&ab>=falta-0.004){const c=GFC.lista.find(x=>x.id===conta);
@@ -4325,7 +4407,8 @@ async function gtAcao(a,b){
     toast(P?'Pagamento registrado':'Recebimento registrado');dlgGT.close();GT.key='';renderGT();
   }else if(a==='desfaz'){
     if(!confirm('Desfazer este '+(P?'pagamento':'recebimento')+'? Ele sai também do extrato da conta.'))return;
-    const {error}=await sb.from('fin_movimentos').delete().eq('id',b.dataset.id);if(error)return fail(error,'Não foi possível desfazer');
+    const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);   // pagamento de fatura: sai também a entrada no cartão
+    const {error}=mv?.transf_id?await sb.from('fin_movimentos').delete().eq('transf_id',mv.transf_id):await sb.from('fin_movimentos').delete().eq('id',b.dataset.id);if(error)return fail(error,'Não foi possível desfazer');
     if(t.origem_id){const {error:e2}=await sb.from('contas_pagar').update({conferido:false,pago_em:null}).eq('id',t.origem_id);if(e2)console.error(e2)}
     toast('Desfeito');dlgGT.close();GT.key='';renderGT();
   }else if(a==='apagar'){
@@ -4552,8 +4635,8 @@ async function rmRetorno(f){
       if(st==='pago'&&it.status!=='pago'&&t){
         const falta=r2(t.valor-(GT.pago[t.id]||0)),valor=r2(x.valor||it.valor);
         if(falta>0.004){const juros=Math.max(0,r2(valor-falta));
-          const {error:e2}=await sb.from('fin_movimentos').insert({cliente_id:cli.id,conta_id:it.conta_id,data:x.data||it.data_pagamento,tipo:'saida',valor,juros,desconto:0,titulo_id:t.id,
-            descricao:(t.descricao||'Pagamento')+' · remessa',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria});if(e2)throw e2;
+          const {error:e2}=await sb.from('fin_movimentos').insert(await pernasFatura(t,{cliente_id:cli.id,conta_id:it.conta_id,data:x.data||it.data_pagamento,tipo:'saida',valor,juros,desconto:0,titulo_id:t.id,
+            descricao:(t.descricao||'Pagamento')+' · remessa',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:t.forma||null}));if(e2)throw e2;
           GT.pago[t.id]=r2((GT.pago[t.id]||0)+valor-juros);pagos++;
           if(t.origem_id&&valor-juros>=falta-0.004){const c=contas.find(y=>y.id===it.conta_id);
             const {error:e3}=await sb.from('contas_pagar').update({conferido:true,pago_em:x.data||it.data_pagamento,banco:c?.conta_bc||c?.nome||null}).eq('id',t.origem_id);if(e3)console.error(e3)}}
@@ -4600,7 +4683,9 @@ async function renderRel(){
   vazio('Carregando…');
   try{
     const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
-    if(!PCAT.ok)await loadCats();
+    REL.plano=await planoDe(cli);
+    REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
+    REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
     REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
     movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
     if(M==='gforc'){const {data,error}=await sb.from('fin_orcamento').select('*').eq('cliente_id',cli.id);if(error)throw error;REL.orc=data||[]}
@@ -4609,33 +4694,43 @@ async function renderRel(){
   ({gfresumo:relResumo,gffluxo:relFluxo,gforc:relOrc,gfdre:relDre,gfdcat:relDesp,gfdforn:relDesp,gfdforma:relDesp})[M]();
 }
 ['relIni','relFim','relSem','relBase'].forEach(id=>$(id).onchange=renderRel);
+// no cartão, a compra é despesa e o estorno abate a despesa; transferências ficam fora
+const relTp=m=>!relSemTr(m)?null:REL.cart.has(m.conta_id)?'saida':m.tipo;
+const relVl=m=>REL.cart.has(m.conta_id)&&m.tipo==='entrada'?-m.valor:+m.valor;
+// para o caixa: só as contas bancárias; o pagamento da fatura (transferência para o cartão) é saída de caixa
+const relCaixa=m=>!REL.cart.has(m.conta_id)&&(!m.transf_id||REL.trCart.has(m.transf_id));
 const relFalta=t=>Math.max(0,r2(t.valor-(REL.pago[t.id]||0)));
 const sgn=m=>(m.tipo==='entrada'?1:-1)*m.valor;
 function saldoConta(c,ate){ // saldo no fim do dia "ate"
   return r2(+c.saldo_inicial+REL.movs.filter(m=>m.conta_id===c.id&&m.data<=ate&&(!c.saldo_data||m.data>=c.saldo_data)).reduce((x,m)=>x+sgn(m),0))}
 const tileH=ts=>ts.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
 function relResumo(){
-  const cs=REL.contas.filter(c=>c.ativo!==false),sal=cs.map(c=>[c,saldoConta(c,TODAY)]),tot=r2(sal.reduce((x,s)=>x+s[1],0));
+  const cs=REL.contas.filter(c=>c.ativo!==false&&!ehCartao(c)),sal=cs.map(c=>[c,saldoConta(c,TODAY)]),tot=r2(sal.reduce((x,s)=>x+s[1],0));
+  const cts=REL.contas.filter(c=>c.ativo!==false&&ehCartao(c)).map(c=>[c,-saldoConta(c,TODAY)]);
   const ab=REL.tits.filter(t=>relFalta(t)>0.004),ar=ab.filter(t=>t.tipo==='receber'),ap=ab.filter(t=>t.tipo==='pagar'),som=l=>r2(l.reduce((x,t)=>x+relFalta(t),0));
   const em30=isoLocal(new Date(dObj(TODAY).getTime()+30*864e5)),r30=som(ar.filter(t=>t.vencimento<=em30)),p30=som(ap.filter(t=>t.vencimento<=em30));
-  const mes=TODAY.slice(0,7),mm=REL.movs.filter(m=>m.data.startsWith(mes)&&relSemTr(m)),ent=r2(mm.filter(m=>m.tipo==='entrada').reduce((x,m)=>x+(+m.valor),0)),sai=r2(mm.filter(m=>m.tipo==='saida').reduce((x,m)=>x+(+m.valor),0));
+  const mes=TODAY.slice(0,7),mm=REL.movs.filter(m=>m.data.startsWith(mes)),ent=r2(mm.filter(m=>relTp(m)==='entrada').reduce((x,m)=>x+relVl(m),0)),sai=r2(mm.filter(m=>relTp(m)==='saida').reduce((x,m)=>x+relVl(m),0));
   $('relTiles').innerHTML=tileH([['Saldo nas contas',fm(tot),'hoje, '+cs.length+(cs.length===1?' conta':' contas'),tot<0?'neg':''],['A receber em aberto',fm(som(ar)),'vencido: '+fm(som(ar.filter(t=>t.vencimento<TODAY))),'pos'],['A pagar em aberto',fm(som(ap)),'vencido: '+fm(som(ap.filter(t=>t.vencimento<TODAY))),'neg'],['Resultado do mês',fm(r2(ent-sai)),MESES[+mes.slice(5)-1]+': entradas menos saídas',ent-sai<0?'neg':'pos']]);
   $('relHead').innerHTML='<tr><th class="l">Conta</th><th class="l">Tipo</th><th>Saldo hoje</th></tr>';
   $('relBody').innerHTML=sal.map(([c,v])=>`<tr><td class="l"><b>${esc(c.nome)}</b></td><td class="l">${esc(c.tipo||'')}</td>${cvl(v,v<0?'neg':'')}</tr>`).join('')
     +`<tr style="background:var(--sunk)"><td class="l"><b>Total nas contas</b></td><td></td>${cvl(tot)}</tr>`
+    +cts.map(([c,v])=>`<tr><td class="l">${esc(c.nome)} <span class="muted">(gasto no cartão ainda não pago)</span></td><td class="l">Cartão de crédito</td>${cvl(-v,v>0.004?'neg':'')}</tr>`).join('')
     +`<tr><td class="l">A receber até ${dBR(em30)} (com os vencidos)</td><td></td>${cvl(r30,'pos')}</tr><tr><td class="l">A pagar até ${dBR(em30)} (com os vencidos)</td><td></td>${cvl(-p30,'neg')}</tr>`
     +`<tr style="background:var(--sunk)"><td class="l"><b>Saldo projetado em ${dBR(em30)}</b></td><td></td>${cvl(r2(tot+r30-p30),tot+r30-p30<0?'neg':'')}</tr>`;
   $('relFoot').innerHTML='';
-  $('relNote').textContent='O saldo de cada conta é o saldo inicial do cadastro mais as entradas e saídas lançadas. Confira com o extrato do banco na Conciliação bancária.';
+  $('relNote').textContent='O saldo de cada conta é o saldo inicial do cadastro mais as entradas e saídas lançadas. Confira com o extrato do banco na Conciliação bancária.'+(cts.length?' O cartão não entra no total: o gasto dele vira conta a pagar quando a fatura é fechada.':'');
 }
 function relFluxo(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return $('relBody').innerHTML='<tr><td class="l muted">Escolha o período.</td></tr>';
   const dia=dObj(fim)-dObj(ini)<=62*864e5,bk=d=>dia?d:d.slice(0,7);
-  const antes=isoLocal(new Date(dObj(ini).getTime()-864e5)),cs=REL.contas;
+  const antes=isoLocal(new Date(dObj(ini).getTime()-864e5)),cs=REL.contas.filter(c=>!ehCartao(c));
   const s0=r2(cs.reduce((x,c)=>x+saldoConta(c,antes),0));
   const B={},b=k=>B[k]||={e:0,s:0,pr:0,pp:0};
-  REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relSemTr(m)).forEach(m=>{const x=b(bk(m.data));m.tipo==='entrada'?x.e+=+m.valor:x.s+=+m.valor});
+  REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relCaixa(m)).forEach(m=>{const x=b(bk(m.data));m.tipo==='entrada'?x.e+=+m.valor:x.s+=+m.valor});
   REL.tits.forEach(t=>{const f=relFalta(t);if(f<=0.004)return;const d=t.vencimento<TODAY?TODAY:t.vencimento;if(d<ini||d>fim)return;const x=b(bk(d));t.tipo==='receber'?x.pr+=f:x.pp+=f});
+  // faturas do cartão ainda não fechadas entram como previstas no vencimento
+  const ab={};REL.movs.filter(m=>REL.cart.has(m.conta_id)&&m.fatura&&!m.transf_id&&!REL.fats.some(f=>f.conta_id===m.conta_id&&f.mes===m.fatura)).forEach(m=>{const k=m.conta_id+'|'+m.fatura;ab[k]=(ab[k]||0)+ftSinal(m)});
+  Object.entries(ab).forEach(([k,v])=>{const [cid,mes]=k.split('|'),c=REL.contas.find(x=>x.id===cid);let d=ftVenc(c,mes);if(d<TODAY)d=TODAY;if(v<=0.004||d<ini||d>fim)return;b(bk(d)).pp+=r2(v)});
   let sal=s0;const ks=Object.keys(B).sort();
   $('relHead').innerHTML=`<tr><th>${dia?'Data':'Mês'}</th><th>Entradas realizadas</th><th>Saídas realizadas</th><th>A receber (previsto)</th><th>A pagar (previsto)</th><th>Saldo do ${dia?'dia':'mês'}</th><th>Saldo acumulado</th></tr>`;
   $('relBody').innerHTML=`<tr style="background:var(--sunk)"><td>${dBR(antes)}</td><td colspan="5" class="l muted">Saldo inicial (todas as contas)</td>${cvl(s0)}</tr>`
@@ -4644,20 +4739,24 @@ function relFluxo(){
   const T=k=>r2(ks.reduce((x,kk)=>x+B[kk][k],0));
   $('relFoot').innerHTML=ks.length?`<tr><td class="l">Total</td>${cvl(T('e'))}${cvl(T('s'))}${cvl(T('pr'))}${cvl(T('pp'))}<td></td>${cvl(sal)}</tr>`:'';
   $('relTiles').innerHTML=tileH([['Saldo inicial',fm(s0),'em '+dBR(antes)],['Realizado',fm(r2(T('e')-T('s'))),'entradas menos saídas'],['Previsto',fm(r2(T('pr')-T('pp'))),'a receber menos a pagar'],['Saldo final',fm(sal),'em '+dBR(fim),sal<0?'neg':'']]);
-  $('relNote').textContent='As contas vencidas e não pagas entram como previstas para hoje. '+(dia?'':'Período longo: agrupado por mês.');
+  $('relNote').textContent='As contas vencidas e não pagas entram como previstas para hoje. '+(REL.cart.size?'As compras no cartão entram no vencimento da fatura. ':'')+(dia?'':'Período longo: agrupado por mês.');
 }
 function relDre(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return;
-  const ms=mesesEntre(ini.slice(0,7),fim.slice(0,7)),mv=REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relSemTr(m));
-  const cod=c=>PCAT.plano.find(p=>p.categoria===c)?.codigo||'',lab=c=>(cod(c)?cod(c)+' · ':'')+c;
-  const grupo=tp=>{const g={};mv.filter(m=>m.tipo===tp).forEach(m=>{const k=m.categoria||'Sem categoria';(g[k]||=Object.fromEntries(ms.map(x=>[x,0])))[m.data.slice(0,7)]+=+m.valor});
+  const ms=mesesEntre(ini.slice(0,7),fim.slice(0,7)),mv=REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relTp(m));
+  const cod=c=>REL.plano.find(p=>p.categoria===c)?.codigo||'',lab=c=>(cod(c)?cod(c)+' · ':'')+c;
+  const grupo=tp=>{const g={};mv.filter(m=>relTp(m)===tp).forEach(m=>{const k=m.categoria||'Sem categoria';(g[k]||=Object.fromEntries(ms.map(x=>[x,0])))[m.data.slice(0,7)]+=relVl(m)});
     return Object.entries(g).sort((a,b)=>(cod(a[0])||'zz').localeCompare(cod(b[0])||'zz',undefined,{numeric:true})||a[0].localeCompare(b[0]))};
   const R=grupo('entrada'),D=grupo('saida'),tot=l=>Object.fromEntries(ms.map(x=>[x,r2(l.reduce((s,[,v])=>s+v[x],0))])),TR=tot(R),TD=tot(D),soma=o=>r2(Object.values(o).reduce((a,b)=>a+b,0));
   const linha=(n,v,cl,b)=>`<tr${b?' style="background:var(--sunk)"':''}><td class="l">${b?`<b>${esc(n)}</b>`:esc(n)}</td>${ms.map(x=>cvl(v[x],cl)).join('')}${cvl(soma(v),cl)}</tr>`;
   const RES=Object.fromEntries(ms.map(x=>[x,r2(TR[x]-TD[x])]));
   $('relHead').innerHTML=`<tr><th class="l">Categoria</th>${ms.map(x=>`<th>${mesCurto(x)}</th>`).join('')}<th>Total</th></tr>`;
-  $('relBody').innerHTML=linha('Receitas',TR,'pos',true)+R.map(([k,v])=>linha(lab(k),v)).join('')
-    +linha('Despesas',TD,'neg',true)+D.map(([k,v])=>linha(lab(k),v)).join('')
+  // dentro de receitas e despesas, um subtotal por grupo do plano de contas (ex.: DESPESAS FIXAS)
+  const grp=c=>REL.plano.find(p=>p.categoria===c)?.grupo||'',porGrupo=L=>{if(!L.some(([k])=>grp(k)))return L.map(([k,v])=>linha(lab(k),v)).join('');
+    const gs=[];L.forEach(([k,v])=>{const g=grp(k)||'Sem grupo';let o=gs.find(x=>x[0]===g);if(!o)gs.push(o=[g,[]]);o[1].push([k,v])});
+    return gs.map(([g,ls])=>`<tr><td class="l" style="padding-left:12px"><b>${esc(g)}</b></td>${ms.map(x=>cvl(r2(ls.reduce((s,[,v])=>s+v[x],0)))).join('')}${cvl(r2(ls.reduce((s,[,v])=>s+soma(v),0)))}</tr>`+ls.map(([k,v])=>linha(lab(k),v).replace('<td class="l">','<td class="l" style="padding-left:26px">')).join('')).join('')};
+  $('relBody').innerHTML=linha('Receitas',TR,'pos',true)+porGrupo(R)
+    +linha('Despesas',TD,'neg',true)+porGrupo(D)
     +linha('Resultado (receitas menos despesas)',RES,'',true)
     +`<tr><td class="l">Margem</td>${ms.map(x=>`<td>${TR[x]?Math.round(RES[x]/TR[x]*100)+'%':'—'}</td>`).join('')}<td>${soma(TR)?Math.round(soma(RES)/soma(TR)*100)+'%':'—'}</td></tr>`;
   $('relFoot').innerHTML='';
@@ -4668,7 +4767,7 @@ function relDre(){
 function relDesp(){
   const M=VIEW,ini=$('relIni').value,fim=$('relFim').value,base=$('relBase').value;if(!ini||!fim||fim<ini)return;
   const chaveDe=M==='gfdcat'?(x=>x.categoria||'Sem categoria'):M==='gfdforn'?(x=>x.pessoa_nome||'Sem fornecedor'):(x=>x.forma||'Não informada');
-  const itens=base==='pago'?REL.movs.filter(m=>m.tipo==='saida'&&m.data>=ini&&m.data<=fim&&relSemTr(m)).map(m=>{const t=REL.tit[m.titulo_id];return {categoria:m.categoria,pessoa_nome:m.pessoa_nome,forma:t?t.forma:'Lançamento avulso',valor:+m.valor}})
+  const itens=base==='pago'?REL.movs.filter(m=>relTp(m)==='saida'&&m.data>=ini&&m.data<=fim).map(m=>{const t=REL.tit[m.titulo_id];return {categoria:m.categoria,pessoa_nome:m.pessoa_nome,forma:REL.cart.has(m.conta_id)?'Cartão de crédito':m.forma||t?.forma||(t?null:'Lançamento avulso'),valor:relVl(m)}})
     :REL.tits.filter(t=>t.tipo==='pagar'&&t.vencimento>=ini&&t.vencimento<=fim).map(t=>({categoria:t.categoria,pessoa_nome:t.pessoa_nome,forma:t.forma,valor:+t.valor,aberto:relFalta(t)}));
   const g={};itens.forEach(x=>{const k=chaveDe(x),o=g[k]||={n:0,v:0,a:0};o.n++;o.v+=x.valor;o.a+=x.aberto||0});
   const ls=Object.entries(g).sort((a,b)=>b[1].v-a[1].v),T=r2(ls.reduce((s,[,o])=>s+o.v,0)),mx=ls[0]?.[1].v||1,V=base==='venc';
@@ -4678,14 +4777,14 @@ function relDesp(){
     ||'<tr><td class="l muted" colspan="6">Nenhuma despesa no período.</td></tr>';
   $('relFoot').innerHTML=ls.length?`<tr><td class="l">Total</td><td>${itens.length}</td>${cvl(T)}${V?cvl(r2(ls.reduce((s,[,o])=>s+o.a,0))):''}<td>100%</td><td></td></tr>`:'';
   $('relTiles').innerHTML=tileH([[V?'Despesas que vencem no período':'Total pago no período',fm(T),itens.length+' lançamentos','neg'],['Maior '+nome.toLowerCase(),ls[0]?esc(ls[0][0]).slice(0,28):'—',ls[0]?fm(ls[0][1].v):''],[nome==='Categoria'?'Categorias':nome==='Fornecedor'?'Fornecedores':'Formas',String(ls.length),'no período'],['Média por lançamento',fm(itens.length?r2(T/itens.length):0),'']]);
-  $('relNote').textContent=V?'Considera as contas a pagar pelo vencimento, pagas ou não.':'Considera o que saiu das contas no período (pagamentos e lançamentos avulsos). Transferências entre contas não entram.';
+  $('relNote').textContent=V?'Considera as contas a pagar pelo vencimento, pagas ou não.':'Considera o que saiu das contas no período (pagamentos, lançamentos avulsos e compras no cartão pela data da compra). Transferências entre contas e o pagamento da fatura do cartão não entram.';
 }
 // previsão orçamentária: orçado por categoria e mês (6 meses) × realizado
 function relOrc(){
   const [y,s]=$('relSem').value.split('-').map(Number),ms=[...Array(6).keys()].map(i=>`${y}-${String((s-1)*6+i+1).padStart(2,'0')}`);
-  const cats=PCAT.plano.filter(p=>p.ativo!==false).sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
+  const cats=REL.plano.filter(p=>p.ativo!==false).sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
   const orc=(c,m)=>REL.orc.find(o=>o.categoria===c&&o.mes.slice(0,7)===m)?.valor;
-  const real=(c,tp,m)=>r2(REL.movs.filter(x=>x.categoria===c&&x.data.startsWith(m)&&relSemTr(x)&&x.tipo===(tp==='Receita'?'entrada':'saida')).reduce((a,x)=>a+(+x.valor),0));
+  const real=(c,tp,m)=>r2(REL.movs.filter(x=>x.categoria===c&&x.data.startsWith(m)&&relTp(x)===(tp==='Receita'?'entrada':'saida')).reduce((a,x)=>a+relVl(x),0));
   let tO={Receita:0,Despesa:0},tR={Receita:0,Despesa:0},tipo=null;
   $('relHead').innerHTML=`<tr><th class="l">Categoria</th>${ms.map(m=>`<th>${mesCurto(m)}<br><span class="muted" style="font-weight:400">orçado / real</span></th>`).join('')}<th>Orçado</th><th>Realizado</th><th>Diferença</th><th>% usado</th></tr>`;
   $('relBody').innerHTML=cats.map(p=>{let h='';if(p.tipo!==tipo){tipo=p.tipo;h=`<tr style="background:var(--sunk)"><td class="l" colspan="${ms.length+5}"><b>${tipo==='Receita'?'Receitas':'Despesas'}</b></td></tr>`}
@@ -4693,7 +4792,7 @@ function relOrc(){
       return `<td><input class="money orc" data-c="${esc(p.categoria)}" data-m="${m}" value="${ov!=null?showMoney(ov):''}" placeholder="0,00" inputmode="decimal" style="width:92px;text-align:right"><br><span class="muted" style="font-size:12px">${rv?fm(rv):'—'}</span></td>`}).join('');
     o=r2(o);r=r2(r);tO[p.tipo]+=o;tR[p.tipo]+=r;const d=r2(o-r),ruim=p.tipo==='Receita'?r<o:r>o;
     return h+`<tr><td class="l">${p.codigo?`<span class="muted">${esc(p.codigo)}</span> `:''}${esc(p.categoria)}</td>${cel}${cvl(o)}${cvl(r)}${cvl(d,o&&ruim?'neg':'')}<td class="${o&&ruim?'neg':''}">${o?Math.round(r/o*100)+'%':'—'}</td></tr>`}).join('')
-    ||'<tr><td class="l muted">Nenhuma categoria no plano de contas. Cadastre em Configurações › Categorias.</td></tr>';
+    ||'<tr><td class="l muted">Nenhuma categoria no plano de contas. Cadastre em Cadastros › Plano de contas.</td></tr>';
   $('relFoot').innerHTML='';
   const rO=r2(tO.Receita-tO.Despesa),rR=r2(tR.Receita-tR.Despesa);
   $('relTiles').innerHTML=tileH([['Receitas orçadas',fm(r2(tO.Receita)),'realizado '+fm(r2(tR.Receita)),'pos'],['Despesas orçadas',fm(r2(tO.Despesa)),'realizado '+fm(r2(tR.Despesa)),'neg'],['Resultado orçado',fm(rO),'receitas menos despesas'],['Resultado realizado',fm(rR),rO?(rR>=rO?'cumpriu o orçamento':'abaixo do orçado'):'',rR<rO?'neg':'pos']]);
@@ -4719,6 +4818,279 @@ $('relXls').onclick=()=>{
   Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n')ws[k].z='#,##0.00'});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Relatório');
   XLSX.writeFile(wb,`${$('relTitle').textContent} ${cli?.nome||''} ${TODAY}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
+};
+
+// ---------- Gestão financeira › Fatura do cartão de crédito (v52) ----------
+// O cartão é uma conta (fin_contas.tipo = 'Cartão de crédito'). Cada compra é uma saída nele, com o mês da
+// fatura (fin_movimentos.fatura); estorno ou crédito é uma entrada. Ao fechar, a soma tem de bater com a
+// fatura do banco: grava fin_faturas e gera a conta a pagar (fin_titulos.fatura_id). O pagamento da
+// fatura é uma transferência da conta bancária para o cartão, para a despesa não contar duas vezes.
+const v52=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||/fin_faturas|fin_plano|plano_proprio|fatura|cartao_|grupo_id|parcela/.test(e.message||''));
+const v52Msg='Esta parte precisa da atualização v52 do banco. Rode o SQL no Supabase.';
+const FT={conta:null,cartoes:[],movs:[],fats:[],tit:null,pagoTit:0,notas:[],key:''};
+let FTR=null;
+const mesTxt=ym=>MESES[+ym.slice(5,7)-1]+'/'+ym.slice(0,4);
+const diaNoMes=(ym,d)=>{const [y,m]=ym.split('-').map(Number);return `${ym.slice(0,7)}-${String(Math.min(d,new Date(y,m,0).getDate())).padStart(2,'0')}`};
+// mês da fatura (dia 1) em que cai uma compra feita em "data"
+function faturaDe(c,data){
+  const [y,m,d]=data.split('-').map(Number),F=c.cartao_fechamento||1,V=c.cartao_vencimento||F;
+  return isoLocal(new Date(y,m-1+(d>=F?1:0)+(V<=F?1:0),1,12))}
+const ftVenc=(c,mes)=>diaNoMes(mes,c.cartao_vencimento||10);
+const ftFech=(c,mes)=>diaNoMes((c.cartao_vencimento||10)<=(c.cartao_fechamento||1)?somaMes(mes,-1):mes,c.cartao_fechamento||1);
+const ftSinal=m=>m.tipo==='saida'?+m.valor:-m.valor;   // compra soma na fatura; estorno abate
+function ftVazio(t,cl){$('ftHead').innerHTML='';$('ftFoot').innerHTML='';$('ftTiles').innerHTML='';$('ftFecha').hidden=true;$('ftBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('ftNote').textContent=''}
+async function renderFat(){
+  const cli=cliAtual();['ftNovo','ftImp','ftXls'].forEach(id=>$(id).hidden=true);
+  if(!cli)return ftVazio('Escolha uma empresa.');
+  let contas;try{contas=await gfContasDe(cli.id,true)}catch(e){console.error(e);return ftVazio(v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  FT.cartoes=contas.filter(c=>ehCartao(c)&&c.ativo!==false);
+  const sel=$('ftConta'),cur=sel.value;
+  sel.innerHTML=FT.cartoes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhum cartão</option>';
+  if(FT.cartoes.some(c=>c.id===cur))sel.value=cur;
+  const c=FT.cartoes.find(x=>x.id===sel.value);
+  if(!c)return ftVazio('Esta empresa não tem cartão de crédito cadastrado. Se tiver, cadastre em Cadastros › Contas bancárias e cartões, com o tipo “Cartão de crédito”.');
+  if(FT.conta?.id!==c.id||!$('ftMes').value)$('ftMes').value=faturaDe(c,TODAY).slice(0,7);
+  FT.conta=c;const mes=$('ftMes').value+'-01';
+  ftVazio('Carregando…');
+  try{
+    const [movs,fats,notas,ja]=await Promise.all([
+      todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).eq('fatura',mes).order('data').order('criado_em')),
+      todas(()=>sb.from('fin_faturas').select('*').eq('conta_id',c.id).order('mes')),
+      todas(()=>sb.from('cartao_notas').select('*').eq('cliente_id',cli.id).eq('conferido',false).order('data')),
+      todas(()=>sb.from('fin_movimentos').select('cartao_nota_id').eq('cliente_id',cli.id).not('cartao_nota_id','is',null))]);
+    FT.movs=movs;FT.fats=fats;FT.mes=mes;
+    const imp=new Set(ja.map(x=>x.cartao_nota_id));FT.notas=notas.filter(n=>!imp.has(n.id));
+    const f=fats.find(x=>x.mes===mes);FT.tit=null;FT.pagoTit=0;
+    if(f){const {data:ts,error}=await sb.from('fin_titulos').select('*').eq('fatura_id',f.id);if(error)throw error;FT.tit=(ts||[])[0]||null;
+      if(FT.tit){const {data:pg,error:e2}=await sb.from('fin_movimentos').select('*').eq('titulo_id',FT.tit.id);if(e2)throw e2;FT.pagoTit=r2((pg||[]).reduce((x,m)=>x+abat(m),0))}}
+  }catch(e){console.error(e);return ftVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  if(VIEW!=='gffatura'||cliAtual()?.id!==cli.id)return;
+  ftDesenha();
+}
+const ftFechada=mes=>FT.fats.find(x=>x.mes===mes);
+function ftDesenha(){
+  const c=FT.conta,mes=FT.mes,f=ftFechada(mes),q=chave($('ftBusca').value),mu=t=>`<span class="muted">${t}</span>`;
+  const rows=FT.movs.filter(m=>!q||chave([m.pessoa_nome,m.descricao,m.documento,m.categoria].join(' ')).includes(q));
+  const tot=r2(FT.movs.reduce((x,m)=>x+ftSinal(m),0)),venc=f?.vencimento||ftVenc(c,mes);
+  $('ftNovo').hidden=false;$('ftXls').hidden=!FT.movs.length;
+  $('ftImp').hidden=!FT.notas.length;$('ftImp').textContent=`Trazer notas enviadas (${FT.notas.length})`;
+  $('ftHead').innerHTML='<tr><th>Data</th><th class="l">Fornecedor</th><th class="l">Descrição</th><th class="l">Categoria</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th></tr>';
+  $('ftBody').innerHTML=rows.map(m=>`<tr class="click" data-id="${m.id}" tabindex="0"><td>${dBR(m.data)}</td><td class="l"><b>${esc(m.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(m.descricao||'')||mu('—')}${m.cartao_nota_id?`<br>${mu('enviado pelo cliente')}`:''}${m.transf_id?`<br>${mu('pagamento da fatura')}`:''}</td><td class="l">${esc(m.categoria||'')||(m.transf_id?'':'<span class="chip c-warn">Sem categoria</span>')}</td><td class="l">${esc(m.documento||'')||mu('—')}</td><td>${m.parcelas>1?m.parcela+'/'+m.parcelas:mu('—')}</td><td class="${m.tipo==='entrada'?'pos':''}">${fm(r2(ftSinal(m)))}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="7">Nenhum lançamento na fatura de ${mesTxt(mes)}.</td></tr>`;
+  $('ftFoot').innerHTML=FT.movs.length?`<tr><td></td><td class="l">${FT.movs.length} ${FT.movs.length===1?'lançamento':'lançamentos'}</td><td></td><td></td><td></td><td></td><td>${fm(tot)}</td></tr>`:'';
+  const pago=FT.tit&&FT.pagoTit>=FT.tit.valor-0.004,sit=!f?['Aberta','c-warn']:pago?['Paga','c-done']:['Fechada','c-none'];
+  const semCat=FT.movs.filter(m=>m.tipo==='saida'&&!m.transf_id&&!m.categoria).length;
+  $('ftTiles').innerHTML=[['Total da fatura',fm(f?+f.valor:tot),f?'valor do banco':'soma dos lançamentos',''],['Fecha em',dBR(ftFech(c,mes)),'compras até a véspera',''],['Vence em',dBR(venc),f&&FT.tit?.conta_id?'paga por '+esc(contaNome(FT.tit.conta_id)):'',''],['Situação',`<span class="chip ${sit[1]}" style="font-size:15px">${sit[0]}</span>`,semCat?`${semCat} sem categoria`:'',semCat?'neg':'']]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n ${t[3]}">${t[2]}</div></div>`).join('');
+  const box=$('ftFecha');box.hidden=false;
+  if(!f){const pagadoras=GFC.lista.filter(x=>!ehCartao(x)&&x.ativo!==false);
+    box.innerHTML=`<h2 style="margin:0">Fechar a fatura de ${mesTxt(mes)}</h2>
+      <div class="fields">
+        <label class="f">Valor da fatura no banco *<input id="ft_valor" class="money" inputmode="decimal" placeholder="${showMoney(tot)}"></label>
+        <label class="f">Vencimento *<input type="date" id="ft_venc" value="${venc}"></label>
+        <label class="f">Conta que paga<select id="ft_pag"><option value=""></option>${pagadoras.map(x=>`<option value="${x.id}"${x.id===c.cartao_conta_pag?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
+        <div class="f" style="align-self:end"><button type="button" class="btn primary" id="ftFechar">Conferir e fechar</button></div>
+      </div><p class="note" id="ftDif" style="margin:0">Digite o total da fatura que veio do banco. Se não bater com a soma dos lançamentos (${fm(tot)}), lance o que falta (anuidade, IOF, juros) ou corrija antes de fechar.</p><p class="err" id="ftErr" hidden></p>`;
+    $('ft_valor').oninput=()=>{const v=parseMoney($('ft_valor').value),d=r2(v-tot);$('ftDif').innerHTML=!(v>0)?`Digite o total da fatura que veio do banco.`:Math.abs(d)<0.005?'<span class="pos">✓ Bate com a soma dos lançamentos.</span>':`<span class="neg">Diferença de ${fm(d)}: ${d>0?'falta lançar':'sobra nos lançamentos'} ${fm(Math.abs(d))}. Lance o que falta (anuidade, IOF, juros) ou corrija.</span>`};
+    $('ftFechar').onclick=ftFecharFatura;
+  }else box.innerHTML=`<h2 style="margin:0">Fatura de ${mesTxt(mes)} fechada</h2>
+    <p class="note" style="margin:0">Fechada${f.fechada_em?' em '+dBR(isoLocal(new Date(f.fechada_em))):''} com ${fm(f.valor)}, vencimento em ${dBR(f.vencimento)}. ${FT.tit?`Ela está em Contas a pagar${pago?' e já foi paga':FT.pagoTit?`, com ${fm(FT.pagoTit)} pago`:', em aberto'}. O pagamento sai da conta bancária e entra no cartão como transferência: a despesa fica nas compras, com a categoria de cada uma.`:'<span class="neg">A conta a pagar desta fatura foi apagada.</span>'}</p>
+    <div class="row">${FT.tit?`<button type="button" class="btn" id="ftVerTit">Abrir a conta a pagar</button>`:''}${FT.pagoTit?'':`<button type="button" class="btn ghost" id="ftReabrir">Reabrir a fatura</button>`}</div>`;
+  if(f){$('ftVerTit')&&($('ftVerTit').onclick=async()=>{go('gfpagar');const t=FT.tit;await new Promise(r=>setTimeout(r,50));for(let i=0;i<40&&GT.key!=='pagar|'+t.cliente_id;i++)await new Promise(r=>setTimeout(r,100));const x=GT.lista.find(y=>y.id===t.id);if(x)abrirGT(x)});
+    $('ftReabrir')&&($('ftReabrir').onclick=ftReabrir)}
+  $('ftNote').textContent=f?'Fatura fechada: para mudar um lançamento, reabra a fatura.':'Clique num lançamento para ver ou corrigir. As compras parceladas aparecem em cada fatura, uma parcela por mês.';
+}
+$('ftConta').onchange=()=>{$('ftMes').value='';renderFat()};$('ftMes').onchange=renderFat;
+$('ftBusca').oninput=()=>{clearTimeout(ftDesenha.t);ftDesenha.t=setTimeout(ftDesenha,200)};
+$('ftBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirFT(FT.movs.find(m=>m.id===tr.dataset.id))});
+$('ftBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirFT(FT.movs.find(m=>m.id===tr.dataset.id))}});
+$('ftNovo').onclick=()=>abrirFT(null);
+async function ftFecharFatura(){
+  const c=FT.conta,cli=cliAtual(),mes=FT.mes,v=parseMoney($('ft_valor').value),venc=$('ft_venc').value,pag=$('ft_pag').value||null,tot=r2(FT.movs.reduce((x,m)=>x+ftSinal(m),0));
+  const err=t=>{$('ftErr').textContent=t;$('ftErr').hidden=false};
+  if(!(v>0))return err('Digite o valor da fatura que veio do banco.');if(!venc)return err('Informe o vencimento.');
+  if(Math.abs(r2(v-tot))>=0.005)return err(`A fatura do banco (${fm(v)}) não bate com a soma dos lançamentos (${fm(tot)}). Lance a diferença ou corrija antes de fechar.`);
+  const semCat=FT.movs.filter(m=>m.tipo==='saida'&&!m.transf_id&&!m.categoria).length;
+  if(semCat&&!confirm(`${semCat} ${semCat===1?'lançamento está':'lançamentos estão'} sem categoria e vão aparecer como “Sem categoria” na DRE. Fechar mesmo assim?`))return;
+  $('ftFechar').disabled=true;
+  try{
+    const {data:f,error}=await sb.from('fin_faturas').insert({cliente_id:cli.id,conta_id:c.id,mes,vencimento:venc,valor:r2(v)}).select().single();if(error)throw error;
+    const {error:e2}=await sb.from('fin_titulos').insert({cliente_id:cli.id,tipo:'pagar',pessoa_nome:c.nome,descricao:'Fatura do cartão '+mesTxt(mes),vencimento:venc,valor:r2(v),parcela:1,parcelas:1,conta_id:pag,fatura_id:f.id,
+      obs:`Fatura conferida: ${FT.movs.length} lançamentos. As despesas estão no cartão, com as categorias de cada compra.`});
+    if(e2){await sb.from('fin_faturas').delete().eq('id',f.id);throw e2}
+    toast('Fatura fechada. Ela está em Contas a pagar.');GT.key='';
+  }catch(e){console.error(e);err(v52(e)?v52Msg:/duplicate|unique/i.test(e.message||'')?'Esta fatura já foi fechada. Atualize a página.':e.message||'Não foi possível fechar.');$('ftFechar').disabled=false;return}
+  renderFat();
+}
+async function ftReabrir(){
+  const f=ftFechada(FT.mes);if(!f)return;
+  if(!confirm(`Reabrir a fatura de ${mesTxt(FT.mes)}? A conta a pagar dela será apagada e os lançamentos voltam a poder ser corrigidos.`))return;
+  try{if(FT.tit){const {error}=await sb.from('fin_titulos').delete().eq('id',FT.tit.id);if(error)throw error}
+    const {error}=await sb.from('fin_faturas').delete().eq('id',f.id);if(error)throw error;toast('Fatura reaberta');GT.key=''}
+  catch(e){return fail(e,'Não foi possível reabrir')}
+  renderFat();
+}
+// lançamento no cartão (compra parcelada ou não, estorno) — usa o mesmo diálogo das contas a pagar
+async function abrirFT(m){
+  FTR=m;const c=FT.conta,cli=cliAtual();if(!c||!cli)return;
+  let pes=[],plano=[];try{[pes,plano]=await Promise.all([gfPessoasDe(cli.id,'fornecedor'),planoDe(cli)])}catch(e){console.error(e)}
+  const v=k=>esc(m?.[k]??''),trava=m&&ftFechada(m.fatura);
+  const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
+  $('gtdTitle').textContent=(m?(m.tipo==='entrada'?'Estorno ou crédito':'Compra no cartão'):'Novo lançamento no cartão')+' · '+c.nome;$('gtdChip').innerHTML=trava?'<span class="chip c-none">Fatura fechada</span>':'';
+  $('gtdBody').innerHTML=`<datalist id="ftPesList">${pes.map(p=>`<option value="${esc(p.nome)}"></option>`).join('')}</datalist><div class="fields">
+    ${m?'':`<label class="f">Tipo<select id="fc_tipo"><option value="saida">Compra</option><option value="entrada">Estorno ou crédito</option></select></label>`}
+    <label class="f">Data da compra *<input type="date" id="fc_data" value="${m?m.data:TODAY}"></label>
+    <label class="f">Valor${m?'':' total'} *<input id="fc_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
+    ${m?'':`<label class="f">Parcelas<input id="fc_parcelas" type="number" min="1" max="36" value="1"></label>`}
+    <label class="f">${m?'Fatura':'Fatura (1ª parcela)'}<input type="month" id="fc_fatura" value="${(m?m.fatura:FT.mes).slice(0,7)}"></label>
+    <label class="f wide">Fornecedor *<input id="fc_pessoa" list="ftPesList" value="${v('pessoa_nome')}" autocomplete="off" placeholder="Onde foi a compra"></label>
+    <label class="f wide">Descrição<input id="fc_descricao" value="${v('descricao')}" placeholder="Ex.: material de escritório"></label>
+    <label class="f">Categoria<select id="fc_categoria"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+    <label class="f">Documento<input id="fc_documento" value="${v('documento')}" placeholder="Nº da NF"></label>
+  </div>${m?.parcelas>1?`<p class="note" style="margin:0">Parcela ${m.parcela} de ${m.parcelas}. A correção vale só para esta parcela.</p>`:''}${m?.transf_id?'<p class="note" style="margin:0">Este é o pagamento da fatura. Para desfazer, use a conta a pagar da fatura.</p>':''}${trava?'<p class="note" style="margin:0">A fatura deste lançamento está fechada. Reabra a fatura para corrigir.</p>':''}<p class="err" id="gtErr" hidden></p>`;
+  // a fatura acompanha a data da compra até ser mudada à mão
+  let mexeu=!!m;$('fc_fatura').oninput=()=>mexeu=true;$('fc_data').onchange=()=>{if(!mexeu&&$('fc_data').value)$('fc_fatura').value=faturaDe(c,$('fc_data').value).slice(0,7)};
+  if(!m)$('fc_fatura').value=faturaDe(c,TODAY)>FT.mes?faturaDe(c,TODAY).slice(0,7):FT.mes.slice(0,7);
+  const pode=!trava&&!m?.transf_id;
+  $('gtdFoot').innerHTML=`${m&&pode?'<button type="button" class="btn ghost" data-act="ct_apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${pode?'<button type="button" class="btn primary" data-act="ct_salvar">Salvar</button>':''}`;
+  dlgGT.showModal();if(!m)$('fc_valor').focus();
+}
+async function ftAcao(a){
+  const c=FT.conta,cli=cliAtual(),m=FTR;
+  if(a==='ct_apagar'){
+    const irmas=m.grupo_id?FT.movs.filter(x=>x.grupo_id===m.grupo_id&&x.id!==m.id):[];
+    let q=sb.from('fin_movimentos').delete();
+    if(m.grupo_id&&m.parcelas>1&&confirm(`Apagar também as outras parcelas desta compra que estão em faturas abertas? (OK = todas, Cancelar = só esta)`)){
+      const {data,error}=await sb.from('fin_movimentos').select('id,fatura').eq('grupo_id',m.grupo_id);if(error)return fail(error,'Não foi possível apagar');
+      q=q.in('id',(data||[]).filter(x=>!ftFechada(x.fatura)).map(x=>x.id))}
+    else{if(!irmas.length&&!confirm('Apagar este lançamento?'))return;q=q.eq('id',m.id)}
+    const {error}=await q;if(error)return fail(error,'Não foi possível apagar');toast('Lançamento apagado');dlgGT.close();return renderFat();
+  }
+  const val=k=>($('fc_'+k)?.value||'').trim()||null,valor=parseMoney($('fc_valor').value),fat=val('fatura');
+  if(!val('data'))return gtErr('Informe a data da compra.');if(!(valor>0))return gtErr('Informe o valor.');if(!val('pessoa'))return gtErr('Informe o fornecedor.');if(!fat)return gtErr('Informe a fatura.');
+  const p=GFP.lista.find(x=>chave(x.nome)===chave(val('pessoa'))||x.fantasia&&chave(x.fantasia)===chave(val('pessoa')));
+  const base={pessoa_nome:p?.nome||val('pessoa'),descricao:val('descricao'),categoria:val('categoria'),documento:val('documento')};
+  let error;
+  if(m){if(ftFechada(fat+'-01'))return gtErr(`A fatura de ${mesTxt(fat)} está fechada. Escolha outra ou reabra a fatura.`);
+    ({error}=await sb.from('fin_movimentos').update({...base,data:val('data'),valor:r2(valor),fatura:fat+'-01'}).eq('id',m.id))}
+  else{
+    const n=Math.max(1,Math.min(36,parseInt($('fc_parcelas').value)||1)),tipo=$('fc_tipo').value,cada=Math.floor(valor/n*100)/100,g=n>1?crypto.randomUUID():null;
+    const rows=[...Array(n).keys()].map(i=>({...base,cliente_id:cli.id,conta_id:c.id,tipo,data:somaMes(val('data'),i),valor:i===n-1?r2(valor-cada*(n-1)):cada,fatura:somaMes(fat+'-01',i),parcela:i+1,parcelas:n,grupo_id:g}));
+    if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
+    const fx=rows.find(r=>ftFechada(r.fatura));if(fx)return gtErr(`A fatura de ${mesTxt(fx.fatura)} já está fechada. Escolha uma fatura aberta.`);
+    ({error}=await sb.from('fin_movimentos').insert(rows));
+  }
+  if(error){console.error(error);return gtErr(v52(error)?v52Msg:error.message||'Não foi possível salvar.')}
+  toast(m?'Correção salva':'Lançado no cartão');dlgGT.close();renderFat();
+}
+// notas do cartão enviadas pelo cliente (Financeiro › Cartão de crédito) que ainda não estão em nenhuma fatura
+$('ftImp').onclick=async()=>{
+  const c=FT.conta,cli=cliAtual(),ls=FT.notas;if(!c||!ls.length)return;
+  const rows=[],fora=[];
+  ls.forEach(r=>{const n=Math.max(1,r.parcelas||1),cada=Math.floor(r.valor/n*100)/100,f1=faturaDe(c,r.data),g=n>1?crypto.randomUUID():null;
+    const ps=[...Array(n).keys()].map(i=>({cliente_id:cli.id,conta_id:c.id,tipo:'saida',data:somaMes(r.data,i),valor:i===n-1?r2(r.valor-cada*(n-1)):cada,fatura:somaMes(f1,i),parcela:i+1,parcelas:n,grupo_id:g,
+      pessoa_nome:r.fornecedor,documento:r.documento||null,categoria:r.categoria||null,descricao:r.obs||null,cartao_nota_id:r.id}));
+    if(ps.some(x=>ftFechada(x.fatura)))fora.push(r);else rows.push(...ps)});
+  if(!rows.length)return toast('As notas enviadas caem em faturas já fechadas. Lance à mão na fatura aberta.');
+  if(!confirm(`Trazer ${ls.length-fora.length} ${ls.length-fora.length===1?'nota enviada':'notas enviadas'} pelo cliente para o cartão ${c.nome}? Cada uma cai na fatura certa pela data da compra, com as parcelas.${fora.length?` ${fora.length} ficam de fora porque caem em fatura já fechada.`:''}`))return;
+  $('ftImp').disabled=true;
+  const {error}=await sb.from('fin_movimentos').insert(rows);$('ftImp').disabled=false;
+  if(error){console.error(error);return toast(v52(error)?v52Msg:'Não foi possível trazer as notas.')}
+  toast('Notas trazidas para o cartão');renderFat();
+};
+$('ftXls').onclick=()=>{
+  const c=FT.conta,cli=cliAtual(),aoa=[[`Fatura do cartão ${c.nome} · ${cli?.nome||''}`],[`Fatura de ${mesTxt(FT.mes)}, vencimento ${dBR(ftFechada(FT.mes)?.vencimento||ftVenc(c,FT.mes))}`],[],['Data','Fornecedor','Descrição','Categoria','Documento','Parcela','Valor']];
+  FT.movs.forEach(m=>aoa.push([dBR(m.data),m.pessoa_nome||'',m.descricao||'',m.categoria||'',m.documento||'',m.parcelas>1?m.parcela+'/'+m.parcelas:'',r2(ftSinal(m))]));
+  aoa.push(['','Total','','','','',r2(FT.movs.reduce((x,m)=>x+ftSinal(m),0))]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:12},{wch:34},{wch:34},{wch:28},{wch:16},{wch:9},{wch:14}];
+  Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n')ws[k].z='#,##0.00'});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fatura');
+  XLSX.writeFile(wb,`Fatura ${c.nome} ${FT.mes.slice(0,7)}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
+};
+// pagamento da fatura: a saída da conta bancária e a entrada no cartão formam uma transferência
+async function pernasFatura(t,mov){
+  if(!t.fatura_id)return [mov];
+  const {data,error}=await sb.from('fin_faturas').select('conta_id').eq('id',t.fatura_id).single();if(error)throw error;
+  const tid=crypto.randomUUID();
+  return [{...mov,transf_id:tid,categoria:null},{cliente_id:mov.cliente_id,conta_id:data.conta_id,data:mov.data,tipo:'entrada',valor:r2(mov.valor-(+mov.juros||0)+(+mov.desconto||0)),transf_id:tid,
+    descricao:'Pagamento da '+(t.descricao||'fatura').replace(/^Fatura/,'fatura'),pessoa_nome:t.pessoa_nome}];
+}
+
+// ---------- Gestão financeira › Plano de contas da empresa (v52) ----------
+// Cada empresa usa o plano padrão (plano_contas, o mesmo para todas) ou um plano próprio (fin_plano).
+const PLANOS={};
+async function planoDe(cli){
+  if(!cli?.plano_proprio){if(!PCAT.ok)await loadCats();return PCAT.plano}
+  if(!PLANOS[cli.id]){const {data,error}=await sb.from('fin_plano').select('*').eq('cliente_id',cli.id);if(error)throw error;PLANOS[cli.id]=data||[]}
+  return PLANOS[cli.id];
+}
+const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
+function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
+async function renderPC(){
+  const cli=cliAtual();$('pcModo').hidden=$('pcForm').hidden=$('pcXls').hidden=true;
+  if(!cli){$('pcSub').textContent='';return pcVazio('Escolha uma empresa.')}
+  const pr=!!cli.plano_proprio;
+  $('pcSub').textContent=`Categorias usadas nas contas a pagar e a receber, no cartão, no extrato e nos relatórios de ${cli.nome}.`;
+  $('pcModo').hidden=false;document.querySelectorAll('[name=pcModo]').forEach(r=>r.checked=r.value===(pr?'proprio':'padrao'));
+  pcVazio('Carregando…');
+  let ls;try{delete PLANOS[cli.id];ls=await planoDe(cli)}catch(e){console.error(e);return pcVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  if(cliAtual()?.id!==cli.id||VIEW!=='gfplano')return;
+  $('pcForm').hidden=false;$('pcXls').hidden=!ls.length;
+  const f=$('pcFiltro').value,q=chave($('pcBusca').value);
+  const rows=ordPlano(ls).filter(p=>(f==='todos'||(f==='ativos')===(p.ativo!==false))&&(!q||chave((p.codigo||'')+' '+p.categoria+' '+(p.grupo||'')).includes(q)));
+  // o padrão vale para todas as empresas que não têm plano próprio; o próprio só para esta
+  const grupos=[...new Set(ls.map(p=>p.grupo).filter(Boolean))].sort();
+  $('pcHead').innerHTML=`<tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Grupo na DRE</th><th class="l">Tipo</th><th class="l">Ativa</th>${pr?'<th></th>':''}</tr>`;
+  $('pcBody').innerHTML=`<datalist id="pcGrupos">${grupos.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>`+rows.map(p=>`<tr data-id="${esc(pr?p.id:p.categoria)}"><td class="l"><input data-k="codigo" value="${esc(p.codigo||'')}" style="max-width:100px"></td><td class="l">${pr?`<input data-k="categoria" value="${esc(p.categoria)}" style="min-width:220px">`:esc(p.categoria)}</td><td class="l"><input data-k="grupo" list="pcGrupos" value="${esc(p.grupo||'')}" style="min-width:170px"></td><td class="l"><select data-k="tipo"><option${p.tipo!=='Receita'?' selected':''}>Despesa</option><option${p.tipo==='Receita'?' selected':''}>Receita</option></select></td><td class="l"><input type="checkbox" data-k="ativo" style="width:auto"${p.ativo!==false?' checked':''}></td>${pr?`<td><button type="button" class="btn small ghost" data-del="${p.id}">Apagar</button></td>`:''}</tr>`).join('')
+    ||`<tr><td class="l muted" colspan="6">${ls.length?'Nenhuma categoria neste filtro.':'Nenhuma categoria. Adicione acima.'}</td></tr>`;
+  $('pcNote').textContent=pr?`Plano próprio de ${cli.nome}: ${ls.length} categorias. Cada alteração é salva sozinha. Ao renomear, os lançamentos desta empresa com o nome antigo passam para o novo. Categoria já usada não pode ser apagada: desmarque “Ativa”.`
+    :`Plano padrão: ${ls.length} categorias, o mesmo para todas as empresas que não têm plano próprio. Mudanças aqui valem para todas elas. Para renomear ou tirar uma categoria do padrão, use Configurações › Categorias.`;
+}
+$('pcFiltro').onchange=renderPC;$('pcBusca').oninput=()=>{clearTimeout(renderPC.t);renderPC.t=setTimeout(renderPC,250)};
+$('pcModo').addEventListener('change',async e=>{
+  const cli=cliAtual(),pr=e.target.value==='proprio';if(!cli||!!cli.plano_proprio===pr)return;
+  if(pr&&!confirm(`Usar um plano de contas próprio em ${cli.nome}? Ele começa como uma cópia do plano padrão.`)||!pr&&!confirm(`Voltar ${cli.nome} para o plano padrão? O plano próprio fica guardado, mas deixa de ser usado. Os lançamentos continuam com as categorias que já têm.`))return renderPC();
+  try{
+    if(pr){const {count,error}=await sb.from('fin_plano').select('id',{count:'exact',head:true}).eq('cliente_id',cli.id);if(error)throw error;
+      if(!count){if(!PCAT.ok)await loadCats();const rows=PCAT.plano.map(p=>({cliente_id:cli.id,codigo:p.codigo||null,categoria:p.categoria,grupo:p.grupo||null,tipo:p.tipo||'Despesa',ativo:p.ativo!==false}));
+        if(rows.length){const {error:e2}=await sb.from('fin_plano').insert(rows);if(e2)throw e2}}}
+    const {error}=await sb.from('clientes').update({plano_proprio:pr}).eq('id',cli.id);if(error)throw error;
+    cli.plano_proprio=pr;delete PLANOS[cli.id];toast(pr?'Plano próprio ativado':'Voltou para o plano padrão');
+  }catch(err){console.error(err);toast(v52(err)?v52Msg:'Não foi possível mudar o plano.')}
+  renderPC();
+});
+$('pcForm').addEventListener('submit',async e=>{e.preventDefault();
+  const cli=cliAtual(),cat=$('pcCat').value.trim(),cod=$('pcCod').value.trim()||null,pr=!!cli?.plano_proprio;if(!cli||!cat)return toast('Digite o nome da categoria.');
+  if((await planoDe(cli)).some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
+  const {error}=pr?await sb.from('fin_plano').insert({cliente_id:cli.id,codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true})
+    :await sb.from('plano_contas').insert({codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true});
+  if(!pr)PCAT.ok=false;
+  if(error)return fail(error,'Não foi possível adicionar');$('pcCat').value='';$('pcCod').value='';toast('Categoria adicionada');renderPC();
+});
+$('pcBody').addEventListener('change',async e=>{
+  const el=e.target.closest('[data-k]'),tr=e.target.closest('tr[data-id]'),cli=cliAtual();if(!el||!tr||!cli)return;
+  const pr=!!cli.plano_proprio,p=pr?(PLANOS[cli.id]||[]).find(x=>x.id===tr.dataset.id):PCAT.plano.find(x=>x.categoria===tr.dataset.id),k=el.dataset.k;if(!p)return;
+  let v=k==='ativo'?el.checked:el.value.trim();if(k==='codigo'||k==='grupo')v=v||null;
+  if(!pr){const {error}=await sb.from('plano_contas').update({[k]:v}).eq('categoria',p.categoria);if(error){el.value=p[k]??'';return fail(error)}p[k]=v;return toast('Plano padrão salvo (vale para todas as empresas que usam o padrão)')}
+  if(k==='categoria'){if(!v){el.value=p.categoria;return toast('O nome não pode ficar vazio.')}
+    if(PLANOS[cli.id].some(x=>x.id!==p.id&&chave(x.categoria)===chave(v))){el.value=p.categoria;return toast('Já existe uma categoria com esse nome.')}}
+  const {error}=await sb.from('fin_plano').update({[k]:v}).eq('id',p.id);if(error){el.value=p[k]??'';return fail(error)}
+  if(k==='categoria'&&v!==p.categoria){const old=p.categoria;
+    const rs=await Promise.all(['fin_titulos','fin_movimentos','fin_orcamento'].map(tb=>sb.from(tb).update({categoria:v}).eq('cliente_id',cli.id).eq('categoria',old)));
+    rs.forEach(r=>r.error&&console.error(r.error))}
+  p[k]=v;toast('Plano salvo');
+});
+$('pcBody').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-del]'),cli=cliAtual();if(!b||!cli)return;const p=(PLANOS[cli.id]||[]).find(x=>x.id===b.dataset.del);if(!p)return;
+  const [a,m]=await Promise.all(['fin_titulos','fin_movimentos'].map(tb=>sb.from(tb).select('id',{count:'exact',head:true}).eq('cliente_id',cli.id).eq('categoria',p.categoria)));
+  if((a.count||0)+(m.count||0))return toast(`“${p.categoria}” já foi usada em ${(a.count||0)+(m.count||0)} lançamentos. Desmarque “Ativa” em vez de apagar.`);
+  if(!confirm(`Apagar a categoria “${p.categoria}”?`))return;
+  const {error}=await sb.from('fin_plano').delete().eq('id',p.id);if(error)return fail(error,'Não foi possível apagar');toast('Categoria apagada');renderPC();
+});
+$('pcXls').onclick=async()=>{
+  const cli=cliAtual();if(!cli)return;const ls=ordPlano(await planoDe(cli));
+  const ws=XLSX.utils.aoa_to_sheet([['Código','Categoria','Tipo','Ativa'],...ls.map(p=>[p.codigo||'',p.categoria,p.tipo||'Despesa',p.ativo===false?'Não':'Sim'])]);ws['!cols']=[{wch:12},{wch:44},{wch:10},{wch:6}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Plano de contas');XLSX.writeFile(wb,`Plano de contas ${cli.nome}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
 };
 
 // ---------- Extrato da conta: saldo anterior, entradas e saídas e saldo de cada dia ----------
@@ -4780,14 +5152,14 @@ $('gxAvulso').onclick=()=>abrirAvulso(null);
 $('gxBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirAvulso(GX.per.find(m=>m.id===tr.dataset.id))});
 $('gxBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirAvulso(GX.per.find(m=>m.id===tr.dataset.id))}});
 async function abrirAvulso(m){
-  GXR=m;if(!PCAT.ok)await loadCats();
-  const c=GX.conta,outras=GFC.lista.filter(x=>x.id!==c.id&&x.ativo!==false),v=k=>esc(m?.[k]??'');
+  GXR=m;const cli=cliAtual();let plano=[],outras=[];try{[plano,outras]=await Promise.all([planoDe(cli),contasGrupo(cli)])}catch(e){console.error(e)}
+  const c=GX.conta,v=k=>esc(m?.[k]??'');outras=outras.filter(x=>x.id!==c.id);
   const tipo=m?(m.transf_id?'transf':m.tipo):'saida';
-  const cats=PCAT.plano.map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
+  const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
   $('gtdTitle').textContent=(m?'Lançamento avulso':'Novo lançamento avulso')+' · '+c.nome;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<div class="fields">
-    <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>Transferência para outra conta</option>`:''}</select></label>
-    <label class="f" id="ga_destBox"${tipo==='transf'&&!m?'':' hidden'}>Conta de destino<select id="ga_dest">${outras.map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></label>
+    <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>Transferência para outra conta (desta ou de outra empresa do grupo)</option>`:''}</select></label>
+    <label class="f" id="ga_destBox"${tipo==='transf'&&!m?'':' hidden'}>Conta de destino<select id="ga_dest">${optContas(outras,cli)}</select></label>
     <label class="f">Data *<input type="date" id="ga_data" value="${m?m.data:TODAY}"></label>
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
@@ -4816,7 +5188,7 @@ async function gxAcao(a){
     else ({error}=await sb.from('fin_movimentos').update(base).eq('id',m.id));
   }else if(tipo==='transf'){
     const dest=val('dest'),tid=crypto.randomUUID();if(!dest)return gtErr('Escolha a conta de destino.');
-    ({error}=await sb.from('fin_movimentos').insert([{...base,cliente_id:cli.id,conta_id:c.id,tipo:'saida',transf_id:tid},{...base,cliente_id:cli.id,conta_id:dest,tipo:'entrada',transf_id:tid}]));
+    ({error}=await sb.from('fin_movimentos').insert([{...base,cliente_id:cli.id,conta_id:c.id,tipo:'saida',transf_id:tid},{...base,cliente_id:CGRUPO.find(x=>x.id===dest)?.cliente_id||cli.id,conta_id:dest,tipo:'entrada',transf_id:tid}]));
   }else ({error}=await sb.from('fin_movimentos').insert({...base,cliente_id:cli.id,conta_id:c.id,tipo}));
   if(error){console.error(error);return gtErr(v45(error)?v45Msg:error.message||'Não foi possível salvar.')}
   toast('Lançamento salvo');dlgGT.close();renderGX();
@@ -4944,14 +5316,14 @@ $('gcBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-g
 function gcMov(l,f){const c=GC.conta;return {cliente_id:c.cliente_id,conta_id:c.id,data:l.data,tipo:l.valor>0?'entrada':'saida',valor:Math.abs(l.valor),ofx_id:l.id,conciliado:true,...f}}
 async function gcInserir(rows){for(let i=0;i<rows.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(rows.slice(i,i+500));if(error)throw error}}
 async function gcAprovar(ls){
-  const novos=[],usos={};let n=0;
+  const novos=[],usos={};let n=0;await contasGrupo(cliAtual()).catch(console.error);
   for(const l of ls){const g=GC.sug[l.id];if(!g)continue;
     if(g.k==='mov'){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',g.mov.id);if(error)throw error;n++}
-    else if(g.k==='tit'){const t=g.tit;novos.push(gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria}));
+    else if(g.k==='tit'){const t=g.tit;novos.push(...await pernasFatura(t,gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})));
       if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}
     else{const r=g.regra;usos[r.id]=(usos[r.id]||0)+1;
       if(r.conta_destino){const tid=crypto.randomUUID(),base={descricao:r.descricao||'Transferência entre contas',transf_id:tid};
-        novos.push(gcMov(l,base),{...gcMov(l,base),conta_id:r.conta_destino,tipo:l.valor>0?'saida':'entrada',ofx_id:null,conciliado:false})}
+        novos.push(gcMov(l,base),{...gcMov(l,base),cliente_id:cliDaConta(r.conta_destino,GC.conta.cliente_id),conta_id:r.conta_destino,tipo:l.valor>0?'saida':'entrada',ofx_id:null,conciliado:false})}
       else novos.push(gcMov(l,{descricao:r.descricao||histDe(l),categoria:r.categoria,pessoa_nome:r.pessoa_nome,documento:l.documento}))}
   }
   await gcInserir(novos);
@@ -4995,8 +5367,8 @@ async function abrirGC(ls){
   if(!ls.length)return;const tipo=ls[0].valor>0?'entrada':'saida';
   if(ls.some(l=>(l.valor>0?'entrada':'saida')!==tipo))return toast('Selecione só entradas ou só saídas para lançar juntas.');
   GCDLG=ls;const cli=cliAtual(),c=GC.conta,um=ls.length===1,l=ls[0],tot=r2(ls.reduce((x,y)=>x+Math.abs(y.valor),0));
-  let pes=[];try{pes=await gfPessoasDe(cli.id,tipo==='saida'?'fornecedor':'cliente');if(!PCAT.ok)await loadCats()}catch(e){console.error(e)}
-  const cats=PCAT.plano.map(x=>x.categoria),outras=GFC.lista.filter(x=>x.id!==c.id&&x.ativo!==false);
+  let pes=[],plano=[],outras=[];try{[pes,plano,outras]=await Promise.all([gfPessoasDe(cli.id,tipo==='saida'?'fornecedor':'cliente'),planoDe(cli),contasGrupo(cli)])}catch(e){console.error(e)}
+  const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);outras=outras.filter(x=>x.id!==c.id);
   const tits=um?GC.tits.filter(t=>t.tipo===(tipo==='saida'?'pagar':'receber')).sort((a,b)=>Math.abs(r2(a.valor-(GC.pago[a.id]||0))-tot)-Math.abs(r2(b.valor-(GC.pago[b.id]||0))-tot)||Math.abs(difDias(a.vencimento,l.data))-Math.abs(difDias(b.vencimento,l.data))).slice(0,30):[];
   const comum=ls.every(x=>x.padrao===l.padrao)?l.padrao:'';
   const doc=l.documento&&pes.find(p=>soDig(p.documento)===l.documento);
@@ -5004,9 +5376,9 @@ async function abrirGC(ls){
   $('gtdBody').innerHTML=`<p class="note" style="margin:0">${um?'Banco: '+esc(histDe(l)):'Mesmo lançamento para as '+ls.length+' linhas selecionadas.'}</p>
     <datalist id="gcPesList">${pes.map(p=>`<option value="${esc(p.nome)}"></option>`).join('')}</datalist>
     <div class="fields">
-      <label class="f wide">O que é<select id="gc_modo"><option value="novo">Lançamento novo (${tipo==='entrada'?'receita':'despesa'}, tarifa, etc.)</option>${outras.length?`<option value="transf">Transferência ${tipo==='saida'?'para':'de'} outra conta da empresa</option>`:''}${tits.length?`<option value="tit">Baixa de uma conta a ${tipo==='saida'?'pagar':'receber'} em aberto</option>`:''}</select></label>
+      <label class="f wide">O que é<select id="gc_modo"><option value="novo">Lançamento novo (${tipo==='entrada'?'receita':'despesa'}, tarifa, etc.)</option>${outras.length?`<option value="transf">Transferência ${tipo==='saida'?'para':'de'} outra conta (desta ou de outra empresa do grupo)</option>`:''}${tits.length?`<option value="tit">Baixa de uma conta a ${tipo==='saida'?'pagar':'receber'} em aberto</option>`:''}</select></label>
       <label class="f wide" id="gc_titBox" hidden>Conta em aberto<select id="gc_tit">${tits.map(t=>`<option value="${t.id}">${esc(t.pessoa_nome||'')} · ${esc(t.descricao||'')} · venc. ${dBR(t.vencimento)} · falta ${fm(r2(t.valor-(GC.pago[t.id]||0)))}</option>`).join('')}</select></label>
-      <label class="f" id="gc_destBox" hidden>Outra conta<select id="gc_dest">${outras.map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></label>
+      <label class="f" id="gc_destBox" hidden>Outra conta<select id="gc_dest">${optContas(outras,cli)}</select></label>
       <label class="f wide" id="gc_descBox">Descrição *<input id="gc_desc" value="${esc(um?(l.nome||l.memo||''):'')}"></label>
       <label class="f" data-novo>Categoria<select id="gc_cat"><option value=""></option>${cats.map(x=>`<option${sugerirCat(l.nome||'',l.memo)===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
       <label class="f" data-novo>${tipo==='saida'?'Fornecedor':'Cliente'}<input id="gc_pes" list="gcPesList" value="${esc(doc?.nome||'')}"></label>
@@ -5024,7 +5396,7 @@ async function gcSalvar(){
   if(modo==='tit'){const t=GC.tits.find(x=>x.id===$('gc_tit').value),v=Math.abs(l.valor),falta=r2(t.valor-(GC.pago[t.id]||0));
     // diferença: a mais = juros/multa; a menos = desconto (a conta fica paga) ou pagamento parcial
     let juros=0,desconto=0;if(v>falta)juros=r2(v-falta);else if(v<falta&&confirm(`O banco mostra ${fm(v)} e falta ${fm(falta)} desta conta. Foi desconto? (OK = desconto, a conta fica quitada; Cancelar = pagamento parcial)`))desconto=r2(falta-v);
-    await gcInserir([gcMov(l,{titulo_id:t.id,juros,desconto,descricao:t.descricao||(tipo==='saida'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})]);
+    await gcInserir(await pernasFatura(t,gcMov(l,{titulo_id:t.id,juros,desconto,descricao:t.descricao||(tipo==='saida'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})));
     if(t.origem_id&&v-juros+desconto>=falta-0.004){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}
   }else{
     const desc=$('gc_desc').value.trim(),cat=$('gc_cat').value||null,pes=$('gc_pes').value.trim()||null,dest=modo==='transf'?$('gc_dest').value:null;
@@ -5033,7 +5405,7 @@ async function gcSalvar(){
     if(lembra&&pad.length<4)return gtErr('Informe o texto que identifica estas linhas no extrato do banco.');
     if(lembra&&ls.some(x=>!(x.padrao||'').includes(pad)))return gtErr('O texto que identifica precisa aparecer em todas as linhas selecionadas.');
     const novos=[];
-    for(const x of ls){if(dest){const tid=crypto.randomUUID(),b={descricao:desc,transf_id:tid};novos.push(gcMov(x,b),{...gcMov(x,b),conta_id:dest,tipo:tipo==='saida'?'entrada':'saida',ofx_id:null,conciliado:false})}
+    for(const x of ls){if(dest){const tid=crypto.randomUUID(),b={descricao:desc,transf_id:tid};novos.push(gcMov(x,b),{...gcMov(x,b),cliente_id:cliDaConta(dest,cli.id),conta_id:dest,tipo:tipo==='saida'?'entrada':'saida',ofx_id:null,conciliado:false})}
       else novos.push(gcMov(x,{descricao:desc,categoria:cat,pessoa_nome:pes,documento:x.documento}))}
     await gcInserir(novos);
     if(lembra){const {error}=await sb.from('fin_conc_regras').upsert({cliente_id:cli.id,padrao:pad,tipo,descricao:desc,categoria:dest?null:cat,pessoa_nome:dest?null:pes,conta_destino:dest,usos:ls.length,atualizado_em:new Date().toISOString()},{onConflict:'cliente_id,padrao,tipo'});if(error)console.error(error)}
