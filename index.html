@@ -3585,7 +3585,7 @@ $('folParcTodos').onchange=()=>renderFolParc(colsDe(FOL.cli),podeLancar(FOL.cli.
 $('folParcAdd').onclick=()=>abrirParc(null);
 $('folParc').addEventListener('click',ev=>{const b=ev.target.closest('[data-fpc]');if(b)abrirParc(FOL.parc.find(p=>p.id===b.dataset.fpc))});
 // 1º desconto: emissão até o dia de corte entra no mesmo mês; depois, no mês seguinte
-const parcInicio=em=>{const c=folModelo().corte||20;return em?(+em.slice(8,10)>c?addMes(em,1):em.slice(0,7)+'-01').slice(0,7):FOL.comp.slice(0,7)};
+const parcInicio=(em,cli)=>{const c=(cli?cli.folha_modelo?.corte:folModelo().corte)||20;return em?(+em.slice(8,10)>c?addMes(em,1):em.slice(0,7)+'-01').slice(0,7):FOL.comp.slice(0,7)};
 function parcGerar(total,n,ini){const v=r2(total/n),ps=[];for(let i=0;i<n;i++)ps.push({c:addMes(ini+'-01',i).slice(0,7),v:i<n-1?v:r2(total-v*(n-1))});return ps}
 function abrirParc(p){
   const edita=podeLancar(FOL.cli.id,'folha'),dis=edita?'':' disabled',fs=FOL.func.filter(f=>f.situacao!=='Desligado'||p&&f.id===p.funcionario_id).sort((a,b)=>a.nome.localeCompare(b.nome));
@@ -3627,9 +3627,16 @@ FOLACAO.parcDel=async b=>{if(!confirm('Apagar este desconto parcelado e todas as
 // Importar descontos parcelados de uma planilha Excel (Carol, 27/10): nome de quem usou, data de impressão, guia,
 // funcionário, total e se foi parcelado. O usuário diz qual coluna é o quê; a mesma guia não entra duas vezes (origem).
 let PCI=null;
-$('folParcImp').onclick=()=>{
+// a planilha mistura as empresas (Oliveira SJ, Biguaçu e Palhoça): procura o colaborador em todas as empresas com
+// desconto parcelado em que o usuário lança, e cada guia vai para a empresa do colaborador (Carol, 27/10)
+$('folParcImp').onclick=async()=>{
   PCI={};
-  folDlg('Importar descontos parcelados',`<p class="note" style="margin-top:0">Envie a planilha em Excel (ou CSV) com uma linha por guia. Pode importar a planilha inteira todo mês: o que já está lançado fica de fora e só entra o que falta.</p>
+  const clis=empresasDe('folha').filter(c=>c.folha_colunas?.some(k=>FCOL[k]?.parc)&&podeLancar(c.id,'folha')),ids=clis.map(c=>c.id);
+  const [rf,rp]=await Promise.all([sb.from('funcionarios').select('id,nome,cliente_id,situacao').in('cliente_id',ids),
+    sb.from('folha_parcelamentos').select('funcionario_id,cliente_id,guia,emissao,valor_total,origem').in('cliente_id',ids)]);
+  if(rf.error||rp.error){fail(rf.error||rp.error,'Não foi possível carregar os colaboradores');return}
+  PCI.clis=clis;PCI.func=(rf.data||[]).filter(f=>f.situacao!=='Desligado').sort((a,b)=>a.nome.localeCompare(b.nome));PCI.parc=rp.data||[];
+  folDlg('Importar descontos parcelados',`<p class="note" style="margin-top:0">Envie a planilha em Excel (ou CSV) com uma linha por guia. Pode importar a planilha inteira todo mês: o que já está lançado fica de fora e só entra o que falta.${clis.length>1?` A planilha pode misturar as empresas: cada guia vai para a empresa do colaborador (${clis.map(c=>esc(c.nome)).join(', ')}).`:''}</p>
     <div class="fields"><label class="f wide">Arquivo<input type="file" id="pciArq" accept=".xlsx,.xls,.csv"></label>
     <label class="f">Desconta em<select id="pciCol">${FOL.parcCols.map(c=>`<option value="${c}">${esc(FCOL[c].t)}</option>`).join('')}</select></label>
     <label class="f">Quando diz só "Sim" (parcelado), quantas parcelas<input id="pciSim" type="number" min="2" max="36" value="2" style="max-width:80px"></label></div>
@@ -3658,30 +3665,40 @@ const pciN=(v,sim)=>{const t=String(v??'').trim().toLowerCase();if(!t||/^n(ao|ã
 function pciPrev(){
   const m={};$('pciMap').querySelectorAll('[data-pci]').forEach(x=>m[x.dataset.pci]=+x.value);PCI.m=m;
   if(m.func<0||m.total<0){$('pciPrev').innerHTML='<p class="note">Escolha as colunas do funcionário e do total.</p>';$('pciOk').hidden=true;return}
-  const fs=FOL.func.filter(f=>f.situacao!=='Desligado').sort((a,b)=>a.nome.localeCompare(b.nome)),col=$('pciCol').value,sim=parseInt($('pciSim').value,10)||2;
-  const ja=new Set(FOL.parc.map(p=>p.origem).filter(Boolean));PCI.g=[];
+  const fs=PCI.func,col=$('pciCol').value,sim=parseInt($('pciSim').value,10)||2,cliDe=id=>PCI.clis.find(c=>c.id===PCI.func.find(f=>f.id===id)?.cliente_id);
+  const ja=new Set(PCI.parc.map(p=>p.cliente_id+'|'+p.origem).filter(x=>!x.endsWith('|null')));PCI.g=[];PCI.cliDe=cliDe;
+  // nome igual em duas empresas: fica com o da empresa aberta
+  const acha=nome=>achaFunc(nome,fs)||achaFunc(nome,fs.filter(f=>f.cliente_id===FOL.cli.id));
+  // só o período da folha aberta: de dia (corte + 1) do mês anterior em diante (outubro = desde 21/09, Carol 27/10)
+  const desde=addMes(FOL.comp,-1).slice(0,8)+pad((folModelo().corte||20)+1);PCI.desde=desde;
   for(let r=PCI.h+1;r<PCI.txt.length;r++){const tx=PCI.txt[r],rw=PCI.raw[r],nome=String(tx[m.func]||'').trim();if(!nome||/^tota(l|is)\b/i.test(nome))continue;
     const total=typeof rw[m.total]==='number'?r2(rw[m.total]):parseMoney(String(tx[m.total]||''));if(!(total>0))continue;
     const em=m.data>=0?pontoData(rw[m.data]):null,guia=m.guia>=0?String(tx[m.guia]||'').trim():'',usuario=m.usuario>=0?String(tx[m.usuario]||'').trim():'';
-    const n=m.parc>=0?pciN(tx[m.parc],sim):1,f=achaFunc(nome,fs),origem=['imp',col,guia||'',em||'',normNome(nome).join(' '),total.toFixed(2)].join('|');
+    const n=m.parc>=0?pciN(tx[m.parc],sim):1,f=acha(nome),origem=['imp',col,guia||'',em||'',normNome(nome).join(' '),total.toFixed(2)].join('|');
     // já lançado: importado antes (mesma linha) ou lançado à mão (mesmo colaborador e mesma guia, ou mesma data e total)
-    const mao=f&&FOL.parc.some(p=>p.funcionario_id===f.id&&(guia&&p.guia?String(p.guia).trim()===guia:p.emissao===em&&Math.abs(+p.valor_total-total)<0.01));
-    PCI.g.push({nome,f,em,guia,usuario,total,n,origem,ja:ja.has(origem)||mao})}
-  $('pciPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th><th>Data</th><th class="l">Guia</th><th class="l">Quem usou</th><th>Total</th><th>Parcelas</th><th>1º desconto</th></tr></thead><tbody>${
-    PCI.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l">${g.ja?'<span class="chip c-none">Já importado</span>':`<select data-pcg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select>`}</td>
-      <td>${g.em?dBR(g.em):''}</td><td class="l">${esc(g.guia)}</td><td class="l">${esc(g.usuario)}</td><td>${fm(g.total)}</td><td>${g.ja?g.n:`<input data-pcn="${i}" type="number" min="1" max="36" value="${g.n}" style="width:56px">`}</td><td>${ymTxt(parcInicio(g.em))}</td></tr>`).join('')
-    ||'<tr><td class="l muted" colspan="8">Nenhuma linha com funcionário e total.</td></tr>'}</tbody></table></div>
-    <p class="note">1º desconto: emissão até o dia ${folModelo().corte||20} entra no mesmo mês; depois, no mês seguinte. A última parcela fica com os centavos que sobram. ${PCI.g.filter(g=>!g.f&&!g.ja).length?`<b>${PCI.g.filter(g=>!g.f&&!g.ja).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''}</p>`;
-  $('pciOk').hidden=!PCI.g.some(g=>!g.ja);
+    const mao=f&&PCI.parc.some(p=>p.funcionario_id===f.id&&(guia&&p.guia?String(p.guia).trim()===guia:p.emissao===em&&Math.abs(+p.valor_total-total)<0.01));
+    PCI.g.push({nome,f,em,guia,usuario,total,n,origem,ja:!!f&&ja.has(f.cliente_id+'|'+origem)||mao,antes:!!em&&em<desde})}
+  const opts=sel=>PCI.clis.map(c=>`<optgroup label="${esc(c.nome)}">${fs.filter(f=>f.cliente_id===c.id).map(f=>`<option value="${f.id}"${sel===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</optgroup>`).join('');
+  const multi=PCI.clis.length>1;
+  $('pciPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${multi?'<th class="l">Empresa</th>':''}<th>Data</th><th class="l">Guia</th><th class="l">Quem usou</th><th>Total</th><th>Parcelas</th><th>1º desconto</th></tr></thead><tbody>${
+    PCI.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l">${g.antes?`<span class="chip c-none">Antes de ${dBR(desde).slice(0,5)}: fora</span>`:g.ja?'<span class="chip c-none">Já importado</span>':`<select data-pcg="${i}"><option value="">Não lançar</option>${opts(g.f?.id)}</select>`}</td>${multi?`<td class="l" data-pce="${i}">${esc(g.f?cliDe(g.f.id)?.nome||'':'')}</td>`:''}
+      <td>${g.em?dBR(g.em):''}</td><td class="l">${esc(g.guia)}</td><td class="l">${esc(g.usuario)}</td><td>${fm(g.total)}</td><td>${g.ja||g.antes?g.n:`<input data-pcn="${i}" type="number" min="1" max="36" value="${g.n}" style="width:56px">`}</td><td>${ymTxt(parcInicio(g.em,g.f&&cliDe(g.f.id)))}</td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="9">Nenhuma linha com funcionário e total.</td></tr>'}</tbody></table></div>
+    <p class="note">1º desconto: emissão até o dia ${folModelo().corte||20} entra no mesmo mês; depois, no mês seguinte. A última parcela fica com os centavos que sobram. Entram só as guias de ${dBR(desde)} em diante (período da folha de ${MESES[+FOL.comp.slice(5,7)-1].toLowerCase()}). ${PCI.g.filter(g=>!g.f&&!g.ja&&!g.antes).length?`<b>${PCI.g.filter(g=>!g.f&&!g.ja&&!g.antes).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''}</p>`;
+  $('pciOk').hidden=!PCI.g.some(g=>!g.ja&&!g.antes);
+  $('pciPrev').querySelectorAll('[data-pcg]').forEach(x=>x.onchange=()=>{const td=$('pciPrev').querySelector(`[data-pce="${x.dataset.pcg}"]`);if(td)td.textContent=x.value?cliDe(x.value)?.nome||'':''});
 }
 FOLACAO.pciLanca=async b=>{
   const col=$('pciCol').value,regs=[];
   document.querySelectorAll('[data-pcg]').forEach(x=>{const g=PCI.g[+x.dataset.pcg];if(!x.value)return;const n=parseInt(document.querySelector(`[data-pcn="${x.dataset.pcg}"]`)?.value,10)||1;
-    regs.push({cliente_id:FOL.cli.id,funcionario_id:x.value,coluna:col,emissao:g.em,guia:g.guia||null,usuario:g.usuario||null,valor_total:g.total,parcelas:parcGerar(g.total,n,parcInicio(g.em)),origem:g.origem})});
+    // a empresa do colaborador; se ela não tiver a coluna escolhida, vai na primeira coluna de parcelados dela
+    const c=PCI.cliDe(x.value),pc=c.folha_colunas.filter(k=>FCOL[k]?.parc),cc=pc.includes(col)?col:pc[0];
+    regs.push({cliente_id:c.id,funcionario_id:x.value,coluna:cc,emissao:g.em,guia:g.guia||null,usuario:g.usuario||null,valor_total:g.total,parcelas:parcGerar(g.total,n,parcInicio(g.em,c)),origem:g.origem})});
   if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
   b.disabled=true;const {error}=await sb.from('folha_parcelamentos').upsert(regs,{onConflict:'cliente_id,origem',ignoreDuplicates:true});b.disabled=false;
   if(error){console.error(error);return foErro(/row-level|policy/i.test(error.message||'')?'Sem permissão para lançar nesta empresa.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
-  dlgFol.close();toast(`${regs.length} ${regs.length===1?'desconto parcelado lançado':'descontos parcelados lançados'}`);renderFolha();
+  const por=PCI.clis.map(c=>[c.nome,regs.filter(r=>r.cliente_id===c.id).length]).filter(x=>x[1]);
+  dlgFol.close();toast(`${regs.length} ${regs.length===1?'desconto parcelado lançado':'descontos parcelados lançados'}${por.length>1?': '+por.map(([n,k])=>`${n} ${k}`).join(', '):''}`);renderFolha();
 };
 
 // Rescisão
