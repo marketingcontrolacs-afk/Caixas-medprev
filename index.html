@@ -677,7 +677,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <h2 style="margin-top:22px">Lançamentos do mês</h2>
     <div class="card tablebox"><table id="folLanc"></table></div>
     <div id="folParcBox" hidden>
-      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Descontos parcelados</h2><div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folParcTodos" style="width:auto"> Mostrar quitados</label><button class="btn" id="folParcImp">Importar planilha</button><button class="btn" id="folParcAdd">+ Desconto parcelado</button></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Descontos parcelados</h2><div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folParcTodos" style="width:auto"> Mostrar quitados</label><select id="folParcFunc" aria-label="Filtrar por funcionário" style="max-width:240px"><option value="">Todos os funcionários</option></select><button class="btn" id="folParcXls">Excel</button><button class="btn" id="folParcPdf" title="Abre o relatório para imprimir ou salvar em PDF">PDF</button><button class="btn" id="folParcImp">Importar planilha</button><button class="btn" id="folParcAdd">+ Desconto parcelado</button></div></div>
       <div class="card tablebox"><table id="folParc"></table></div>
       <p class="note">Vales de atendimentos e adiantamentos divididos em parcelas. A parcela de cada mês entra sozinha na coluna da folha; não precisa lançar de novo.</p>
     </div>
@@ -3576,15 +3576,51 @@ function renderFolParc(cols,lanca){
   FOL.parcCols=pc;$('folParcAdd').hidden=$('folParcImp').hidden=!lanca||FOL.semParc;
   if(FOL.semParc){$('folParc').innerHTML='<tbody><tr><td class="l neg">Os descontos parcelados precisam da atualização v19 do banco. Rode o SQL no Supabase.</td></tr></tbody>';return}
   const ym=FOL.comp.slice(0,7),todos=$('folParcTodos').checked,nome=id=>FOL.func.find(f=>f.id===id)?.nome||'',sit=id=>FOL.func.find(f=>f.id===id)?.situacao;
-  const ls=FOL.parc.filter(p=>todos||(p.parcelas||[]).some(x=>x.c>=ym)).sort((a,b)=>nome(a.funcionario_id).localeCompare(nome(b.funcionario_id))||String(a.emissao||'').localeCompare(String(b.emissao||'')));
+  // filtro por funcionário: mostra todos os lançamentos dele, inclusive os quitados (Carol, 27/10)
+  const fsel=$('folParcFunc'),fv=fsel.value,comParc=[...new Set(FOL.parc.map(p=>p.funcionario_id))].sort((a,b)=>nome(a).localeCompare(nome(b)));
+  fsel.innerHTML='<option value="">Todos os funcionários</option>'+comParc.map(id=>`<option value="${id}"${id===fv?' selected':''}>${esc(nome(id))}</option>`).join('');
+  const ls=FOL.parc.filter(p=>fv?p.funcionario_id===fv:todos||(p.parcelas||[]).some(x=>x.c>=ym)).sort((a,b)=>nome(a.funcionario_id).localeCompare(nome(b.funcionario_id))||String(a.emissao||'').localeCompare(String(b.emissao||'')));
   $('folParc').innerHTML=ls.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Desconta em</th><th>Emissão</th><th class="l">Guia</th><th class="l">Usuário</th><th>Total</th><th>Parcelas</th><th>Neste mês</th><th>Falta depois</th><th></th></tr></thead><tbody>${
-    ls.map(p=>{const ps=p.parcelas||[],i=ps.findIndex(x=>x.c===ym),rest=parcRest(p);
+    (FOL.parcLista=ls).map(p=>{const ps=p.parcelas||[],i=ps.findIndex(x=>x.c===ym),rest=parcRest(p);
       return `<tr><td class="l">${esc(nome(p.funcionario_id))}${sit(p.funcionario_id)==='Desligado'&&rest>0?' <span class="chip c-warn">Desligado: descontar na rescisão</span>':''}</td><td class="l">${esc(FCOL[p.coluna]?.t||p.coluna)}</td><td>${p.emissao?dBR(p.emissao):''}</td><td class="l">${esc(p.guia||'')}</td><td class="l">${esc(p.usuario||'')}</td>
         <td>${fm(p.valor_total)}</td><td>${ps.length}x ${ps.length?`<span class="muted">(${ymTxt(ps[0].c)} a ${ymTxt(ps[ps.length-1].c)})</span>`:''}</td><td>${i>=0?`<b>${fm(ps[i].v)}</b> <span class="muted">${i+1}/${ps.length}</span>`:'<span class="muted">–</span>'}</td><td>${rest?fm(rest):'<span class="muted">quitado</span>'}</td>
         <td><button class="btn small" data-fpc="${p.id}">Abrir</button></td></tr>`}).join('')}</tbody>`
     :`<tbody><tr><td class="l muted">Nenhum desconto parcelado em aberto.${lanca?' Use “+ Desconto parcelado” para lançar um vale ou adiantamento em parcelas.':''}</td></tr></tbody>`;
 }
-$('folParcTodos').onchange=()=>renderFolParc(colsDe(FOL.cli),podeLancar(FOL.cli.id,'folha'));
+$('folParcTodos').onchange=$('folParcFunc').onchange=()=>renderFolParc(colsDe(FOL.cli),podeLancar(FOL.cli.id,'folha'));
+// relatório dos descontos parcelados (o que está na tela, com o filtro): Excel ou PDF (impressão do navegador)
+function parcRel(){
+  const ym=FOL.comp.slice(0,7),nome=id=>FOL.func.find(f=>f.id===id)?.nome||'',fv=$('folParcFunc').value;
+  const ls=FOL.parcLista||[],H=['Colaborador','Desconta em','Emissão','Guia','Usuário','Total','Parcelas','Neste mês','Falta depois','Parcela a parcela'];
+  const rows=ls.map(p=>{const ps=p.parcelas||[],i=ps.findIndex(x=>x.c===ym);
+    return [nome(p.funcionario_id),FCOL[p.coluna]?.t||p.coluna,p.emissao?dBR(p.emissao):'',p.guia||'',p.usuario||'',+p.valor_total||0,`${ps.length}x`,i>=0?+ps[i].v:'',parcRest(p),ps.map((x,k)=>`${k+1}ª ${ymTxt(x.c)} ${fm(x.v)}`).join(' · ')]});
+  const tit=`Descontos parcelados · ${FOL.cli.folha_modelo?.titulo||FOL.cli.nome}`,sub=`Folha de ${MESES[+ym.slice(5)-1]} ${ym.slice(0,4)}${fv?' · '+nome(fv):$('folParcTodos').checked?' · com os quitados':' · em aberto'}`;
+  return {ls,H,rows,tit,sub,tot:[r2(rows.reduce((t,r)=>t+r[5],0)),r2(rows.reduce((t,r)=>t+(+r[7]||0),0)),r2(rows.reduce((t,r)=>t+r[8],0))]};
+}
+$('folParcXls').onclick=()=>{
+  const R=parcRel();if(!R.rows.length){toast('Nada para exportar');return}
+  const ws=XLSX.utils.aoa_to_sheet([[R.tit],[R.sub],[],R.H,...R.rows,['Total','','','','',R.tot[0],'',R.tot[1],R.tot[2],'']]),W=R.H.length-1,R$='"R$" #,##0.00',n=R.rows.length;
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:W}},{s:{r:1,c:0},e:{r:1,c:W}}];xFaixa(ws,0,0,W,XS.titulo);xFaixa(ws,1,0,W,XS.sub);xFaixa(ws,3,0,W,XS.cab2);
+  for(let r=4;r<4+n;r++)for(let c=0;c<=W;c++){const k=XLSX.utils.encode_cell({r,c});if([5,7,8].includes(c)&&ws[k]?.t==='n')ws[k].z=R$;xSt(ws,r,c,XS.cel,(r-4)%2?XS.zebra:null,c===0?XS.nome:[5,7,8].includes(c)?XS.num:XS.txt)}
+  for(const c of [5,7,8]){const k=XLSX.utils.encode_cell({r:4+n,c});ws[k].z=R$}xFaixa(ws,4+n,0,W,{font:{bold:true}});
+  ws['!cols']=[{wch:30},{wch:18},{wch:11},{wch:12},{wch:24},{wch:12},{wch:9},{wch:12},{wch:13},{wch:60}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Parcelados');
+  XLSX.writeFile(wb,`Descontos parcelados ${FOL.cli.nome} ${FOL.comp.slice(5,7)}.${FOL.comp.slice(0,4)}.xlsx`);
+};
+$('folParcPdf').onclick=()=>{
+  const R=parcRel();if(!R.rows.length){toast('Nada para imprimir');return}
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
+  const td=(v,c)=>`<td${[5,7,8].includes(c)?' class="n"':''}>${typeof v==='number'?fm(v):esc(v)}</td>`;
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(R.tit)}</title><style>
+    body{font:12px system-ui,Arial,sans-serif;color:#1b2a2a;margin:24px}h1{font-size:17px;margin:0 0 2px}p{margin:0 0 14px;color:#555}
+    table{border-collapse:collapse;width:100%}th,td{border:1px solid #cfd8d8;padding:5px 6px;text-align:left;vertical-align:top}th{background:#0f5c57;color:#fff;font-weight:600}
+    tr:nth-child(even) td{background:#f3f7f7}td.n{text-align:right;white-space:nowrap}tfoot td{font-weight:700;background:#e3eded}@page{size:A4 landscape;margin:12mm}</style></head><body>
+    <h1>${esc(R.tit)}</h1><p>${esc(R.sub)} · emitido em ${dBR(TODAY)}</p>
+    <table><thead><tr>${R.H.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${R.rows.map(r=>`<tr>${r.map(td).join('')}</tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="5">Total</td><td class="n">${fm(R.tot[0])}</td><td></td><td class="n">${fm(R.tot[1])}</td><td class="n">${fm(R.tot[2])}</td><td></td></tr></tfoot></table>
+    <script>window.onload=()=>setTimeout(()=>window.print(),200)<\/script></body></html>`);
+  w.document.close();
+};
 $('folParcAdd').onclick=()=>abrirParc(null);
 $('folParc').addEventListener('click',ev=>{const b=ev.target.closest('[data-fpc]');if(b)abrirParc(FOL.parc.find(p=>p.id===b.dataset.fpc))});
 // 1º desconto: emissão até o dia de corte entra no mesmo mês; depois, no mês seguinte
