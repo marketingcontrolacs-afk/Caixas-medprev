@@ -677,7 +677,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <h2 style="margin-top:22px">Lançamentos do mês</h2>
     <div class="card tablebox"><table id="folLanc"></table></div>
     <div id="folParcBox" hidden>
-      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Descontos parcelados</h2><div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folParcTodos" style="width:auto"> Mostrar quitados</label><button class="btn" id="folParcAdd">+ Desconto parcelado</button></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Descontos parcelados</h2><div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folParcTodos" style="width:auto"> Mostrar quitados</label><button class="btn" id="folParcImp">Importar planilha</button><button class="btn" id="folParcAdd">+ Desconto parcelado</button></div></div>
       <div class="card tablebox"><table id="folParc"></table></div>
       <p class="note">Vales de atendimentos e adiantamentos divididos em parcelas. A parcela de cada mês entra sozinha na coluna da folha; não precisa lançar de novo.</p>
     </div>
@@ -3570,7 +3570,7 @@ const parcRest=p=>r2((p.parcelas||[]).filter(x=>x.c>FOL.comp.slice(0,7)).reduce(
 function renderFolParc(cols,lanca){
   const pc=cols.filter(c=>FCOL[c].parc);
   $('folParcBox').hidden=!pc.length;if(!pc.length)return;
-  FOL.parcCols=pc;$('folParcAdd').hidden=!lanca||FOL.semParc;
+  FOL.parcCols=pc;$('folParcAdd').hidden=$('folParcImp').hidden=!lanca||FOL.semParc;
   if(FOL.semParc){$('folParc').innerHTML='<tbody><tr><td class="l neg">Os descontos parcelados precisam da atualização v19 do banco. Rode o SQL no Supabase.</td></tr></tbody>';return}
   const ym=FOL.comp.slice(0,7),todos=$('folParcTodos').checked,nome=id=>FOL.func.find(f=>f.id===id)?.nome||'',sit=id=>FOL.func.find(f=>f.id===id)?.situacao;
   const ls=FOL.parc.filter(p=>todos||(p.parcelas||[]).some(x=>x.c>=ym)).sort((a,b)=>nome(a.funcionario_id).localeCompare(nome(b.funcionario_id))||String(a.emissao||'').localeCompare(String(b.emissao||'')));
@@ -3623,6 +3623,66 @@ FOLACAO.parcSalva=async b=>{
 FOLACAO.parcDel=async b=>{if(!confirm('Apagar este desconto parcelado e todas as parcelas?'))return;
   b.disabled=true;const {error}=await sb.from('folha_parcelamentos').delete().eq('id',FOLACAO.parcCtx.id);b.disabled=false;
   if(error){console.error(error);return foErro('Não foi possível apagar.')}dlgFol.close();toast('Desconto parcelado apagado');renderFolha()};
+
+// Importar descontos parcelados de uma planilha Excel (Carol, 27/10): nome de quem usou, data de impressão, guia,
+// funcionário, total e se foi parcelado. O usuário diz qual coluna é o quê; a mesma guia não entra duas vezes (origem).
+let PCI=null;
+$('folParcImp').onclick=()=>{
+  PCI={};
+  folDlg('Importar descontos parcelados',`<p class="note" style="margin-top:0">Envie a planilha em Excel (ou CSV) com uma linha por guia. Pode importar a planilha inteira todo mês: o que já está lançado fica de fora e só entra o que falta.</p>
+    <div class="fields"><label class="f wide">Arquivo<input type="file" id="pciArq" accept=".xlsx,.xls,.csv"></label>
+    <label class="f">Desconta em<select id="pciCol">${FOL.parcCols.map(c=>`<option value="${c}">${esc(FCOL[c].t)}</option>`).join('')}</select></label>
+    <label class="f">Quando diz só "Sim" (parcelado), quantas parcelas<input id="pciSim" type="number" min="2" max="36" value="2" style="max-width:80px"></label></div>
+    <div id="pciMap"></div><div id="pciPrev"></div>`,'<button type="button" class="btn primary" data-fo="pciLanca" id="pciOk" hidden>Lançar</button>');
+  $('pciArq').onchange=async()=>{const f=$('pciArq').files[0];if(!f)return;$('foErr').hidden=true;
+    try{PCI.wb=/\.csv$/i.test(f.name)?XLSX.read(await f.text(),{type:'string',raw:true}):XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});pciAba(PCI.wb.SheetNames[0])}
+    catch(ex){console.error(ex);foErro('Não consegui ler o arquivo. Salve como Excel (.xlsx) e tente de novo.')}};
+  ['pciCol','pciSim'].forEach(x=>$(x).onchange=()=>PCI.m&&pciPrev());
+};
+function pciAba(aba){
+  const ws=PCI.wb.Sheets[aba];PCI.raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});PCI.txt=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+  const txt=r=>r.filter(v=>typeof v==='string'&&v.trim()).length;
+  let h=PCI.txt.findIndex(r=>txt(r)>=3&&r.some(v=>/funcion|colab|nome/i.test(v)));if(h<0)h=PCI.txt.findIndex(r=>txt(r)>=3);if(h<0)h=0;PCI.h=h;
+  const cab=PCI.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`),usado=new Set();
+  const chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
+  const alvo=[['func','Funcionário (quem tem o desconto)',/funcion|colab/],['data','Data (impressão ou emissão)',/data|impress|emiss/],['guia','Nº da guia',/guia|numero|^n[º°]/],
+    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelado (Sim/Não ou nº de parcelas)',/parcel/]];
+  const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
+  $('pciMap').innerHTML=`${PCI.wb.SheetNames.length>1?`<label class="f">Aba<select id="pciAba">${PCI.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
+    <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pci="${k}"><option value="-1">${k==='func'||k==='total'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>`;
+  if($('pciAba'))$('pciAba').onchange=()=>pciAba($('pciAba').value);
+  $('pciMap').querySelectorAll('[data-pci]').forEach(x=>x.onchange=pciPrev);pciPrev();
+}
+// "3x", "3 parcelas", "Sim" (usa o padrão), "Não"/vazio = à vista (1 parcela)
+const pciN=(v,sim)=>{const t=String(v??'').trim().toLowerCase();if(!t||/^n(ao|ão)?$/.test(t))return 1;const m=t.match(/(\d+)/);if(m)return Math.max(1,Math.min(36,+m[1]));return /^s(im)?$|parcel/.test(t)?sim:1};
+function pciPrev(){
+  const m={};$('pciMap').querySelectorAll('[data-pci]').forEach(x=>m[x.dataset.pci]=+x.value);PCI.m=m;
+  if(m.func<0||m.total<0){$('pciPrev').innerHTML='<p class="note">Escolha as colunas do funcionário e do total.</p>';$('pciOk').hidden=true;return}
+  const fs=FOL.func.filter(f=>f.situacao!=='Desligado').sort((a,b)=>a.nome.localeCompare(b.nome)),col=$('pciCol').value,sim=parseInt($('pciSim').value,10)||2;
+  const ja=new Set(FOL.parc.map(p=>p.origem).filter(Boolean));PCI.g=[];
+  for(let r=PCI.h+1;r<PCI.txt.length;r++){const tx=PCI.txt[r],rw=PCI.raw[r],nome=String(tx[m.func]||'').trim();if(!nome||/^tota(l|is)\b/i.test(nome))continue;
+    const total=typeof rw[m.total]==='number'?r2(rw[m.total]):parseMoney(String(tx[m.total]||''));if(!(total>0))continue;
+    const em=m.data>=0?pontoData(rw[m.data]):null,guia=m.guia>=0?String(tx[m.guia]||'').trim():'',usuario=m.usuario>=0?String(tx[m.usuario]||'').trim():'';
+    const n=m.parc>=0?pciN(tx[m.parc],sim):1,f=achaFunc(nome,fs),origem=['imp',col,guia||'',em||'',normNome(nome).join(' '),total.toFixed(2)].join('|');
+    // já lançado: importado antes (mesma linha) ou lançado à mão (mesmo colaborador e mesma guia, ou mesma data e total)
+    const mao=f&&FOL.parc.some(p=>p.funcionario_id===f.id&&(guia&&p.guia?String(p.guia).trim()===guia:p.emissao===em&&Math.abs(+p.valor_total-total)<0.01));
+    PCI.g.push({nome,f,em,guia,usuario,total,n,origem,ja:ja.has(origem)||mao})}
+  $('pciPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th><th>Data</th><th class="l">Guia</th><th class="l">Quem usou</th><th>Total</th><th>Parcelas</th><th>1º desconto</th></tr></thead><tbody>${
+    PCI.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l">${g.ja?'<span class="chip c-none">Já importado</span>':`<select data-pcg="${i}"><option value="">Não lançar</option>${fs.map(f=>`<option value="${f.id}"${g.f?.id===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</select>`}</td>
+      <td>${g.em?dBR(g.em):''}</td><td class="l">${esc(g.guia)}</td><td class="l">${esc(g.usuario)}</td><td>${fm(g.total)}</td><td>${g.ja?g.n:`<input data-pcn="${i}" type="number" min="1" max="36" value="${g.n}" style="width:56px">`}</td><td>${ymTxt(parcInicio(g.em))}</td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="8">Nenhuma linha com funcionário e total.</td></tr>'}</tbody></table></div>
+    <p class="note">1º desconto: emissão até o dia ${folModelo().corte||20} entra no mesmo mês; depois, no mês seguinte. A última parcela fica com os centavos que sobram. ${PCI.g.filter(g=>!g.f&&!g.ja).length?`<b>${PCI.g.filter(g=>!g.f&&!g.ja).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''}</p>`;
+  $('pciOk').hidden=!PCI.g.some(g=>!g.ja);
+}
+FOLACAO.pciLanca=async b=>{
+  const col=$('pciCol').value,regs=[];
+  document.querySelectorAll('[data-pcg]').forEach(x=>{const g=PCI.g[+x.dataset.pcg];if(!x.value)return;const n=parseInt(document.querySelector(`[data-pcn="${x.dataset.pcg}"]`)?.value,10)||1;
+    regs.push({cliente_id:FOL.cli.id,funcionario_id:x.value,coluna:col,emissao:g.em,guia:g.guia||null,usuario:g.usuario||null,valor_total:g.total,parcelas:parcGerar(g.total,n,parcInicio(g.em)),origem:g.origem})});
+  if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
+  b.disabled=true;const {error}=await sb.from('folha_parcelamentos').upsert(regs,{onConflict:'cliente_id,origem',ignoreDuplicates:true});b.disabled=false;
+  if(error){console.error(error);return foErro(/row-level|policy/i.test(error.message||'')?'Sem permissão para lançar nesta empresa.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
+  dlgFol.close();toast(`${regs.length} ${regs.length===1?'desconto parcelado lançado':'descontos parcelados lançados'}`);renderFolha();
+};
 
 // Rescisão
 $('folRescAdd').onclick=()=>abrirResc(null);
