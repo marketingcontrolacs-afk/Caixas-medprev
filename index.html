@@ -1008,7 +1008,9 @@ function fillClientes(){
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
-function go(v){if(!eqPode(v))return;VIEW=v;renderNav();fillClientes();openView()}
+// a seção aberta fica guardada: ao atualizar a página, o portal volta para ela (Carol, 27/10)
+const SECK='portal_secao';
+function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
   ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC'].forEach(x=>$(x).hidden=true);
@@ -1059,7 +1061,8 @@ async function boot(){
   $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
-  show('app');go(first.k);
+  const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
+  show('app');go((volta||first).k);
   const novid=()=>{tNovidades();avNovidades();tcAtrasos()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
