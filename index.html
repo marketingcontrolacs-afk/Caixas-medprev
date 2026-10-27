@@ -3692,7 +3692,7 @@ function pciAba(aba){
   const cab=PCI.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`),usado=new Set();
   const chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const alvo=[['func','Funcionário (quem tem o desconto)',/funcion|colab/],['data','Data (impressão ou emissão)',/data|impress|emiss/],['guia','Nº da guia',/guia|numero|^n[º°]/],
-    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelado (Sim/Não ou nº de parcelas)',/parcel/],['obs','Observação das parcelas ("5 vezes", "3x")',/obs|vezes/]];
+    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelas (Cond. de pgto: 1x, 2x, Sim/Não)',/parcel|cond|pgto|pagto|pagamento/],['obs','Observação das parcelas ("5 vezes", "3x")',/obs|vezes/]];
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   $('pciMap').innerHTML=`${PCI.wb.SheetNames.length>1?`<label class="f">Aba<select id="pciAba">${PCI.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pci="${k}"><option value="-1">${k==='func'||k==='total'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>`;
