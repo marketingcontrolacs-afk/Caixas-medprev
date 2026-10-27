@@ -642,8 +642,26 @@ const dObj=s=>new Date(s+'T12:00:00');
 const dBR=s=>s.split('-').reverse().join('/');
 const dLabel=s=>DOW[dObj(s).getDay()]+' '+s.slice(8,10)+'/'+s.slice(5,7);
 const r2=v=>Math.round((Number(v)||0)*100)/100;
-function parseMoney(s){if(s==null)return null;s=String(s).trim().replace(/R\$\s?/,'');if(!s)return null;
-  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return isFinite(n)?n:NaN}
+function numBR(s){if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=Number(s);return isFinite(n)?n:NaN}
+// campos de valor como calculadora: "10+25,50+3*2" = 41,50 (sem eval: só números, + - * / x ÷ e parênteses)
+const CALC_OP=/[+*/x×÷()]|.-/i;
+function calcBR(s){s=s.replace(/^=/,'').replace(/\s+/g,'').replace(/[+\-*/x×÷]+$/i,'');
+  const tk=s.match(/\d[\d.,]*|[.,]\d+|[+\-*/x×÷()]/gi);if(!tk||tk.join('')!==s)return NaN;let i=0;
+  const fator=()=>{const t=tk[i++];if(t==='-')return -fator();if(t==='+')return fator();
+    if(t==='('){const v=soma();if(tk[i++]!==')')return NaN;return v}return t!=null&&/\d/.test(t)?numBR(t):NaN};
+  const prod=()=>{let v=fator();while(/^[*/x×÷]$/i.test(tk[i]||'')){const o=tk[i++],b=fator();v=o==='/'||o==='÷'?(b?v/b:NaN):v*b}return v};
+  const soma=()=>{let v=prod();while(tk[i]==='+'||tk[i]==='-'){const o=tk[i++],b=prod();v=o==='+'?v+b:v-b}return v};
+  const v=soma();return i===tk.length&&isFinite(v)?Math.round(v*100)/100:NaN}
+function parseMoney(s){if(s==null)return null;s=String(s).trim().replace(/R\$\s?/g,'');if(!s)return null;
+  const n=numBR(s);return isNaN(n)&&CALC_OP.test(s)?calcBR(s):n}
+// ao sair do campo ou apertar Enter, troca a conta pelo total (antes dos outros avisos de mudança da tela)
+function calcCampo(el){if(!el||el.tagName!=='INPUT'||el.type!=='text'&&el.type!==''||!(el.classList.contains('money')||el.inputMode==='decimal'))return false;
+  const s=el.value.trim().replace(/R\$\s?/g,'');if(!s||!isNaN(numBR(s))||!CALC_OP.test(s))return false;
+  const n=calcBR(s);if(isNaN(n))return false;
+  el.value=el.classList.contains('money')?showMoney(n):String(n).replace('.',',');el.dispatchEvent(new Event('input',{bubbles:true}));return true}
+document.addEventListener('change',e=>calcCampo(e.target),true);
+document.addEventListener('focusout',e=>calcCampo(e.target),true);
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&calcCampo(e.target))e.preventDefault()},true);
 const showMoney=v=>v==null||v===''?'':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200)}
@@ -3186,11 +3204,11 @@ function renderBenCad(){
   $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th class="l">Sábados</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th><th>R$ Assiduidade (no VA fixo)</th></tr></thead><tbody>${
     fs.map(f=>`<tr data-bc="${f.id}"><td class="l"><b>${esc(f.nome)}</b></td>
       <td class="l">${sel(f,'vt_tipo',[['','Não tem'],['vt','Vale transporte'],...(R.combustivel||ff(f,'vt_tipo')==='comb'?[['comb','Combustível']]:[])])}</td>
-      <td class="l"><input data-k="vt_empresa" value="${esc(ff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" value="${showMoney(ffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
+      <td class="l"><input data-k="vt_empresa" value="${esc(ff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" class="money" value="${showMoney(ffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
       <td class="l">${sel(f,'sab_escala',[['','Não trabalha'],['todos','Todos'],['alt','Alternados']])}</td>
       <td class="l">${sel(f,'va_tipo',[['','Não tem'],['dia','Por dia trabalhado'],['fixo','Fixo no mês']])}</td>
-      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" value="${showMoney(ffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
-      <td><input data-k="va_assid" value="${showMoney(ffNum(f,'va_assid'))}" style="width:80px;min-width:80px" inputmode="decimal"></td></tr>`).join('')}</tbody>`
+      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" class="money" value="${showMoney(ffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
+      <td><input data-k="va_assid" class="money" value="${showMoney(ffNum(f,'va_assid'))}" style="width:80px;min-width:80px" inputmode="decimal"></td></tr>`).join('')}</tbody>`
     :'<tbody><tr><td class="l muted">Nenhum colaborador ativo.</td></tr></tbody>';
 }
 $('bnCadSalvar').onclick=async ev=>{
