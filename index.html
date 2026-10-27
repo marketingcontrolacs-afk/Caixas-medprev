@@ -115,6 +115,7 @@ dialog[open].cheia{width:calc(100vw - 16px)!important;max-width:none;height:calc
 .dcheia{margin-left:auto;flex:none}select[data-pg]{min-width:230px}#bnCad select{min-width:160px}#bnVa select{min-width:140px}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
+#dlg.edit{width:min(860px,calc(100vw - 32px))} #dlg .db>*{min-width:0} .ajuste .de{color:var(--muted);text-decoration:line-through;font-weight:500}
 #dlgFer,#dlgRep,#dlgFol,#dlgColab{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
 .ccgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}.ccgrid>*{min-width:0}
 @media (max-width:900px){.ccgrid{grid-template-columns:minmax(0,1fr)}}
@@ -563,7 +564,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 <dialog id="dlg">
   <div class="dh"><h2 id="dTitle"></h2><span class="spacer"></span><span id="dChip"></span></div>
   <div class="db" id="dBody"></div>
-  <div class="df"><button class="btn ghost" id="dClose">Fechar</button><button class="btn primary" id="dConf">Marcar como conferido</button></div>
+  <div class="df"><button class="btn ghost" id="dClose">Fechar</button><button class="btn" id="dEdit">Corrigir valores</button><button class="btn" id="dSave" hidden>Salvar correções</button><button class="btn primary" id="dConf">Marcar como conferido</button></div>
 </dialog>
 <dialog id="dlgReg">
   <form id="rForm" novalidate>
@@ -1002,7 +1003,7 @@ function initEsc(){
   $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
   $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. Os lançamentos ficam em Financeiro › Caixa e a importação em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
   $('painelNote').textContent=e?'Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.':'Clique num dia para ver os detalhes e os comprovantes.';
-  $('dConf').hidden=!e;
+  $('dConf').hidden=!e;$('dEdit').hidden=!e;
   renderPainel();
 }
 escMes.onchange=()=>renderPainel();
@@ -1011,10 +1012,14 @@ function renderCfg(){
   $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';$('tabFbc').hidden=tabCfg!=='fbc';
   if(tabCfg==='cadastro')renderCadastro();else if(tabCfg==='cats')renderCats();else if(tabCfg==='fbc')renderFbc();else renderMapa();
 }
+// correções do escritório (v42); sem a v42 rodada, a conferência continua funcionando sem o histórico
+let TEM_AJ=true;
 async function loadPeriodo(ini,fim){
-  const {data,error}=await sb.from('fechamentos').select('*, saidas(*), anexos(*), conferencias(*)').eq('cliente_id',escCli.value).gte('data',ini).lte('data',fim).order('data');
+  const q=sel=>sb.from('fechamentos').select('*, saidas(*), anexos(*), conferencias(*)'+sel).eq('cliente_id',escCli.value).gte('data',ini).lte('data',fim).order('data');
+  let {data,error}=await q(TEM_AJ?', caixa_ajustes(*), caixa_original(*)':'');
+  if(error&&TEM_AJ){console.warn('v42 ainda não rodada',error);TEM_AJ=false;({data,error}=await q(''))}
   if(error){fail(error,'Erro ao carregar');return []}
-  return data.map(f=>({...f,conf:one(f.conferencias)}));
+  return data.map(f=>({...f,conf:one(f.conferencias),orig:one(f.caixa_original)||null,ajustes:(f.caixa_ajustes||[]).sort((a,b)=>a.ajustado_em<b.ajustado_em?-1:1)}));
 }
 function monthRange(k){const [y,m]=k.split('-').map(Number);const last=new Date(y,m,0).getDate();return [`${k}-01`,`${k}-${pad(last)}`]}
 async function renderPainel(){
@@ -1029,7 +1034,8 @@ async function renderPainel(){
     const c=calc(f);T.din+=+f.din_sis;T.sai+=c.sai;T.fs+=c.fs;T.deb+=+f.deb_maq;T.difDeb+=c.difDeb;T.cred+=+f.cred_maq;T.juros+=c.juros;
     if(f.conferido)nConf++;else{nPend++;if(c.alerta)nAlert++}
     const clip=(f.anexos||[]).length?` <span class="muted" title="Comprovantes">📎${f.anexos.length}</span>`:'';
-    return `<tr class="click${aConferir(f)?' pend':''}" data-d="${s}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${dLabel(s)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}</td></tr>`}).join('')
+    const aj=(f.ajustes||[]).length?` <span class="muted" title="Valores corrigidos pelo escritório">✎${f.ajustes.length}</span>`:'';
+    return `<tr class="click${aConferir(f)?' pend':''}" data-d="${s}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${dLabel(s)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}${aj}</td></tr>`}).join('')
     ||'<tr><td class="l muted" colspan="9">Nenhum dia neste mês até hoje.</td></tr>';
   $('tfDias').innerHTML=MES.length?`<tr><td>Total</td><td>${fm(T.din)}</td><td>${fm(T.sai)}</td><td>${fsign(T.fs)}</td><td>${fm(T.deb)}</td><td>${fsign(T.difDeb)}</td><td>${fm(T.cred)}</td><td>${fm(T.juros)}</td><td></td></tr>`:'';
   $('tiles').innerHTML=`
@@ -1040,46 +1046,142 @@ async function renderPainel(){
 }
 $('tbDias').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openDay(tr.dataset.d)});
 $('tbDias').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDay(tr.dataset.d)}});
-const dlg=$('dlg');let dlgF=null;
+const dlg=$('dlg');let dlgF=null,dlgEd=null;
 $('dBody').addEventListener('click',e=>{if(e.target.matches('.fotos img'))e.target.classList.toggle('big')});
-async function openDay(s){
+const AJLAB={din_sis:'Dinheiro do sistema',din_cont:'Dinheiro contado',deb_sis:'Débito (sistema)',deb_maq:'Débito (máquina)',cred_sis:'Crédito (sistema)',cred_maq:'Crédito (máquina)'};
+const saidaTxt=x=>[x.tipo,x.tipo==='Repasse'?(x.parceiro?'parceiro '+x.parceiro:''):x.guia?(x.tipo===DEV?'guia ':'doc ')+x.guia:'',x.descricao].filter(Boolean).join(' · ')+' · '+fm(x.valor);
+const dtHr=t=>new Date(t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+// o dia como o operador lançou (fica guardado antes da primeira correção do escritório)
+const fotoDia=f=>({...Object.fromEntries(NUM.map(k=>[k,r2(f[k])])),obs:f.obs||null,enviado_em:f.enviado_em,saidas:(f.saidas||[]).map(x=>({id:x.id,tipo:x.tipo,guia:x.guia,parceiro:x.parceiro,descricao:x.descricao,valor:r2(x.valor)}))});
+async function openDay(s,edit){
   const f=MES.find(x=>x.data===s);if(!f)return;dlgF=f;const c=calc(f);
+  dlgEd=edit?{...fotoDia(f),saidas:fotoDia(f).saidas.map(x=>({...x}))}:null;
   const urls=await signed((f.anexos||[]).map(a=>a.caminho));
   const L=(a,b,cl)=>`<div class="sline"><span>${a}</span><b class="${cl||''}">${b}</b></div>`;
   const cls=v=>v<-0.004?'neg':v>0.004?'pos':'';
   const anxSaida=id=>(f.anexos||[]).find(a=>a.saida_id===id);
   const anxDia=(f.anexos||[]).filter(a=>!a.saida_id);
-  $('dTitle').textContent=`${DOW[dObj(s).getDay()]}, ${dBR(s)}`;$('dChip').innerHTML=chip(c.status);
-  $('dBody').innerHTML=`
-    <div><h3 style="margin-bottom:6px">Dinheiro</h3>${L('Sistema',fm(f.din_sis))}${L('(−) Saídas',fm(c.sai))}${L('Esperado',fm(c.esp))}${L('Contado',fm(f.din_cont))}${L('Falta / sobra',fsign(c.fs),cls(c.fs))}</div>
-    ${f.saidas.length?`<div><h3 style="margin-bottom:6px">Saídas</h3>${f.saidas.map(x=>L(esc(x.tipo)+refTxt(x)+(x.descricao?' · '+esc(x.descricao):'')+(anxSaida(x.id)?'':' · <span class="neg">sem comprovante</span>'),fm(x.valor))).join('')}
-      <div class="fotos" style="margin-top:8px">${f.saidas.map(x=>anxSaida(x.id)).filter(Boolean).map(a=>anexoView(a,urls[a.caminho])).join('')}</div></div>`:''}
-    <div><h3 style="margin-bottom:6px">Cartões</h3>${L('Débito sistema / máquina',fm(f.deb_sis)+' / '+fm(f.deb_maq))}${L('Diferença débito',fsign(c.difDeb),cls(c.difDeb))}${L('Crédito sistema / máquina',fm(f.cred_sis)+' / '+fm(f.cred_maq))}${L('Juros de parcelamento',fm(c.juros))}</div>
+  $('dTitle').textContent=`${DOW[dObj(s).getDay()]}, ${dBR(s)}`+(edit?' · corrigindo':'');$('dChip').innerHTML=chip(c.status);
+  const docs=`${f.saidas.some(x=>anxSaida(x.id))?`<div><h3 style="margin-bottom:6px">Comprovantes das saídas</h3><div class="fotos">${f.saidas.map(x=>anxSaida(x.id)).filter(Boolean).map(a=>anexoView(a,urls[a.caminho])).join('')}</div></div>`:''}
     <div><h3 style="margin-bottom:6px">Comprovantes do dia</h3>${anxDia.length?`<div class="fotos">${anxDia.map(a=>`<div style="display:grid;gap:4px;max-width:100%"><span class="note">${esc(a.categoria)}</span>${anexoView(a,urls[a.caminho])}</div>`).join('')}</div>`:'<p class="neg" style="margin:0">Nenhum relatório anexado.</p>'}</div>
-    <div><h3 style="margin-bottom:6px">Observação do operador</h3><p style="margin:0">${f.obs?esc(f.obs):'<span class="muted">Sem observação</span>'}</p></div>
-    ${ehEsc()?`<label class="f">Nota da conferência (só o escritório vê)<textarea id="confNota">${esc(f.conf?.nota||'')}</textarea></label>`:''}`;
-  $('dConf').textContent=f.conferido?'Desfazer conferência':'Marcar como conferido';
-  dlg.showModal();
+    <div><h3 style="margin-bottom:6px">Observação do operador</h3><p style="margin:0">${f.obs?esc(f.obs):'<span class="muted">Sem observação</span>'}</p></div>`;
+  const inp=k=>`<label class="f">${AJLAB[k].replace(/ \((.+)\)$/,' · $1')}<input class="money" inputmode="decimal" data-n="${k}" value="${showMoney(dlgEd[k])}"></label>`;
+  if(edit){
+    $('dBody').innerHTML=`<p class="note" style="margin:0">Corrija o que o operador lançou errado. O portal guarda como estava e registra cada ajuste (antes, depois, quem e quando).</p>
+    <div><h3 style="margin-bottom:6px">Dinheiro</h3><div class="fields">${inp('din_sis')}${inp('din_cont')}</div></div>
+    <div><h3 style="margin-bottom:6px">Saídas</h3><div id="eSaidas" style="display:grid;gap:10px"></div><button type="button" class="btn small" id="eAdd" style="margin-top:8px">+ Saída</button></div>
+    <div><h3 style="margin-bottom:6px">Cartões</h3><div class="fields">${inp('deb_sis')}${inp('deb_maq')}${inp('cred_sis')}${inp('cred_maq')}</div></div>
+    <div id="eResumo"></div>
+    <label class="f">Motivo da correção (opcional)<input id="eMotivo" placeholder="Ex.: operador digitou o débito no crédito"></label>
+    <p class="err" id="eErr" hidden></p>${docs}`;
+    renderESaidas();resumoEd();
+  }else{
+    const o=f.orig?.dados;
+    $('dBody').innerHTML=`
+    <div><h3 style="margin-bottom:6px">Dinheiro</h3>${L('Sistema',fm(f.din_sis))}${L('(−) Saídas',fm(c.sai))}${L('Esperado',fm(c.esp))}${L('Contado',fm(f.din_cont))}${L('Falta / sobra',fsign(c.fs),cls(c.fs))}</div>
+    ${f.saidas.length?`<div><h3 style="margin-bottom:6px">Saídas</h3>${f.saidas.map(x=>L(esc(x.tipo)+refTxt(x)+(x.descricao?' · '+esc(x.descricao):'')+(anxSaida(x.id)?'':' · <span class="neg">sem comprovante</span>'),fm(x.valor))).join('')}</div>`:''}
+    <div><h3 style="margin-bottom:6px">Cartões</h3>${L('Débito sistema / máquina',fm(f.deb_sis)+' / '+fm(f.deb_maq))}${L('Diferença débito',fsign(c.difDeb),cls(c.difDeb))}${L('Crédito sistema / máquina',fm(f.cred_sis)+' / '+fm(f.cred_maq))}${L('Juros de parcelamento',fm(c.juros))}</div>
+    ${ehEsc()&&f.ajustes.length?`<div><h3 style="margin-bottom:6px">Ajustes do escritório</h3>${f.ajustes.map(a=>`<div class="sline ajuste"><span>${esc(a.campo)}<br><span class="note">${dtHr(a.ajustado_em)}${a.ajustado_nome?' · '+esc(a.ajustado_nome):''}${a.motivo?' · '+esc(a.motivo):''}</span></span><span style="text-align:right">${a.antes?`<span class="de">${esc(a.antes)}</span>`:''}${a.antes&&a.depois?' → ':a.antes?' ':''}<b>${esc(a.depois||'removida')}</b></span></div>`).join('')}
+      ${o?`<details style="margin-top:8px"><summary><b>Como o operador lançou</b> <span class="note">enviado em ${dtHr(o.enviado_em)}</span></summary>
+        ${L('Dinheiro sistema / contado',fm(o.din_sis)+' / '+fm(o.din_cont))}${o.saidas.map(x=>L('Saída: '+esc(saidaTxt(x).replace(/ · [^·]+$/,'')),fm(x.valor))).join('')}${L('Débito sistema / máquina',fm(o.deb_sis)+' / '+fm(o.deb_maq))}${L('Crédito sistema / máquina',fm(o.cred_sis)+' / '+fm(o.cred_maq))}${L('Falta / sobra',fsign(calc(o).fs),cls(calc(o).fs))}</details>`:''}</div>`:''}
+    ${docs}
+    ${ehEsc()&&f.conferido&&f.conf?`<p class="note" style="margin:0">Conferido em ${dtHr(f.conf.conferido_em)}${f.ajustes.length?' com '+f.ajustes.length+(f.ajustes.length===1?' ajuste':' ajustes'):' sem ajustes'}.</p>`:''}`;
+  }
+  if(ehEsc())$('dBody').insertAdjacentHTML('beforeend',`<label class="f">Nota da conferência (só o escritório vê)<textarea id="confNota">${esc(f.conf?.nota||'')}</textarea></label>`);
+  dlg.classList.toggle('edit',!!edit);
+  $('dConf').textContent=edit?'Salvar e marcar como conferido':f.conferido?'Desfazer conferência':'Marcar como conferido';
+  $('dSave').hidden=!edit;
+  $('dEdit').textContent=edit?'Cancelar correção':'Corrigir valores';
+  $('dEdit').hidden=!ehEsc()||f.conferido;
+  if(!dlg.open)dlg.showModal();
 }
+function renderESaidas(){
+  $('eSaidas').innerHTML=dlgEd.saidas.map((x,i)=>{const r=REF(x.tipo);return `<div class="saida" data-i="${i}">
+    <label class="f">Tipo<select data-k="tipo">${TIPOS_SAIDA.concat(TIPOS_SAIDA.includes(x.tipo)?[]:[x.tipo]).map(t=>`<option${t===x.tipo?' selected':''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="f">${r[1]}<input data-k="${r[0]}" value="${esc(x[r[0]])}" placeholder="${r[2]}"></label>
+    <label class="f">Valor<input data-k="valor" class="money" inputmode="decimal" value="${showMoney(x.valor)}" placeholder="0,00"></label>
+    ${x.tipo===OUTRAS?`<label class="f">Descrição<input data-k="descricao" value="${esc(x.descricao)}"></label>`:'<span></span>'}
+    <button type="button" class="btn small ghost del">Remover</button></div>`}).join('')||'<p class="note" style="margin:0">Nenhuma saída.</p>';
+}
+function resumoEd(){
+  const c=calc(dlgEd),cls=v=>v<-0.004?'neg':v>0.004?'pos':'',L=(a,b,cl)=>`<div class="sline"><span>${a}</span><b class="${cl||''}">${b}</b></div>`;
+  $('eResumo').innerHTML=`<h3 style="margin-bottom:6px">Como fica</h3>${L('(−) Saídas',fm(c.sai))}${L('Esperado',fm(c.esp))}${L('Falta / sobra',fsign(c.fs),cls(c.fs))}${L('Diferença débito',fsign(c.difDeb),cls(c.difDeb))}${L('Juros de parcelamento',fm(c.juros))}`;
+}
+$('dBody').addEventListener('input',e=>{
+  if(!dlgEd)return;const t=e.target;
+  if(t.dataset.n){dlgEd[t.dataset.n]=parseMoney(t.value)}
+  else if(t.dataset.k){const x=dlgEd.saidas[+t.closest('.saida').dataset.i],k=t.dataset.k;x[k]=k==='valor'?parseMoney(t.value):t.value;
+    if(k==='tipo'){if(x.tipo!==OUTRAS)x.descricao='';renderESaidas()}}
+  else return;
+  resumoEd();
+});
+$('dBody').addEventListener('focusout',e=>{if(dlgEd&&e.target.classList.contains('money')){const n=parseMoney(e.target.value);if(n!=null&&!isNaN(n))e.target.value=showMoney(n)}});
+$('dBody').addEventListener('click',e=>{
+  if(!dlgEd)return;
+  if(e.target.id==='eAdd'){dlgEd.saidas.push({tipo:TIPOS_SAIDA[0],guia:'',parceiro:'',descricao:'',valor:null});renderESaidas();resumoEd()}
+  if(e.target.classList.contains('del')){dlgEd.saidas.splice(+e.target.closest('.saida').dataset.i,1);renderESaidas();resumoEd()}
+});
+// grava as correções: guarda o original (1ª vez), atualiza o dia e registra cada ajuste. Devolve false se não salvou.
+async function salvarAjustes(){
+  const f=dlgF,d=dlgEd,err=$('eErr');let m='';
+  if(!TEM_AJ)m='Antes de corrigir, rode a atualização v42 no Supabase (ela guarda o histórico dos ajustes).';
+  else if(NUM.some(k=>d[k]==null||Number.isNaN(d[k])))m='Preencha todos os valores com números (pode ser 0), por exemplo 1.234,56.';
+  else if(d.saidas.some(x=>!(x.valor>0)))m='Toda saída precisa de um valor maior que zero.';
+  if(m){err.textContent=m;err.hidden=false;return false}
+  err.hidden=true;
+  const norm=x=>({tipo:x.tipo,guia:x.tipo==='Repasse'?null:(x.guia||'').trim()||null,parceiro:x.tipo==='Repasse'?(x.parceiro||'').trim()||null:null,descricao:x.tipo===OUTRAS?(x.descricao||'').trim()||null:null,valor:r2(x.valor)});
+  const aj=[];
+  NUM.forEach(k=>{if(r2(d[k])!==r2(f[k]))aj.push({campo:AJLAB[k],antes:fm(f[k]),depois:fm(d[k])})});
+  const novas=d.saidas.map(x=>({id:x.id,...norm(x)}));
+  const rem=f.saidas.filter(o=>!novas.some(n=>n.id===o.id)),alt=[];
+  rem.forEach(o=>aj.push({campo:'Saída removida',antes:saidaTxt(o),depois:''}));
+  novas.forEach(n=>{
+    if(!n.id){aj.push({campo:'Saída incluída',antes:'',depois:saidaTxt(n)});return}
+    const o=norm(f.saidas.find(x=>x.id===n.id));
+    if(['tipo','guia','parceiro','descricao','valor'].some(k=>o[k]!==n[k])){alt.push(n);aj.push({campo:'Saída',antes:saidaTxt(o),depois:saidaTxt(n)})}
+  });
+  if(!aj.length)return true;
+  const motivo=$('eMotivo').value.trim()||null,ok=x=>{if(x.error)throw x.error};
+  if(!f.orig)ok(await sb.from('caixa_original').upsert({fechamento_id:f.id,dados:fotoDia(f)},{onConflict:'fechamento_id',ignoreDuplicates:true}));
+  ok(await sb.from('fechamentos').update(Object.fromEntries(NUM.map(k=>[k,r2(d[k])]))).eq('id',f.id));
+  // o comprovante de uma saída removida continua no dia
+  for(const o of rem){ok(await sb.from('anexos').update({saida_id:null}).eq('saida_id',o.id));ok(await sb.from('saidas').delete().eq('id',o.id))}
+  for(const n of alt){const {id,...v}=n;ok(await sb.from('saidas').update(v).eq('id',id))}
+  const inc=novas.filter(n=>!n.id).map(({id,...v})=>({...v,fechamento_id:f.id}));
+  if(inc.length)ok(await sb.from('saidas').insert(inc));
+  ok(await sb.from('caixa_ajustes').insert(aj.map(a=>({...a,fechamento_id:f.id,motivo,ajustado_nome:ME.nome||ME.email}))));
+  return aj.length;
+}
+async function reabrirDia(s,edit){await renderPainel();if(MES.some(x=>x.data===s))openDay(s,edit);else dlg.close()}
 $('dClose').onclick=()=>dlg.close();
+dlg.addEventListener('close',()=>{dlgEd=null;dlg.classList.remove('edit')});
+$('dEdit').onclick=()=>openDay(dlgF.data,!dlgEd);
+$('dSave').onclick=async()=>{
+  const b=$('dSave');b.disabled=true;
+  try{const n=await salvarAjustes();if(n===false)return;
+    if(n===true){toast('Nenhum valor foi alterado.');openDay(dlgF.data,false);return}
+    toast(n+(n===1?' ajuste salvo':' ajustes salvos'));await reabrirDia(dlgF.data,false)}
+  catch(ex){fail(ex);await reabrirDia(dlgF.data,false)}finally{b.disabled=false}
+};
 $('dConf').onclick=async()=>{
-  const f=dlgF,nota=$('confNota').value,novo=!f.conferido;$('dConf').disabled=true;
+  const f=dlgF,nota=$('confNota').value,novo=!f.conferido||!!dlgEd;$('dConf').disabled=true;
   try{
+    if(dlgEd){const n=await salvarAjustes();if(n===false)return}
     if(novo){const {error}=await sb.from('conferencias').upsert({fechamento_id:f.id,nota,conferido_em:new Date().toISOString(),conferido_por:(await sb.auth.getUser()).data.user.id});if(error)throw error}
     else{const {error}=await sb.from('conferencias').delete().eq('fechamento_id',f.id);if(error)throw error}
     const {error}=await sb.from('fechamentos').update({conferido:novo}).eq('id',f.id);if(error)throw error;
     dlg.close();toast(novo?'Dia '+dBR(f.data)+' conferido':'Conferência desfeita');renderPainel();
-  }catch(ex){fail(ex)}finally{$('dConf').disabled=false}
+  }catch(ex){fail(ex);if(dlgEd)await reabrirDia(f.data,false)}finally{$('dConf').disabled=false}
 };
 $('btnPlanMes').onclick=()=>{
   const cli=cliAtual();if(!cli||!MES.length){toast('Não há lançamentos neste mês.');return}
-  const H=['Data','Dia','Dinheiro (sistema)','Saídas','Dinheiro esperado','Dinheiro contado','Falta(-)/Sobra(+)','Débito (sistema)','Débito (máquina)','Diferença débito','Crédito (sistema)','Crédito (máquina)','Juros de parcelamento','Observações','Situação','Nota da conferência'];
-  const rows=MES.map(f=>{const c=calc(f);return [dObj(f.data),DOW[dObj(f.data).getDay()],+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'']});
+  const H=['Data','Dia','Dinheiro (sistema)','Saídas','Dinheiro esperado','Dinheiro contado','Falta(-)/Sobra(+)','Débito (sistema)','Débito (máquina)','Diferença débito','Crédito (sistema)','Crédito (máquina)','Juros de parcelamento','Observações','Situação','Nota da conferência','Ajustes do escritório'];
+  const rows=MES.map(f=>{const c=calc(f);return [dObj(f.data),DOW[dObj(f.data).getDay()],+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'',(f.ajustes||[]).map(a=>a.campo+': '+(a.antes||'—')+' → '+(a.depois||'removida')).join(' | ')]});
   const S=[['Tipo','Nº guia / documento','Parceiro','Descrição','Valor','Data']];
   MES.forEach(f=>f.saidas.forEach(s=>S.push([s.tipo,s.guia||'',s.parceiro||'',s.descricao||'',+s.valor,dObj(f.data)])));
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet([H,...rows],{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=H.map((h,i)=>({wch:i===13||i===15?40:i===14?22:i===1?6:14}));
-  xTabela(ws,{money:[2,3,4,5,6,7,8,9,10,11,12],neg:[6,9],texto:[13,15]});
+  const ws=XLSX.utils.aoa_to_sheet([H,...rows],{cellDates:true,dateNF:'dd/mm/yyyy'});ws['!cols']=H.map((h,i)=>({wch:i===13||i===15?40:i===16?60:i===14?22:i===1?6:14}));
+  xTabela(ws,{money:[2,3,4,5,6,7,8,9,10,11,12],neg:[6,9],texto:[13,15,16]});
   // situação do dia com a cor da tela (vermelho: conferir; verde: OK ou conferido)
   rows.forEach((x,i)=>{const t=x[14];xSt(ws,i+1,14,/⚠/.test(t)?XS.alerta:/OK|Conferido/.test(t)?{font:{bold:true,color:{rgb:XC.okInk}}}:null)});
   XLSX.utils.book_append_sheet(wb,ws,'Lançamentos');
