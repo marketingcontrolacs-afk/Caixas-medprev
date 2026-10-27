@@ -152,8 +152,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .navbtn svg{width:18px;height:18px;flex:none}
 .navbtn .soon{margin-left:auto;font-size:10px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 6px;text-transform:uppercase}
 @media (max-width:900px){.shell{grid-template-columns:minmax(0,1fr);gap:12px}nav.side{position:static;display:flex;overflow-x:auto;gap:6px;padding-bottom:4px}.navgrp{display:none}.navbtn{width:auto;white-space:nowrap;border:1px solid var(--line);background:var(--surface)}}
-.ctxbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
-.ctxbar .f{min-width:220px}
+.ctxbar{display:flex;gap:8px;align-items:center;flex:1 1 260px;max-width:420px;min-width:0}
+.ctxbar>span{font-size:13px;font-weight:600;color:var(--muted)}
+.ctxbar select{flex:1;min-width:0;font-weight:600}
 .docrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fields .wide{grid-column:1/-1}
 .navbtn .nbadge{margin-left:auto;min-width:20px;text-align:center;font-size:11px;font-weight:700;background:var(--bad);color:#fff;border-radius:999px;padding:1px 6px}
@@ -190,6 +191,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 <header class="top">
   <div class="wrap topin">
     <div class="logo" id="logo"><span class="chip-logo"><img src="logo.png" alt="Controlacs Gestão Empresarial"></span><small>Portal do Cliente</small></div>
+    <div class="ctxbar" id="ctxbar" hidden><span>Empresa</span><select id="escCli" aria-label="Empresa"></select></div>
     <span class="spacer"></span>
     <div class="who" id="who" hidden></div>
     <button class="btn small" id="btnSair" hidden>Sair</button>
@@ -220,7 +222,6 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <nav class="side" id="nav" aria-label="Módulos"></nav>
     <div style="min-width:0">
       <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
-      <div class="ctxbar" id="ctxbar"><label class="f">Empresa<select id="escCli"></select></label></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -894,8 +895,12 @@ function empresasMod(m){
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':m==='ponto'?'ponto':mod)));
 }
 const escCli=$('escCli');
+// a empresa é escolhida uma vez no topo e vale para todos os módulos, inclusive depois de atualizar a página
+const EMPK='portal_empresa';
+let EMP=(()=>{try{return localStorage.getItem(EMPK)||''}catch(e){return ''}})();
+function guardaEmp(){const v=escCli.value;if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
 function fillClientes(){
-  const m=VIEW,v=escCli.value,lista=empresasDe(m);
+  const m=VIEW,lista=empresasDe(m),cur=escCli.value,v=(cur==='*'||cur==='int')&&escCli.dataset.mod===m?cur:EMP||cur;escCli.dataset.mod=m;
   const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas')&&(lista.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
@@ -903,11 +908,8 @@ function fillClientes(){
   $('ctxbar').hidden=m==='cfg'||m==='avisos';
   escCli.disabled=escCli.options.length<2;
 }
-escCli.onchange=()=>openView();
-function go(v){if(!eqPode(v))return;const antes=VIEW;VIEW=v;renderNav();fillClientes();
-  // o escritório abre os repasses com todas as empresas, para a conferência de quinta
-  if((v==='repasse'||v==='tarefas')&&antes!==v&&ehEsc()&&escCli.querySelector('option[value="*"]'))escCli.value='*';
-  openView()}
+escCli.onchange=()=>{guardaEmp();openView()};
+function go(v){if(!eqPode(v))return;VIEW=v;renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
   ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC'].forEach(x=>$(x).hidden=true);
@@ -1573,7 +1575,7 @@ async function renderPendAviso(){
   box.innerHTML=`<div class="alerta"><b>${tot} ${tot===1?'lançamento aguarda':'lançamentos aguardam'} a conferência do escritório</b><span class="note">Clique para abrir:</span><div class="row" style="gap:8px">${itens.map(x=>`<button type="button" class="btn small" data-pc="${x.c}" data-po="${x.o}"${x.c===escCli.value&&x.o===exOrig.value?' aria-current="true" disabled':''}>${esc(x.nome)} · ${MODNOME[x.o]}: ${x.n}</button>`).join('')}</div></div>`;
 }
 $('exPendAviso').addEventListener('click',e=>{const b=e.target.closest('[data-pc]');if(!b)return;
-  if(escCli.querySelector(`option[value="${b.dataset.pc}"]`))escCli.value=b.dataset.pc;exOrig.value=b.dataset.po;$('exSoTxt').textContent=EXORIG[exOrig.value].so;renderExport()});
+  if(escCli.querySelector(`option[value="${b.dataset.pc}"]`)){escCli.value=b.dataset.pc;guardaEmp()}exOrig.value=b.dataset.po;$('exSoTxt').textContent=EXORIG[exOrig.value].so;renderExport()});
 // Conferência completa de um lançamento: documento ao lado de todos os dados, para o escritório
 // corrigir o que precisar antes de confirmar (qualquer erro trava a importação no Bom Controle)
 const dlgCC=$('dlgCC');let CCI=-1;
@@ -2203,7 +2205,7 @@ async function renderTC(cli){
 $('mConf').addEventListener('click',e=>{
   if(e.target.closest('#tcNova'))return tcAbrir(null);
   const t=e.target.closest('[data-tc]');if(t)return tcAbrir(TCL.find(c=>c.id===t.dataset.tc));
-  const b=e.target.closest('[data-tcc]');if(b&&escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;openView()}
+  const b=e.target.closest('[data-tcc]');if(b&&escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;guardaEmp();openView()}
 });
 $('mConf').addEventListener('keydown',e=>{const t=e.target.closest('[data-tc]');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tcAbrir(TCL.find(c=>c.id===t.dataset.tc))}});
 
