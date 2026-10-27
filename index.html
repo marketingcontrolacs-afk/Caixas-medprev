@@ -3672,7 +3672,7 @@ $('folParcImp').onclick=async()=>{
   PCI={};
   const clis=empresasDe('folha').filter(c=>c.folha_colunas?.some(k=>FCOL[k]?.parc)&&podeLancar(c.id,'folha')),ids=clis.map(c=>c.id);
   const [rf,rp]=await Promise.all([sb.from('funcionarios').select('id,nome,cliente_id,situacao').in('cliente_id',ids),
-    sb.from('folha_parcelamentos').select('funcionario_id,cliente_id,guia,emissao,valor_total,origem').in('cliente_id',ids)]);
+    sb.from('folha_parcelamentos').select('id,funcionario_id,cliente_id,guia,emissao,valor_total,origem,parcelas').in('cliente_id',ids)]);
   if(rf.error||rp.error){fail(rf.error||rp.error,'Não foi possível carregar os colaboradores');return}
   PCI.clis=clis;PCI.func=(rf.data||[]).filter(f=>f.situacao!=='Desligado').sort((a,b)=>a.nome.localeCompare(b.nome));PCI.parc=rp.data||[];
   folDlg('Importar descontos parcelados',`<p class="note" style="margin-top:0">Envie a planilha em Excel (ou CSV) com uma linha por guia. Pode importar a planilha inteira todo mês: o que já está lançado fica de fora e só entra o que falta.${clis.length>1?` A planilha pode misturar as empresas: cada guia vai para a empresa do colaborador (${clis.map(c=>esc(c.nome)).join(', ')}).`:''}</p>
@@ -3692,7 +3692,7 @@ function pciAba(aba){
   const cab=PCI.txt[h].map((v,i)=>String(v).trim()||`Coluna ${XLSX.utils.encode_col(i)}`),usado=new Set();
   const chute=re=>{const i=cab.findIndex((t,i)=>!usado.has(i)&&re.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));if(i>=0)usado.add(i);return i};
   const alvo=[['func','Funcionário (quem tem o desconto)',/funcion|colab/],['data','Data (impressão ou emissão)',/data|impress|emiss/],['guia','Nº da guia',/guia|numero|^n[º°]/],
-    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelado (Sim/Não ou nº de parcelas)',/parcel/]];
+    ['usuario','Nome (quem usou)',/nome|paciente|usuario|benefic/],['total','Total (R$)',/total|valor/],['parc','Parcelas (Parcelado, Observação: "5 vezes", "3x")',/parcel|vezes|obs/]];
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   $('pciMap').innerHTML=`${PCI.wb.SheetNames.length>1?`<label class="f">Aba<select id="pciAba">${PCI.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pci="${k}"><option value="-1">${k==='func'||k==='total'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>`;
@@ -3700,7 +3700,9 @@ function pciAba(aba){
   $('pciMap').querySelectorAll('[data-pci]').forEach(x=>x.onchange=pciPrev);pciPrev();
 }
 // "3x", "3 parcelas", "Sim" (usa o padrão), "Não"/vazio = à vista (1 parcela)
-const pciN=(v,sim)=>{const t=String(v??'').trim().toLowerCase();if(!t||/^n(ao|ão)?$/.test(t))return 1;const m=t.match(/(\d+)/);if(m)return Math.max(1,Math.min(36,+m[1]));return /^s(im)?$|parcel/.test(t)?sim:1};
+// também lê a observação: "em 5 vezes", "5x", "3 parcelas" (Carol, 27/10: a Fernanda veio em 1 vez)
+const pciN=(v,sim)=>{const t=String(v??'').trim().toLowerCase();if(!t||/^n(ao|ão)?$|vista/.test(t))return 1;
+  const m=t.match(/(\d+)\s*(x\b|x$|vez|parc)/)||t.match(/^(\d+)$/);if(m)return Math.max(1,Math.min(36,+m[1]));return /^s(im)?$|parcel/.test(t)?sim:1};
 function pciPrev(){
   const m={};$('pciMap').querySelectorAll('[data-pci]').forEach(x=>m[x.dataset.pci]=+x.value);PCI.m=m;
   if(m.func<0||m.total<0){$('pciPrev').innerHTML='<p class="note">Escolha as colunas do funcionário e do total.</p>';$('pciOk').hidden=true;return}
@@ -3716,15 +3718,18 @@ function pciPrev(){
     const n=m.parc>=0?pciN(tx[m.parc],sim):1,f=acha(nome),origem=['imp',col,guia||'',em||'',normNome(nome).join(' '),total.toFixed(2)].join('|');
     // já lançado: importado antes (mesma linha) ou lançado à mão (mesmo colaborador e mesma guia, ou mesma data e total)
     const mao=f&&PCI.parc.some(p=>p.funcionario_id===f.id&&(guia&&p.guia?String(p.guia).trim()===guia:p.emissao===em&&Math.abs(+p.valor_total-total)<0.01));
-    PCI.g.push({nome,f,em,guia,usuario,total,n,origem,ja:!!f&&ja.has(f.cliente_id+'|'+origem)||mao,antes:!!em&&em<desde})}
+    // já importado com outro nº de parcelas: oferece corrigir (refaz as parcelas a partir do mesmo 1º mês)
+    const ant=f&&(PCI.parc.find(p=>p.cliente_id===f.cliente_id&&p.origem===origem)||PCI.parc.find(p=>p.funcionario_id===f.id&&(guia&&p.guia?String(p.guia).trim()===guia:p.emissao===em&&Math.abs(+p.valor_total-total)<0.01)));
+    const corr=ant&&(ant.parcelas||[]).length!==n&&Math.abs(+ant.valor_total-total)<0.01?{id:ant.id,de:(ant.parcelas||[]).length,ini:ant.parcelas?.[0]?.c||parcInicio(em,cliDe(f.id))}:null;
+    PCI.g.push({nome,f,em,guia,usuario,total,n,origem,ja:!!f&&ja.has(f.cliente_id+'|'+origem)||mao,antes:!!em&&em<desde,corr})}
   const opts=sel=>PCI.clis.map(c=>`<optgroup label="${esc(c.nome)}">${fs.filter(f=>f.cliente_id===c.id).map(f=>`<option value="${f.id}"${sel===f.id?' selected':''}>${esc(f.nome)}</option>`).join('')}</optgroup>`).join('');
   const multi=PCI.clis.length>1;
   $('pciPrev').innerHTML=`<h3>Confira antes de lançar</h3><div class="tablebox"><table><thead><tr><th class="l">No arquivo</th><th class="l">Colaborador</th>${multi?'<th class="l">Empresa</th>':''}<th>Data</th><th class="l">Guia</th><th class="l">Quem usou</th><th>Total</th><th>Parcelas</th><th>1º desconto</th></tr></thead><tbody>${
-    PCI.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l">${g.antes?`<span class="chip c-none">Antes de ${dBR(desde).slice(0,5)}: fora</span>`:g.ja?'<span class="chip c-none">Já importado</span>':`<select data-pcg="${i}"><option value="">Não lançar</option>${opts(g.f?.id)}</select>`}</td>${multi?`<td class="l" data-pce="${i}">${esc(g.f?cliDe(g.f.id)?.nome||'':'')}</td>`:''}
-      <td>${g.em?dBR(g.em):''}</td><td class="l">${esc(g.guia)}</td><td class="l">${esc(g.usuario)}</td><td>${fm(g.total)}</td><td>${g.ja||g.antes?g.n:`<input data-pcn="${i}" type="number" min="1" max="36" value="${g.n}" style="width:56px">`}</td><td>${ymTxt(parcInicio(g.em,g.f&&cliDe(g.f.id)))}</td></tr>`).join('')
+    PCI.g.map((g,i)=>`<tr><td class="l">${esc(g.nome)}</td><td class="l">${g.antes?`<span class="chip c-none">Antes de ${dBR(desde).slice(0,5)}: fora</span>`:g.ja?(g.corr?`<label style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" data-pcx="${i}" checked style="width:auto"> Corrigir: está em ${g.corr.de}x</label>`:'<span class="chip c-none">Já importado</span>'):`<select data-pcg="${i}"><option value="">Não lançar</option>${opts(g.f?.id)}</select>`}</td>${multi?`<td class="l" data-pce="${i}">${esc(g.f?cliDe(g.f.id)?.nome||'':'')}</td>`:''}
+      <td>${g.em?dBR(g.em):''}</td><td class="l">${esc(g.guia)}</td><td class="l">${esc(g.usuario)}</td><td>${fm(g.total)}</td><td>${g.antes||g.ja&&!g.corr?g.n:`<input data-pcn="${i}" type="number" min="1" max="36" value="${g.n}" style="width:56px">`}</td><td>${ymTxt(parcInicio(g.em,g.f&&cliDe(g.f.id)))}</td></tr>`).join('')
     ||'<tr><td class="l muted" colspan="9">Nenhuma linha com funcionário e total.</td></tr>'}</tbody></table></div>
     <p class="note">1º desconto: emissão até o dia ${folModelo().corte||20} entra no mesmo mês; depois, no mês seguinte. A última parcela fica com os centavos que sobram. Entram só as guias de ${dBR(desde)} em diante (período da folha de ${MESES[+FOL.comp.slice(5,7)-1].toLowerCase()}). ${PCI.g.filter(g=>!g.f&&!g.ja&&!g.antes).length?`<b>${PCI.g.filter(g=>!g.f&&!g.ja&&!g.antes).length} nome(s) não foram reconhecidos:</b> escolha o colaborador ou deixe “Não lançar”.`:''}</p>`;
-  $('pciOk').hidden=!PCI.g.some(g=>!g.ja&&!g.antes);
+  $('pciOk').hidden=!PCI.g.some(g=>!g.antes&&(!g.ja||g.corr));
   $('pciPrev').querySelectorAll('[data-pcg]').forEach(x=>x.onchange=()=>{const td=$('pciPrev').querySelector(`[data-pce="${x.dataset.pcg}"]`);if(td)td.textContent=x.value?cliDe(x.value)?.nome||'':''});
 }
 FOLACAO.pciLanca=async b=>{
@@ -3733,11 +3738,16 @@ FOLACAO.pciLanca=async b=>{
     // a empresa do colaborador; se ela não tiver a coluna escolhida, vai na primeira coluna de parcelados dela
     const c=PCI.cliDe(x.value),pc=c.folha_colunas.filter(k=>FCOL[k]?.parc),cc=pc.includes(col)?col:pc[0];
     regs.push({cliente_id:c.id,funcionario_id:x.value,coluna:cc,emissao:g.em,guia:g.guia||null,usuario:g.usuario||null,valor_total:g.total,parcelas:parcGerar(g.total,n,parcInicio(g.em,c)),origem:g.origem})});
-  if(!regs.length)return foErro('Nenhum colaborador escolhido para lançar.');
-  b.disabled=true;const {error}=await sb.from('folha_parcelamentos').upsert(regs,{onConflict:'cliente_id,origem',ignoreDuplicates:true});b.disabled=false;
+  const corr=[...document.querySelectorAll('[data-pcx]:checked')].map(x=>{const g=PCI.g[+x.dataset.pcx],n=parseInt(document.querySelector(`[data-pcn="${x.dataset.pcx}"]`)?.value,10)||g.n;
+    return {id:g.corr.id,parcelas:parcGerar(g.total,n,g.corr.ini)}});
+  if(!regs.length&&!corr.length)return foErro('Nenhum colaborador escolhido para lançar.');
+  b.disabled=true;let error=null;
+  if(regs.length)({error}=await sb.from('folha_parcelamentos').upsert(regs,{onConflict:'cliente_id,origem',ignoreDuplicates:true}));
+  for(const x of corr){if(error)break;({error}=await sb.from('folha_parcelamentos').update({parcelas:x.parcelas}).eq('id',x.id))}
+  b.disabled=false;
   if(error){console.error(error);return foErro(/row-level|policy/i.test(error.message||'')?'Sem permissão para lançar nesta empresa.':'Não foi possível lançar. Verifique a internet e tente de novo.')}
   const por=PCI.clis.map(c=>[c.nome,regs.filter(r=>r.cliente_id===c.id).length]).filter(x=>x[1]);
-  dlgFol.close();toast(`${regs.length} ${regs.length===1?'desconto parcelado lançado':'descontos parcelados lançados'}${por.length>1?': '+por.map(([n,k])=>`${n} ${k}`).join(', '):''}`);renderFolha();
+  dlgFol.close();toast([regs.length?`${regs.length} ${regs.length===1?'desconto parcelado lançado':'descontos parcelados lançados'}${por.length>1?': '+por.map(([n,k])=>`${n} ${k}`).join(', '):''}`:'',corr.length?`${corr.length} com as parcelas corrigidas`:''].filter(Boolean).join('; '));renderFolha();
 };
 
 // Rescisão
