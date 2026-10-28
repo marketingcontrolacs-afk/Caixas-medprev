@@ -5004,9 +5004,9 @@ async function gfPessoasTodas(cid){
   if(GFPT.cid!==cid)GFPT={cid,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,papel').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'))};
   return GFPT.lista;
 }
-// nas entradas os clientes vêm primeiro; nas saídas, os fornecedores
+// nas entradas os clientes vêm primeiro; nas saídas, os fornecedores (a lista mostra só o nome, e o nome fantasia quando houver)
 const pesOpts=(ls,ent)=>[...ls].sort((a,b)=>((a.papel===(ent?'fornecedor':'cliente'))-(b.papel===(ent?'fornecedor':'cliente')))||a.nome.localeCompare(b.nome))
-  .map(p=>`<option value="${esc(p.nome)}">${p.fantasia&&p.fantasia!==p.nome?esc(p.fantasia)+' · ':''}${p.papel==='ambos'?'cliente e fornecedor':p.papel}</option>`).join('');
+  .map(p=>`<option value="${esc(p.nome)}">${p.fantasia&&p.fantasia!==p.nome?esc(p.fantasia):''}</option>`).join('');
 async function gfPessoasDe(cid,papel){
   const key=cid+'|'+papel;
   // todos os cadastros, com os do papel pedido (cliente ou fornecedor) primeiro
