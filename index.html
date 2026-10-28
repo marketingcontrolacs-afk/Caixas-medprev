@@ -509,6 +509,24 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   </section>
 
   <!-- GESTÃO FINANCEIRA › PLANO DE CONTAS DA EMPRESA (escritório) -->
+  <!-- CONTABILIDADE › PORTAL DA CONTABILIDADE (escritório e contador) -->
+  <section id="viewCtb" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Portal da contabilidade</h1><p class="sub" id="ctbSub"></p></div>
+      <div class="row" style="align-items:flex-end" id="ctbAcoes"></div>
+    </div>
+    <div id="ctbAlerta"></div>
+    <div class="tabs" role="tablist" id="tabsCtb">
+      <button role="tab" data-tab="ctbexp">Fechamento e exportação</button>
+      <button role="tab" data-tab="ctbdepara">De-para de contas</button>
+      <button role="tab" data-tab="ctbplano">Plano de contas contábil</button>
+      <button role="tab" data-tab="ctblayout">Layout de exportação</button>
+    </div>
+    <div class="toolbar" id="ctbBar"></div>
+    <div class="card tablebox"><table><thead id="ctbHead"></thead><tbody id="ctbBody"></tbody></table></div>
+    <p class="note" id="ctbNote"></p>
+  </section>
+
   <section id="viewPC" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Plano de contas</h1><p class="sub" id="pcSub"></p></div>
@@ -966,10 +984,10 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Tarefas e Avisos são de toda a equipe
 const SEMPRE=['tarefas','avisos'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
-const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k));
-const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
+const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)||k.startsWith('cfg')&&ME.modulos_equipe.includes('cfg'));
+const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
 // seções agrupadas no quadro Acessos
-const MODGRUPOS=[['Financeiro',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas']]];
+const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas']],['Contabilidade',['contabil']]];
 // os dados da folha e das férias também servem às seções que dependem deles (igual ao banco, v38)
 const MODEQ={folha:['folha','ponto','premio','beneficios','colab'],ferias:['ferias','colab']};
 const temEm=(cli,m)=>ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
@@ -1016,16 +1034,17 @@ const ICO={
   gfplano:'<path d="M4 5h16M4 12h16M4 19h16"/><circle cx="8" cy="5" r="1.5"/><circle cx="14" cy="12" r="1.5"/><circle cx="10" cy="19" r="1.5"/>',
   m_fin:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1.2-1.7-2-3-2-1.7 0-3 1-3 2.3 0 3 6 1.7 6 4.6 0 1.3-1.3 2.3-3 2.3-1.3 0-2.5-.8-3-2M12 5.5v2M12 16.7v1.8"/>',
   m_gf:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/><path d="M16 8h4v4"/>',
+  m_ctb:'<path d="M5 3h14v18H5z"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h8"/>',
   m_rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
   m_com:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/>',
   m_esc:'<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
-  {k:'caixa',t:'Caixa',g:'Financeiro',s:'Dia a dia',ok:()=>temAcesso('caixa')},
-  {k:'pagar',t:'Boletos e notas fiscais a pagar',g:'Financeiro',s:'Dia a dia',ok:()=>temAcesso('pagar')},
-  {k:'tesouraria',t:'Tesouraria',g:'Financeiro',s:'Dia a dia',ok:()=>temAcesso('tesouraria')},
-  {k:'cartao',t:'Cartão de crédito',g:'Financeiro',s:'Dia a dia',ok:()=>temAcesso('cartao')},
+  {k:'caixa',t:'Caixa',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('caixa')},
+  {k:'pagar',t:'Boletos e notas fiscais a pagar',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('pagar')},
+  {k:'tesouraria',t:'Tesouraria',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('tesouraria')},
+  {k:'cartao',t:'Cartão de crédito',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('cartao')},
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
   {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
@@ -1049,6 +1068,11 @@ const NAV=[
   {k:'gfpes',t:'Clientes e fornecedores',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
   {k:'gfcontas',t:'Contas bancárias e cartões',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
   {k:'gfplano',t:'Plano de contas',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
+  // Portal da contabilidade: escritório e contador (acesso Contabilidade)
+  {k:'ctbexp',t:'Fechamento e exportação',g:'Contabilidade',s:'Dia a dia',ok:()=>temAcesso('contabil')},
+  {k:'ctbdepara',t:'De-para de contas',g:'Contabilidade',s:'Cadastros',ok:()=>temAcesso('contabil')},
+  {k:'ctbplano',t:'Plano de contas contábil',g:'Contabilidade',s:'Cadastros',ok:()=>temAcesso('contabil')},
+  {k:'ctblayout',t:'Layout de exportação',g:'Contabilidade',s:'Avançado',ok:()=>temAcesso('contabil')},
   {k:'rh',t:'Férias',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('ferias')},
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('folha')},
   {k:'ponto',t:'Espelho de ponto',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('ponto')},
@@ -1059,20 +1083,24 @@ const NAV=[
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
-  {k:'confcaixa',t:'Conferência de caixa',g:'Escritório',s:'Dia a dia',ok:ehEsc},
-  {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Escritório':'Financeiro',s:'Dia a dia',ok:()=>temAcesso('repasse')},
-  {k:'bc',t:'Exportação Bom Controle',g:'Escritório',s:'Dia a dia',ok:ehEsc},
-  {k:'cfg',t:'Configurações',g:'Escritório',s:'Avançado',ok:ehEsc},
+  // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
+  {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'repasse',t:'Repasses de parceiros',g:()=>ehEsc()?'Gestão financeira':'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('repasse')},
+  {k:'bc',t:'Exportação Bom Controle',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'cfg',t:'Empresas e usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
+  {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  {k:'cfgfbc',t:'Fornecedores',g:'Configurações',s:'Bom Controle',ok:ehEsc},
 ];
 const NAVBADGE={};
 // módulos no topo (um ícone cada); as seções e as telas abrem num painel, como no Bom Controle
-const MODS=[{g:'Financeiro',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Escritório',i:'m_esc'}];
-const SECOES=['Dia a dia','Mensagens','Cadastros','Relatórios','Avançado'];
+const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Configurações',i:'cfg'}];
+const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado'];
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
-const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
+const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW);
   $('nav').innerHTML=MODS.filter(m=>itens.some(n=>navGrp(n)===m.g)).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
@@ -1108,6 +1136,7 @@ function empresasMod(m){
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
   if(m==='tarefas')return CLIENTES.filter(c=>c.ativo!==false&&podeVer(c.id,'tarefas'));
+  if(m.startsWith('ctb'))return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_financeiro!==false:temEm(c.id,'contabil')));
   const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   // o cliente vê só as empresas em que tem a seção liberada (Benefícios é seção própria)
@@ -1124,7 +1153,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m==='cfg'||m==='avisos';
+  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
@@ -1133,7 +1162,7 @@ const SECK='portal_secao';
 function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1141,7 +1170,7 @@ function openView(){
     if(cli&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
     else{$('viewEsc').hidden=false;initEsc()}
   }else if(VIEW==='confcaixa'){$('viewEsc').hidden=false;initEsc()}else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
-  else if(VIEW==='cfg'){$('viewCfg').hidden=false;renderCfg()}
+  else if(VIEW.startsWith('cfg')){$('viewCfg').hidden=false;tabCfg={cfg:'cadastro',cfgmapa:'mapa',cfgcats:'cats',cfgfbc:'fbc'}[VIEW];document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===tabCfg));renderCfg()}
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
@@ -1162,6 +1191,7 @@ function openView(){
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
+  else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
   avBanner();
 }
 function show(view){
@@ -1185,7 +1215,7 @@ async function boot(){
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   show('app');go((volta||first).k);
-  const novid=()=>{tNovidades();avNovidades();tcAtrasos();gteNovidades()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{tNovidades();avNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -1353,13 +1383,13 @@ function initEsc(){
   if(!escIni.value)[escIni.value,escFim.value]=monthRange(TODAY.slice(0,7));
   const e=ehEsc();
   $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
-  $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. Os lançamentos ficam em Financeiro › Caixa e a importação em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
+  $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. Os lançamentos ficam em Rotina diária › Caixa e a importação em Gestão financeira › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
   $('painelNote').textContent=e?'Clique num dia para ver os detalhes, os comprovantes e marcar como conferido.':'Clique num dia para ver os detalhes e os comprovantes.';
   $('dConf').hidden=!e;$('dEdit').hidden=!e;
   renderPainel();
 }
 escFim.onchange=escIni.onchange=()=>renderPainel();
-document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
+document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>go({cadastro:'cfg',mapa:'cfgmapa',cats:'cfgcats',fbc:'cfgfbc'}[b.dataset.tab]));
 function renderCfg(){
   $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';$('tabFbc').hidden=tabCfg!=='fbc';
   if(tabCfg==='cadastro')renderCadastro();else if(tabCfg==='cats')renderCats();else if(tabCfg==='fbc')renderFbc();else renderMapa();
@@ -2165,8 +2195,8 @@ $('tbUsr').addEventListener('click',e=>{const b=e.target.closest('[data-perm]');
 const dlgPerm=$('dlgPerm');let PERMU=null;
 function abrirPermissoes(u){
   PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
-  const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Escritório':n.g;
-  const grupos=['Financeiro','Gestão financeira','Recursos humanos','Escritório'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
+  const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Gestão financeira':n.g;
+  const grupos=['Rotina diária','Gestão financeira','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
   const ck=(n)=>`<label><input type="checkbox" value="${n.k}"${!ms||ms.includes(n.k)?' checked':''}> ${n.t}</label>`;
   $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe.</p>
     <div class="pick" id="pmMods" style="max-height:none"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
@@ -6167,7 +6197,7 @@ async function renderGTes(){
   const cli=cliAtual();
   if(!$('gteIni').value)[$('gteIni').value,$('gteFim').value]=monthRange(TODAY.slice(0,7));
   if(!cli)return gteVazio('Escolha uma empresa.');
-  $('gteSub').textContent=`${cli.nome} · Lançamentos que o cliente faz em Financeiro › Tesouraria. Corrija, ponha a categoria e marque como revisado: o lançamento do cliente não muda.`;
+  $('gteSub').textContent=`${cli.nome} · Lançamentos que o cliente faz em Rotina diária › Tesouraria. Corrija, ponha a categoria e marque como revisado: o lançamento do cliente não muda.`;
   let conta,movs,alt;
   try{
     const {data:c,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cli.id).eq('espelho_tes',true).maybeSingle();if(error)throw error;
@@ -7101,6 +7131,238 @@ $('adFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-a
   finally{b.disabled=false}
 });
 
+// ---------- Contabilidade › Portal da contabilidade (v60) ----------
+// O escritório importa o plano de contas e o layout do sistema contábil; o portal sugere o de-para pelo nome,
+// o contador confere e confirma; o escritório fecha o mês e o contador baixa o arquivo para importar.
+const CTB={tab:'ctbexp',cli:null,plano:[],depara:{},layout:null,fech:[],cats:[],contas:[],imp:null,filtro:'todos'};
+const CTBCAMPOS={data:'Data do lançamento',debito:'Conta débito',credito:'Conta crédito',valor:'Valor',historico:'Histórico',documento:'Documento',pessoa:'Cliente ou fornecedor',fixo:'Valor fixo',vazio:'Deixar em branco'};
+const v60=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='PGRST202'||/ctb_/.test(e.message||''));
+const v60Msg='O Portal da contabilidade precisa da atualização v60 do banco. Rode o SQL no Supabase.';
+const ctbChave=(t,o)=>t+'|'+o;
+function ctbVazio(t,cl){$('ctbHead').innerHTML='';$('ctbBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('ctbNote').textContent='';$('ctbBar').innerHTML='';$('ctbAcoes').innerHTML=''}
+async function renderCtb(){
+  CTB.tab=VIEW;document.querySelectorAll('#tabsCtb button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===CTB.tab));
+  const cli=cliAtual();$('ctbAlerta').innerHTML='';
+  $('ctbSub').textContent=(cli?cli.nome+' · ':'')+(ehEsc()?'O escritório importa o plano de contas e o layout do sistema contábil e fecha o mês; o contador confere o de-para e baixa o arquivo.':'Confira o vínculo de cada categoria e conta com o seu plano de contas e baixe o arquivo dos meses fechados.');
+  if(!cli)return ctbVazio('Escolha uma empresa.');
+  try{
+    const [p,d,l,f,cats,contas]=await Promise.all([
+      todas(()=>sb.from('ctb_plano').select('*').eq('cliente_id',cli.id).order('classificacao').order('codigo')),
+      todas(()=>sb.from('ctb_depara').select('*').eq('cliente_id',cli.id)),
+      sb.from('ctb_layout').select('*').eq('cliente_id',cli.id).maybeSingle(),
+      sb.from('ctb_fechamentos').select('*').eq('cliente_id',cli.id).order('mes',{ascending:false}),
+      planoDe(cli).catch(()=>[]),
+      sb.from('fin_contas').select('id,nome,tipo,ativo,espelho_tes').eq('cliente_id',cli.id).order('nome')]);
+    if(l.error)throw l.error;if(f.error)throw f.error;if(contas.error)throw contas.error;
+    if(cliAtual()?.id!==cli.id||!VIEW.startsWith('ctb'))return;
+    Object.assign(CTB,{cli,plano:p,depara:Object.fromEntries(d.map(x=>[ctbChave(x.origem_tipo,x.origem),x])),layout:l.data,fech:f.data||[],
+      cats:ordPlano(cats.filter(c=>c.ativo!==false)),contas:(contas.data||[]).filter(c=>c.ativo!==false)});
+  }catch(e){console.error(e);return ctbVazio(v60(e)?v60Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  await ctbPendencias();ctbAlertas();
+  ({ctbexp:ctbExp,ctbdepara:ctbDepara,ctbplano:ctbPlano,ctblayout:ctbLayout})[CTB.tab]();
+}
+// o que falta configurar nesta empresa (fica no topo de todas as abas até resolver)
+function ctbFaltas(){
+  const f=[],orig=ctbOrigens(),sem=orig.filter(o=>!CTB.depara[o.k]?.confirmado||!CTB.depara[o.k]?.conta_codigo).length;
+  if(!CTB.plano.length)f.push(['ctbplano','Importar o plano de contas da contabilidade']);
+  if(!CTB.layout?.colunas?.length)f.push(['ctblayout','Importar e configurar o layout de exportação do sistema contábil']);
+  if(ehEsc()&&CTB.status&&!CTB.status[CTB.cli.id]?.contador)f.push(['cfg','Cadastrar o login do contador (Configurações › Empresas e usuários, acesso Contabilidade)']);
+  if(sem)f.push(['ctbdepara',`Conferir o de-para: ${sem} de ${orig.length} ${orig.length===1?'item':'itens'} sem conta contábil confirmada`]);
+  return f;
+}
+function ctbAlertas(){
+  const f=ctbFaltas();
+  $('ctbAlerta').innerHTML=f.length?`<div class="alerta bad" style="margin-top:14px"><b>⚠ Portal da contabilidade ainda não configurado nesta empresa</b><span class="note">Falta:</span><div class="row" style="gap:8px">${f.map(([t,x])=>`<button type="button" class="btn small" data-ctbtab="${t}">${esc(x)}</button>`).join('')}</div></div>`:'';
+}
+// origens do de-para: as categorias do plano da empresa e as contas financeiras
+function ctbOrigens(){
+  return [...CTB.cats.map(c=>({k:ctbChave('categoria',c.categoria),tipo:'categoria',origem:c.categoria,nome:c.categoria,grupo:(c.tipo==='Receita'?'Receitas':'Despesas')+(c.grupo?' · '+c.grupo:''),codigo:c.codigo})),
+    ...CTB.contas.map(c=>({k:ctbChave('conta',c.id),tipo:'conta',origem:c.id,nome:c.nome,grupo:'Contas · '+(c.tipo||'')}))];
+}
+const ctbConta=cod=>CTB.plano.find(p=>p.codigo===cod);
+const ctbRot=p=>p?[p.codigo,p.classificacao,p.nome].filter(Boolean).join(' · '):'';
+// sugestão pelo nome: palavras em comum (as 5 primeiras letras de cada), entre as contas analíticas
+function ctbSugere(nome){
+  const tk=t=>new Set(pessoaChave(t).split(' ').filter(w=>w.length>2&&!['de','da','do','das','dos','com','para'].includes(w)).map(w=>w.slice(0,5)));
+  const a=tk(nome);if(!a.size)return null;let best=null,bs=0;
+  for(const p of CTB.plano){if(!p.analitica)continue;const b=tk(p.nome);if(!b.size)continue;
+    const i=[...a].filter(w=>b.has(w)).length,sc=i/(a.size+b.size-i)+(pessoaChave(p.nome)===pessoaChave(nome)?1:0);if(sc>bs){bs=sc;best=p}}
+  return bs>=0.34?best:null;
+}
+// --- aba De-para ---
+function ctbDepara(){
+  const os=ctbOrigens(),F=CTB.filtro,st=o=>{const d=CTB.depara[o.k];return !d?.conta_codigo?'sem':d.confirmado?'ok':'sug'};
+  const ls=os.filter(o=>F==='todos'||st(o)===F),nSug=os.filter(o=>st(o)==='sug').length;
+  $('ctbAcoes').innerHTML=`<button class="btn" data-ctb="sugerir"${CTB.plano.length?'':' disabled'}>Sugerir pelo nome</button><button class="btn primary" data-ctb="confsug"${nSug?'':' disabled'}>${nSug===1?'Confirmar o sugerido':`Confirmar os ${nSug} sugeridos`}</button>`;
+  $('ctbBar').innerHTML=`<label class="f">Mostrar<select id="ctbFiltro"><option value="todos">Todos</option><option value="sem">Sem conta contábil</option><option value="sug">Sugeridos (a confirmar)</option><option value="ok">Confirmados</option></select></label>
+    <datalist id="ctbContas">${CTB.plano.filter(p=>p.analitica).map(p=>`<option value="${esc(p.codigo)}">${esc([p.classificacao,p.nome].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>`;
+  $('ctbFiltro').value=F;
+  $('ctbHead').innerHTML='<tr><th class="l">Categoria ou conta</th><th class="l">Conta contábil (código)</th><th class="l">Nome no plano da contabilidade</th><th class="l">Situação</th><th></th></tr>';
+  let g=null;
+  $('ctbBody').innerHTML=ls.map(o=>{const d=CTB.depara[o.k],p=ctbConta(d?.conta_codigo),s=st(o),h=o.grupo!==g?`<tr><td class="l" colspan="5"><b>${esc(o.grupo)}</b></td></tr>`:'';g=o.grupo;
+    return h+`<tr data-k="${esc(o.k)}"><td class="l">${o.codigo?`<span class="muted">${esc(o.codigo)}</span> `:''}${esc(o.nome)}</td>
+      <td class="l"><input class="ctbCod" list="ctbContas" value="${esc(d?.conta_codigo||'')}" placeholder="Código" style="max-width:150px"${CTB.plano.length?'':' disabled'}></td>
+      <td class="l">${p?esc([p.classificacao,p.nome].filter(Boolean).join(' · ')):d?.conta_codigo?'<span class="neg">não existe no plano</span>':'<span class="muted">—</span>'}</td>
+      <td class="l">${s==='ok'?'<span class="chip c-ok">✓ Confirmado</span>':s==='sug'?'<span class="chip c-warn">Sugerido</span>':'<span class="chip c-bad">Sem vínculo</span>'}</td>
+      <td>${s==='sug'?'<button type="button" class="btn small" data-ctb="conf1">Confirmar</button>':''}</td></tr>`}).join('')||`<tr><td class="l muted" colspan="5">${os.length?'Nada neste filtro.':'Esta empresa ainda não tem categorias nem contas cadastradas na Gestão financeira.'}</td></tr>`;
+  $('ctbNote').textContent=CTB.plano.length?'Digite o código ou escolha na lista. O que você escolhe fica confirmado; o que o portal sugere pelo nome fica “Sugerido” até alguém conferir e confirmar.':'Importe primeiro o plano de contas da contabilidade (aba Plano de contas contábil).';
+}
+async function ctbSalvaDepara(rows){
+  const {error}=await sb.from('ctb_depara').upsert(rows.map(r=>({cliente_id:CTB.cli.id,...r})),{onConflict:'cliente_id,origem_tipo,origem'});if(error)throw error;
+}
+// --- aba Plano de contas contábil ---
+function ctbPlano(){
+  $('ctbAcoes').innerHTML=`<span class="btn primary fotobtn">Importar plano de contas<input type="file" id="ctbPlArq" accept=".xlsx,.xls,.csv,.txt"></span>`;
+  $('ctbBar').innerHTML='<input id="ctbBusca" placeholder="Buscar no plano" style="max-width:260px">';
+  const imp=CTB.imp;
+  if(imp){ // conferência da importação: qual coluna é qual
+    const op=(k,lab,opc)=>`<label class="f">${lab}<select data-col="${k}">${opc?'<option value="">(não tem)</option>':''}${imp.cab.map((c,i)=>`<option value="${i}"${imp.map[k]===i?' selected':''}>${esc(c||'Coluna '+(i+1))}</option>`).join('')}</select></label>`;
+    $('ctbBar').innerHTML=`<div class="card" style="padding:14px 16px;display:grid;gap:10px;flex:1 1 100%"><b>Importar “${esc(imp.nome)}”: ${imp.linhas.length} linhas. Confira qual coluna é qual:</b><div class="row" style="align-items:flex-end">${op('codigo','Código (reduzido) *')}${op('nome','Nome da conta *')}${op('classificacao','Classificação',1)}${op('tipo','Tipo (A/S)',1)}</div>
+      <p class="note" style="margin:0">O plano atual desta empresa (${CTB.plano.length} contas) é substituído. O de-para já feito continua valendo pelos códigos.</p><div class="row"><button class="btn primary" data-ctb="plimp">Importar</button><button class="btn ghost" data-ctb="plcanc">Cancelar</button></div></div>`;
+    const ex=imp.linhas.slice(0,8);
+    $('ctbHead').innerHTML='<tr>'+imp.cab.map(c=>`<th class="l">${esc(c)}</th>`).join('')+'</tr>';
+    $('ctbBody').innerHTML=ex.map(r=>'<tr>'+imp.cab.map((_,i)=>`<td class="l">${esc(String(r[i]??''))}</td>`).join('')+'</tr>').join('');
+    $('ctbNote').textContent='Prévia das primeiras linhas do arquivo.';return;
+  }
+  const q=pessoaChave($('ctbBusca')?.value||''),ls=CTB.plano.filter(p=>!q||pessoaChave(p.codigo+' '+p.classificacao+' '+p.nome).includes(q));
+  $('ctbHead').innerHTML='<tr><th class="l">Classificação</th><th class="l">Código</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Usada no de-para por</th></tr>';
+  const uso={};Object.values(CTB.depara).forEach(d=>{if(d.conta_codigo)(uso[d.conta_codigo]||=[]).push(d.origem_tipo==='conta'?CTB.contas.find(c=>c.id===d.origem)?.nome||'conta':d.origem)});
+  $('ctbBody').innerHTML=ls.slice(0,1500).map(p=>`<tr><td class="l">${esc(p.classificacao||'')}</td><td class="l">${esc(p.codigo)}</td><td class="l"${p.analitica?'':' style="font-weight:700"'}>${esc(p.nome)}</td><td class="l muted">${p.analitica?'Analítica':'Sintética'}</td><td class="l muted">${esc((uso[p.codigo]||[]).join(', '))}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="5">${CTB.plano.length?'Nada encontrado.':'Nenhum plano importado. Use “Importar plano de contas” com a planilha ou o CSV exportado do sistema contábil.'}</td></tr>`;
+  $('ctbNote').textContent=CTB.plano.length?`${CTB.plano.length} contas no plano.`:'';
+  $('ctbBusca').oninput=()=>{clearTimeout(ctbPlano.t);ctbPlano.t=setTimeout(ctbPlano,200)};
+}
+async function ctbLerArquivo(f){
+  const txt=/\.(csv|txt)$/i.test(f.name),wb=txt?XLSX.read(await f.text(),{type:'string',raw:true}):XLSX.read(await f.arrayBuffer(),{type:'array'});
+  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:false}).filter(r=>r.some(c=>String(c).trim()!==''));
+  return {cab:(aoa[0]||[]).map(c=>String(c).trim()),linhas:aoa.slice(1)};
+}
+function ctbAcha(cab,re){const i=cab.findIndex(c=>re.test(pessoaChave(c)));return i<0?undefined:i}
+// --- aba Layout de exportação ---
+function ctbLayout(){
+  const L=CTB.layout||{colunas:[],separador:';',formato_data:'dd/mm/aaaa',decimal:',',cabecalho:true,extensao:'csv',sistema:''},ed=ehEsc();CTB.lay=CTB.lay||JSON.parse(JSON.stringify(L));const W=CTB.lay;
+  $('ctbAcoes').innerHTML=ed?`<span class="btn fotobtn">Importar arquivo de exemplo<input type="file" id="ctbLayArq" accept=".xlsx,.xls,.csv,.txt"></span><button class="btn primary" data-ctb="laysalva">Salvar layout</button>`:'';
+  const dis=ed?'':' disabled';
+  $('ctbBar').innerHTML=`<label class="f">Sistema contábil<input id="lay_sistema" value="${esc(W.sistema||'')}" placeholder="Ex.: Domínio, Alterdata"${dis}></label>
+    <label class="f">Arquivo<select id="lay_extensao"${dis}>${[['csv','CSV'],['txt','Texto (TXT)'],['xlsx','Excel (XLSX)']].map(([v,t])=>`<option value="${v}"${W.extensao===v?' selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f">Separador<select id="lay_separador"${dis}>${[[';','Ponto e vírgula ( ; )'],[',','Vírgula ( , )'],['\t','Tabulação'],['|','Barra ( | )']].map(([v,t])=>`<option value="${esc(v)}"${W.separador===v?' selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f">Data<select id="lay_formato_data"${dis}>${['dd/mm/aaaa','aaaa-mm-dd','ddmmaaaa','dd/mm/aa'].map(v=>`<option${W.formato_data===v?' selected':''}>${v}</option>`).join('')}</select></label>
+    <label class="f">Decimal<select id="lay_decimal"${dis}><option value=","${W.decimal===','?' selected':''}>Vírgula (1234,56)</option><option value="."${W.decimal==='.'?' selected':''}>Ponto (1234.56)</option></select></label>
+    <label style="display:flex;align-items:center;gap:8px;padding-bottom:10px;font-weight:600;font-size:14px"><input type="checkbox" id="lay_cabecalho" style="width:auto"${W.cabecalho?' checked':''}${dis}> Primeira linha com os títulos</label>`;
+  $('ctbHead').innerHTML='<tr><th>Ordem</th><th class="l">Coluna no arquivo</th><th class="l">Preencher com</th><th class="l">Valor fixo</th><th></th></tr>';
+  $('ctbBody').innerHTML=W.colunas.map((c,i)=>`<tr data-i="${i}"><td>${i+1}</td><td class="l"><input data-lay="titulo" value="${esc(c.titulo||'')}"${dis}></td>
+    <td class="l"><select data-lay="campo"${dis}>${Object.entries(CTBCAMPOS).map(([k,t])=>`<option value="${k}"${c.campo===k?' selected':''}>${t}</option>`).join('')}</select></td>
+    <td class="l"><input data-lay="fixo" value="${esc(c.fixo||'')}"${c.campo==='fixo'?'':' hidden'}${dis}></td>
+    <td>${ed?`<button type="button" class="btn small ghost" data-ctb="laycima"${i?'':' disabled'} aria-label="Subir">↑</button><button type="button" class="btn small ghost" data-ctb="laytira" aria-label="Tirar">✕</button>`:''}</td></tr>`).join('')
+    +(ed?`<tr><td></td><td class="l" colspan="4"><button type="button" class="btn small" data-ctb="laymais">+ Coluna</button></td></tr>`:'')
+    +(W.colunas.length?'':`<tr><td class="l muted" colspan="5">Nenhuma coluna. ${ed?'Importe um arquivo de exemplo exportado do sistema contábil (a primeira linha com os títulos) ou adicione as colunas.':'O escritório ainda não configurou o layout.'}</td></tr>`);
+  $('ctbNote').textContent=ed?'Cada linha do arquivo é um lançamento com conta débito, conta crédito e valor. Ao importar o exemplo, o portal reconhece as colunas pelos títulos; confira e salve.':'O layout é configurado pelo escritório.';
+}
+function ctbLayLe(){const W=CTB.lay;['sistema','extensao','separador','formato_data','decimal'].forEach(k=>W[k]=$('lay_'+k).value);W.cabecalho=$('lay_cabecalho').checked;
+  $('ctbBody').querySelectorAll('tr[data-i]').forEach(tr=>{const c=W.colunas[+tr.dataset.i];tr.querySelectorAll('[data-lay]').forEach(x=>c[x.dataset.lay]=x.value)})}
+function ctbCampoDe(t){const k=pessoaChave(t);
+  return /deb/.test(k)?'debito':/cred/.test(k)?'credito':/^data|dt /.test(k)||k==='data'?'data':/valor|vlr/.test(k)?'valor':/hist|complemento|descr/.test(k)?'historico':/doc|nota|nf/.test(k)?'documento':/fornec|cliente|particip|favorec/.test(k)?'pessoa':'vazio'}
+// --- aba Fechamento e exportação ---
+function ctbExp(){
+  const ed=ehEsc(),meses=[];let m=TODAY.slice(0,7);for(let i=0;i<13;i++){meses.push(m);m=perSomaMes(m,-1)}
+  $('ctbAcoes').innerHTML='';$('ctbBar').innerHTML='';
+  $('ctbHead').innerHTML='<tr><th class="l">Mês</th><th class="l">Situação</th><th class="l">Exportação</th><th></th></tr>';
+  $('ctbBody').innerHTML=meses.map(k=>{const f=CTB.fech.find(x=>x.mes.slice(0,7)===k),atual=k===TODAY.slice(0,7);
+    return `<tr data-mes="${k}"><td class="l"><b>${perMesK(k)}</b></td><td class="l">${f?`<span class="chip c-ok">Fechado em ${dtHr(f.fechado_em)}</span>`:`<span class="chip c-none">${atual?'Em andamento':'Aberto'}</span>`}</td>
+      <td class="l">${f?.exportado_em?`<span class="chip c-done">Exportado em ${dtHr(f.exportado_em)}</span>`:'<span class="muted">—</span>'}</td>
+      <td class="l"><button type="button" class="btn small" data-ctb="conferir">Conferir lançamentos</button>${f?`<button type="button" class="btn small primary" data-ctb="baixar">Baixar arquivo</button>`:''}${ed?(f?`<button type="button" class="btn small ghost" data-ctb="reabrir">Reabrir</button>`:`<button type="button" class="btn small" data-ctb="fechar">Fechar o mês</button>`):''}</td></tr>`}).join('');
+  $('ctbNote').textContent=ed?'Feche o mês depois de conferir os lançamentos; o contador só baixa o arquivo dos meses fechados.':'Os meses fechados pelo escritório podem ser baixados no layout do seu sistema.';
+}
+// lançamentos realizados do mês em partidas dobradas, com o que falta para exportar
+async function ctbLinhas(k){
+  const [ini,fim]=monthRange(k),movs=await todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',CTB.cli.id).gte('data',ini).lte('data',fim).order('data').order('criado_em'));
+  const cod=(t,o)=>{const d=CTB.depara[ctbChave(t,o)];return d?.conta_codigo&&d.confirmado?d.conta_codigo:''};
+  const nomeC=id=>CTB.contas.find(c=>c.id===id)?.nome||'conta de outra empresa',out=[];
+  for(const m of movs){
+    const hist=[m.descricao,m.pessoa_nome].filter(Boolean).join(' - '),base={data:m.data,valor:+m.valor,historico:hist,documento:m.documento||'',pessoa:m.pessoa_nome||''};
+    if(m.transf_id){ // transferência: sai uma linha só, pela perna de saída
+      if(m.tipo!=='saida')continue;const dest=movs.find(x=>x.transf_id===m.transf_id&&x.id!==m.id);
+      const D=dest?cod('conta',dest.conta_id):'',C=cod('conta',m.conta_id);
+      out.push({...base,debito:D,credito:C,falta:!dest?'transferência sem a conta de destino nesta empresa':!D?'sem conta contábil para '+nomeC(dest.conta_id):!C?'sem conta contábil para '+nomeC(m.conta_id):''});continue}
+    const K=cod('conta',m.conta_id),G=m.categoria?cod('categoria',m.categoria):'';
+    const [D,C]=m.tipo==='saida'?[G,K]:[K,G];
+    out.push({...base,debito:D,credito:C,falta:!m.categoria?'lançamento sem categoria':!G?'sem conta contábil para a categoria '+m.categoria:!K?'sem conta contábil para '+nomeC(m.conta_id):''});
+  }
+  return out;
+}
+function ctbFmtData(s,f){const [y,m,d]=s.split('-');return f==='aaaa-mm-dd'?s:f==='ddmmaaaa'?d+m+y:f==='dd/mm/aa'?`${d}/${m}/${y.slice(2)}`:`${d}/${m}/${y}`}
+function ctbArquivo(k,ls){
+  const L=CTB.layout,val=(r,c)=>c.campo==='fixo'?c.fixo||'':c.campo==='vazio'?'':c.campo==='data'?ctbFmtData(r.data,L.formato_data):c.campo==='valor'?(L.extensao==='xlsx'?r.valor:r.valor.toFixed(2).replace('.',L.decimal)):String(r[c.campo]??'');
+  const aoa=[...(L.cabecalho?[L.colunas.map(c=>c.titulo||'')]:[]),...ls.map(r=>L.colunas.map(c=>val(r,c)))];
+  const nome=`Contabilidade ${CTB.cli.nome} ${k}`;
+  if(L.extensao==='xlsx'){const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Lançamentos');XLSX.writeFile(wb,nome+'.xlsx');return}
+  const sep=L.separador,txt=aoa.map(r=>r.map(v=>{v=String(v);return v.includes(sep)||v.includes('"')||/\n/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(sep)).join('\r\n')+'\r\n';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));a.download=nome+'.'+L.extensao;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+async function ctbConferir(k){
+  const ls=await ctbLinhas(k),pend=ls.filter(r=>r.falta),nm=c=>ctbConta(c)?.nome||'';
+  $('gtdTitle').textContent='Lançamentos de '+perMesK(k);$('gtdChip').innerHTML=pend.length?`<span class="chip c-bad">${pend.length} sem conta contábil</span>`:'<span class="chip c-ok">Tudo com conta contábil</span>';
+  $('gtdBody').innerHTML=`<div class="tablebox" style="margin:0;max-height:60vh"><table><thead><tr><th>Data</th><th class="l">Débito</th><th class="l">Crédito</th><th>Valor</th><th class="l">Histórico</th></tr></thead><tbody>${ls.map(r=>`<tr${r.falta?' class="pend"':''}><td>${dBR(r.data)}</td><td class="l">${r.debito?`${esc(r.debito)} <span class="muted">${esc(nm(r.debito))}</span>`:'<span class="neg">—</span>'}</td><td class="l">${r.credito?`${esc(r.credito)} <span class="muted">${esc(nm(r.credito))}</span>`:'<span class="neg">—</span>'}</td><td>${fm(r.valor)}</td><td class="l" style="white-space:normal">${esc(r.historico)}${r.falta?`<br><span class="neg">${esc(r.falta)}</span>`:''}</td></tr>`).join('')||'<tr><td class="l muted" colspan="5">Nenhum lançamento realizado neste mês.</td></tr>'}</tbody></table></div>`;
+  $('gtdFoot').innerHTML=`<span class="note">${ls.length} ${ls.length===1?'lançamento':'lançamentos'}</span><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>`;
+  dlgGT.showModal();
+}
+async function ctbAcao(a,el){
+  const cli=CTB.cli,tr=el.closest('tr');
+  try{
+    if(a==='sugerir'){const rows=[];ctbOrigens().forEach(o=>{if(CTB.depara[o.k]?.conta_codigo)return;const p=ctbSugere(o.nome);if(p)rows.push({origem_tipo:o.tipo,origem:o.origem,conta_codigo:p.codigo,sugerido:true,confirmado:false})});
+      if(!rows.length)return toast('Não achei sugestões para os itens sem vínculo.');await ctbSalvaDepara(rows);toast(`${rows.length} ${rows.length===1?'sugestão':'sugestões'} para conferir`);return renderCtb()}
+    if(a==='confsug'||a==='conf1'){const ks=a==='conf1'?[tr.dataset.k]:Object.keys(CTB.depara).filter(k=>CTB.depara[k].conta_codigo&&!CTB.depara[k].confirmado);
+      await ctbSalvaDepara(ks.map(k=>{const d=CTB.depara[k];return {origem_tipo:d.origem_tipo,origem:d.origem,conta_codigo:d.conta_codigo,sugerido:d.sugerido,confirmado:true,confirmado_por:ME.user_id,confirmado_em:new Date().toISOString()}}));toast('Confirmado');return renderCtb()}
+    if(a==='plcanc'){CTB.imp=null;return ctbPlano()}
+    if(a==='plimp'){const I=CTB.imp,c=k=>{const v=$('ctbBar').querySelector(`[data-col="${k}"]`).value;return v===''?null:+v};
+      const ic=c('codigo'),inn=c('nome'),icl=c('classificacao'),it=c('tipo');if(ic==null||inn==null)return toast('Escolha as colunas do código e do nome.');
+      const vis=new Set(),rows=[];for(const r of I.linhas){const codigo=String(r[ic]??'').trim(),nome=String(r[inn]??'').trim();if(!codigo||!nome||vis.has(codigo))continue;vis.add(codigo);
+        const t=it==null?'':String(r[it]??'').trim().toUpperCase();rows.push({cliente_id:cli.id,codigo,nome,classificacao:icl==null?null:String(r[icl]??'').trim()||null,analitica:t?!t.startsWith('S'):true})}
+      if(!rows.length)return toast('Nenhuma conta com código e nome no arquivo.');
+      if(!confirm(`Substituir o plano desta empresa pelas ${rows.length} contas do arquivo?`))return;
+      let {error}=await sb.from('ctb_plano').delete().eq('cliente_id',cli.id);if(error)throw error;
+      for(let i=0;i<rows.length;i+=500){({error}=await sb.from('ctb_plano').insert(rows.slice(i,i+500)));if(error)throw error}
+      CTB.imp=null;toast(`Plano importado: ${rows.length} contas`);return renderCtb()}
+    if(a==='laymais'){ctbLayLe();CTB.lay.colunas.push({titulo:'',campo:'vazio'});return ctbLayout()}
+    if(a==='laytira'){ctbLayLe();CTB.lay.colunas.splice(+tr.dataset.i,1);return ctbLayout()}
+    if(a==='laycima'){ctbLayLe();const i=+tr.dataset.i,C=CTB.lay.colunas;[C[i-1],C[i]]=[C[i],C[i-1]];return ctbLayout()}
+    if(a==='laysalva'){ctbLayLe();const W=CTB.lay;if(!W.colunas.length)return toast('Adicione as colunas do arquivo.');
+      if(!['debito','credito','valor'].every(k=>W.colunas.some(c=>c.campo===k)))return toast('O layout precisa das colunas de conta débito, conta crédito e valor.');
+      const {error}=await sb.from('ctb_layout').upsert({cliente_id:cli.id,sistema:W.sistema||null,colunas:W.colunas,separador:W.separador,formato_data:W.formato_data,decimal:W.decimal,cabecalho:W.cabecalho,extensao:W.extensao,atualizado_em:new Date().toISOString()});if(error)throw error;
+      CTB.lay=null;toast('Layout salvo');return renderCtb()}
+    const k=tr?.dataset.mes;
+    if(a==='fechar'){const {error}=await sb.from('ctb_fechamentos').insert({cliente_id:cli.id,mes:k+'-01'});if(error)throw error;toast(perMesK(k)+' fechado');return renderCtb()}
+    if(a==='reabrir'){if(!confirm('Reabrir '+perMesK(k)+'? O contador não consegue baixar até fechar de novo.'))return;const {error}=await sb.from('ctb_fechamentos').delete().eq('cliente_id',cli.id).eq('mes',k+'-01');if(error)throw error;return renderCtb()}
+    if(a==='conferir')return ctbConferir(k);
+    if(a==='baixar'){
+      if(!CTB.layout?.colunas?.length)return toast('O layout de exportação ainda não foi configurado.');
+      const ls=await ctbLinhas(k),pend=ls.filter(r=>r.falta);
+      if(pend.length){toast(`${pend.length} ${pend.length===1?'lançamento está':'lançamentos estão'} sem conta contábil. Confira antes de baixar.`);return ctbConferir(k)}
+      if(!ls.length)return toast('Nenhum lançamento realizado neste mês.');
+      ctbArquivo(k,ls);const {error}=await sb.rpc('ctb_exportado',{p_cli:cli.id,p_mes:k+'-01'});if(error)console.error(error);return renderCtb()}
+  }catch(e){console.error(e);toast(v60(e)?v60Msg:e.message||'Não foi possível salvar.')}
+}
+$('viewCtb').addEventListener('click',e=>{const t=e.target.closest('[data-ctbtab]');if(t)return go(t.dataset.ctbtab);const b=e.target.closest('[data-ctb]');if(b&&!b.disabled)ctbAcao(b.dataset.ctb,b)});
+$('tabsCtb').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)go(b.dataset.tab)});
+$('viewCtb').addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='ctbFiltro'){CTB.filtro=t.value;return ctbDepara()}
+  if(t.classList.contains('ctbCod')){const k=t.closest('tr').dataset.k,[tipo,...o]=k.split('|'),v=t.value.trim();
+    if(v&&!ctbConta(v))return toast('Este código não está no plano de contas importado.');
+    try{await ctbSalvaDepara([{origem_tipo:tipo,origem:o.join('|'),conta_codigo:v||null,sugerido:false,confirmado:!!v,confirmado_por:v?ME.user_id:null,confirmado_em:v?new Date().toISOString():null}]);renderCtb()}catch(er){console.error(er);toast(v60(er)?v60Msg:'Não foi possível salvar.')}return}
+  if(t.dataset.lay==='campo'){ctbLayLe();return ctbLayout()}
+  if(t.id==='ctbPlArq'&&t.files[0]){try{const r=await ctbLerArquivo(t.files[0]);CTB.imp={nome:t.files[0].name,...r,map:{codigo:ctbAcha(r.cab,/reduz|^cod|codigo/)??0,nome:ctbAcha(r.cab,/nome|descr|titulo|conta/)??1,classificacao:ctbAcha(r.cab,/classif|estrutura|mascara/),tipo:ctbAcha(r.cab,/^tipo|analit|sintet|^a s$/)}};ctbPlano()}catch(er){console.error(er);toast('Não consegui ler o arquivo.')}t.value='';return}
+  if(t.id==='ctbLayArq'&&t.files[0]){try{const r=await ctbLerArquivo(t.files[0]);ctbLayLe();CTB.lay.colunas=r.cab.map(c=>({titulo:c,campo:ctbCampoDe(c),fixo:''}));
+    if(/\.txt$/i.test(t.files[0].name))CTB.lay.extensao='txt';else if(/\.xlsx?$/i.test(t.files[0].name))CTB.lay.extensao='xlsx';
+    ctbLayout();toast(`${r.cab.length} colunas reconhecidas. Confira e salve.`)}catch(er){console.error(er);toast('Não consegui ler o arquivo.')}t.value=''}
+});
+// empresas com o portal ainda não configurado (aviso no menu, para não esquecer)
+async function ctbPendencias(){
+  if(!temAcesso('contabil'))return;
+  const {data,error}=await sb.rpc('ctb_status');if(error)return;
+  CTB.status=Object.fromEntries((data||[]).map(r=>[r.cliente_id,r]));
+  const n=(data||[]).filter(r=>!r.plano||!r.layout||!r.confirmados||(ehEsc()&&!r.contador)).length;
+  if((NAVBADGE.ctbexp||0)!==n){NAVBADGE.ctbexp=n;renderNav()}
+}
 // período no modelo do Bom Controle em todas as telas com De/Até
 [['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gteIni','gteFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
