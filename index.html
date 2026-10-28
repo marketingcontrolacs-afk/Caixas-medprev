@@ -2726,6 +2726,7 @@ function folCelula(f,c){
   if(d.k==='datas')return folDatas(ls);
   // fixo em texto (ex.: gratificação "Função") vai junto com os textos do mês
   if(typeof fx==='string'){const n=/^[\d.,\s]+$/.test(fx)?parseMoney(fx):NaN;if(isFinite(n)&&d.k==='money')fx=n;else{textos.unshift(fx);fx=null}}
+  if(d.k==='pct'){const t=ff(f,'fixo_'+c);if(t!=null&&t!=='')textos.unshift(typeof t==='number'?showMoney(t):String(t))}
   if(c==='dsr'&&FOL.lanc.some(l=>l.funcionario_id===f.id&&FCOL[l.coluna]?.dsr&&l.texto==='dsr'))textos.unshift('Sim');
   if(c==='observacoes'&&f.situacao==='Afastado'&&f.motivo_afastamento)textos.unshift(f.motivo_afastamento);
   // quem tem ajuda de custo e sábado no mês: lembrete de que o sábado está somado na ajuda (Carol, 25/10)
@@ -2960,7 +2961,9 @@ async function salvarLanc(b,outro){
   renderFolha();
 }
 // campo do cadastro que guarda o fixo da coluna: o próprio (ex.: Gratificação fixa) ou um fixo genérico em valor (R$)
-function fixoCampo(c){const d=FCOL[c];if(!['money','livre','texto'].includes(d.lanca)||d.k==='simnao'||d.k==='pct')return null;
+// colunas em % lançadas como texto (Gratificação da Viva: "72,80", "5 dias"): o fixo genérico vai junto com o % do cadastro (Carol, 28/10)
+function fixoCampo(c){const d=FCOL[c];if(d.k==='pct'&&d.lanca==='texto')return 'ff.fixo_'+c;
+  if(!['money','livre','texto'].includes(d.lanca)||d.k==='simnao'||d.k==='pct')return null;
   const x=(d.fx||[]).find(x=>x[2]==='money'||x[2]==='livre'||x[2]==='texto'&&d.lanca==='texto');if(x)return x[0];
   return !d.fixo&&d.k==='money'&&d.lanca!=='texto'?'ff.fixo_'+c:null}
 FOLACAO.lanc=b=>salvarLanc(b,false);FOLACAO.lancOutro=b=>salvarLanc(b,true);
@@ -3291,7 +3294,7 @@ $('folGrid').addEventListener('click',async ev=>{
 });
 $('folGrid').addEventListener('click',async ev=>{
   const b=ev.target.closest('.ffixo');if(!b)return;const f=FOL.func.find(x=>x.id===b.dataset.f),c=b.dataset.c,fk=fixoCampo(c),on=folTemFixo(f,c);
-  const tp=(FCOL[c].fx||[]).find(x=>x[0]===fk)?.[2]||'money',v=b.closest('.fin').querySelector('input').value.trim();let val=null;
+  const tp=(FCOL[c].fx||[]).find(x=>x[0]===fk)?.[2]||(FCOL[c].k==='pct'?'livre':'money'),v=b.closest('.fin').querySelector('input').value.trim();let val=null;
   if(on){if(!confirm(`${FNOME(c)} de ${f.nome} deixa de ser fixo? Os próximos meses não terão mais esse valor.`))return}
   else{if(!v){toast('Digite o valor antes de marcar como fixo');return}
     if(FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna===c)){toast('Esta célula tem lançamentos do mês: grave o fixo em “Colaboradores e valores fixos”');return}
@@ -3864,7 +3867,8 @@ const lerPct=s=>{s=String(s||'').replace('%','').trim();if(!s)return null;const 
 // campos fixos das colunas desta empresa (cada planilha tem os seus)
 const cadCampos=()=>{const v=new Set(),o=[];colsDe(FOL.cli).forEach(c=>(FCOL[c].fx||[]).forEach(x=>{if(!v.has(x[0])){v.add(x[0]);o.push(x)}}));
   // fixos gravados pelo "+ Lançamento" em colunas que não têm campo fixo próprio (ex.: Descontos Diversos)
-  colsDe(FOL.cli).forEach(c=>{if(!FCOL[c].fx&&!FCOL[c].fixo&&FCOL[c].k==='money'&&FOL.func.some(f=>ff(f,'fixo_'+c)!=null))o.push(['ff.fixo_'+c,FNOME(c)+' fixo R$','money'])});return o};
+  colsDe(FOL.cli).forEach(c=>{if(!FCOL[c].fx&&!FCOL[c].fixo&&FCOL[c].k==='money'&&FOL.func.some(f=>ff(f,'fixo_'+c)!=null))o.push(['ff.fixo_'+c,FNOME(c)+' fixo R$','money'])
+    else if(FCOL[c].k==='pct'&&FCOL[c].lanca==='texto'&&FOL.func.some(f=>ff(f,'fixo_'+c)!=null))o.push(['ff.fixo_'+c,FNOME(c)+' fixo (valor)','livre'])});return o};
 const fxLer=(f,k)=>k.startsWith('ff.')?ff(f,k.slice(3)):f[k];
 const cadRow=(f,cs)=>`<tr data-id="${f.id||''}"><td><input data-k="nome" value="${esc(f.nome||'')}" style="min-width:200px"></td><td><input data-k="cargo" value="${esc(f.cargo||'')}" style="min-width:150px"></td>
   ${cs.map(([k,,tp])=>{const v=fxLer(f,k);return `<td>${tp==='bool'?`<input type="checkbox" data-k="${k}" ${(k==='folha_va'?v!==false:v)?'checked':''} style="width:auto">`
