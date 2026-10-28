@@ -750,7 +750,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 <dialog id="dlgColab">
   <div class="dh"><h2 id="cbTitle"></h2><span class="spacer"></span><span id="cbChip"></span></div>
   <div class="db" id="cbBody"></div>
-  <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="cbClose">Fechar</button><button type="button" class="btn primary" id="cbSave">Salvar</button></div>
+  <div class="df"><button type="button" class="btn ghost" id="cbDel" hidden>Excluir cadastro</button><span class="spacer"></span><button type="button" class="btn ghost" id="cbClose">Fechar</button><button type="button" class="btn primary" id="cbSave">Salvar</button></div>
 </dialog>
 <dialog id="dlgFol">
   <div class="dh"><h2 id="foTitle"></h2></div>
@@ -4092,7 +4092,7 @@ async function renderColab(){
 $('cbTab').addEventListener('click',ev=>{const tr=ev.target.closest('[data-cb]');if(tr)abrirColab(COLAB.find(f=>f.id===tr.dataset.cb))});
 $('cbNovo').onclick=()=>abrirColab(null);
 function abrirColab(f){
-  const e=ehEsc(),dis=e?'':' disabled',v=f||{situacao:'Ativo',folha_va:true};COLABDLG=f;
+  const e=ehEsc(),dis=e?'':' disabled',v=f||{situacao:'Ativo',folha_va:true};COLABDLG=f;$('cbDel').hidden=!e||!f;
   const I=(k,t,tipo='text',extra='')=>`<label class="f">${t}<input data-ck="${k}" type="${tipo}" value="${esc(tipo==='date'?v[k]||'':k==='va_valor'||k==='vt_valor_dia'?showMoney(v[k]):v[k]||'')}"${dis}${extra}></label>`;
   $('cbTitle').textContent=f?f.nome:'Novo colaborador';$('cbChip').innerHTML=f?`<span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>`:'';
   $('cbBody').innerHTML=`<div class="fields"><label class="f wide">Nome completo<input data-ck="nome" value="${esc(v.nome||'')}"${dis}></label>${I('cargo','Cargo')}
@@ -4113,6 +4113,13 @@ function abrirColab(f){
   $('cbSave').hidden=!e;dlgColab.showModal();
 }
 $('cbClose').onclick=()=>dlgColab.close();
+// excluir o cadastro (ex.: colaborador cadastrado duas vezes, Carol 28/10): apaga junto os lançamentos, férias e benefícios dele
+$('cbDel').onclick=async()=>{const f=COLABDLG;if(!f)return;
+  const {count}=await sb.from('folha_lancamentos').select('id',{count:'exact',head:true}).eq('funcionario_id',f.id);
+  if(!confirm(`Excluir o cadastro de ${f.nome}?${count?` Ele tem ${count} lançamento(s) na folha, que também serão apagados.`:''} Isso não pode ser desfeito. Se a pessoa saiu da empresa, use a situação Desligado.`))return;
+  $('cbDel').disabled=true;const {error}=await sb.from('funcionarios').delete().eq('id',f.id);$('cbDel').disabled=false;
+  if(error){console.error(error);toast('Não foi possível excluir. Verifique a internet e tente de novo.');return}
+  dlgColab.close();toast('Cadastro excluído');renderColab()};
 $('cbSave').onclick=async()=>{
   const err=$('cbErr'),o={};err.hidden=true;
   document.querySelectorAll('#cbBody [data-ck]').forEach(i=>{const k=i.dataset.ck,s=i.value.trim();
