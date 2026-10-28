@@ -192,6 +192,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .aviso .q{font-size:12px;color:var(--muted)}
 .chk{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:400;color:var(--ink)}.chk label{display:flex;gap:6px;align-items:center}.chk input{width:auto;margin:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+#dcCampos h3{margin:14px 0 6px}#dcSalvaL[hidden]{display:none!important}#dcEpi{border-collapse:collapse;width:100%;margin-top:4px}#dcEpi th,#dcEpi td{padding:3px 4px;text-align:left;font-size:13px}#dcEpi input,#dcEpi select{width:100%;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -665,6 +666,21 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="card tablebox"><table id="cbTab"></table></div>
     <p class="note">Clique no colaborador para ver ou alterar os dados. O 1º período vence com 45 dias (prorrogar ou desligar) e a prorrogação com 90 dias (efetivar ou desligar).</p>
   </section>
+  <!-- RH · DOCUMENTOS -->
+  <section id="viewDocs" hidden>
+    <div><h1>Documentos</h1><p class="sub">Termos prontos com os dados da empresa e do colaborador: escolha o modelo e o colaborador, complete o que falta e gere o PDF para imprimir e assinar.</p></div>
+    <div class="card block" style="margin-top:16px">
+      <div class="fields"><label class="f">Modelo<select id="dcMod"></select></label><label class="f">Colaborador<select id="dcFunc"></select></label><label class="f">Data do documento<input id="dcData" type="date"></label></div>
+      <div id="dcCampos"></div>
+      <p class="note" id="dcEmp" style="margin:10px 0 0"></p>
+      <div id="dcEmpBox" hidden></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="dcGerar">Gerar PDF</button><label class="note" id="dcSalvaL" style="display:flex;align-items:center;gap:6px;margin:0" hidden><input type="checkbox" id="dcSalva" checked style="width:auto"> Atualizar o cadastro do colaborador com CPF, função e setor</label></div>
+      <p class="err" id="dcErr" hidden></p>
+    </div>
+    <h2 style="margin-top:22px">Documentos gerados</h2>
+    <div class="card tablebox"><table id="dcHist"></table></div>
+    <p class="note">Para incluir um modelo novo, envie o documento (Word ou PDF) para a Controlacs.</p>
+  </section>
   <!-- RH · FOLHA DE PAGAMENTO -->
   <section id="viewFolha" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -876,7 +892,8 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas e Avisos são de toda a equipe
 const SEMPRE=['tarefas','avisos'];
-const eqPode=k=>!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k);
+// Documentos usa o mesmo acesso de Colaboradores e prazos
+const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k));
 const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Financeiro',['caixa','pagar','tesouraria','cartao','repasse']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas']]];
@@ -896,6 +913,7 @@ const ICO={
   ben:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/>',
   premio:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>',
   colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
+  docs:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/><path d="M4 7v14h11"/>',
   rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
   confcaixa:'<path d="M9 4h6v3H9z"/><path d="M15 5h3v16H6V5h3"/><path d="M9 13l2 2 4-4"/>',
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
@@ -957,6 +975,7 @@ const NAV=[
   {k:'premio',t:'Premiação',g:'Recursos humanos',ok:()=>empresasDe('premio').length>0},
   {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',ok:()=>temAcesso('beneficios')},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',ok:()=>temAcesso('colab')},
+  {k:'docs',t:'Documentos',g:'Recursos humanos',ok:()=>temAcesso('colab')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',ok:()=>temAcesso('tarefas')},
@@ -984,7 +1003,7 @@ function empresasDe(m){
   return so?l.filter(c=>so.includes(c.id)):l;
 }
 function empresasMod(m){
-  if(m==='colab')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:temEm(c.id,'colab')));
+  if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:temEm(c.id,'colab')));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
@@ -1014,7 +1033,7 @@ const SECK='portal_secao';
 function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC'].forEach(x=>$(x).hidden=true);
+  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1026,6 +1045,7 @@ function openView(){
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
+  else if(VIEW==='docs'){$('viewDocs').hidden=false;initDocs()}
   else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
   else if(VIEW==='ponto'){$('viewPonto').hidden=false;initPonto()}
   else if(VIEW==='ben'){$('viewBen').hidden=false;initBen()}
@@ -4102,7 +4122,7 @@ function abrirColab(f){
   const e=ehEsc(),dis=e?'':' disabled',v=f||{situacao:'Ativo',folha_va:true};COLABDLG=f;$('cbDel').hidden=!e||!f;
   const I=(k,t,tipo='text',extra='')=>`<label class="f">${t}<input data-ck="${k}" type="${tipo}" value="${esc(tipo==='date'?v[k]||'':k==='va_valor'||k==='vt_valor_dia'?showMoney(v[k]):v[k]||'')}"${dis}${extra}></label>`;
   $('cbTitle').textContent=f?f.nome:'Novo colaborador';$('cbChip').innerHTML=f?`<span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>`:'';
-  $('cbBody').innerHTML=`<div class="fields"><label class="f wide">Nome completo<input data-ck="nome" value="${esc(v.nome||'')}"${dis}></label>${I('cargo','Cargo')}
+  $('cbBody').innerHTML=`<div class="fields"><label class="f wide">Nome completo<input data-ck="nome" value="${esc(v.nome||'')}"${dis}></label>${I('cargo','Cargo')}${I('cpf','CPF')}${I('setor','Setor')}
       <label class="f">Situação<select data-ck="situacao"${dis}>${['Ativo','Afastado','Desligado'].map(s=>`<option${v.situacao===s?' selected':''}>${s}</option>`).join('')}</select></label>
       ${I('nascimento','Nascimento','date')}${I('telefone','WhatsApp')}${I('matricula','Matrícula')}</div>
     <h3>Contrato de experiência</h3>
@@ -4155,6 +4175,250 @@ $('cbSave').onclick=async()=>{
   if(error){console.error(error);err.textContent=/duplicate|unique/i.test(error.message||'')?'Matrícula repetida nesta empresa.':'Não foi possível salvar. Verifique a internet e tente de novo.';err.hidden=false;return}
   dlgColab.close();toast('Colaborador salvo');renderColab();
 };
+
+// =====================================================================
+// RH · DOCUMENTOS
+// =====================================================================
+// Termos com os dados da empresa e do colaborador (Carol, 28/10/2026). Os modelos ficam aqui no código;
+// os dados da empresa (razão social, unidade, cidade, banco de horas) ficam em clientes.doc_empresa (v53),
+// e cada documento gerado fica em rh_documentos para imprimir de novo.
+let DOCF=[], DOCH=[];
+const UNEX=['','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+const DZEX=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+const CTEX=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+const ext999=n=>{if(n===100)return 'cem';const c=Math.floor(n/100),r=n%100,p=[];if(c)p.push(CTEX[c]);
+  if(r)p.push(r<20?UNEX[r]:DZEX[Math.floor(r/10)]+(r%10?' e '+UNEX[r%10]:''));return p.join(' e ')};
+// valor em reais por extenso: 1.250,50 → "mil, duzentos e cinquenta reais e cinquenta centavos"
+function extenso(v){
+  const t=Math.round((+v||0)*100),i=Math.floor(t/100),c=t%100,mi=Math.floor(i/1e6),mil=Math.floor(i/1000)%1000,u=i%1000;
+  let s='';
+  if(mi)s=ext999(mi)+(mi>1?' milhões':' milhão');
+  if(mil)s+=(s?(u?' ':' e '):'')+(mil===1?'mil':ext999(mil)+' mil');
+  if(u)s+=(s?(u<100||u%100===0?' e ':' '):'')+ext999(u);
+  if(s)s+=i===1?' real':mi&&!mil&&!u?' de reais':' reais';
+  const ce=c?ext999(c)+(c===1?' centavo':' centavos'):'';
+  return [s,ce].filter(Boolean).join(' e ')||'zero real';
+}
+const dataExt=s=>s?`${+s.slice(8,10)} de ${MESES[+s.slice(5,7)-1]} de ${s.slice(0,4)}`:'';
+const docEmp=cli=>({razao:cli.nome,unidade:'',cidade:'',uf:'',...(cli.doc_empresa||{}),cnpj:cli.cnpj||''});
+const empNome=E=>E.unidade?`${E.razao} (${E.unidade.toUpperCase()})`:E.razao;
+const lin=(v,n=20)=>v?esc(v):'_'.repeat(n);
+const dLin=s=>s?dBR(s):'_____/_____/______';
+const localData=D=>`${esc(D.emp.cidade||'')}${D.emp.uf?'/'+esc(D.emp.uf):''}, ${dataExt(D.data)}.`;
+const assina=(...q)=>`<div class="ass">${q.map(t=>`<div><div class="lin"></div>${t}</div>`).join('')}</div>`;
+const cab=E=>`<div class="emp"><b>${esc(empNome(E))}</b><br>CNPJ: ${esc(E.cnpj)}${E.cidade?` – ${esc(E.cidade)}${E.uf?'/'+esc(E.uf):''}`:''}</div>`;
+const VIVA=/viva|simon/i;
+const EPIPAD=[['E','1','Jaleco/Avental Impermeável','Tamanho Único'],['E','1','Óculos de Proteção','Tamanho Único'],['E','1','Pijama Cirúrgico (Camisa e Calça)',''],['E','1','Sapato Impermeável NR 32','']];
+// cada modelo: k (chave), t (nome), so (empresas em que aparece), campos extras e o corpo do documento
+const DOCMOD=[
+  {k:'valores_recepcao',t:'Termo de responsabilidade de valores – Recepção',so:VIVA,
+   campos:[{k:'fundo',t:'Fundo de caixa (R$)',tp:'money'},{k:'fundo_data',t:'Fundo entregue no dia',tp:'date'}],
+   corpo:D=>{const f=D.f,x=D.x,v=parseMoney(x.fundo);return `
+    <h1>TERMO DE RESPONSABILIDADE SOBRE RECEBIMENTO, GUARDA E MOVIMENTAÇÃO DE VALORES – RECEPÇÃO</h1>
+    <p class="id"><b>EMPRESA:</b> ${esc(D.emp.razao)}<br><b>CNPJ:</b> ${esc(D.emp.cnpj)}<br><b>COLABORADOR(A):</b> ${lin(f.nome?.toUpperCase(),40)}<br><b>CPF:</b> ${lin(f.cpf)}<br><b>FUNÇÃO:</b> ${lin(f.cargo?.toUpperCase())}</p>
+    <p>Pelo presente instrumento, declaro que recebi, li, compreendi e estou ciente de todas as normas e procedimentos relacionados ao recebimento, guarda, movimentação, conferência e entrega de valores recebidos pela clínica, comprometendo-me a cumprir integralmente as disposições abaixo.</p>
+    <h2>1. RECEBIMENTO DE VALORES</h2>
+    <p>a) Receber valores referentes a consultas, procedimentos, sublocações médicas e demais recebimentos autorizados pela empresa;<br>b) Inserir imediatamente o valor recebido e/ou comprovante correspondente em seu malote individual;<br>c) Manter a correta identificação e organização dos valores recebidos durante o expediente;<br>d) Zelar pela integridade dos documentos, comprovantes e numerários sob sua responsabilidade.</p>
+    <h2>2. GUARDA E TRANSFERÊNCIA DOS VALORES</h2>
+    <p>a) Todo valor recebido de médicos particulares deverá permanecer acondicionado no malote individual do colaborador até o primeiro intervalo para refeição (almoço);<br>b) Ao iniciar seu intervalo, o colaborador deverá entregar o malote e os respectivos valores diretamente ao Supervisor responsável;<br>c) O Supervisor será responsável por encaminhar os valores recebidos à Supervisão do Financeiro, para guarda no cofre institucional da empresa;<br>d) Após o retorno do intervalo, os novos valores eventualmente recebidos deverão permanecer sob responsabilidade do colaborador até o encerramento de sua jornada de trabalho;<br>e) Ao término do expediente, o colaborador deverá entregar os valores recebidos diretamente ao Supervisor, antes de deixar as dependências da clínica, para posterior encaminhamento ao setor financeiro;<br>f) Caso o colaborador deixe de realizar a entrega dos valores ao Supervisor, por esquecimento ou qualquer outro motivo, permanecerá integralmente responsável pelos valores existentes em seu malote e em seu caixa, inclusive durante o período em que estes permanecerem guardados em sua gaveta individual;<br>g) O colaborador que realiza o fechamento da clínica, em razão de possuir horário de saída posterior ao dos Supervisores, deverá realizar a entrega dos valores recebidos no momento da saída do Supervisor. Neste caso, o Supervisor realizará a guarda dos valores no cofre sob sua responsabilidade, promovendo a entrega ao setor financeiro no próximo expediente;<br>h) É proibida a guarda de valores fora dos locais definidos pela empresa.</p>
+    <h2>3. PROIBIÇÃO DE ENTREGA DIRETA DE VALORES AOS MÉDICOS</h2>
+    <p>a) É expressamente proibido ao colaborador realizar entrega direta de numerários aos médicos;<br>b) Todo repasse financeiro aos médicos deverá ser realizado exclusivamente pelo setor financeiro;<br>c) O descumprimento desta norma sujeitará o colaborador à aplicação de medidas disciplinares, inclusive advertência escrita, sem prejuízo de outras penalidades cabíveis.</p>
+    <h2>4. FUNDO DE CAIXA</h2>
+    <p>a) Declaro estar ciente de que recebo o valor de R$ ${v>0?showMoney(v):'_____________'} (${v>0?esc(extenso(v)):'_________________________________'}) a título de fundo de caixa para realização de troco; Conferido e entregue no dia ${dLin(x.fundo_data)}.<br>b) O fundo de caixa deverá permanecer disponível durante todo o expediente;<br>c) O valor poderá ser solicitado para conferência a qualquer momento pela Administração ou Financeiro;<br>d) O colaborador é responsável pela guarda e conservação do fundo de caixa enquanto estiver sob sua posse;<br>e) É expressamente proibida a retirada do malote, valores, comprovantes ou quaisquer documentos financeiros pertencentes à clínica para fora de suas dependências, sem autorização formal da Administração;<br>f) O malote deverá permanecer integralmente nas dependências da empresa, sendo vedado seu transporte para residência do colaborador, veículos particulares ou qualquer outro ambiente externo à clínica;<br>g) O colaborador que retirar o malote das dependências da empresa sem autorização estará sujeito à apuração disciplinar, podendo ser aplicada advertência, suspensão ou, nos casos de maior gravidade ou reincidência, demissão por justa causa;<br>h) A responsabilidade pelos valores existentes no malote permanecerá integralmente sob responsabilidade do colaborador enquanto não houver a transferência formal ao Supervisor ou ao setor Financeiro, conforme os procedimentos internos da empresa.</p>
+    <h2>5. QUEBRA DE CAIXA</h2>
+    <p>a) Em conformidade com a Convenção Coletiva de Trabalho aplicável, o colaborador receberá o adicional de quebra de caixa quando previsto na Convenção Coletiva e concedido pela empresa em razão do exercício da atividade de caixa;<br>b) O adicional não afasta a responsabilidade do colaborador quanto à correta guarda e movimentação dos valores;<br>c) O recebimento do adicional de quebra de caixa não autoriza negligência, descuido ou descumprimento dos procedimentos internos de controle financeiro.</p>
+    <h2>6. DIVERGÊNCIAS DE VALORES</h2>
+    <p>a) Toda divergência identificada será objeto de conferência e apuração;<br>b) O colaborador será comunicado para prestar esclarecimentos;<br>c) Poderão ser utilizadas imagens de monitoramento interno, registros de sistema, protocolos e demais documentos para análise dos fatos;<br>d) Confirmada a responsabilidade do colaborador, poderão ser adotadas as medidas cabíveis.</p>
+    <h2>7. DESCONTOS E RESPONSABILIDADES</h2>
+    <p>a) Nos termos do artigo 462 da CLT, havendo comprovação de culpa ou dolo do colaborador, os prejuízos causados poderão ser objeto de desconto salarial, observados os limites legais;<br>b) O colaborador terá direito à ciência da divergência e apresentação de justificativa antes da adoção de qualquer medida;<br>c) Os descontos eventualmente realizados serão precedidos da apuração dos fatos e da identificação da responsabilidade do colaborador.</p>
+    <h2>8. MEDIDAS DISCIPLINARES</h2>
+    <p>a) Advertência verbal ou escrita;<br>b) Suspensão disciplinar;<br>c) Demissão por justa causa, quando configuradas as hipóteses previstas na legislação trabalhista;<br>d) O descumprimento das regras de guarda, transferência, entrega de valores, utilização dos malotes ou entrega direta de numerários a médicos ou terceiros não autorizados poderá ensejar a aplicação das penalidades acima, conforme a gravidade da ocorrência.</p>
+    <h2>09. ATUALIZAÇÃO DOS PROCEDIMENTOS INTERNOS</h2>
+    <p>a) O presente termo constitui atualização e consolidação dos procedimentos internos relacionados ao recebimento, guarda, movimentação e transferência de valores no setor de Recepção da Clínica Viva Simon Ltda., adequando-se à realidade operacional atualmente praticada pela empresa.<br>b) O colaborador declara estar ciente de que as normas e procedimentos aqui descritos poderão complementar, substituir ou atualizar orientações anteriormente repassadas verbalmente, por escrito, por comunicados internos, treinamentos, procedimentos operacionais padrão (POPs) ou termos anteriormente assinados.<br>c) A partir da data de assinatura deste documento, as disposições nele contidas passam a prevalecer sobre quaisquer orientações anteriores que tratem do mesmo assunto, permanecendo válidas as demais normas internas da empresa que não sejam conflitantes com este termo.<br>d) O colaborador declara ter recebido orientação acerca das alterações implementadas e compromete-se a observar integralmente os procedimentos aqui estabelecidos.<br>e) A empresa poderá promover futuras atualizações dos procedimentos operacionais sempre que necessário, mediante comunicação aos colaboradores envolvidos.</p>
+    <h2>10. DECLARAÇÃO FINAL</h2>
+    <p>Declaro que recebi orientação sobre todos os procedimentos descritos neste termo, compreendi integralmente seu conteúdo e comprometo-me a cumprir as normas estabelecidas pela empresa.</p>
+    <p>Declaro ainda estar ciente de que a responsabilidade sobre os valores recebidos permanece sob minha guarda até a transferência formal da responsabilidade para o Supervisor ou para o setor Financeiro, conforme os procedimentos internos da clínica.</p>
+    <p class="loc">${localData(D)}</p>
+    ${assina('Assinatura do(a) Colaborador(a)')}${assina('Assinatura do Supervisor Financeiro','Assinatura do Resp. Legal Empresa')}`}},
+  {k:'termo_geral',t:'Termo geral de condições, responsabilidades e ciência',so:VIVA,
+   campos:[{k:'bh_ini',t:'Banco de horas: vigência de',tp:'date',def:E=>E.bh_ini},{k:'bh_fim',t:'até',tp:'date',def:E=>E.bh_fim}],
+   corpo:D=>{const E=D.emp,f=D.f,x=D.x,en=esc(empNome(E));return `${cab(E)}
+    <h1>TERMO GERAL DE CONDIÇÕES, RESPONSABILIDADES E CIÊNCIA DO COLABORADOR</h1>
+    <p>Pelo presente instrumento, a ${en}, inscrita no CNPJ nº ${esc(E.cnpj)}, doravante denominada EMPREGADORA, estabelece, em conjunto com o(a) colaborador(a) abaixo identificado(a), as condições e responsabilidades referentes à conduta, utilização de equipamentos, imagem e regime de compensação de horas no ambiente de trabalho. Este documento tem por objetivo formalizar as regras internas, os termos de responsabilidade e a ciência do colaborador sobre suas obrigações legais e comportamentais.</p>
+    <p class="id"><b>Colaborador:</b> ${lin(f.nome,40)}<br><b>CPF:</b> ${lin(f.cpf)}</p>
+    <h2>I – NORMAS DE CONDUTA E VESTIMENTA NO AMBIENTE DE TRABALHO</h2>
+    <p>Com o objetivo de manter um ambiente profissional, seguro e harmonioso, é expressamente vedado durante o expediente:</p>
+    <p>- Uso de regatas, camisetas cavadas, blusas com decotes excessivos, calças legging ou rasgadas;<br>- Bermudas, saias ou vestidos curtos;<br>- Roupas que deixem a barriga ou partes íntimas à mostra;<br>- Calçados abertos como chinelos, sandálias rasteiras ou crocs;<br>- Bonés, chapéus ou acessórios que prejudiquem a imagem profissional.</p>
+    <p>Também é proibido:<br>- Uso de palavrões, brincadeiras de mau gosto ou comentários inapropriados;<br>- Uso de fones de ouvido durante o expediente;<br>- Alimentar-se no posto de trabalho;<br>- Consumo de bebidas alcoólicas ou substâncias ilícitas;<br>- Uso excessivo de celular pessoal para assuntos não relacionados ao trabalho;<br>- Atitudes desrespeitosas com colegas, clientes ou superiores;<br>- Qualquer prática de assédio moral ou sexual.</p>
+    <p>O descumprimento das normas acima poderá resultar em advertência verbal, escrita ou demais medidas disciplinares conforme a gravidade da conduta. O presente termo visa garantir a boa convivência e a imagem institucional da empresa.</p>
+    <h2>II – AUTORIZAÇÃO DE USO DE IMAGEM E VOZ</h2>
+    <p>Autorizo, de forma livre e espontânea, o uso da minha imagem e voz pela ${en}, para fins institucionais, promocionais e de comunicação interna ou externa, sem que disso decorra qualquer ônus ou direito de indenização.</p>
+    <p>Esta autorização é concedida de forma irrevogável enquanto perdurar o vínculo empregatício, podendo ser revogada por escrito a qualquer tempo após o encerramento do contrato.</p>
+    <h2>III – TERMO DE BANCO DE HORAS E COMPENSAÇÃO</h2>
+    <p>A ${en}, pessoa jurídica inscrita sob CNPJ nº ${esc(E.cnpj)}, adota o regime de Banco de Horas nos termos do art. 59, §5º da CLT, com vigência de ${dLin(x.bh_ini)} a ${dLin(x.bh_fim)}. As horas extras prestadas poderão ser compensadas dentro do período de vigência, mediante acordo entre as partes.</p>
+    <p>Regras aplicáveis:<br>- Faltas não justificadas serão descontadas em folha;<br>- Saldo negativo de horas ao final da competência será descontado;<br>- Cada hora extra gerará uma hora de saldo positivo;<br>- A realização de horas extras deverá ser previamente autorizada pela gestão.</p>
+    <h2>IV – CIÊNCIA E ASSINATURA</h2>
+    <p>Declaro que li, compreendi e estou ciente de todas as cláusulas contidas neste TERMO GERAL DE CONDIÇÕES, RESPONSABILIDADES E CIÊNCIA DO COLABORADOR, comprometendo-me a cumpri-las integralmente.</p>
+    <p class="loc">${localData(D)}</p>
+    ${assina('Assinatura do Colaborador','Assinatura da Empresa')}`}},
+  {k:'equipamento',t:'Termo de responsabilidade pela guarda e uso de equipamento',so:VIVA,
+   campos:[{k:'patrimonio',t:'Patrimônio (equipamento, modelo, nº de série, IMEI)',tp:'area'}],
+   corpo:D=>{const E=D.emp,f=D.f;return `
+    <h1>TERMO DE RESPONSABILIDADE PELA GUARDA E USO DE EQUIPAMENTO</h1>
+    <h2>IDENTIFICAÇÃO DO EMPREGADO</h2>
+    <p class="id">Nome: ${lin(f.nome,40)}<br>CPF: ${lin(f.cpf)}<br>Setor: ${lin(f.setor)}</p>
+    <p><b>Recebi da empresa: ${esc(E.razao.toUpperCase())}${E.unidade?' '+esc(E.unidade.toUpperCase()):''}, CNPJ Nº ${esc(E.cnpj)}</b> a título de empréstimo para meu uso exclusivo em favor das demandas da empresa, os equipamentos especificados neste documento, comprometendo-me a mantê-los em perfeito estado de conservação, ficando ciente de que:</p>
+    <p>Se o equipamento for danificado ou inutilizado por emprego inadequado, mau uso, negligência ou extravio, a empresa me fornecerá novo equipamento e cobrará o valor de um equipamento da mesma marca ou equivalente ao da praça.</p>
+    <p>Em caso de dano, inutilização ou extravio do equipamento deverei comunicar imediatamente ao setor competente.</p>
+    <p>Terminando os serviços ou no caso de rescisão do contrato de trabalho, devolverei o equipamento completo e em perfeito estado de conservação, considerando-se o tempo do uso do mesmo, ao setor competente.</p>
+    <p><b>PATRIMÔNIO:</b> ${D.x.patrimonio?esc(D.x.patrimonio).replace(/\n/g,'<br>'):'_'.repeat(70)}</p>
+    <p class="loc c">${localData(D).slice(0,-1)}</p>
+    <p style="margin-top:28px">Ciente (Nome/Assinatura): _______________________________________________</p>
+    <h2 style="margin-top:28px">DEVOLUÇÃO:</h2>
+    <p>Atestamos que o bem foi devolvido em _____/_____/_______ nas seguintes condições:</p>
+    <p>(&nbsp;&nbsp;&nbsp;&nbsp;) Em perfeito estado<br>(&nbsp;&nbsp;&nbsp;&nbsp;) Apresentando defeito<br>(&nbsp;&nbsp;&nbsp;&nbsp;) Faltando peças/acessórios</p>
+    <p style="margin-top:22px">Assinatura do responsável pelo recebimento: _________________________________</p>`}},
+  {k:'epi',t:'Recibo de entrega, troca e devolução de EPIs',so:VIVA,
+   campos:[{k:'itens',t:'EPIs',tp:'epi'}],
+   corpo:D=>{const E=D.emp,f=D.f,it=(D.x.itens||[]).filter(r=>r.some(Boolean));
+    while(it.length<8)it.push(['','','','','']);return `
+    <table class="epi"><tr><td style="width:30%"><b>${esc(E.razao.toUpperCase())}${E.unidade?' '+esc(E.unidade.toUpperCase()):''}</b></td><td class="c"><b>RECIBO DE ENTREGA TROCA E DEVOLUÇÃO DE EPI’S</b></td><td style="width:18%">DATA<br>${dBR(D.data)}</td></tr></table>
+    <h2 class="c">IDENTIFICAÇÃO DO FUNCIONÁRIO</h2>
+    <table class="epi"><tr><td colspan="2">Nome: ${esc(f.nome?.toUpperCase()||'')}</td></tr><tr><td>Setor: ${esc(f.setor||'')}</td><td rowspan="3" style="width:40%;vertical-align:top">Assinatura:</td></tr><tr><td>Função: ${esc(f.cargo||'')}</td></tr><tr><td>Data de admissão: ${f.admissao?dBR(f.admissao):''}</td></tr></table>
+    <h2 class="c">DECLARAÇÃO</h2>
+    <p>Declaro que: Recebi nas datas especificadas abaixo, da Empresa ${esc(E.razao.toUpperCase())}, os EPI’s adequados discriminados, aos quais desde já me comprometo sempre usar na execução de minhas tarefas, zelando pela perfeita guarda e conservação, uso e funcionamento, de acordo com as orientações e treinamentos, assumindo também o compromisso de o devolver quando solicitado ou por ocasião da rescisão de meu Contrato de Trabalho.</p>
+    <p>Estou ciente e de pleno acordo que, o não cumprimento das condições estabelecidas na letra ‘a’ supra, acarretará aplicação de penas disciplinares.</p>
+    <p>Comunicar o empregador qualquer alteração que o torne impróprio para o uso.</p>
+    <p class="c"><b>LEGENDA: E=Entrega, T=Troca e D=Devolução</b></p>
+    <table class="epi grade"><tr><th>DATA</th><th>(E – T – D)</th><th>QTDE.</th><th>EQUIPAMENTO</th><th>NÚMERO</th></tr>
+      ${it.map(r=>`<tr><td>${r[0]?dBR(r[0]):'&nbsp;'}</td><td class="c">${esc(r[1])}</td><td class="c">${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td></tr>`).join('')}</table>
+    ${assina('EMPREGADO','EMPREGADOR')}`}},
+  {k:'callcenter',t:'Termo de responsabilidade e uso de valores – Call Center',so:VIVA,campos:[],
+   corpo:D=>{const f=D.f;return `
+    <h1>TERMO DE RESPONSABILIDADE, CIÊNCIA E USO DE VALORES<br>CALL CENTER – ${esc(D.emp.razao.replace(/\s+LTDA\.?$/i,'').toUpperCase())}</h1>
+    <p>Eu, <b>${lin(f.nome,40)}</b>, CPF nº <b>${lin(f.cpf)}</b>, exercendo a função de: <b>${lin(f.cargo)}</b></p>
+    <p>Declaro, para todos os fins de direito, que recebi, li, compreendi e estou ciente de todas as normas, procedimentos e responsabilidades referentes ao manuseio, recebimento, guarda, conferência e comunicação de valores, bem como ao uso dos canais oficiais de atendimento da empresa (WhatsApp/Orpen, telefone e atendimento presencial).</p>
+    <p>Este termo integra as políticas internas da empresa e compõe meu contrato de trabalho.</p>
+    <h2>1. RESPONSABILIDADE SOBRE INFORMAÇÃO DE VALORES</h2>
+    <p>As normas desta seção aplicam-se a todos os colaboradores que atuam na Recepção e no Call Center, ou em qualquer função que realize contato com pacientes/clientes e repasse informações de valores, procedimentos, exames, serviços e condições de atendimento.</p>
+    <p><b>1.1 Conferência e fidelidade das informações</b><br>a) Toda informação repassada aos pacientes/clientes deve ser fiel, correta, clara e previamente confirmada em tabela, sistema ou orientação formal;<br>b) É responsabilidade do colaborador conferir previamente todos os valores, pacotes, condições de pagamento, procedimentos e orientações antes de repassar ao paciente;<br>c) É proibido repassar informações baseadas em suposição, “memória” ou sem a devida validação junto às tabelas oficiais ou ao gestor responsável.</p>
+    <p><b>1.2 Uso dos canais oficiais de atendimento</b><br>a) Comprometo-me a utilizar os canais oficiais (WhatsApp/Orpen, telefone e outros meios institucionais) exclusivamente para fins profissionais;<br>b) É proibido utilizar número de telefone pessoal ou canais não autorizados para atendimento a pacientes em nome da empresa;<br>c) Qualquer dúvida sobre valores, procedimentos ou regras deve ser imediatamente comunicada ao gestor antes do envio da informação ao paciente.</p>
+    <h2>2. DIVERGÊNCIAS DE VALORES</h2>
+    <p>Em caso de divergência entre os valores registrados e os valores efetivamente encontrados em caixa, malote ou fundo de caixa, tenho ciência de que será adotado o seguinte procedimento interno:<br>a) Comunicação imediata à Administração, ao setor Financeiro e à Gerência de Recepção;<br>b) Conferência formal dos valores na presença ou com ciência do colaborador envolvido, com registro do ocorrido;<br>c) Quando disponível, utilização de imagens do local de conferência (CFTV) para análise da abertura do malote e constatação de eventual falta ou divergência;<br>d) Emissão de comunicado formal ao colaborador, com descrição da divergência apurada e das eventuais medidas a serem adotadas, inclusive possibilidade de desconto e/ou aplicação de sanções disciplinares.</p>
+    <h2>3. BASE LEGAL</h2>
+    <p>Tenho ciência de que as disposições deste termo observam a legislação trabalhista vigente, em especial:<br>a) Artigo 2º da CLT – que estabelece que o empregador não é obrigado a assumir prejuízos causados por culpa do empregado;<br>b) Artigo 462 da CLT – que autoriza o desconto salarial quando houver comprovação de culpa, dolo ou prejuízo causado pelo empregado, bem como nos casos de adiantamento salarial e outras hipóteses legais;<br>c) Artigo 482 da CLT – que prevê hipóteses de aplicação de penalidades disciplinares, incluindo advertência, suspensão e dispensa por justa causa, em casos de falta grave ou conduta reiterada.</p>
+    <h2>4. MEDIDAS DISCIPLINARES</h2>
+    <p>Tenho ciência de que o descumprimento das normas estabelecidas neste termo, bem como dos procedimentos internos da empresa, poderá resultar na aplicação de medidas disciplinares, observada a gradação de penalidades e a legislação vigente, incluindo:<br>a) Advertência verbal ou escrita;<br>b) Suspensão disciplinar;<br>c) Dispensa por justa causa, nos casos previstos em lei, em especial quando houver prejuízo deliberado, má-fé, conduta desidiosa ou reincidência em erros.</p>
+    <h2>5. DECLARAÇÃO FINAL DO COLABORADOR</h2>
+    <p>Declaro que:<br>a) Recebi treinamento adequado para o desempenho de minhas funções;<br>b) Li atentamente e compreendi todas as cláusulas deste termo.<br>c) Reconheço que este termo integra meu contrato de trabalho e que seu descumprimento poderá acarretar as consequências previstas na legislação e nas normas internas da empresa.</p>
+    <p class="loc">Local: ${esc(D.emp.cidade||'')}${D.emp.uf?'/'+esc(D.emp.uf):''}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Data: ${dBR(D.data)}</p>
+    ${assina('Assinatura do(a) Colaborador(a)','Assinatura do(a) Responsável/RH')}`}},
+  {k:'chave',t:'Termo de entrega e responsabilidade por chave de armário',so:VIVA,
+   campos:[{k:'armario',t:'Nº do armário',tp:'text'},{k:'chaves',t:'Quantidade de chaves',tp:'text',def:()=>'1'},{k:'entrega',t:'Data da entrega',tp:'date',def:(E,D)=>D.data}],
+   corpo:D=>{const E=D.emp,f=D.f,x=D.x,un=`${E.razao.replace(/\s+LTDA\.?$/i,'')}${E.unidade?' – '+E.unidade:''}`;return `
+    <div class="emp c"><b>${esc(un.toUpperCase())}</b><br>CNPJ: ${esc(E.cnpj)}</div>
+    <h1>TERMO DE ENTREGA E RESPONSABILIDADE POR CHAVE DE ARMÁRIO</h1>
+    <p class="id">Unidade: ${esc(E.unidade||'')}<br>Colaborador(a): ${lin(f.nome,50)}<br>Cargo / Setor: ${lin([f.cargo,f.setor].filter(Boolean).join(' / '),50)}<br>Nº do armário: ${lin(x.armario,12)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quantidade de chaves entregues: ${lin(x.chaves,6)}<br>Data da entrega: ${dLin(x.entrega)}</p>
+    <p>Por meio deste termo, declaro que recebi da ${esc(un)} a(s) chave(s) do armário acima identificado, destinado ao uso durante minhas atividades na unidade, comprometendo-me a:</p>
+    <ul><li>Zelar pela guarda, conservação e utilização adequada da(s) chave(s) e do armário;</li><li>Não emprestar, copiar ou transferir a(s) chave(s) a terceiros sem autorização da empresa;</li><li>Comunicar imediatamente à gestão ou ao RH qualquer perda, extravio, dano ou irregularidade;</li><li>Manter o armário em boas condições de uso, observando as regras internas de organização, higiene e segurança;</li><li>Devolver a(s) chave(s) quando solicitado ou no encerramento do vínculo, mediante registro de devolução.</li></ul>
+    <p>Estou ciente de que a(s) chave(s) e o armário permanecem de propriedade da empresa. Eventuais situações de perda ou dano serão avaliadas conforme as normas internas e a legislação aplicável, sem autorização automática de desconto salarial.</p>
+    <p>Declaro ter recebido a(s) chave(s) indicada(s) e estar ciente das responsabilidades acima.</p>
+    <p class="loc">${localData(D)}</p>
+    ${assina('Assinatura do(a) colaborador(a)','Assinatura do responsável pela entrega')}
+    <h2 style="margin-top:26px">REGISTRO DE DEVOLUÇÃO (preenchimento quando aplicável)</h2>
+    <p>Data: _____/_____/______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Chaves devolvidas: __________</p>
+    <p>Condição / observações: _________________________________________________________<br>_____________________________________________________________________________</p>
+    <p>Assinatura de quem recebeu: ___________________________________________________</p>`}},
+];
+const docsDe=cli=>cli?DOCMOD.filter(m=>!m.so||m.so.test(cli.nome||'')):[];
+const FDOC=[['nome','Nome completo'],['cpf','CPF'],['cargo','Função / cargo'],['setor','Setor'],['admissao','Admissão','date']];
+async function initDocs(){
+  const cli=cliAtual(),mods=docsDe(cli);
+  $('dcData').value=$('dcData').value||TODAY;
+  $('dcMod').innerHTML=mods.map(m=>`<option value="${m.k}">${esc(m.t)}</option>`).join('')||'<option value="">Nenhum modelo para esta empresa</option>';
+  $('dcGerar').disabled=!mods.length;
+  DOCF=[];DOCH=[];
+  if(cli){
+    const {data}=await sb.from('funcionarios').select('*').eq('cliente_id',cli.id).neq('situacao','Desligado');
+    DOCF=(data||[]).sort((a,b)=>a.nome.localeCompare(b.nome));
+  }
+  $('dcFunc').innerHTML='<option value="">— digitar os dados —</option>'+DOCF.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+  docCampos();docEmpInfo();renderDocHist();
+}
+function docCampos(){
+  const cli=cliAtual(),m=DOCMOD.find(x=>x.k===$('dcMod').value),f=DOCF.find(x=>x.id===$('dcFunc').value)||{},E=cli?docEmp(cli):{};
+  const fx=FDOC.map(([k,t,tp])=>`<label class="f${k==='nome'?' wide':''}">${t}<input data-dk="${k}" type="${tp||'text'}" value="${esc(f[k]||'')}"></label>`).join('');
+  const D={data:$('dcData').value};
+  const ex=(m?.campos||[]).map(c=>{const v=c.def?c.def(E,D)||'':'';
+    if(c.tp==='area')return `<label class="f wide">${c.t}<textarea data-dx="${c.k}" rows="3">${esc(v)}</textarea></label>`;
+    if(c.tp==='epi')return `<div class="wide"><table class="mini" id="dcEpi"><thead><tr><th>Data</th><th>E/T/D</th><th>Qtde</th><th class="l">Equipamento</th><th class="l">Número</th></tr></thead><tbody>${
+      Array.from({length:8},(_,i)=>{const r=EPIPAD[i]||['','','',''];return `<tr><td><input type="date" value="${r[2]?D.data:''}"></td><td><select>${['','E','T','D'].map(o=>`<option${o===r[0]?' selected':''}>${o}</option>`).join('')}</select></td><td><input style="width:50px" value="${esc(r[1])}"></td><td><input value="${esc(r[2])}"></td><td><input value="${esc(r[3])}"></td></tr>`}).join('')}</tbody></table>
+      <p class="note" style="margin:4px 0 0">Linhas em branco não saem no recibo (o recibo sempre tem espaço para mais itens).</p></div>`;
+    return `<label class="f">${c.t}<input data-dx="${c.k}" type="${c.tp==='date'?'date':'text'}"${c.tp==='money'?' class="money" placeholder="0,00"':''} value="${esc(v)}"></label>`}).join('');
+  $('dcCampos').innerHTML=`<h3>Colaborador</h3><div class="fields">${fx}</div>${ex?`<h3>${esc(m.t)}</h3><div class="fields">${ex}</div>`:''}`;
+  const falta=f.id&&ehEsc()&&['cpf','cargo','setor'].some(k=>!f[k]);
+  $('dcSalvaL').hidden=!(f.id&&ehEsc());$('dcSalva').checked=!!falta;
+  $('dcErr').hidden=true;
+}
+function docEmpInfo(){
+  const cli=cliAtual();if(!cli){$('dcEmp').textContent='';return}
+  const E=docEmp(cli);
+  $('dcEmp').innerHTML=`Dados da empresa nos documentos: <b>${esc(empNome(E))}</b> · CNPJ ${esc(E.cnpj||'não informado')} · ${esc([E.cidade,E.uf].filter(Boolean).join('/')||'cidade não informada')}${E.bh_ini?` · banco de horas de ${dBR(E.bh_ini)} a ${E.bh_fim?dBR(E.bh_fim):'—'}`:''} ${ehEsc()?'<button class="btn small" id="dcEmpEd">Alterar</button>':''}`;
+  $('dcEmpBox').hidden=true;
+  if(ehEsc())$('dcEmpEd').onclick=()=>{
+    const b=$('dcEmpBox');b.hidden=false;
+    b.innerHTML=`<div class="fields" style="margin-top:8px">${[['razao','Razão social'],['unidade','Unidade (Matriz, Filial)'],['cnpj','CNPJ'],['cidade','Cidade'],['uf','UF'],['bh_ini','Banco de horas de','date'],['bh_fim','até','date']].map(([k,t,tp])=>`<label class="f">${t}<input data-de="${k}" type="${tp||'text'}" value="${esc(E[k]||'')}"></label>`).join('')}</div>
+      <div class="row"><button class="btn primary small" id="dcEmpSave">Salvar dados da empresa</button><button class="btn small" id="dcEmpCanc">Cancelar</button></div>`;
+    $('dcEmpCanc').onclick=()=>{b.hidden=true};
+    $('dcEmpSave').onclick=async ev=>{const o={};b.querySelectorAll('[data-de]').forEach(i=>{const v=i.value.trim();if(v)o[i.dataset.de]=v});
+      const cnpj=o.cnpj||null;delete o.cnpj;
+      ev.target.disabled=true;const {error}=await sb.from('clientes').update({doc_empresa:o,cnpj}).eq('id',cli.id);ev.target.disabled=false;
+      if(error){console.error(error);toast(/doc_empresa/.test(error.message||'')?'Rode a atualização v53 do banco no Supabase.':'Não foi possível salvar. Verifique a internet e tente de novo.');return}
+      cli.doc_empresa=o;cli.cnpj=cnpj;toast('Dados da empresa salvos');docEmpInfo();docCampos()};
+  };
+}
+$('dcMod').onchange=docCampos;$('dcFunc').onchange=docCampos;
+$('dcData').onchange=()=>{const m=DOCMOD.find(x=>x.k===$('dcMod').value);if(m?.campos.some(c=>c.tp==='epi'||c.def))docCampos()};
+function docImprime(m,D){
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return false}
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(m.t)} - ${esc(D.f.nome||'')}</title><style>
+    body{font:11.5pt Arial,Helvetica,sans-serif;color:#000;margin:0;line-height:1.4}h1{font-size:12.5pt;text-align:center;margin:14px 0 16px}h2{font-size:11.5pt;margin:14px 0 4px}
+    p{margin:0 0 8px;text-align:justify}.c{text-align:center}.id{text-align:left;line-height:1.7}.emp{margin-bottom:6px}.loc{margin-top:22px}ul{margin:0 0 8px;padding-left:22px}
+    .ass{display:flex;gap:40px;justify-content:space-around;margin-top:46px;text-align:center;page-break-inside:avoid}.ass>div{flex:1;max-width:300px}.lin{border-top:1px solid #000;margin-bottom:4px}
+    table.epi{border-collapse:collapse;width:100%;margin:8px 0}table.epi td,table.epi th{border:1px solid #000;padding:5px 6px;text-align:left}table.grade td{height:20px}
+    @page{size:A4;margin:18mm 20mm}</style></head><body>${m.corpo(D)}
+    <script>window.onload=()=>setTimeout(()=>window.print(),200)<\/script></body></html>`);
+  w.document.close();return true;
+}
+$('dcGerar').onclick=async()=>{
+  const cli=cliAtual(),m=DOCMOD.find(x=>x.k===$('dcMod').value),err=$('dcErr');err.hidden=true;if(!cli||!m)return;
+  const fid=$('dcFunc').value||null,f={},x={};
+  document.querySelectorAll('#dcCampos [data-dk]').forEach(i=>{f[i.dataset.dk]=i.value.trim()});
+  document.querySelectorAll('#dcCampos [data-dx]').forEach(i=>{x[i.dataset.dx]=i.value.trim()});
+  if($('dcEpi'))x.itens=[...$('dcEpi').querySelectorAll('tbody tr')].map(tr=>{const v=[...tr.querySelectorAll('input,select')].map(i=>i.value.trim());return [v[0],v[1],v[2],v[3],v[4]]}).filter(r=>r[3]);
+  if(!f.nome){err.textContent='Informe o nome do colaborador.';err.hidden=false;return}
+  if(x.fundo&&!(parseMoney(x.fundo)>0)){err.textContent='Valor do fundo de caixa inválido.';err.hidden=false;return}
+  const D={emp:docEmp(cli),f,x,data:$('dcData').value||TODAY};
+  if(!docImprime(m,D))return;
+  // completa o cadastro com o que foi digitado (só o escritório altera o cadastro)
+  const reg=DOCF.find(r=>r.id===fid);
+  if(reg&&ehEsc()&&$('dcSalva').checked){const o={};['cpf','cargo','setor'].forEach(k=>{if(f[k]&&f[k]!==(reg[k]||''))o[k]=f[k]});
+    if(Object.keys(o).length){const {error}=await sb.from('funcionarios').update(o).eq('id',reg.id);if(error)console.error(error);else Object.assign(reg,o)}}
+  const {error}=await sb.from('rh_documentos').insert({cliente_id:cli.id,funcionario_id:fid,modelo:m.k,nome:f.nome,dados:D});
+  if(error){console.error(error);toast(/rh_documentos/.test(error.message||'')?'PDF gerado. Para guardar o histórico, rode a atualização v53 do banco.':'PDF gerado, mas não foi possível guardar no histórico.');return}
+  renderDocHist();
+};
+async function renderDocHist(){
+  const cli=cliAtual(),t=$('dcHist');if(!cli){t.innerHTML='';return}
+  const {data,error}=await sb.from('rh_documentos').select('*').eq('cliente_id',cli.id).order('criado_em',{ascending:false}).limit(100);
+  if(error){t.innerHTML=`<tbody><tr><td class="l muted">${/rh_documentos/.test(error.message||'')?'O histórico precisa da atualização v53 do banco. Rode o SQL no Supabase.':'Erro ao carregar o histórico.'}</td></tr></tbody>`;return}
+  DOCH=data||[];
+  t.innerHTML=`<thead><tr><th class="l">Gerado em</th><th class="l">Colaborador</th><th class="l">Documento</th><th></th></tr></thead><tbody>${
+    DOCH.map(r=>`<tr><td class="l">${dBR(r.criado_em.slice(0,10))} ${r.criado_em.slice(11,16)}</td><td class="l">${esc(r.nome||'')}</td><td class="l">${esc(DOCMOD.find(m=>m.k===r.modelo)?.t||r.modelo)}</td><td><button class="btn small" data-dh="${r.id}">Gerar de novo</button></td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="4">Nenhum documento gerado nesta empresa.</td></tr>'}</tbody>`;
+}
+$('dcHist').addEventListener('click',ev=>{const b=ev.target.closest('[data-dh]');if(!b)return;
+  const r=DOCH.find(x=>x.id===b.dataset.dh),m=r&&DOCMOD.find(x=>x.k===r.modelo);if(m)docImprime(m,r.dados)});
 
 // =====================================================================
 // REPASSES DE PARCEIROS
