@@ -4518,6 +4518,32 @@ const DOCMOD=[
     <p>Data: _____/_____/______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Chaves devolvidas: __________</p>
     <p>Condição / observações: _________________________________________________________<br>_____________________________________________________________________________</p>
     <p>Assinatura de quem recebeu: ___________________________________________________</p>`}},
+  {k:'carta_santander',t:'Carta para conta salário (Santander)',so:/oliveira/i,
+   campos:[{k:'endereco',t:'Endereço (rua, nº, bairro, CEP, cidade, UF)',tp:'area'},{k:'salario',t:'Salário nominal mensal (R$)',tp:'money'},
+     {k:'celular',t:'Telefone celular',tp:'text',defF:f=>f.telefone},{k:'fixo',t:'Telefone fixo (opcional)',tp:'text'},{k:'email',t:'E-mail (opcional)',tp:'text'},
+     {k:'ref_nome',t:'Referência pessoal: nome',tp:'text'},{k:'ref_grau',t:'Grau de parentesco',tp:'text'},{k:'ref_cpf',t:'CPF da referência',tp:'text'},{k:'ref_tel',t:'Telefone da referência',tp:'text'},
+     {k:'rh_nome',t:'Responsável de RH',tp:'text',lembra:1},{k:'rh_tel',t:'Telefone do RH',tp:'text',lembra:1}],
+   corpo:D=>{const E=D.emp,f=D.f,x=D.x,v=parseMoney(x.salario);return `<div class="carta">
+    <style>.carta{font-size:10pt;line-height:1.3}.carta p{margin:0 0 6px}.carta ul{margin:0 0 6px}</style>
+    <div style="display:flex;justify-content:flex-end"><div style="border:1px solid #000;padding:6px 10px;font-family:'Times New Roman',serif">${esc(E.razao)}<br>CNPJ: ${esc(E.cnpj)}</div></div>
+    <p class="loc" style="margin-top:14px">${localData(D)}</p>
+    <p><b>Prezado (a)</b></p>
+    <p>Escolhemos o Santander como nosso parceiro para o processamento do pagamento do seu salário.</p>
+    <p>Conforme determinam as Resoluções nº 3.402 e 3.424/06, do Conselho Monetário Nacional, seu salário será creditado em uma conta de registro, denominada ‘conta salário’, que não é movimentável por cheque, não admite créditos de outras naturezas que não salariais e possui serviços limitados.</p>
+    <p>Você também poderá aproveitar as vantagens de ter uma <b><i>CONTA CORRENTE</i></b> e transferir automaticamente o seu salário, possibilitando assim fazer uso de diversos outros serviços e condições diferenciadas oferecidas pelo Santander, que acreditamos que tenham um valor diferenciado para você. Para conhecer as vantagens de uma conta corrente compareça a uma agência até a data da sua admissão e apresente o original e uma cópia simples (frente e verso) dos documentos abaixo indicados:</p>
+    <ul><li>Esta carta;</li><li>Documento de identidade com foto;</li><li>CPF – Cadastro de Pessoa Física;</li><li>Comprovante de endereço de residência atual (onde prefere receber correspondência) com prazo inferior a 60 dias da data de vencimento: Ex.: conta de luz, de água, de gás, de telefone fixo, IPTU, contrato de locação (cópia autenticada com firma reconhecida);</li><li>Se casado (a), apresentar nome completo do cônjuge, número do CPF, data de nascimento e data do casamento.</li></ul>
+    <p>Se a sua opção for apenas pela utilização da conta salário, você poderá realizar a portabilidade de salário para outra instituição ou utilizar o cartão de débito, fornecido sem custo*, para os serviços mensais gratuitos** disponíveis para a conta salário. Procure a agência Santander de sua conveniência e fale com o gerente que está apto a orientá-lo e a prestar todas as informações necessárias para a movimentação da sua conta.</p>
+    <p><b>Dados do Funcionário:</b></p>
+    <p style="line-height:1.7">Declaramos que o Sr(a) ${lin(f.nome,40)}, portador do CPF: ${lin(f.cpf)}, residente e domiciliado na: ${lin(x.endereco,60)}, é nosso funcionário desde ${f.admissao?dBR(f.admissao):'____/____/______'} e exercerá o cargo de ${lin(f.cargo)}, com salário nominal mensal de R$ ${v>0?showMoney(v):'__________'}.</p>
+    <p>Telefone Celular ${lin(x.celular,15)} Telefone Fixo ${lin(x.fixo,15)} E-mail ${lin(x.email,30)}</p>
+    <p><b>Referências Pessoais (Pai/Mãe/Amigos/Cônjuge/Filhos):</b></p>
+    <p>Nome ${lin(x.ref_nome,30)}, Grau Parentesco ${lin(x.ref_grau,12)}, CPF: ${lin(x.ref_cpf,14)}, Telefone ${lin(x.ref_tel,15)}</p>
+    <p style="margin-top:14px">Responsável de RH: ${lin(x.rh_nome,30)} Telefone: ${lin(x.rh_tel,15)}</p>
+    <hr style="margin:22px 0 6px">
+    <p style="font-size:7.5pt;text-align:center">* Exceto nos casos de pedidos de reposição de formulados pelos clientes decorrentes de perda, roubo danificação ou outros motivos não imputáveis ao Banco. ** Serviços gratuitos: duas consultas ao saldo de sua conta, dois extratos dos últimos 30 dias, um DOC/TED pelo valor total do crédito e cinco saques (por evento de crédito). A utilização acima desses limites ou de quaisquer outros serviços estará sujeita à cobrança de tarifas.</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;page-break-inside:avoid">
+      <div style="border:1px solid #000;padding:8px 12px;line-height:2"><div class="c"><b>Para uso exclusivo do Banco Santander:</b></div>Nome e Número da Agência: ______________________<br>Número da Conta: ______________________________<br>Responsável pelo atendimento: __________________</div>
+      <div style="border:1px solid #000;padding:6px 10px;font-family:'Times New Roman',serif;font-size:10pt">${esc(E.razao)}<br>CNPJ: ${esc(E.cnpj)}</div></div></div>`}},
   {k:'pendencia',t:'Comunicado de pendência operacional',so:VIVA,
    campos:[{k:'pend',t:'Pendências',tp:'pend'},
      {k:'obs',t:'Observação (o que a clínica assume, previsão de desconto…)',tp:'area'},
@@ -4648,7 +4674,7 @@ function docCampos(){
   const cli=cliAtual(),m=docModelo($('dcMod').value),f=DOCF.find(x=>x.id===$('dcFunc').value)||{},E=cli?docEmp(cli):{};
   const fx=FDOC.map(([k,t,tp])=>`<label class="f${k==='nome'?' wide':''}">${t}<input data-dk="${k}" type="${tp||'text'}" value="${esc(f[k]||'')}"></label>`).join('');
   const D={data:$('dcData').value};
-  const ex=(m?.campos||[]).map(c=>{let v=c.def?c.def(E,D)||'':'';if(c.lembra)try{v=localStorage.getItem('doc_'+c.k)||v}catch(e){}
+  const ex=(m?.campos||[]).map(c=>{let v=c.def?c.def(E,D)||'':c.defF?c.defF(f)||'':'';if(c.lembra)try{v=localStorage.getItem('doc_'+c.k)||v}catch(e){}
     if(c.tp==='pend')return `<div class="wide"><table class="mini" id="dcPend"><thead><tr><th>Data</th><th class="l">Paciente</th><th class="l">Descrição da pendência</th><th>Valor (R$)</th></tr></thead><tbody>${
       Array.from({length:3},()=>'<tr><td><input type="date"></td><td><input placeholder="Não informado"></td><td><textarea rows="2" style="width:100%"></textarea></td><td><input class="money" placeholder="0,00" style="max-width:110px"></td></tr>').join('')}</tbody></table>
       <p class="note" style="margin:4px 0 0">Preencha uma linha por pendência; linhas em branco não saem. Sem data ou paciente, sai “Não informada”. O total vai por extenso.</p></div>`;
