@@ -2665,7 +2665,8 @@ const FCOL={
   insalubridade:{t:'Insalubridade',g:'P',k:'pct',fixo:f=>+f.folha_insalubridade||null,fx:[['folha_insalubridade','Insalub. %','pct']]},
   // com pedido de benefícios no mês (e a empresa descontando), o VA/VT segue o pedido; sem pedido, o cadastro
   va:{t:'VA',g:'D',k:'simnao',fixo:f=>folBen(f,'va')??f.folha_va,fx:[['folha_va','VA','bool']]},
-  vt:{t:'VT',g:'D',k:'simnao',fixo:f=>folBen(f,'vt')??f.folha_vt,fx:[['folha_vt','VT','bool']]},
+  // Viva (Carol, 28/10): o transporte do cadastro manda no desconto: vale transporte = Sim; ajuda de custo ou combustível = Não
+  vt:{t:'VT',g:'D',k:'simnao',fixo:f=>{const t=ehViva(FOL.cli)?ff(f,'vt_tipo'):null;if(t==='ajuda'||t==='comb')return false;return folBen(f,'vt')??(t==='vt'?true:f.folha_vt)},fx:[['folha_vt','VT','bool']]},
   descontos_diversos:{t:'Descontos Diversos',g:'D',k:'money',lanca:'money'},
   quebra_cx_desc:{t:'Quebra de CX',g:'D',k:'money',lanca:'money',nome:'Quebra de CX (desconto)'},
   faltas_horas:{t:'Faltas/ Horas',g:'D',k:'horas',lanca:'horas',dsr:true,parc:true},
@@ -2696,6 +2697,7 @@ const FCOL={
 const ADTO='Adiantamento salarial',ADTO_MAX=830;
 const adtoDecidido=f=>FOL.lanc.some(l=>l.funcionario_id===f.id&&l.coluna==='adiantamento'&&(l.descricao||'').startsWith(ADTO));
 const AJUDA_DIAS=22;
+const ehViva=cli=>!!cli&&/viva|simon/i.test(cli.nome||'');
 const folBen=(f,t)=>FOL.ben?.length&&benRegra(FOL.cli).desconta?FOL.ben.some(x=>x.funcionario_id===f.id&&x.tipo===t):null;
 const FPADRAO=['ajuda_custo','gratificacao','horas_extras','dif_salario','quebra_cx','insalubridade','va','vt','descontos_diversos','quebra_cx_desc','faltas_horas','faltas_dias','dsr','adiantamento','observacoes'];
 const FNOME=c=>FCOL[c].nome||FCOL[c].t;
@@ -3571,7 +3573,7 @@ function renderBenCad(){
   const R=benRegra(BEN.cli),fs=BEN.func.filter(f=>f.situacao!=='Desligado'),sel=(f,k,ops)=>`<select data-k="${k}">${ops.map(([v,t])=>`<option value="${v}"${(ff(f,k)||'')===v?' selected':''}>${t}</option>`).join('')}</select>`;
   $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th class="l">Sábados</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th><th>R$ Assiduidade (no VA fixo)</th></tr></thead><tbody>${
     fs.map(f=>`<tr data-bc="${f.id}"><td class="l"><b>${esc(f.nome)}</b></td>
-      <td class="l">${sel(f,'vt_tipo',[['','Não tem'],['vt','Vale transporte'],...(R.combustivel||ff(f,'vt_tipo')==='comb'?[['comb','Combustível']]:[])])}</td>
+      <td class="l">${sel(f,'vt_tipo',[['','Não tem'],['vt','Vale transporte'],['ajuda','Ajuda de custo (sem VT)'],...(R.combustivel||ff(f,'vt_tipo')==='comb'?[['comb','Combustível']]:[])])}</td>
       <td class="l"><input data-k="vt_empresa" value="${esc(ff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" class="money" value="${showMoney(ffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
       <td class="l">${sel(f,'sab_escala',[['','Não trabalha'],['todos','Todos'],['alt','Alternados']])}</td>
       <td class="l">${sel(f,'va_tipo',[['','Não tem'],['dia','Por dia trabalhado'],['fixo','Fixo no mês']])}</td>
@@ -4055,6 +4057,7 @@ $('folRescBaixar').onclick=()=>{
 // fim do 1º período (prorrogar ou desligar) e fim da prorrogação (efetivar ou desligar).
 const EXP_AVISO=10; // dias de antecedência para o alerta
 let COLAB=[], COLABDLG=null;
+const trAtual=v=>ff(v,'vt_tipo')||(+v.folha_ajuda_custo>0?'ajuda':v.folha_vt?'vt':'');
 const diasAte=s=>Math.round((dObj(s)-dObj(TODAY))/864e5);
 function expSit(f){
   if(f.situacao==='Desligado')return {t:'Desligado',c:'c-none',ord:9};
@@ -4105,10 +4108,14 @@ function abrirColab(f){
     ${e?'<div class="row"><button type="button" class="btn small" id="cb4545">Calcular 45 + 45 dias pela admissão</button><span class="note">O 1º período termina no 45º dia e a prorrogação no 90º.</span></div>':''}
     <label class="f">Observação dos prazos<textarea data-ck="prazos_obs" rows="2"${dis}>${esc(v.prazos_obs||'')}</textarea></label>
     <h3>Benefícios</h3>
-    <div class="fields">${I('va_valor','VA por mês (R$)','text',' class="money"')}${I('vt_valor_dia','VT por dia, ida e volta (R$)','text',' class="money"')}${I('vt_empresa','Empresa do VT')}</div>
+    <div class="fields"><label class="f">Transporte<select id="cbTr"${dis}>${[['','Não recebe'],['vt','Vale transporte'],['ajuda','Ajuda de custo'],['comb','Vale combustível']].map(([k,t])=>`<option value="${k}"${trAtual(v)===k?' selected':''}>${t}</option>`).join('')}</select></label>
+      <label class="f" id="cbAjL"${trAtual(v)==='ajuda'?'':' hidden'}>Ajuda de custo por mês (R$)<input id="cbAj" class="money" value="${showMoney(v.folha_ajuda_custo)}"${dis}></label>
+      ${I('vt_valor_dia','VT por dia, ida e volta (R$)','text',' class="money"')}${I('vt_empresa','Empresa do VT')}${I('va_valor','VA por mês (R$)','text',' class="money"')}</div>
+    ${ehViva(cliAtual())?'<p class="note" style="margin:0">Viva: vale transporte marca “Sim” no desconto de VT da folha; ajuda de custo vai com o valor para a folha, sem desconto de VT.</p>':''}
     ${v.situacao==='Afastado'||!f?I('motivo_afastamento','Motivo do afastamento'):''}
     <p class="note" style="margin:0">Ajuda de custo, percentuais e VA/VT da folha ficam em Folha de pagamento › Colaboradores e valores fixos.</p>
     <p class="err" id="cbErr" hidden></p>`;
+  $('cbTr').onchange=()=>{$('cbAjL').hidden=$('cbTr').value!=='ajuda'};
   if(e)$('cb4545').onclick=()=>{const a=document.querySelector('[data-ck="admissao"]').value;if(!a){toast('Informe a admissão');return}
     document.querySelector('[data-ck="fim_experiencia1"]').value=addDias(a,44);document.querySelector('[data-ck="fim_experiencia2"]').value=addDias(a,89)};
   $('cbSave').hidden=!e;dlgColab.showModal();
@@ -4131,6 +4138,12 @@ $('cbSave').onclick=async()=>{
   if(o.fim_experiencia1&&o.fim_experiencia2&&o.fim_experiencia2<o.fim_experiencia1){err.textContent='A prorrogação não pode terminar antes do 1º período.';err.hidden=false;return}
   if(o.admissao&&o.fim_experiencia2&&diasAte(o.fim_experiencia2)-diasAte(o.admissao)>89){err.textContent='O contrato de experiência não pode passar de 90 dias.';err.hidden=false;return}
   const f=COLABDLG;o.situacao=o.situacao||'Ativo';
+  // transporte (Carol, 28/10): vale transporte, ajuda de custo (com o valor, que vai para a folha) ou vale combustível
+  const tr=$('cbTr').value,aj=tr==='ajuda'?parseMoney($('cbAj').value):null;
+  if(tr==='ajuda'&&!(aj>0)){err.textContent='Informe o valor da ajuda de custo.';err.hidden=false;return}
+  const fxT={...(f?.folha_fixos||{})};if(tr)fxT.vt_tipo=tr;else delete fxT.vt_tipo;o.folha_fixos=fxT;
+  if(tr==='ajuda')o.folha_ajuda_custo=aj;else if(f&&trAtual(f)==='ajuda')o.folha_ajuda_custo=null;
+  if(ehViva(cliAtual()))o.folha_vt=tr==='vt';
   if(o.situacao==='Desligado'&&!f?.desligado_em)o.desligado_em=o.ultimo_dia_aviso||TODAY;if(o.situacao!=='Desligado')o.desligado_em=null;
   if(o.situacao==='Afastado'&&!f?.afastado_desde)o.afastado_desde=TODAY;
   $('cbSave').disabled=true;
