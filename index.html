@@ -29,6 +29,36 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
+/* seletor de período (modelo do Bom Controle) */
+.per-orig{display:none!important}
+.per.f{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+.perbox{display:flex;gap:4px;align-items:stretch}
+.perbox .per-nav{padding:9px 10px}
+.perbox .per-btn{min-width:210px;text-align:left;font-weight:500;display:flex;align-items:center;gap:8px}
+.perbox .per-btn svg{flex:none;color:var(--brand)}
+.perpop{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.2);padding:14px;display:grid;gap:12px;width:min(880px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;color:var(--ink)}
+.per-at{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;font-weight:600;color:var(--muted);font-size:14px}
+.per-at button,.per-lk{border:0;background:none;color:var(--brand);font:700 14px var(--body);padding:5px 8px;border-radius:6px;cursor:pointer}
+.per-at button:hover,.per-lk:hover{background:var(--brand-soft)}
+.per-main{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:18px}
+.per-de{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
+.per-cals{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.per-ch{display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:6px}
+.per-ch button{border:0;background:none;color:var(--ink);font-size:18px;line-height:1;padding:4px 10px;border-radius:6px;cursor:pointer}
+.per-ch button:hover{background:var(--sunk)}
+.per-ch .per-mob{visibility:hidden}
+.per-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.per-g .per-w{font-size:12px;font-weight:700;color:var(--muted);padding:4px 0}
+.per-d,.per-m{border:0;background:none;padding:7px 0;border-radius:6px;font:500 14px var(--body);color:var(--ink);cursor:pointer}
+.per-d:hover,.per-m:hover{background:var(--sunk)}
+.per-d.fora{color:var(--muted);opacity:.55}
+.per-d.in,.per-m.in{background:var(--brand-soft)}
+.per-d.end,.per-m.end{background:var(--brand);color:var(--brand-ink)}
+.per-d.hoje{box-shadow:inset 0 0 0 1px var(--brand)}
+.per-meses{border-left:1px solid var(--line);padding-left:18px}
+.per-mg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.per-foot{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:12px}
+@media (max-width:760px){.per-main{grid-template-columns:1fr}.per-cals{grid-template-columns:1fr}.per-cal[data-k="1"]{display:none}.per-ch .per-mob{visibility:visible}.per-meses{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px}.per-mg{grid-template-columns:repeat(4,1fr)}.perbox .per-btn{min-width:0;flex:1}}
 .wrap{max-width:1600px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topin{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
@@ -300,11 +330,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewEsc" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="escTitle">Conferência de caixa</h1><p class="sub" id="escSub">Acompanhe os fechamentos e confira os dias.</p></div>
-      <label class="f">Mês<select id="escMes"></select></label>
+      <div class="row" style="align-items:flex-end"><label class="f">De<input type="date" id="escIni"></label><label class="f">Até<input type="date" id="escFim"></label></div>
     </div>
     <div id="tabPainel">
       <div class="tiles" id="tiles"></div>
-      <div class="toolbar"><span class="spacer"></span><button class="btn" id="btnPlanMes">Baixar planilha do mês</button></div>
+      <div class="toolbar"><span class="spacer"></span><button class="btn" id="btnPlanMes">Baixar planilha do período</button></div>
       <div class="card tablebox">
         <table>
           <thead><tr><th>Dia</th><th>Dinheiro</th><th>Saídas</th><th>Falta/sobra</th><th>Débito</th><th>Dif. débito</th><th>Crédito</th><th>Juros</th><th class="l">Situação</th></tr></thead>
@@ -320,7 +350,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewMod" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="mTitle"></h1><p class="sub" id="mSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="mFiltro"></select></label><label class="f" id="mPerBox" hidden>De<input type="date" id="mIni"></label><label class="f" id="mPerBox2" hidden>Até<input type="date" id="mFim"></label><label class="f" id="mTipoBox" hidden>Lançamentos<select id="mTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f" id="mFiltroBox">Mostrar<select id="mFiltro"></select></label><label class="f" id="mPerBox">De<input type="date" id="mIni"></label><label class="f" id="mPerBox2">Até<input type="date" id="mFim"></label><label class="f" id="mTipoBox" hidden>Lançamentos<select id="mTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
     </div>
     <div class="tiles" id="mTiles"></div>
     <div id="mConf"></div>
@@ -392,9 +422,8 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     </div>
     <div id="gteAlerta"></div>
     <div class="toolbar">
-      <label class="f">Período<select id="gteMes"></select></label>
-      <label class="f" id="gtePerBox" hidden>De<input type="date" id="gteIni"></label>
-      <label class="f" id="gtePerBox2" hidden>Até<input type="date" id="gteFim"></label>
+      <label class="f">De<input type="date" id="gteIni"></label>
+      <label class="f">Até<input type="date" id="gteFim"></label>
       <label class="f">Lançamentos<select id="gteTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label>
       <label class="f">Mostrar<select id="gteFiltro"><option value="todos">Todos</option><option value="rev">A revisar e alterados</option><option value="ok">Revisados</option></select></label>
     </div>
@@ -516,7 +545,6 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewBC" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Exportação Bom Controle</h1><p class="sub" id="exSub">Escolha a origem e o período e baixe a planilha de importação do Bom Controle.</p></div>
-      <label class="f">Mês<select id="exMes"></select></label>
     </div>
     <div class="toolbar">
       <label class="f">Origem<select id="exOrig">
@@ -1265,14 +1293,14 @@ $('opCaixa').addEventListener('change',()=>{if($('opData').value)loadDay()});
 // ESCRITÓRIO
 // =====================================================================
 let tabCfg='cadastro', MES=[], MAPA=[];
-const escMes=$('escMes');
+const escIni=$('escIni'),escFim=$('escFim');
 function mesesOpts(ate){
   const y=+TODAY.slice(0,4),opts=[];
   for(const yy of [y+1,y,y-1])for(let m=12;m>=1;m--){const k=`${yy}-${pad(m)}`;if(k<=ate)opts.push(`<option value="${k}">${MESES[m-1]} ${yy}</option>`)}
   return opts.slice(0,26).join('');
 }
 function initEsc(){
-  if(!escMes.options.length){escMes.innerHTML=mesesOpts(TODAY.slice(0,7));escMes.value=TODAY.slice(0,7)}
+  if(!escIni.value)[escIni.value,escFim.value]=monthRange(TODAY.slice(0,7));
   const e=ehEsc();
   $('escTitle').textContent=e?'Conferência de caixa':'Caixa';
   $('escSub').textContent=e?'Acompanhe os fechamentos e confira os dias. Os lançamentos ficam em Financeiro › Caixa e a importação em Escritório › Exportação Bom Controle.':'Consulta dos fechamentos e comprovantes, sem alterar.';
@@ -1280,7 +1308,7 @@ function initEsc(){
   $('dConf').hidden=!e;$('dEdit').hidden=!e;
   renderPainel();
 }
-escMes.onchange=()=>renderPainel();
+escFim.onchange=escIni.onchange=()=>renderPainel();
 document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>{tabCfg=b.dataset.tab;document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x===b));renderCfg()});
 function renderCfg(){
   $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';$('tabFbc').hidden=tabCfg!=='fbc';
@@ -1296,9 +1324,105 @@ async function loadPeriodo(ini,fim){
   return data.sort((a,b)=>a.data<b.data?-1:a.data>b.data?1:(a.caixa||1)-(b.caixa||1)).map(f=>({...f,conf:one(f.conferencias),orig:one(f.caixa_original)||null,ajustes:(f.caixa_ajustes||[]).sort((a,b)=>a.ajustado_em<b.ajustado_em?-1:1)}));
 }
 function monthRange(k){const [y,m]=k.split('-').map(Number);const last=new Date(y,m,0).getDate();return [`${k}-01`,`${k}-${pad(last)}`]}
+// ---------- Seletor de período (modelo do Bom Controle): atalhos, dois meses de calendário e os meses do ano ----------
+// Fica no lugar de um par de campos De/Até; os campos continuam sendo a fonte do período (escondidos).
+const PER={cur:null,pop:null,a:'',b:'',anc:null,view:'',ano:0};
+const perMesK=k=>{const [y,m]=k.split('-').map(Number);return MESES[m-1]+' '+y};
+const perSomaMes=(k,n)=>{const [y,m]=k.split('-').map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)};
+function perTexto(a,b){
+  if(!a&&!b)return 'Escolher período';
+  if(a&&!b)return 'A partir de '+dBR(a);if(!a&&b)return 'Até '+dBR(b);
+  if(a===b)return dBR(a);
+  const ma=a.slice(0,7),mb=b.slice(0,7);
+  if(a===ma+'-01'&&b===monthRange(mb)[1]){
+    if(a.slice(5)==='01-01'&&b.slice(5)==='12-31')return a.slice(0,4)===b.slice(0,4)?'Ano de '+a.slice(0,4):a.slice(0,4)+' a '+b.slice(0,4);
+    return ma===mb?perMesK(ma):perMesK(ma)+' a '+perMesK(mb);
+  }
+  return dBR(a)+' – '+dBR(b);
+}
+// anda para o período anterior ou o próximo, do mesmo tamanho (meses inteiros andam por mês)
+function perAnda([a,b],n){
+  if(!a||!b)return [a,b];
+  const ma=a.slice(0,7),mb=b.slice(0,7);
+  if(a===ma+'-01'&&b===monthRange(mb)[1]){const q=(+mb.slice(0,4)-+ma.slice(0,4))*12+(+mb.slice(5)-+ma.slice(5))+1;return [perSomaMes(ma,n*q)+'-01',monthRange(perSomaMes(mb,n*q))[1]]}
+  const q=Math.round((dObj(b)-dObj(a))/864e5)+1;return [addDias(a,n*q),addDias(b,n*q)];
+}
+function perLigar(idA,idB,opt={}){
+  const ia=$(idA),ib=$(idB),la=ia.closest('label'),lb=ib.closest('label');
+  const tit=opt.titulo||la.firstChild.textContent.replace(/\s+de\s*$/,'').trim().replace(/^De$/,'Período');
+  const box=document.createElement('div');box.className='f per';
+  box.innerHTML=`<span>${esc(tit)}</span><span class="perbox"><button type="button" class="btn per-nav" data-d="-1" aria-label="Período anterior">‹</button><button type="button" class="btn per-btn" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span></span></button><button type="button" class="btn per-nav" data-d="1" aria-label="Próximo período">›</button></span>`;
+  la.before(box);la.classList.add('per-orig');lb.classList.add('per-orig');
+  const btn=box.querySelector('.per-btn'),txt=btn.querySelector('span');
+  const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  const upd=()=>{txt.textContent=perTexto(d.get.call(ia),d.get.call(ib))};
+  [ia,ib].forEach(i=>Object.defineProperty(i,'value',{configurable:true,get(){return d.get.call(this)},set(v){d.set.call(this,v);upd()}}));
+  new MutationObserver(()=>{box.hidden=la.hidden}).observe(la,{attributes:true,attributeFilter:['hidden']});box.hidden=la.hidden;
+  const ctl={vazio:!!opt.vazio,get:()=>[ia.value,ib.value],set(a,b){ia.value=a||'';ib.value=b||'';ib.dispatchEvent(new Event('change'))},btn};
+  btn.onclick=()=>PER.cur===ctl&&!PER.pop.hidden?perFecha():perAbre(ctl);
+  box.querySelectorAll('.per-nav').forEach(x=>x.onclick=()=>{const [a,b]=perAnda(ctl.get(),+x.dataset.d);if(a&&b)ctl.set(a,b)});
+  upd();return ctl;
+}
+function perPop(){
+  if(PER.pop)return PER.pop;
+  const p=document.createElement('div');p.className='perpop';p.hidden=true;p.setAttribute('role','dialog');p.setAttribute('aria-label','Escolher período');
+  p.innerHTML=`<div class="per-at">Últimos <button type="button" data-u="7">7</button><button type="button" data-u="15">15</button><button type="button" data-u="30">30</button> dias <span class="spacer"></span><button type="button" data-q="hoje">Apenas hoje</button><button type="button" data-q="mes">Este mês</button><button type="button" data-q="mesant">Mês passado</button><button type="button" data-q="ano">Este ano</button></div>
+    <div class="per-main"><div><div class="per-de"><label class="f">De<input type="date" id="perA"></label><label class="f">Até<input type="date" id="perB"></label></div><div class="per-cals"><div class="per-cal" data-k="0"></div><div class="per-cal" data-k="1"></div></div></div>
+      <div class="per-meses"><div class="per-ch"><button type="button" data-ano="-1" aria-label="Ano anterior">‹</button><span id="perAno"></span><button type="button" data-ano="1" aria-label="Próximo ano">›</button></div><div class="per-mg" id="perMg"></div><p class="note" style="margin:8px 0 0">Clique num mês para ver o mês todo; clique em outro para juntar os meses entre os dois.</p></div></div>
+    <div class="per-foot"><button type="button" class="btn ghost" data-x="limpar">Limpar</button><span class="spacer"></span><button type="button" class="btn" data-x="cancelar">Cancelar</button><button type="button" class="btn primary" data-x="aplicar">Aplicar período</button></div>`;
+  document.body.append(p);PER.pop=p;
+  p.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.u){PER.cur.set(addDias(TODAY,1-+b.dataset.u),TODAY);return perFecha()}
+    if(b.dataset.q){const q=b.dataset.q,m=TODAY.slice(0,7),r=q==='hoje'?[TODAY,TODAY]:q==='mes'?monthRange(m):q==='mesant'?monthRange(perSomaMes(m,-1)):[TODAY.slice(0,4)+'-01-01',TODAY.slice(0,4)+'-12-31'];PER.cur.set(...r);return perFecha()}
+    if(b.dataset.x==='cancelar')return perFecha();
+    if(b.dataset.x==='limpar'){PER.cur.set('','');return perFecha()}
+    if(b.dataset.x==='aplicar'){let {a,b:z}=PER;if(!a&&!z&&!PER.cur.vazio)return;if(a&&z&&a>z)[a,z]=[z,a];if(!PER.cur.vazio){a=a||z;z=z||a}PER.cur.set(a,z);return perFecha()}
+    if(b.dataset.nav){PER.view=perSomaMes(PER.view,+b.dataset.nav);return perDesenha()}
+    if(b.dataset.ano){PER.ano+=+b.dataset.ano;return perDesenha()}
+    if(b.dataset.dia){const v=b.dataset.dia;if(PER.anc?.t==='d'){[PER.a,PER.b]=[PER.anc.v,v].sort();PER.anc=null}else{PER.a=PER.b=v;PER.anc={t:'d',v}}return perDesenha()}
+    if(b.dataset.mes){const v=b.dataset.mes;if(PER.anc?.t==='m'){const [x,y]=[PER.anc.v,v].sort();PER.a=x+'-01';PER.b=monthRange(y)[1];PER.anc=null}else{[PER.a,PER.b]=monthRange(v);PER.anc={t:'m',v}}
+      PER.view=PER.a.slice(0,7);return perDesenha()}
+  });
+  p.querySelector('#perA').onchange=e=>{PER.a=e.target.value;PER.anc=null;if(PER.a)PER.view=PER.a.slice(0,7);perDesenha()};
+  p.querySelector('#perB').onchange=e=>{PER.b=e.target.value;PER.anc=null;perDesenha()};
+  document.addEventListener('pointerdown',e=>{if(!p.hidden&&!p.contains(e.target)&&!PER.cur?.btn.contains(e.target))perFecha()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!p.hidden){e.stopPropagation();perFecha()}},true);
+  window.addEventListener('resize',()=>{if(!p.hidden)perPosiciona()});
+  return p;
+}
+function perAbre(ctl){
+  const p=perPop();PER.cur=ctl;[PER.a,PER.b]=ctl.get();PER.anc=null;
+  PER.view=(PER.a||PER.b||TODAY).slice(0,7);PER.ano=+PER.view.slice(0,4);
+  p.querySelector('[data-x="limpar"]').hidden=!ctl.vazio;
+  p.hidden=false;perDesenha();perPosiciona();ctl.btn.setAttribute('aria-expanded','true');
+}
+function perFecha(){if(PER.pop&&!PER.pop.hidden){PER.pop.hidden=true;PER.cur?.btn.setAttribute('aria-expanded','false');PER.cur?.btn.focus()}}
+function perPosiciona(){
+  const p=PER.pop,r=PER.cur.btn.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight;
+  p.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+'px';
+  p.style.top=(r.bottom+6+h<=innerHeight-8?r.bottom+6:Math.max(8,innerHeight-h-8))+'px';
+}
+function perDesenha(){
+  const p=PER.pop,{a,b}=PER,lo=a&&b?(a<b?a:b):a||b,hi=a&&b?(a<b?b:a):a||b;
+  p.querySelector('#perA').value=a||'';p.querySelector('#perB').value=b||'';
+  p.querySelectorAll('.per-cal').forEach(el=>{
+    const k=perSomaMes(PER.view,+el.dataset.k),[y,m]=k.split('-').map(Number),ini=new Date(y,m-1,1),off=(ini.getDay()+6)%7;
+    let h=`<div class="per-ch">${el.dataset.k==='0'?'<button type="button" data-nav="-1" aria-label="Mês anterior">‹</button>':'<span></span>'}<span>${perMesK(k)}</span><button type="button" data-nav="1" aria-label="Próximo mês"${el.dataset.k==='0'?' class="per-mob"':''}>›</button></div><div class="per-g">`
+      +['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(x=>`<span class="per-w">${x}</span>`).join('');
+    for(let i=0;i<42;i++){const d=new Date(y,m-1,1-off+i),s=isoLocal(d),fora=d.getMonth()!==m-1;
+      if(i>=35&&fora&&new Date(y,m-1,1-off+35).getMonth()!==m-1)break;
+      const c=['per-d',fora?'fora':'',lo&&s>=lo&&s<=hi?'in':'',s===lo||s===hi?'end':'',s===TODAY?'hoje':''].filter(Boolean).join(' ');
+      h+=`<button type="button" class="${c}" data-dia="${s}" aria-label="${dBR(s)}">${d.getDate()}</button>`}
+    el.innerHTML=h+'</div>';
+  });
+  p.querySelector('#perAno').textContent=PER.ano;
+  const mlo=lo?.slice(0,7),mhi=hi?.slice(0,7);
+  p.querySelector('#perMg').innerHTML=MESES.map((n,i)=>{const k=PER.ano+'-'+pad(i+1),r=monthRange(k),cheio=lo&&r[0]>=lo&&r[1]<=hi;
+    return `<button type="button" class="per-m${cheio?(k===mlo||k===mhi?' end':' in'):''}" data-mes="${k}">${n}</button>`}).join('');
+}
 async function renderPainel(){
   if(!escCli.value){$('tbDias').innerHTML='<tr><td class="l muted" colspan="9">Nenhuma empresa liberada.</td></tr>';$('tiles').innerHTML='';$('tfDias').innerHTML='';return}
-  const [ini,fim]=monthRange(escMes.value);MES=await loadPeriodo(ini,fim);
+  const ini=escIni.value,fim=escFim.value;if(!ini||!fim)return;MES=await loadPeriodo(ini,fim);
   const by={};MES.forEach(f=>(by[f.data]||=[]).push(f));const cli=cliAtual(),n=nCx(cli);
   // uma linha por caixa de cada dia (com um caixa só, uma por dia como antes)
   const days=[];const d=dObj(ini);while(isoLocal(d)<=fim&&isoLocal(d)<=TODAY){const s=isoLocal(d);if(d.getDay()!==0||cli.abre_domingo||by[s]){
@@ -1313,11 +1437,11 @@ async function renderPainel(){
     const clip=(f.anexos||[]).length?` <span class="muted" title="Comprovantes">📎${f.anexos.length}</span>`:'';
     const aj=(f.ajustes||[]).length?` <span class="muted" title="Valores corrigidos pelo escritório">✎${f.ajustes.length}</span>`:'';
     return `<tr class="click${aConferir(f)?' pend':''}" data-id="${f.id}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${lbl(s,k)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}${aj}</td></tr>`}).join('')
-    ||'<tr><td class="l muted" colspan="9">Nenhum dia neste mês até hoje.</td></tr>';
+    ||'<tr><td class="l muted" colspan="9">Nenhum dia neste período até hoje.</td></tr>';
   $('tfDias').innerHTML=MES.length?`<tr><td>Total</td><td>${fm(T.din)}</td><td>${fm(T.sai)}</td><td>${fsign(T.fs)}</td><td>${fm(T.deb)}</td><td>${fsign(T.difDeb)}</td><td>${fm(T.cred)}</td><td>${fm(T.juros)}</td><td></td></tr>`:'';
   $('tiles').innerHTML=`
-    <div class="card tile"><div class="k">Vendas do mês</div><div class="v">${fm(T.din+T.deb+T.cred-T.juros)}</div><div class="n">dinheiro, débito e crédito</div></div>
-    <div class="card tile"><div class="k">Falta / sobra</div><div class="v ${T.fs<-0.004?'neg':T.fs>0.004?'pos':''}">${fsign(T.fs)}</div><div class="n">saldo do mês no dinheiro</div></div>
+    <div class="card tile"><div class="k">Vendas do período</div><div class="v">${fm(T.din+T.deb+T.cred-T.juros)}</div><div class="n">dinheiro, débito e crédito</div></div>
+    <div class="card tile"><div class="k">Falta / sobra</div><div class="v ${T.fs<-0.004?'neg':T.fs>0.004?'pos':''}">${fsign(T.fs)}</div><div class="n">saldo do período no dinheiro</div></div>
     <div class="card tile"><div class="k">Juros de parcelamento</div><div class="v">${fm(T.juros)}</div><div class="n">crédito da máquina acima do sistema</div></div>
     <div class="card tile"><div class="k">A conferir</div><div class="v">${nPend}</div><div class="n">${nAlert} com diferença · ${nConf} conferidos · ${nSem} sem lançamento</div></div>`;
 }
@@ -1451,7 +1575,7 @@ $('dConf').onclick=async()=>{
   }catch(ex){fail(ex);if(dlgEd)await reabrirDia(f.id,false)}finally{$('dConf').disabled=false}
 };
 $('btnPlanMes').onclick=()=>{
-  const cli=cliAtual();if(!cli||!MES.length){toast('Não há lançamentos neste mês.');return}
+  const cli=cliAtual();if(!cli||!MES.length){toast('Não há lançamentos neste período.');return}
   const H=['Data','Dia','Dinheiro (sistema)','Saídas','Dinheiro esperado','Dinheiro contado','Falta(-)/Sobra(+)','Débito (sistema)','Débito (máquina)','Diferença débito','Crédito (sistema)','Crédito (máquina)','Juros de parcelamento','Observações','Situação','Nota da conferência','Ajustes do escritório'];
   const rows=MES.map(f=>{const c=calc(f),cx=cxNome(cli,f);return [dObj(f.data),DOW[dObj(f.data).getDay()]+(cx?' · '+cx:''),+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'',(f.ajustes||[]).map(a=>a.campo+': '+(a.antes||'—')+' → '+(a.depois||'removida')).join(' | ')]});
   const S=[['Tipo','Nº guia / documento','Parceiro','Descrição','Valor','Data','Caixa']];
@@ -1464,12 +1588,12 @@ $('btnPlanMes').onclick=()=>{
   XLSX.utils.book_append_sheet(wb,ws,'Lançamentos');
   const wsS=XLSX.utils.aoa_to_sheet(S,{cellDates:true,dateNF:'dd/mm/yyyy'});wsS['!cols']=[{wch:16},{wch:18},{wch:26},{wch:40},{wch:14},{wch:12},{wch:10}];xTabela(wsS,{money:[4],texto:[2,3]});
   XLSX.utils.book_append_sheet(wb,wsS,'Saídas');
-  XLSX.writeFile(wb,`Caixa ${cli.nome} ${escMes.value}.xlsx`);
+  XLSX.writeFile(wb,`Caixa ${cli.nome} ${perTexto(escIni.value,escFim.value).replace(/\//g,'-')}.xlsx`);
 };
 
 // ---------- exportação Bom Controle ----------
 const HEAD=["Tipo(Despesa/Receita)","Conta Bancária","CNPJ/CPF","Nome do Cliente/Fornecedor","Forma de Pagamento","Categoria Financeira","Departamento","Status Movimentação(Em aberto/Pago)","Data Vencimento","Data Pagamento","Valor (R$)","Observação","Nº Documento","Data Competência","Valor Conciliado (R$)","Etiqueta"];
-const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf'),exMes=$('exMes'),exOrig=$('exOrig');
+const exIni=$('exIni'),exFim=$('exFim'),exSo=$('exSoConf'),exOrig=$('exOrig');
 // origens da importação: o texto da caixinha de filtro e o aviso de cada uma
 const EXORIG={
   caixa:{so:'Só dias conferidos',nota:'Débito e crédito ficam fora por enquanto'},
@@ -1477,12 +1601,10 @@ const EXORIG={
   pagar:{so:'Só contas pagas',nota:'Contas pelo vencimento. A conta bancária é o banco informado no pagamento'},
   cartao:{so:'Só notas conferidas com a fatura',nota:'Uma linha por nota, pela data da compra. As parcelas vão na observação'}
 };
-function syncExportDates(){const [a,b]=monthRange(exMes.value);exIni.value=a;exFim.value=b}
 function initExport(){
-  if(!exMes.options.length){exMes.innerHTML=mesesOpts(TODAY.slice(0,7));exMes.value=TODAY.slice(0,7);syncExportDates()}
+  if(!exIni.value)[exIni.value,exFim.value]=monthRange(TODAY.slice(0,7));
   renderExport();
 }
-exMes.onchange=()=>{syncExportDates();renderExport()};
 exOrig.onchange=()=>{$('exSoTxt').textContent=EXORIG[exOrig.value].so;renderExport()};
 [exIni,exFim,exSo].forEach(el=>el.onchange=renderExport);
 async function loadMapa(){const {data}=await sb.from('mapeamento_bc').select('*');MAPA=data||[];return MAPA}
@@ -2063,9 +2185,9 @@ function initMod(m){
   const cfg=MODCFG[m],cli=cliAtual();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
-    mFiltro.innerHTML=(m==='pagar'?'<option value="aberto">Em aberto</option>':'')+mesesOpts(m==='pagar'?fut:TODAY.slice(0,7))+(m==='tesouraria'?'<option value="per">Período personalizado…</option>':'');
-    $('mTipo').value='';$('mTipoBox').hidden=m!=='tesouraria';
-    mFiltro.value=m==='pagar'?'aberto':TODAY.slice(0,7);
+    mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option>':'';
+    $('mFiltroBox').hidden=m!=='pagar';$('mTipo').value='';$('mTipoBox').hidden=m!=='tesouraria';
+    mFiltro.value=m==='pagar'?'aberto':'';[$('mIni').value,$('mFim').value]=monthRange(TODAY.slice(0,7));
   }
   $('mTitle').textContent=cfg.titulo;
   $('mSub').textContent=(cli?cli.nome+(m==='cartao'&&cli.cartao_final?' · cartão final '+cli.cartao_final:'')+' · ':'')+cfg.sub;
@@ -2080,9 +2202,8 @@ async function renderMod(){
   if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   let q=sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
-  const f=mFiltro.value,per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
-  if(per&&!$('mIni').value){$('mIni').value=TODAY.slice(0,8)+'01';$('mFim').value=TODAY}
-  const [pIni,pFim]=per?[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31']:f==='aberto'?[]:monthRange(f);
+  const f=MOD==='pagar'?mFiltro.value:'per',per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
+  const [pIni,pFim]=[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31'];
   if(f==='aberto')q=q.eq('conferido',false);else q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
@@ -2114,18 +2235,18 @@ async function renderMod(){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
     body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
-    tiles=[['Compras do mês',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
+    tiles=[['Compras do período',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
   }else{
     let saldo=ANT;
     head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
     body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);const tp=$('mTipo').value;if(tp&&(tp==='entrada')!==ent)return '';return `<tr class="click${aConferir(r)?' pend':''}" data-id="${r.id}" tabindex="0"${aConferir(r)?` title="${esc(r.obs)}"`:''}><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}${r.fechamento_id?' <span class="muted">· automático do caixa</span>':''}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||r.tipo!=='Despesa'?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':aConferir(r)?'<span class="chip c-bad">⚠ Conferir divergência</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
     const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),D=sum(REGS.filter(r=>r.tipo==='Depósito bancário')),S=r2(sum(REGS.filter(r=>r.tipo==='Despesa'))),SD=r2(S+D);
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(SD)}</td><td>${fm(r2(ANT+E-SD))}</td><td colspan="2"></td></tr>`:'';
-    tiles=[['Saldo anterior',fm(ANT),per?'acumulado antes de '+dBR(pIni):'acumulado até o mês passado'],['Entradas',fm(E),per?'suprimentos do período':'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Depósitos no banco',fm(D),(n=>n+(n===1?' depósito':' depósitos'))(REGS.filter(r=>r.tipo==='Depósito bancário').length)],['Saldo atual',fm(r2(ANT+E-SD)),'saldo anterior + entradas − despesas − depósitos'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
+    tiles=[['Saldo anterior',fm(ANT),'acumulado antes de '+dBR(pIni)],['Entradas',fm(E),'suprimentos do período'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Depósitos no banco',fm(D),(n=>n+(n===1?' depósito':' depósitos'))(REGS.filter(r=>r.tipo==='Depósito bancário').length)],['Saldo atual',fm(r2(ANT+E-SD)),'saldo anterior + entradas − despesas − depósitos'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
   }
   $('mHead').innerHTML=head;$('mFoot').innerHTML=foot;
   if(MOD==='tesouraria'&&!REGS.length)body='';
-  $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':per?'neste período':'neste mês'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
+  $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste período'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   if(MOD==='tesouraria')renderTC(cli);else $('mConf').innerHTML='';
   $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
@@ -5994,16 +6115,14 @@ async function gteNovidades(){
 }
 async function renderGTes(){
   const cli=cliAtual();
-  if(!$('gteMes').options.length){$('gteMes').innerHTML=mesesOpts(TODAY.slice(0,7))+'<option value="per">Período personalizado…</option>';$('gteMes').value=TODAY.slice(0,7)}
-  const per=$('gteMes').value==='per';$('gtePerBox').hidden=$('gtePerBox2').hidden=!per;
-  if(per&&!$('gteIni').value){$('gteIni').value=TODAY.slice(0,8)+'01';$('gteFim').value=TODAY}
+  if(!$('gteIni').value)[$('gteIni').value,$('gteFim').value]=monthRange(TODAY.slice(0,7));
   if(!cli)return gteVazio('Escolha uma empresa.');
   $('gteSub').textContent=`${cli.nome} · Lançamentos que o cliente faz em Financeiro › Tesouraria. Corrija, ponha a categoria e marque como revisado: o lançamento do cliente não muda.`;
   let conta,movs,alt;
   try{
     const {data:c,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cli.id).eq('espelho_tes',true).maybeSingle();if(error)throw error;
     if(!c)return gteVazio('Esta empresa ainda não tem lançamentos na Tesouraria do cliente.');
-    conta=c;const [ini,fim]=per?[$('gteIni').value||'1900-01-01',$('gteFim').value||'2999-12-31']:monthRange($('gteMes').value);
+    conta=c;const ini=$('gteIni').value,fim=$('gteFim').value;
     if(ini>fim)return gteVazio('A data inicial é depois da data final.');
     [movs,alt]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',c.saldo_data||'1900-01-01').lte('data',fim).order('data').order('criado_em')),
       todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).not('tes_alteracao','is',null).order('data'))]);
@@ -6019,15 +6138,15 @@ function gteSit(m){
   return m.revisado?`<span class="chip c-ok">✓ Revisado${m.por_regra?' (igual a outro)':''}</span>`:'<span class="chip c-none">A revisar</span>';
 }
 function gteDesenha(){
-  const mu=t=>`<span class="muted">${t}</span>`,f=$('gteFiltro').value,tp=$('gteTipo').value,per=$('gteMes').value==='per';let saldo=GTE.ant;
+  const mu=t=>`<span class="muted">${t}</span>`,f=$('gteFiltro').value,tp=$('gteTipo').value;let saldo=GTE.ant;
   const linhas=GTE.per.map(m=>{saldo=r2(saldo+(m.tipo==='entrada'?1:-1)*m.valor);return {m,saldo}}).filter(({m})=>(!tp||m.tipo===tp)&&(f==='todos'||(f==='rev'?!m.revisado||m.tes_alteracao:m.revisado&&!m.tes_alteracao)));
   const E=r2(GTE.per.filter(m=>m.tipo==='entrada').reduce((x,m)=>x+(+m.valor),0)),S=r2(GTE.per.filter(m=>m.tipo==='saida').reduce((x,m)=>x+(+m.valor),0)),F=r2(GTE.ant+E-S);
   const arev=GTE.per.filter(m=>m.tes_id&&!m.revisado),ccat=arev.filter(m=>m.categoria||m.tipo==='entrada'||m.transf_id);
   $('gteHead').innerHTML='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Cliente ou fornecedor</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th><th class="l">Situação</th></tr>';
   $('gteBody').innerHTML=`<tr><td></td><td class="l"></td><td class="l muted" colspan="5">Saldo anterior</td><td class="${GTE.ant<0?'neg':''}"><b>${fm(GTE.ant)}</b></td><td></td></tr>`
     +linhas.map(({m,saldo})=>`<tr class="click${m.tes_alteracao?' pend':''}" data-id="${m.id}" tabindex="0"><td>${dBR(m.data)}</td><td class="l">${esc(m.tes_original?.tipo||(m.tipo==='entrada'?'Entrada':'Saída'))}</td><td class="l">${esc(m.descricao||'')||mu('—')}${m.transf_id?` ${mu('· para o banco')}`:''}<br>${m.categoria?mu(esc(m.categoria)):m.tipo==='saida'&&!m.transf_id?'<span class="neg">sem categoria</span>':''}</td><td class="l">${esc(m.pessoa_nome||'')}</td><td class="l">${esc(m.documento||'')}</td><td class="pos">${m.tipo==='entrada'?fm(m.valor):''}</td><td class="neg">${m.tipo==='saida'?fm(m.valor):''}</td><td class="${saldo<0?'neg':'muted'}">${fm(saldo)}</td><td class="l">${gteSit(m)}</td></tr>`).join('')
-    +(linhas.length?'':`<tr><td class="l muted" colspan="9">Nada ${f==='rev'?'a revisar':f==='ok'?'revisado':'lançado'}${tp?(tp==='entrada'?' (só entradas)':' (só saídas)'):''} ${per?'neste período':'neste mês'}.</td></tr>`);
-  $('gteTiles').innerHTML=[['Saldo anterior',fm(GTE.ant),per?'acumulado antes de '+dBR(GTE.ini):'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Saídas',fm(S),'despesas e depósitos'],['Saldo final',fm(F),'em '+dBR(GTE.fim)],['A revisar',String(arev.length),per?'neste período':'neste mês']]
+    +(linhas.length?'':`<tr><td class="l muted" colspan="9">Nada ${f==='rev'?'a revisar':f==='ok'?'revisado':'lançado'}${tp?(tp==='entrada'?' (só entradas)':' (só saídas)'):''} neste período.</td></tr>`);
+  $('gteTiles').innerHTML=[['Saldo anterior',fm(GTE.ant),'acumulado antes de '+dBR(GTE.ini)],['Entradas',fm(E),'suprimentos do período'],['Saídas',fm(S),'despesas e depósitos'],['Saldo final',fm(F),'em '+dBR(GTE.fim)],['A revisar',String(arev.length),'neste período']]
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===3&&F<0?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gteRevTodos').hidden=!ccat.length;$('gteRevTodos').textContent=ccat.length===1?'Marcar como revisado o que já tem categoria':`Marcar como revisados os ${ccat.length} que já têm categoria`;
   $('gteNote').textContent='Clique num lançamento para corrigir e revisar. Ao revisar, o portal mostra os lançamentos semelhantes para você conferir e revisar todos de uma vez.';
@@ -6059,7 +6178,7 @@ $('gteAlerta').addEventListener('click',e=>{const b=e.target.closest('[data-te],
   if(b.dataset.tcc){if(escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;openView()}return}
   if(b.dataset.te==='abrir')return gteAbrir(GTE.alt.find(m=>m.id===b.dataset.id));
   b.disabled=true;gteResolve(b.closest('[data-tes]').dataset.tes,b.dataset.te)});
-['gteMes','gteFiltro','gteTipo','gteIni','gteFim'].forEach(id=>$(id).onchange=()=>id==='gteFiltro'||id==='gteTipo'?gteDesenha():renderGTes());
+['gteFiltro','gteTipo','gteIni','gteFim'].forEach(id=>$(id).onchange=()=>id==='gteFiltro'||id==='gteTipo'?gteDesenha():renderGTes());
 $('gteBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)gteAbrir(GTE.per.find(m=>m.id===tr.dataset.id))});
 $('gteBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gteAbrir(GTE.per.find(m=>m.id===tr.dataset.id))}});
 $('gteRevTodos').onclick=async()=>{
@@ -6932,6 +7051,8 @@ $('adFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-a
   finally{b.disabled=false}
 });
 
+// período no modelo do Bom Controle em todas as telas com De/Até
+[['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gteIni','gteFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
 })();
 </script>
