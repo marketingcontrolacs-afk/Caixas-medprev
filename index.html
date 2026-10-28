@@ -606,7 +606,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewRH" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Férias</h1><p class="sub" id="fSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
     </div>
     <div class="card block" id="fImpRes" hidden style="margin-top:16px"></div>
     <div class="tiles" id="fTiles"></div>
@@ -671,6 +671,8 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div><h1>Documentos</h1><p class="sub">Termos prontos com os dados da empresa e do colaborador: escolha o modelo e o colaborador, complete o que falta e gere o PDF para imprimir e assinar.</p></div>
     <div class="card block" style="margin-top:16px">
       <div class="fields"><label class="f">Modelo<select id="dcMod"></select></label><label class="f">Colaborador<select id="dcFunc"></select></label><label class="f">Data do documento<input id="dcData" type="date"></label></div>
+      <div class="row" style="margin-top:4px"><button type="button" class="btn small" id="dcVarBtn">Gerar para vários colaboradores</button><span class="note" id="dcVarN"></span></div>
+      <div id="dcVar" hidden style="margin-top:8px"></div>
       <div id="dcCampos"></div>
       <p class="note" id="dcEmp" style="margin:10px 0 0"></p>
       <div id="dcEmpBox" hidden></div>
@@ -2627,7 +2629,7 @@ function ferAlertas(r){
 }
 async function renderRH(){
   const lista=empresasDe('rh'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[];
-  const e=ehEsc(),vazio=t=>{$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
+  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
   $('fImport').hidden=!e;
   $('fSub').textContent=e?'Períodos aquisitivos, saldos e prazos de cada colaborador. O cliente informa a programação e o escritório confere.'
     :'Veja as férias que estão para vencer e informe a programação de cada colaborador.';
@@ -2648,9 +2650,11 @@ async function renderRH(){
       :p.status==='Devolvida'?'<span class="chip c-bad">Devolvida</span>':`<span class="chip c-done">${esc(p.status)}</span>`;
     return `<button class="lk" data-per="${r.id}" title="Ver detalhes e conferir">${ch}${al.length?`<span class="al">${al.length===1?esc(al[0]):al.length+' pendências'}</span>`:''}<span class="ob">${ob?esc(ob):podeLancar(r.cliente_id,'ferias')&&!FFORA.includes(r.situacao)&&(!p||['Proposta','Devolvida'].includes(p.status))?(p?'ver ou alterar':'lançar férias'):'ver detalhes'}</span></button>`;
   };
-  $('fHead').innerHTML=`<tr><th class="l">Matrícula</th><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Período aquisitivo</th><th>Limite para gozo</th><th>Direito</th><th>Saldo</th><th>Iniciar até</th><th class="l">Situação</th><th class="l">Programação</th></tr>`;
-  $('fBody').innerHTML=rows.map(r=>`<tr><td class="l">${esc(r.matricula)}</td><td class="l">${esc(r.nome)}</td>${todas?`<td class="l">${esc(nomeCli(r.cliente_id))}</td>`:''}<td class="l">${dAno2(r.inicio_aquisitivo)} a ${dAno2(r.fim_aquisitivo)}</td><td>${dCurto(r.limite_concessivo)}</td><td>${r.direito}</td><td>${r.saldo}</td><td>${dCurto(r.iniciar_ate)}</td><td class="l"><span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span></td><td class="l">${prog(r)}</td></tr>`).join('')
-    ||`<tr><td class="l muted" colspan="10">${f==='pend'?'Nenhuma pendência de férias.':'Nenhum período neste filtro.'}${e&&!FER.length?' Use “Importar planilha” para começar.':''}</td></tr>`;
+  // marcar para gerar a solicitação (e o escritório aprovar) de várias de uma vez: só quem tem programação com venda ou datas
+  const temSol=r=>{const p=FPROG[r.id];return p&&p.status!=='Devolvida'&&((FPARC[p.id]||[]).length||p.venda_total>0)};
+  $('fHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="fSelAll" title="Marcar todas as programações" aria-label="Marcar todas"></th><th class="l">Matrícula</th><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Período aquisitivo</th><th>Limite para gozo</th><th>Direito</th><th>Saldo</th><th>Iniciar até</th><th class="l">Situação</th><th class="l">Programação</th></tr>`;
+  $('fBody').innerHTML=rows.map(r=>`<tr><td>${temSol(r)?`<input type="checkbox" data-fsel="${r.id}"${FSEL.has(r.id)?' checked':''} aria-label="Marcar ${esc(r.nome)}">`:''}</td><td class="l">${esc(r.matricula)}</td><td class="l">${esc(r.nome)}</td>${todas?`<td class="l">${esc(nomeCli(r.cliente_id))}</td>`:''}<td class="l">${dAno2(r.inicio_aquisitivo)} a ${dAno2(r.fim_aquisitivo)}</td><td>${dCurto(r.limite_concessivo)}</td><td>${r.direito}</td><td>${r.saldo}</td><td>${dCurto(r.iniciar_ate)}</td><td class="l"><span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span></td><td class="l">${prog(r)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="11">${f==='pend'?'Nenhuma pendência de férias.':'Nenhum período neste filtro.'}${e&&!FER.length?' Use “Importar planilha” para começar.':''}</td></tr>`;
   const n=s=>FER.filter(r=>r.situacao===s).length,dias=s=>FER.filter(r=>r.situacao===s).reduce((x,r)=>x+r.saldo,0);
   const conf=FER.filter(conferir).length;
   $('fTiles').innerHTML=[['Vencidas',n('Vencida'),dias('Vencida')+' dias de saldo · pagamento em dobro'],['Prazo estourado',n('Prazo estourado'),'já não dá para gozar o saldo todo no prazo'],
@@ -2658,8 +2662,23 @@ async function renderRH(){
     [e?'Programações a conferir':'Aguardando o escritório',conf,e?'informadas pelo cliente':'programações enviadas']]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('fNote').textContent='Tudo é recalculado com a data de hoje, e o novo período aquisitivo abre sozinho quando o anterior completa 1 ano. “Iniciar até” é o último dia para começar as férias e gozar o saldo todo antes do limite. Clique na programação para ver os detalhes e as pendências.';
+  fSelBar();
 }
 $('fBody').addEventListener('click',ev=>{const b=ev.target.closest('.lk');if(b)abrirFerias(b.dataset.per)});
+const FSEL=new Set();
+function fSelBar(){const vis=[...document.querySelectorAll('#fBody [data-fsel]')].map(i=>i.dataset.fsel);
+  [...FSEL].forEach(id=>{if(!vis.includes(id))FSEL.delete(id)});
+  const n=FSEL.size,prop=[...FSEL].filter(id=>FPROG[id]?.status==='Proposta').length;
+  $('fSol').hidden=!n;$('fSol').textContent=`Solicitação para a contabilidade (${n})`;
+  $('fAprov').hidden=!(ehEsc()&&prop);$('fAprov').textContent=`Aprovar marcadas (${prop})`;
+  const all=$('fSelAll');if(all){all.checked=n>0&&n===vis.length;all.indeterminate=n>0&&n<vis.length;all.disabled=!vis.length}}
+$('fBody').addEventListener('change',ev=>{const c=ev.target.closest('[data-fsel]');if(!c)return;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel);fSelBar()});
+$('fHead').addEventListener('change',ev=>{if(ev.target.id!=='fSelAll')return;document.querySelectorAll('#fBody [data-fsel]').forEach(c=>{c.checked=ev.target.checked;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel)});fSelBar()});
+$('fSol').onclick=()=>gerarSolFerias(FER.filter(r=>FSEL.has(r.id)));
+$('fAprov').onclick=async ev=>{const ids=[...FSEL].map(id=>FPROG[id]).filter(p=>p?.status==='Proposta').map(p=>p.id);if(!ids.length)return;
+  if(!confirm(`Aprovar ${ids.length} programaç${ids.length===1?'ão':'ões'} de férias?`))return;
+  ev.target.disabled=true;const {error}=await sb.from('ferias_programacoes').update({status:'Aprovada',aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()}).in('id',ids);ev.target.disabled=false;
+  if(error){fail(error,'Não foi possível aprovar');return}toast(ids.length+(ids.length===1?' programação aprovada':' programações aprovadas'));renderRH()};
 
 // Detalhe de um período: programação, datas para a contabilidade, pendências e observações.
 // Quem lança (escritório ou usuário do cliente com "lançamento" em Férias) informa a venda e as datas aqui.
@@ -2718,19 +2737,25 @@ function abrirFerias(per){
   dlgFer.showModal();
 }
 // solicitação de férias para a contabilidade (Carol, 28/10): venda legal, divisão e as datas de gozo como vão para a contabilidade
-$('feSol').onclick=async()=>{
-  const {r,p}=FERDLG,cli=CLIENTES.find(c=>c.id===r.cliente_id),m=DOCMOD.find(x=>x.k==='ferias_contab');if(!p||!cli)return;
-  const ps=(FPARC[p.id]||[]).slice().sort((a,b)=>a.ordem-b.ordem);
-  const {data:fu}=await sb.from('funcionarios').select('*').eq('id',r.funcionario_id).maybeSingle();
+function solFerD(r,p,fu){
+  const cli=CLIENTES.find(c=>c.id===r.cliente_id),ps=(FPARC[p.id]||[]).slice().sort((a,b)=>a.ordem-b.ordem);
   const f={nome:r.nome,matricula:r.matricula||'',cpf:fu?.cpf||'',cargo:fu?.cargo||'',admissao:fu?.admissao||r.admissao||''};
   const x={aq_ini:r.inicio_aquisitivo,aq_fim:r.fim_aquisitivo,venda:Math.min(p.venda_total,Math.floor(r.direito/3)),
     parcelas:ps.map(q=>({inicio:q.inicio,fim:q.fim_contabilidade,dias:q.dias_contabilidade}))};
-  const D={emp:docEmp(cli),f,x,data:TODAY};
-  if(!docImprime(m,D))return;
-  if(p.status!=='Aprovada')toast('Atenção: esta programação ainda não foi aprovada pelo escritório.');
-  const {error}=await sb.from('rh_documentos').insert({cliente_id:cli.id,funcionario_id:r.funcionario_id,modelo:m.k,nome:r.nome,dados:D});
+  return {emp:docEmp(cli),f,x,data:TODAY};
+}
+// uma ou várias solicitações num PDF só (Carol, 28/10: conferir todas e depois escolher quem vai)
+async function gerarSolFerias(rs){
+  const m=DOCMOD.find(x=>x.k==='ferias_contab'),its=rs.map(r=>({r,p:FPROG[r.id]})).filter(o=>o.p);if(!its.length)return;
+  const {data:fus}=await sb.from('funcionarios').select('*').in('id',its.map(o=>o.r.funcionario_id));
+  const Ds=its.map(o=>solFerD(o.r,o.p,(fus||[]).find(f=>f.id===o.r.funcionario_id)));
+  if(!docImprime(m,Ds))return;
+  const nao=its.filter(o=>o.p.status!=='Aprovada').length;
+  if(nao)toast(`Atenção: ${nao===1?'1 programação ainda não foi aprovada':nao+' programações ainda não foram aprovadas'} pelo escritório.`);
+  const {error}=await sb.from('rh_documentos').insert(its.map((o,i)=>({cliente_id:o.r.cliente_id,funcionario_id:o.r.funcionario_id,modelo:m.k,nome:o.r.nome,dados:Ds[i]})));
   if(error)console.error(error);
-};
+}
+$('feSol').onclick=()=>{if(FERDLG?.p)gerarSolFerias([FERDLG.r])};
 async function salvarFerias(status){
   const {r,edita}=FERDLG,e=ehEsc(),bts=['feSave','feOk','feDev'],err=$('feErr');err.hidden=true;
   const erro=t=>{err.textContent=t;err.hidden=false;err.scrollIntoView({block:'nearest'})};
@@ -4615,6 +4640,7 @@ async function initDocs(){
     const {data}=await sb.from('funcionarios').select('*').eq('cliente_id',cli.id).neq('situacao','Desligado');
     DOCF=(data||[]).sort((a,b)=>a.nome.localeCompare(b.nome));
   }
+  DCVAR.clear();$('dcVar').hidden=true;$('dcVarN').textContent='';$('dcVarBtn').textContent='Gerar para vários colaboradores';
   $('dcFunc').innerHTML='<option value="">— digitar os dados —</option>'+DOCF.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('');
   docCampos();docEmpInfo();renderDocHist();
 }
@@ -4631,11 +4657,16 @@ function docCampos(){
       Array.from({length:8},(_,i)=>{const r=EPIPAD[i]||['','','',''];return `<tr><td><input type="date" value="${r[2]?D.data:''}"></td><td><select>${['','E','T','D'].map(o=>`<option${o===r[0]?' selected':''}>${o}</option>`).join('')}</select></td><td><input style="width:50px" value="${esc(r[1])}"></td><td><input value="${esc(r[2])}"></td><td><input value="${esc(r[3])}"></td></tr>`}).join('')}</tbody></table>
       <p class="note" style="margin:4px 0 0">Linhas em branco não saem no recibo (o recibo sempre tem espaço para mais itens).</p></div>`;
     return `<label class="f">${c.t}<input data-dx="${c.k}" type="${c.tp==='date'?'date':'text'}"${c.tp==='money'?' class="money" placeholder="0,00"':''} value="${esc(v)}"></label>`}).join('');
-  $('dcCampos').innerHTML=`<h3>Colaborador</h3><div class="fields">${fx}</div>${ex?`<h3>${esc(m.t)}</h3><div class="fields">${ex}</div>`:''}`;
+  const multi=DCVAR.size>0;
+  $('dcCampos').innerHTML=`<p class="note" id="dcMultiNota" style="margin:10px 0 0" hidden>Vai sair um documento para cada um dos <b>${DCVAR.size}</b> colaboradores marcados, num PDF só, com os dados do cadastro de cada um (o que faltar no cadastro sai com linha para preencher à mão).</p><div id="dcColBox"><h3>Colaborador</h3><div class="fields">${fx}</div></div>${ex?`<h3>${esc(m.t)}</h3><div class="fields">${ex}</div>`:''}`;
   const falta=f.id&&ehEsc()&&['cpf','cargo','setor'].some(k=>!f[k]);
   $('dcSalvaL').hidden=!(f.id&&ehEsc());$('dcSalva').checked=!!falta;
-  $('dcErr').hidden=true;
+  $('dcErr').hidden=true;dcMultiUI();
 }
+// modo "vários": troca os campos do colaborador pelo aviso, sem redesenhar (o que foi digitado fica)
+function dcMultiUI(){const multi=DCVAR.size>0,f=DOCF.find(x=>x.id===$('dcFunc').value);$('dcFunc').disabled=multi;
+  if($('dcColBox'))$('dcColBox').hidden=multi;if($('dcMultiNota')){$('dcMultiNota').hidden=!multi;$('dcMultiNota').querySelector('b').textContent=DCVAR.size}
+  if(multi)$('dcSalvaL').hidden=true;else $('dcSalvaL').hidden=!(f&&ehEsc())}
 function docEmpInfo(){
   const cli=cliAtual();if(!cli){$('dcEmp').textContent='';return}
   const E=docEmp(cli);
@@ -4653,19 +4684,32 @@ function docEmpInfo(){
       cli.doc_empresa=o;cli.cnpj=cnpj;toast('Dados da empresa salvos');docEmpInfo();docCampos()};
   };
 }
-$('dcMod').onchange=docCampos;$('dcFunc').onchange=docCampos;
+$('dcMod').onchange=docCampos;
+// gerar o mesmo documento para vários colaboradores (Carol, 28/10)
+const DCVAR=new Set();
+function dcVarRender(){const n=DCVAR.size;$('dcVarN').textContent=n?`${n} marcado${n===1?'':'s'}`:'';
+  $('dcVar').innerHTML=`<div class="row" style="gap:6px"><button type="button" class="btn small" data-dv="todos">Marcar todos</button><button type="button" class="btn small ghost" data-dv="nenhum">Desmarcar</button></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 12px;margin-top:6px">${DOCF.map(f=>`<label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" style="width:auto" data-dvf="${f.id}"${DCVAR.has(f.id)?' checked':''}>${esc(f.nome)}${f.cargo?` <span class="muted">· ${esc(f.cargo)}</span>`:''}</label>`).join('')||'<span class="muted">Nenhum colaborador ativo nesta empresa.</span>'}</div>`}
+$('dcVarBtn').onclick=()=>{const v=$('dcVar');v.hidden=!v.hidden;if(!v.hidden)dcVarRender();else{DCVAR.clear();dcVarTxt()}
+  $('dcVarBtn').textContent=v.hidden?'Gerar para vários colaboradores':'Voltar para um colaborador'};
+// só redesenha os campos quando entra ou sai do modo "vários" (para não apagar o que já foi digitado)
+const dcVarTxt=()=>{const n=DCVAR.size;$('dcVarN').textContent=n?`${n} marcado${n===1?'':'s'}`:'';dcMultiUI()};
+$('dcVar').addEventListener('change',e=>{const c=e.target.closest('[data-dvf]');if(!c)return;c.checked?DCVAR.add(c.dataset.dvf):DCVAR.delete(c.dataset.dvf);dcVarTxt()});
+$('dcVar').addEventListener('click',e=>{const b=e.target.closest('[data-dv]');if(!b)return;DCVAR.clear();if(b.dataset.dv==='todos')DOCF.forEach(f=>DCVAR.add(f.id));dcVarRender();dcVarTxt()});$('dcFunc').onchange=docCampos;
 $('dcData').onchange=()=>{const m=docModelo($('dcMod').value),d=$('dcData').value;
   // no comunicado de pendência, só atualiza a folha prevista (sem apagar as pendências já digitadas)
   if(m?.campos.some(c=>c.tp==='pend')){const el=document.querySelector('#dcCampos [data-dx="folha"]');if(el&&d)el.value=d.slice(5,7)+'/'+d.slice(0,4);return}
   if(m?.campos.some(c=>c.tp==='epi'||c.def))docCampos()};
+// D pode ser uma lista: o mesmo documento para vários colaboradores, um por página
 function docImprime(m,D){
+  const Ds=Array.isArray(D)?D:[D];if(!Ds.length)return false;
   const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return false}
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(m.t)} - ${esc(D.f.nome||'')}</title><style>
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(m.t)} - ${esc(Ds.length>1?Ds.length+' colaboradores':Ds[0].f.nome||'')}</title><style>
     body{font:11.5pt Arial,Helvetica,sans-serif;color:#000;margin:0;line-height:1.4}h1{font-size:12.5pt;text-align:center;margin:14px 0 16px}h2{font-size:11.5pt;margin:14px 0 4px}
     p{margin:0 0 8px;text-align:justify}.c{text-align:center}.id{text-align:left;line-height:1.7}.emp{margin-bottom:6px}.loc{margin-top:22px}ul{margin:0 0 8px;padding-left:22px}
     .ass{display:flex;gap:40px;justify-content:space-around;margin-top:46px;text-align:center;page-break-inside:avoid}.ass>div{flex:1;max-width:300px}.lin{border-top:1px solid #000;margin-bottom:4px}
     table{border-collapse:collapse;margin:8px 0}td,th{border:1px solid #000;padding:4px 6px;vertical-align:top}img{max-width:100%}table.epi{border-collapse:collapse;width:100%;margin:8px 0}table.epi td,table.epi th{border:1px solid #000;padding:5px 6px;text-align:left}table.grade td{height:20px}
-    @page{size:A4;margin:18mm 20mm}</style></head><body>${m.corpo(D)}
+    .pg+.pg{page-break-before:always}@page{size:A4;margin:18mm 20mm}</style></head><body>${Ds.map(d=>`<div class="pg">${m.corpo(d)}</div>`).join('')}
     <script>window.onload=()=>setTimeout(()=>window.print(),200)<\/script></body></html>`);
   w.document.close();return true;
 }
@@ -4678,8 +4722,14 @@ $('dcGerar').onclick=async()=>{
   if($('dcPend'))x.pend=[...$('dcPend').querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('input,textarea')].map(i=>i.value.trim())).filter(r=>r.some(Boolean));
   if(x.pend?.some(r=>r[3]&&!(parseMoney(r[3])>0))){err.textContent='Valor de pendência inválido. Use, por exemplo, 60,00.';err.hidden=false;return}
   (m.campos||[]).filter(c=>c.lembra&&x[c.k]).forEach(c=>{try{localStorage.setItem('doc_'+c.k,x[c.k])}catch(e){}});
-  if(!f.nome){err.textContent='Informe o nome do colaborador.';err.hidden=false;return}
   if(x.fundo&&!(parseMoney(x.fundo)>0)){err.textContent='Valor do fundo de caixa inválido.';err.hidden=false;return}
+  // vários colaboradores: o mesmo documento para cada um, com os dados do cadastro
+  if(DCVAR.size){const regs=DOCF.filter(r=>DCVAR.has(r.id)),data=$('dcData').value||TODAY,emp=docEmp(cli);
+    const Ds=regs.map(r=>({emp,f:{nome:r.nome,cpf:r.cpf||'',cargo:r.cargo||'',setor:r.setor||'',admissao:r.admissao||'',matricula:r.matricula||''},x,data}));
+    if(!docImprime(m,Ds))return;
+    const {error}=await sb.from('rh_documentos').insert(regs.map((r,i)=>({cliente_id:cli.id,funcionario_id:r.id,modelo:m.k,nome:r.nome,dados:Ds[i]})));
+    if(error)console.error(error);else renderDocHist();return}
+  if(!f.nome){err.textContent='Informe o nome do colaborador.';err.hidden=false;return}
   const D={emp:docEmp(cli),f,x,data:$('dcData').value||TODAY};
   if(!docImprime(m,D))return;
   // completa o cadastro com o que foi digitado (só o escritório altera o cadastro)
