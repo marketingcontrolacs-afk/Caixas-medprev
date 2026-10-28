@@ -143,6 +143,8 @@ $$ declare v numeric := round(coalesce(new.din_cont,0),2);
            d text := 'Dinheiro do caixa' || case when coalesce(new.caixa,1) > 1 then ' ' || new.caixa else '' end;
 begin
   if v <= 0 then delete from tesouraria where fechamento_id = new.id; return new; end if;
+  -- importação de histórico pelo SQL Editor (sem usuário) não gera suprimento: a planilha da tesouraria já traz
+  if new.enviado_por is null and auth.uid() is null then return new; end if;
   if exists (select 1 from tesouraria where fechamento_id = new.id) then
     update tesouraria set data = new.data, valor = v, descricao = d
      where fechamento_id = new.id and (data, valor, descricao) is distinct from (new.data, v, d);
