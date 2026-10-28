@@ -386,7 +386,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <!-- REPASSES DE PARCEIROS -->
   <section id="viewRep" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Repasses de parceiros</h1><p class="sub" id="pSub"></p></div>
+      <div><h1>Parceiros: cadastro e alterações</h1><p class="sub" id="pSub"></p></div>
       <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="pFiltro"><option value="ativos">Parceiros ativos</option><option value="alerta">Só com alerta</option><option value="inativos">Inativos</option></select></label><button class="btn" id="pDesc" hidden>+ Lançar desconto</button><button class="btn primary" id="pNovo">+ Novo parceiro</button></div>
     </div>
     <div class="alerta" id="pAlerta" hidden></div>
@@ -985,7 +985,7 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 const SEMPRE=['tarefas','avisos'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)||k.startsWith('cfg')&&ME.modulos_equipe.includes('cfg'));
-const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Repasses de parceiros',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
+const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Parceiros: cadastro e alterações',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas','repasse']],['Contabilidade',['contabil']]];
 // os dados da folha e das férias também servem às seções que dependem deles (igual ao banco, v38)
@@ -1085,7 +1085,7 @@ const NAV=[
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
   {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'repasse',t:'Repasses de parceiros',g:'Comunicação',s:'Dia a dia',ok:()=>temAcesso('repasse')},
+  {k:'repasse',t:'Parceiros: cadastro e alterações',g:'Comunicação',s:'Dia a dia',ok:()=>temAcesso('repasse')},
   {k:'bc',t:'Exportação Bom Controle',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'cfg',t:'Empresas e usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
