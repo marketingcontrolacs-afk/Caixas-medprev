@@ -2720,11 +2720,14 @@ const fimMes=comp=>{const d=new Date(comp+'T12:00');d.setMonth(d.getMonth()+1,0)
 const colsDe=cli=>(cli.folha_colunas&&cli.folha_colunas.length?cli.folha_colunas:FPADRAO).filter(c=>FCOL[c]);
 // Valor da célula: ajuste do escritório, ou fixo do cadastro somado ao que foi lançado no mês.
 // Devolve {v: valor para a planilha, z: formato do Excel, txt: texto da tela}
+const obsInterna=l=>l.descricao===PONTO&&/^\W*(faltas:|falta fora do banco|banco de horas:)/i.test(l.texto||'');
 function folCelula(f,c){
   const d=FCOL[c],aj=FOL.aj[f.id+'|'+c];
   if(aj!==undefined)return {...folTexto(aj,d.k),aj:true};
   const ls=FOL.lanc.filter(l=>l.funcionario_id===f.id&&l.coluna===c);let fx=d.fixo?d.fixo(f):d.k==='money'?ffNum(f,'fixo_'+c):null;
-  const textos=ls.filter(l=>l.texto).map(l=>l.texto);
+  // observações internas do ponto (faltas não descontadas, banco de horas) não vão para a folha da contabilidade,
+  // para não serem descontadas por engano (Carol, 28/10): ficam em Lançamentos do mês e no Espelho de ponto
+  const textos=ls.filter(l=>l.texto&&!(c==='observacoes'&&obsInterna(l))).map(l=>l.texto);
   if(c==='ajuda_dia')return ajudaDia(f,ls);
   if(d.k==='datas')return folDatas(ls);
   // fixo em texto (ex.: gratificação "Função") vai junto com os textos do mês
