@@ -4964,6 +4964,9 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
     if(d&&d.length!==11&&d.length!==14)return err('O CNPJ tem 14 números e o CPF tem 11.');
     const dup=d&&GFL.find(x=>x.id!==GFR?.id&&gfDig(x.documento)===d);
     if(dup)return err(`Já existe um cadastro com esse CNPJ/CPF: ${dup.nome}.`);
+    // o mesmo nome só com outro CNPJ; pessoa física nunca (o banco confere de novo, v58)
+    const k=pessoaChave(row.nome),igual=GFL.find(x=>x.id!==GFR?.id&&pessoaChave(x.nome)===k&&!(d.length===14&&gfDig(x.documento).length===14&&gfDig(x.documento)!==d));
+    if(igual)return err(`Já existe “${igual.nome}” no cadastro${igual.documento?' ('+igual.documento+')':''}. O mesmo nome só pode ser cadastrado de novo com outro CNPJ; pessoa física nunca.`);
   }
   if(!GFR&&contas)row.cliente_id=cli.id;
   $('gfSave').disabled=true;
@@ -4986,6 +4989,8 @@ const GTFORMAS=['Boleto','Pix','Transferência','Débito automático','Cartão',
 const gtP=()=>GT.tipo==='pagar';
 const dP=()=>GT.dlg==='pagar';   // o diálogo aberto é de conta a pagar (na movimentação, depende da conta)
 const abat=m=>r2(m.valor-(+m.juros||0)+(+m.desconto||0));   // quanto o movimento abate do título
+// mesma regra do banco (v58): sem acento, maiúsculas, pontuação e LTDA/ME/EPP/EIRELI/SA no fim
+const pessoaChave=t=>(t||'').toLowerCase().replace(/&/g,' e ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/( (ltda|me|epp|eireli|sa|s a|mei))+$/,'');
 const v45=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/fin_titulos|fin_movimentos|fin_contas/.test(e.message||''));
 const v45Msg='Este módulo precisa da atualização v45 do banco. Rode o SQL no Supabase.';
 async function todas(q){const out=[];for(let i=0;;i+=1000){const {data,error}=await q().range(i,i+999);if(error)throw error;out.push(...data);if(data.length<1000)return out}}
@@ -5998,14 +6003,14 @@ function gteDesenha(){
   const linhas=GTE.per.map(m=>{saldo=r2(saldo+(m.tipo==='entrada'?1:-1)*m.valor);return {m,saldo}}).filter(({m})=>f==='todos'||(f==='rev'?!m.revisado||m.tes_alteracao:m.revisado&&!m.tes_alteracao));
   const E=r2(GTE.per.filter(m=>m.tipo==='entrada').reduce((x,m)=>x+(+m.valor),0)),S=r2(GTE.per.filter(m=>m.tipo==='saida').reduce((x,m)=>x+(+m.valor),0)),F=r2(GTE.ant+E-S);
   const arev=GTE.per.filter(m=>m.tes_id&&!m.revisado),ccat=arev.filter(m=>m.categoria||m.tipo==='entrada'||m.transf_id);
-  $('gteHead').innerHTML='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th><th class="l">Situação</th></tr>';
+  $('gteHead').innerHTML='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Cliente ou fornecedor</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th><th class="l">Situação</th></tr>';
   $('gteBody').innerHTML=`<tr><td></td><td class="l"></td><td class="l muted" colspan="5">Saldo anterior</td><td class="${GTE.ant<0?'neg':''}"><b>${fm(GTE.ant)}</b></td><td></td></tr>`
     +linhas.map(({m,saldo})=>`<tr class="click${m.tes_alteracao?' pend':''}" data-id="${m.id}" tabindex="0"><td>${dBR(m.data)}</td><td class="l">${esc(m.tes_original?.tipo||(m.tipo==='entrada'?'Entrada':'Saída'))}</td><td class="l">${esc(m.descricao||'')||mu('—')}${m.transf_id?` ${mu('· para o banco')}`:''}<br>${m.categoria?mu(esc(m.categoria)):m.tipo==='saida'&&!m.transf_id?'<span class="neg">sem categoria</span>':''}</td><td class="l">${esc(m.pessoa_nome||'')}</td><td class="l">${esc(m.documento||'')}</td><td class="pos">${m.tipo==='entrada'?fm(m.valor):''}</td><td class="neg">${m.tipo==='saida'?fm(m.valor):''}</td><td class="${saldo<0?'neg':'muted'}">${fm(saldo)}</td><td class="l">${gteSit(m)}</td></tr>`).join('')
     +(linhas.length?'':`<tr><td class="l muted" colspan="9">Nada ${f==='rev'?'a revisar':f==='ok'?'revisado':'lançado'} neste mês.</td></tr>`);
   $('gteTiles').innerHTML=[['Saldo anterior',fm(GTE.ant),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Saídas',fm(S),'despesas e depósitos'],['Saldo final',fm(F),'em '+dBR(GTE.fim)],['A revisar',String(arev.length),'neste mês']]
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===3&&F<0?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gteRevTodos').hidden=!ccat.length;$('gteRevTodos').textContent=ccat.length===1?'Marcar como revisado o que já tem categoria':`Marcar como revisados os ${ccat.length} que já têm categoria`;
-  $('gteNote').textContent='Clique num lançamento para corrigir e revisar. Ao revisar, marque “fazer o mesmo nos iguais” para aplicar a categoria e o fornecedor aos lançamentos com a mesma descrição, inclusive os que o cliente lançar depois.';
+  $('gteNote').textContent='Clique num lançamento para corrigir e revisar. Ao revisar, o portal mostra os lançamentos semelhantes para você conferir e revisar todos de uma vez.';
 }
 // alterações do cliente depois da revisão, de qualquer mês, no topo; e as outras empresas com alteração
 async function gteAlertas(cli){
@@ -6043,52 +6048,82 @@ $('gteRevTodos').onclick=async()=>{
   const {error}=await sb.from('fin_movimentos').update({revisado:true}).in('id',ids);if(error)return fail(error);toast('Lançamentos revisados');renderGTes();
 };
 // quantos lançamentos ainda a revisar têm a mesma descrição do cliente (o "fazer o mesmo nos iguais")
-const gteIguais=m=>sb.from('fin_movimentos').select('id',{count:'exact',head:true}).eq('conta_id',m.conta_id).eq('tes_chave',m.tes_chave).eq('revisado',false).eq('tes_original->>tipo',m.tes_original?.tipo||'').neq('id',m.id);
+// lançamentos ainda a revisar parecidos com o revisado: os iguais (mesma descrição do cliente) vêm marcados;
+// os que começam com a mesma palavra aparecem desmarcados, para a Carol conferir antes
+async function gteSemelhantes(m){
+  const tp=m.tes_original?.tipo||'',p1=(m.tes_chave||'').split(' ')[0];
+  const base=()=>sb.from('fin_movimentos').select('id,data,valor,descricao,categoria,pessoa_nome,tes_chave,tes_original').eq('conta_id',m.conta_id).eq('revisado',false).is('transf_id',null).eq('tes_original->>tipo',tp).neq('id',m.id).order('data').limit(300);
+  const [a,b]=await Promise.all([base().eq('tes_chave',m.tes_chave),p1.length>=4?base().like('tes_chave',p1+'%').neq('tes_chave',m.tes_chave):{data:[]}]);
+  if(a.error)throw a.error;
+  return [...(a.data||[]).map(x=>({...x,igual:true})),...(b.data||[]).map(x=>({...x,igual:false}))];
+}
 async function gteAbrir(m){
-  if(!m)return;GTE.m=m;const cli=cliAtual(),o=m.tes_original||{},v=k=>esc(m[k]??'');
-  let plano=[],docs=[],nIg=0,forn=[];
-  try{const [p,d,ig,fs]=await Promise.all([planoDe(cli),m.tes_id?sb.from('documentos').select('*').eq('registro_id',m.tes_id):{data:[]},m.tes_id&&m.tes_chave?gteIguais(m):{count:0},gfPessoasDe(cli.id,'fornecedor').catch(()=>[])]);
-    plano=p;docs=d.data||[];nIg=ig.count||0;forn=fs}catch(e){console.error(e)}
+  if(!m)return;GTE.m=m;GTE.sem=null;const cli=cliAtual(),o=m.tes_original||{},v=k=>esc(m[k]??''),ent=m.tipo==='entrada';
+  let plano=[],docs=[],pes=[],contas=[],leg=null;
+  try{const [p,d,ps,cs,lg]=await Promise.all([planoDe(cli),m.tes_id?sb.from('documentos').select('*').eq('registro_id',m.tes_id):{data:[]},gfPessoasDe(cli.id,ent?'cliente':'fornecedor').catch(()=>[]),
+      gfContasDe(cli.id,true),m.transf_id?sb.from('fin_movimentos').select('id,conta_id').eq('transf_id',m.transf_id).neq('id',m.id).maybeSingle():{data:null}]);
+    plano=p;docs=d.data||[];pes=ps;contas=cs.filter(c=>c.id!==m.conta_id&&c.ativo!==false&&!c.espelho_tes);leg=lg.data}catch(e){console.error(e)}
+  GTE.leg=leg;
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
-  const urls=await signed(docs.map(d=>d.caminho).filter(Boolean));
+  const urls=await signed(docs.map(d=>d.caminho).filter(Boolean)),tr=!!m.transf_id;
   $('gtdTitle').textContent='Tesouraria · '+(o.descricao||m.descricao||'');$('gtdChip').innerHTML=gteSit(m);
   $('gtdBody').innerHTML=(m.tes_alteracao?`<div class="alerta bad" style="margin:0"><b>${m.tes_alteracao.acao==='excluido'?'Excluído':'Alterado'} pelo cliente depois da sua revisão</b>${gteDif(m.tes_alteracao)}<div class="row"><button type="button" class="btn small primary" data-act="te_aplicar">${m.tes_alteracao.acao==='excluido'?'Excluir do espelho':'Aplicar a alteração'}</button><button type="button" class="btn small" data-act="te_manter">Manter a minha versão</button></div></div>`:'')
     +(m.tes_id?`<div class="cmp"><div><span class="note">Como o cliente lançou</span><br><b>${esc(o.tipo||'')}</b> · ${o.data?dBR(o.data):''} · <b>${fm(o.valor)}</b><br>${esc(o.descricao||'')}${o.documento?' · doc. '+esc(o.documento):''}${o.conta_destino?'<br>Banco: '+esc(o.conta_destino):''}</div><div><span class="note">Documentos do cliente</span><br>${docs.map(d=>anexoView(d,urls[d.caminho],true)).join(' ')||'<span class="muted">nenhum</span>'}</div></div>`:'')
     +`<div class="fields">
+    ${ent?'':`<label class="f wide">Esta saída é<select id="te_natureza"><option value="pag"${tr?'':' selected'}>Um pagamento (despesa)</option><option value="transf"${tr?' selected':''}>Uma transferência para outra conta da empresa (ex.: depósito no banco)</option></select></label>
+    <label class="f wide" id="te_destBox"${tr?'':' hidden'}>Conta de destino<select id="te_dest"><option value="">${contas.length?'Escolha a conta':'Nenhuma outra conta cadastrada nesta empresa'}</option>${contas.map(c=>`<option value="${c.id}"${leg?.conta_id===c.id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
     <label class="f">Data *<input type="date" id="te_data" value="${m.data}"></label>
     <label class="f">Valor *<input id="te_valor" class="money" inputmode="decimal" value="${showMoney(m.valor)}"></label>
     <label class="f wide">Descrição *<input id="te_descricao" value="${v('descricao')}"></label>
-    <label class="f">Fornecedor<input id="te_pessoa" list="teForn" value="${v('pessoa_nome')}"><datalist id="teForn">${forn.map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist></label>
+    <label class="f" data-pag>${ent?'Cliente':'Fornecedor'}<input id="te_pessoa" list="tePes" value="${v('pessoa_nome')}"><datalist id="tePes">${pes.map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist></label>
     <label class="f">Documento<input id="te_documento" value="${v('documento')}"></label>
-    <label class="f wide">Categoria<select id="te_categoria"><option value=""></option>${cats.map(x=>`<option${m.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
-  </div>${m.transf_id?'<p class="note" style="margin:0">Depósito: a data e o valor valem também para a entrada no banco.</p>':''}
-  ${m.tes_id&&m.tes_chave?`<label class="row" style="gap:8px;font-weight:600;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="te_iguais" style="width:auto;margin-top:3px" checked><span> Fazer o mesmo (categoria, fornecedor e descrição) nos lançamentos iguais${nIg?` · ${nIg} a revisar agora`:''} e nos próximos que o cliente lançar como “${esc(o.descricao||'')}”</span></label>`:''}
+    <label class="f wide" data-pag>Categoria<select id="te_categoria"><option value=""></option>${cats.map(x=>`<option${m.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+  </div>${tr?'<p class="note" style="margin:0">Transferência: a data e o valor valem também para a entrada na conta de destino.</p>':''}
   <p class="err" id="gtErr" hidden></p>`;
+  const nat=$('te_natureza');if(nat){const aj=()=>{const t=nat.value==='transf';$('te_destBox').hidden=!t;$('gtdBody').querySelectorAll('[data-pag]').forEach(x=>x.hidden=t)};nat.onchange=aj;aj()}
   $('gtdFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${m.revisado&&m.tes_id?'<button type="button" class="btn" data-act="te_desrev">Voltar para “a revisar”</button>':''}<button type="button" class="btn primary" data-act="te_salvar">Salvar e marcar revisado</button>`;
   $('gtErr').hidden=true;dlgGT.showModal();
+}
+// depois de salvar: os semelhantes para uma conferida rápida e revisar todos de uma vez
+function gteMostraSem(m,ls,meu){
+  const o=m.tes_original||{},ig=ls.filter(x=>x.igual).length;
+  $('gtdTitle').textContent='Lançamentos semelhantes';$('gtdChip').innerHTML='';
+  $('gtdBody').innerHTML=`<p style="margin:0">Encontrei ${ls.length} ${ls.length===1?'lançamento a revisar parecido':'lançamentos a revisar parecidos'} com “${esc(o.descricao||'')}”. Confira e revise de uma vez com:</p>
+    <div class="cmp"><div><span class="note">${m.tipo==='entrada'?'Cliente':'Fornecedor'}</span><br><b>${esc(meu.pessoa_nome||'—')}</b></div><div><span class="note">Categoria</span><br><b>${esc(meu.categoria||'—')}</b></div>${meu.descricao!==o.descricao?`<div><span class="note">Descrição</span><br><b>${esc(meu.descricao)}</b></div>`:''}</div>
+    <div class="tablebox" style="margin:0;max-height:45vh"><table><thead><tr><th><input type="checkbox" id="te_todos" style="width:auto"${ig===ls.length?' checked':''} aria-label="Marcar todos"></th><th>Data</th><th class="l">Como o cliente lançou</th><th>Valor</th><th class="l">Hoje</th></tr></thead><tbody>${
+      ls.map(x=>`<tr><td><input type="checkbox" data-sem="${x.id}" style="width:auto"${x.igual?' checked':''}></td><td>${dBR(x.data)}</td><td class="l">${esc(x.tes_original?.descricao||x.descricao||'')}${x.igual?'':' <span class="chip c-warn">parecido</span>'}</td><td>${fm(x.valor)}</td><td class="l muted">${esc([x.pessoa_nome,x.categoria].filter(Boolean).join(' · ')||'—')}</td></tr>`).join('')}</tbody></table></div>
+    <label class="row" style="gap:8px;font-weight:600;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="te_regra" style="width:auto;margin-top:3px" checked><span>Fazer o mesmo nos próximos que o cliente lançar como “${esc(o.descricao||'')}”</span></label><p class="err" id="gtErr" hidden></p>`;
+  $('te_todos').onchange=e=>$('gtdBody').querySelectorAll('[data-sem]').forEach(c=>c.checked=e.target.checked);
+  $('gtdFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-act="te_semnao">Agora não</button><button type="button" class="btn primary" data-act="te_semok">Revisar os marcados</button>`;
 }
 async function gteAcao(a){
   const m=GTE.m,cli=cliAtual();
   try{
     if(a==='te_aplicar'||a==='te_manter'){dlgGT.close();return gteResolve(m.tes_id,a==='te_aplicar'?'aplicar':'manter')}
     if(a==='te_desrev'){const {error}=await sb.from('fin_movimentos').update({revisado:false,por_regra:false}).eq('id',m.id);if(error)throw error;dlgGT.close();toast('Voltou para “a revisar”');return renderGTes()}
-    const val=k=>($('te_'+k).value||'').trim()||null,valor=parseMoney($('te_valor').value);
-    if(!val('data'))return gtErr('Informe a data.');if(valor==null||isNaN(valor)||valor<=0)return gtErr('Informe o valor, por exemplo 1.234,56.');if(!val('descricao'))return gtErr('Informe a descrição.');
-    const base={data:val('data'),valor:r2(valor),documento:val('documento')},meu={descricao:val('descricao'),pessoa_nome:val('pessoa'),categoria:val('categoria')};
-    let q=sb.from('fin_movimentos').update(base);q=m.transf_id?q.eq('transf_id',m.transf_id):q.eq('id',m.id);
-    const {error:e1}=await q;if(e1)throw e1;
-    const {error:e2}=await sb.from('fin_movimentos').update({...meu,revisado:true,por_regra:false}).eq('id',m.id);if(e2)throw e2;
-    let n=0;
-    if($('te_iguais')?.checked){
-      const o=m.tes_original||{},regra={cliente_id:cli.id,tipo:o.tipo,chave:m.tes_chave,categoria:meu.categoria,pessoa_nome:meu.pessoa_nome,descricao:meu.descricao!==o.descricao?meu.descricao:null};
-      const {error:e3}=await sb.from('fin_tes_regras').upsert(regra,{onConflict:'cliente_id,tipo,chave'});if(e3)throw e3;
-      const upd={categoria:meu.categoria,pessoa_nome:meu.pessoa_nome,revisado:true,por_regra:true};if(regra.descricao)upd.descricao=regra.descricao;
-      const {data:ig,error:e4}=await sb.from('fin_movimentos').update(upd).eq('conta_id',m.conta_id).eq('tes_chave',m.tes_chave).eq('revisado',false).eq('tes_original->>tipo',o.tipo||'').select('id');if(e4)throw e4;n=(ig||[]).length;
+    if(a==='te_semnao'){dlgGT.close();return renderGTes()}
+    if(a==='te_semok'){
+      const S=GTE.sem,ids=[...$('gtdBody').querySelectorAll('[data-sem]:checked')].map(c=>c.dataset.sem),o=m.tes_original||{};
+      if($('te_regra').checked){const {error}=await sb.from('fin_tes_regras').upsert({cliente_id:cli.id,tipo:o.tipo,chave:m.tes_chave,categoria:S.categoria,pessoa_nome:S.pessoa_nome,descricao:S.descricao!==o.descricao?S.descricao:null},{onConflict:'cliente_id,tipo,chave'});if(error)throw error}
+      if(ids.length){const upd={categoria:S.categoria,pessoa_nome:S.pessoa_nome,revisado:true,por_regra:true};if(S.descricao!==o.descricao)upd.descricao=S.descricao;
+        const {error}=await sb.from('fin_movimentos').update(upd).in('id',ids);if(error)throw error}
+      dlgGT.close();toast(ids.length?`Mais ${ids.length} ${ids.length===1?'lançamento revisado':'lançamentos revisados'}`:'Regra salva');return renderGTes();
     }
-    dlgGT.close();toast('Lançamento revisado'+(n?` e mais ${n} iguais`:''));renderGTes();
+    const val=k=>($('te_'+k)?.value||'').trim()||null,valor=parseMoney($('te_valor').value),transf=$('te_natureza')?.value==='transf';
+    if(!val('data'))return gtErr('Informe a data.');if(valor==null||isNaN(valor)||valor<=0)return gtErr('Informe o valor, por exemplo 1.234,56.');if(!val('descricao'))return gtErr('Informe a descrição.');
+    if(transf&&!val('dest'))return gtErr('Escolha a conta de destino da transferência.');
+    const base={data:val('data'),valor:r2(valor),documento:val('documento')},meu=transf?{descricao:val('descricao'),pessoa_nome:null,categoria:null}:{descricao:val('descricao'),pessoa_nome:val('pessoa'),categoria:val('categoria')};
+    let tf=m.transf_id||null;
+    if(transf){ // a perna de entrada na conta de destino
+      tf=tf||crypto.randomUUID();
+      if(GTE.leg){const {error}=await sb.from('fin_movimentos').update({conta_id:val('dest'),...base,descricao:meu.descricao}).eq('id',GTE.leg.id);if(error)throw error}
+      else{const {error}=await sb.from('fin_movimentos').insert({cliente_id:cli.id,conta_id:val('dest'),tipo:'entrada',transf_id:tf,...base,descricao:meu.descricao,tes_id:m.tes_id,tes_chave:m.tes_chave,tes_original:m.tes_original,revisado:true});if(error)throw error}
+    }else if(tf){const {error}=await sb.from('fin_movimentos').delete().eq('transf_id',tf).neq('id',m.id);if(error)throw error;tf=null}
+    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,transf_id:tf,revisado:true,por_regra:false}).eq('id',m.id);if(e1)throw e1;
+    if(!transf&&m.tes_id&&m.tes_chave){const ls=await gteSemelhantes(m);if(ls.length){GTE.sem=meu;toast('Lançamento revisado');return gteMostraSem(m,ls,meu)}}
+    dlgGT.close();toast('Lançamento revisado');renderGTes();
   }catch(e){console.error(e);gtErr(v57(e)?v57Msg:e.message||'Não foi possível salvar.')}
 }
-
 // ---------- Extrato da conta: saldo anterior, entradas e saídas e saldo de cada dia ----------
 const GX={conta:null,ant:0,per:[],ini:'',fim:''};
 function gxVazio(t,cl){$('gxHead').innerHTML='';$('gxTiles').innerHTML='';$('gxBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gxNote').textContent='';$('gxBaixar').hidden=true}
@@ -6154,16 +6189,16 @@ async function abrirAvulso(m){
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
   $('gtdTitle').textContent=(m?'Lançamento avulso':'Novo lançamento avulso')+' · '+c.nome;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<div class="fields">
-    <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>Transferência para outra conta (desta ou de outra empresa do grupo)</option>`:''}</select></label>
+    <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída: pagamento (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>Saída: transferência para outra conta (desta ou de outra empresa do grupo)</option>`:''}</select></label>
     <label class="f" id="ga_destBox"${tipo==='transf'&&!m?'':' hidden'}>Conta de destino<select id="ga_dest">${optContas(outras,cli)}</select></label>
     <label class="f">Data *<input type="date" id="ga_data" value="${m?m.data:TODAY}"></label>
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
     <label class="f">Categoria<select id="ga_categoria"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
-    <label class="f">Fornecedor ou cliente<input id="ga_pessoa" value="${v('pessoa_nome')}"></label>
+    <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" value="${v('pessoa_nome')}"></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
   </div>${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}<p class="err" id="gtErr" hidden></p>`;
-  $('ga_tipo').onchange=()=>$('ga_destBox').hidden=$('ga_tipo').value!=='transf';
+  $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf'};
   $('gtdFoot').innerHTML=`${m?'<button type="button" class="btn ghost" data-act="av_apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="av_salvar">Salvar</button>`;
   dlgGT.showModal();
 }
