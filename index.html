@@ -4974,12 +4974,12 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
   const {error}=GFR?await sb.from(tb).update(row).eq('id',GFR.id):await sb.from(tb).insert(row);
   $('gfSave').disabled=false;
   if(error){console.error(error);return err(v52(error)?v52Msg:v48(error)?v48Msg:/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')?'O endereço e a situação na Receita precisam da atualização v49 do banco. Rode o SQL no Supabase.':error.message||'Não foi possível salvar.')}
-  toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';GFP.key='';GFC.cid='';renderGF();
+  toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';GFP.key='';GFPT.cid=null;GFC.cid='';renderGF();
 });
 $('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já tiver lançamentos, prefira desmarcar “Ativo”.`))return;
   const {error}=await sb.from(gfTab==='contas'?'fin_contas':'fin_pessoas').delete().eq('id',GFR.id);
   if(error)return fail(error,'Não foi possível apagar');
-  toast('Cadastro apagado');dlgGF.close();GFKEY='';GFP.key='';GFC.cid='';renderGF()};
+  toast('Cadastro apagado');dlgGF.close();GFKEY='';GFP.key='';GFPT.cid=null;GFC.cid='';renderGF()};
 // ---------- Gestão financeira › Contas a pagar e a receber e Extrato da conta (v45) ----------
 // fin_titulos = o que vence (uma linha por parcela); fin_movimentos = o que já entrou ou saiu da conta.
 // A baixa de um título gera o movimento; o extrato da conta é a lista dos movimentos, dia a dia.
@@ -4998,9 +4998,20 @@ async function gfContasDe(cid,forcar){
   if(forcar||GFC.cid!==cid){const {data,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cid).order('nome');if(error)throw error;GFC={cid,lista:data||[]}}
   return GFC.lista;
 }
+// todos os cadastros ativos da empresa (e os que valem para todas), clientes e fornecedores juntos
+let GFPT={cid:null,lista:[]};
+async function gfPessoasTodas(cid){
+  if(GFPT.cid!==cid)GFPT={cid,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,papel').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'))};
+  return GFPT.lista;
+}
+// nas entradas os clientes vêm primeiro; nas saídas, os fornecedores
+const pesOpts=(ls,ent)=>[...ls].sort((a,b)=>((a.papel===(ent?'fornecedor':'cliente'))-(b.papel===(ent?'fornecedor':'cliente')))||a.nome.localeCompare(b.nome))
+  .map(p=>`<option value="${esc(p.nome)}">${p.fantasia&&p.fantasia!==p.nome?esc(p.fantasia)+' · ':''}${p.papel==='ambos'?'cliente e fornecedor':p.papel}</option>`).join('');
 async function gfPessoasDe(cid,papel){
   const key=cid+'|'+papel;
-  if(GFP.key!==key){GFP={key,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo').or(`cliente_id.eq.${cid},cliente_id.is.null`).in('papel',[papel,'ambos']).eq('ativo',true).order('nome'))}}
+  // todos os cadastros, com os do papel pedido (cliente ou fornecedor) primeiro
+  if(GFP.key!==key){const ls=await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo,papel').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'));
+    GFP={key,lista:ls.filter(p=>p.papel===papel||p.papel==='ambos').concat(ls.filter(p=>p.papel!==papel&&p.papel!=='ambos'))}}
   return GFP.lista;
 }
 const contaNome=id=>GFC.lista.find(c=>c.id===id)?.nome||(c=>c?c.nome+' · '+(CLIENTES.find(x=>x.id===c.cliente_id)?.nome||''):'')(CGRUPO.find(c=>c.id===id));
@@ -6060,7 +6071,7 @@ async function gteSemelhantes(m){
 async function gteAbrir(m){
   if(!m)return;GTE.m=m;GTE.sem=null;const cli=cliAtual(),o=m.tes_original||{},v=k=>esc(m[k]??''),ent=m.tipo==='entrada';
   let plano=[],docs=[],pes=[],contas=[],leg=null;
-  try{const [p,d,ps,cs,lg]=await Promise.all([planoDe(cli),m.tes_id?sb.from('documentos').select('*').eq('registro_id',m.tes_id):{data:[]},gfPessoasDe(cli.id,ent?'cliente':'fornecedor').catch(()=>[]),
+  try{const [p,d,ps,cs,lg]=await Promise.all([planoDe(cli),m.tes_id?sb.from('documentos').select('*').eq('registro_id',m.tes_id):{data:[]},gfPessoasTodas(cli.id).catch(()=>[]),
       gfContasDe(cli.id,true),m.transf_id?sb.from('fin_movimentos').select('id,conta_id').eq('transf_id',m.transf_id).neq('id',m.id).maybeSingle():{data:null}]);
     plano=p;docs=d.data||[];pes=ps;contas=cs.filter(c=>c.id!==m.conta_id&&c.ativo!==false&&!c.espelho_tes);leg=lg.data}catch(e){console.error(e)}
   GTE.leg=leg;
@@ -6075,7 +6086,7 @@ async function gteAbrir(m){
     <label class="f">Data *<input type="date" id="te_data" value="${m.data}"></label>
     <label class="f">Valor *<input id="te_valor" class="money" inputmode="decimal" value="${showMoney(m.valor)}"></label>
     <label class="f wide">Descrição *<input id="te_descricao" value="${v('descricao')}"></label>
-    <label class="f" data-pag>${ent?'Cliente':'Fornecedor'}<input id="te_pessoa" list="tePes" value="${v('pessoa_nome')}"><datalist id="tePes">${pes.map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist></label>
+    <label class="f" data-pag>${ent?'Cliente':'Fornecedor'}<input id="te_pessoa" list="tePes" value="${v('pessoa_nome')}"><datalist id="tePes">${pesOpts(pes,ent)}</datalist></label>
     <label class="f">Documento<input id="te_documento" value="${v('documento')}"></label>
     <label class="f wide" data-pag>Categoria<select id="te_categoria"><option value=""></option>${cats.map(x=>`<option${m.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
   </div>${tr?'<p class="note" style="margin:0">Transferência: a data e o valor valem também para a entrada na conta de destino.</p>':''}
@@ -6183,7 +6194,7 @@ $('gxAvulso').onclick=()=>abrirAvulso(null);
 $('gxBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirAvulso(GX.per.find(m=>m.id===tr.dataset.id))});
 $('gxBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirAvulso(GX.per.find(m=>m.id===tr.dataset.id))}});
 async function abrirAvulso(m){
-  GXR=m;const cli=cliAtual();let plano=[],outras=[];try{[plano,outras]=await Promise.all([planoDe(cli),contasGrupo(cli)])}catch(e){console.error(e)}
+  GXR=m;const cli=cliAtual();let plano=[],outras=[],pes=[];try{[plano,outras,pes]=await Promise.all([planoDe(cli),contasGrupo(cli),gfPessoasTodas(cli.id).catch(()=>[])])}catch(e){console.error(e)}
   const c=GX.conta,v=k=>esc(m?.[k]??'');outras=outras.filter(x=>x.id!==c.id);
   const tipo=m?(m.transf_id?'transf':m.tipo):'saida';
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
@@ -6195,7 +6206,7 @@ async function abrirAvulso(m){
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
     <label class="f">Categoria<select id="ga_categoria"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
-    <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" value="${v('pessoa_nome')}"></label>
+    <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}"><datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
   </div>${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}<p class="err" id="gtErr" hidden></p>`;
   $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf'};
