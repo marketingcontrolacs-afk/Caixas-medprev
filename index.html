@@ -3268,9 +3268,10 @@ $('ptBar').addEventListener('click',async ev=>{
 // Edição direta das células (escritório): o valor vale só para este mês e fica guardado como ajuste.
 // Os fixos do cadastro continuam iguais; para mudar de vez, use “Colaboradores e valores fixos”.
 // 📌 ao lado do valor: marcado = fixo no cadastro (entra todo mês); clicar marca ou desmarca (Carol, 27/10)
+// ↺ e 📌 ficam fora do Tab: o Tab vai direto para a próxima célula (Carol, 28/10)
 const folTemFixo=(f,c)=>{const k=fixoCampo(c),v=k&&fxLer(f,k);return v!=null&&v!==''&&v!==false};
-const folFixoBtn=(f,c)=>{const on=folTemFixo(f,c);return `<button type="button" class="ffixo${on?' on':''}" data-f="${f.id}" data-c="${c}" title="${on?'Fixo: entra todo mês. Clique para deixar de ser fixo':'Marcar como fixo: o valor entra todo mês'}" aria-label="${on?'Fixo (clique para tirar)':'Marcar como fixo'}" aria-pressed="${on}">📌</button>`};
-const folInput=(f,c,x)=>`<span class="fin"><input data-f="${f.id}" data-c="${c}" value="${esc(x.txt)}" placeholder="–" aria-label="${esc(f.nome+' · '+FNOME(c))}" title="${x.aj?'Alterado neste mês. ':''}Altere aqui para este mês">${x.aj?`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`:''}${fixoCampo(c)&&(x.txt||folTemFixo(f,c))?folFixoBtn(f,c):''}</span>`;
+const folFixoBtn=(f,c)=>{const on=folTemFixo(f,c);return `<button type="button" tabindex="-1" class="ffixo${on?' on':''}" data-f="${f.id}" data-c="${c}" title="${on?'Fixo: entra todo mês. Clique para deixar de ser fixo':'Marcar como fixo: o valor entra todo mês'}" aria-label="${on?'Fixo (clique para tirar)':'Marcar como fixo'}" aria-pressed="${on}">📌</button>`};
+const folInput=(f,c,x)=>`<span class="fin"><input data-f="${f.id}" data-c="${c}" value="${esc(x.txt)}" placeholder="–" aria-label="${esc(f.nome+' · '+FNOME(c))}" title="${x.aj?'Alterado neste mês. ':''}Altere aqui para este mês">${x.aj?`<button type="button" tabindex="-1" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`:''}${fixoCampo(c)&&(x.txt||folTemFixo(f,c))?folFixoBtn(f,c):''}</span>`;
 $('folGrid').addEventListener('change',async ev=>{
   const i=ev.target.closest('.fin input');if(!i)return;const f=FOL.func.find(x=>x.id===i.dataset.f),c=i.dataset.c,k=f.id+'|'+c,v=i.value.trim();
   if(FOL.aj[k]===undefined&&v===folCelula(f,c).txt)return;
@@ -3282,7 +3283,7 @@ async function folAjusta(f,c,v,i){
   if(error){fail(error);return}
   FOL.aj[k]=v;const x=folCelula(f,c),td=i.closest('td');td.classList.add('fadj');
   if(document.activeElement!==i)i.value=x.txt;
-  if(!td.querySelector('.fvolta'))i.insertAdjacentHTML('afterend',`<button type="button" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`);
+  if(!td.querySelector('.fvolta'))i.insertAdjacentHTML('afterend',`<button type="button" tabindex="-1" class="fvolta" data-f="${f.id}" data-c="${c}" title="Voltar ao valor do cadastro e dos lançamentos" aria-label="Voltar ao valor calculado">↺</button>`);
   if(!td.querySelector('.ffixo')&&fixoCampo(c))td.querySelector('.fin').insertAdjacentHTML('beforeend',folFixoBtn(f,c));
   toast('Alterado só neste mês');
 }
