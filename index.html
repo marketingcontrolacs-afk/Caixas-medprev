@@ -722,7 +722,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 <dialog id="dlgReg">
   <form id="rForm" novalidate>
     <div class="dh"><h2 id="rTitle"></h2><span class="spacer"></span><span id="rChip"></span></div>
-    <div class="db"><div class="fields" id="rFields"></div><div id="rRat"></div><div id="rDocs" style="display:grid;gap:8px"></div><div id="rBaixa"></div><p class="err" id="rErr" hidden></p></div>
+    <div class="db"><div class="fields" id="rFields"></div><div id="rRat"></div><div id="rDocs" style="display:grid;gap:8px"></div><div id="rLiq" style="display:grid;gap:8px"></div><div id="rBaixa"></div><p class="err" id="rErr" hidden></p></div>
     <div class="df"><button type="button" class="btn ghost" id="rDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="rClose">Fechar</button><button type="button" class="btn" id="rConf"></button><button type="submit" class="btn primary" id="rSave">Salvar</button></div>
   </form>
 </dialog>
@@ -2081,7 +2081,7 @@ async function renderMod(){
     const st=r=>{if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
       return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}</td><td class="l">${st(r)}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
   }else if(MOD==='cartao'){
@@ -2117,7 +2117,7 @@ function ajustaDeposito(){
 }
 async function openReg(r){
   if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
-  const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];
+  const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
   const ed=regEditavel(),dis=ed?'':' disabled';
   const v=k=>r?r[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
   $('rTitle').textContent=r?(MOD==='pagar'?r.fornecedor:MOD==='tesouraria'?r.descricao:r.fornecedor):cfg.novo;
@@ -2143,7 +2143,7 @@ async function openReg(r){
   $('rErr').hidden=true;
   $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||ehEsc()));
   $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
-  await renderRDocs();
+  await renderRDocs();renderRLiq();
   dlgReg.showModal();
 }
 async function renderRDocs(){
@@ -2155,7 +2155,11 @@ async function renderRDocs(){
 $('rDocs').addEventListener('change',async e=>{if(e.target.type!=='file'||!e.target.files[0])return;const cli=regCli();
   const dt=$('rFields').querySelector('[data-k="'+MODCFG[MOD].dataK+'"]').value||TODAY;
   toast('Enviando arquivo…');
-  try{RDOCS.push({...await uploadAnexo(e.target.files[0],cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast('Arquivo anexado')}catch(err){toast(err.message)}});
+  const arq=e.target.files[0];
+  try{RDOCS.push({...await uploadAnexo(arq,cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast('Arquivo anexado')}catch(err){toast(err.message);return}
+  // PDF com vários recibos de pagamento (folha, 13º): monta o relatório de líquidos sozinho
+  if(MOD==='pagar'&&!RLIQ&&/pdf$/i.test(arq.type||arq.name))try{const l=await lerRecibos(await arq.arrayBuffer(),await nomesCadastro(cli.id));
+    if(l.length>=2){RLIQ=l;renderRLiq();toast(`Recibos de pagamento: li ${l.length} pessoas. Confira o relatório de líquidos.`)}}catch(err){console.error(err)}});
 $('rDocs').addEventListener('click',e=>{if(e.target.classList.contains('deldoc')){RDOCS.splice(+e.target.closest('.docrow').dataset.i,1);renderRDocs()}});
 $('rFields').addEventListener('focusout',e=>{if(e.target.classList.contains('money')){const n=parseMoney(e.target.value);if(n!=null&&!isNaN(n))e.target.value=showMoney(n)}});
 $('rClose').onclick=()=>dlgReg.close();
@@ -2170,6 +2174,9 @@ $('rForm').addEventListener('submit',async e=>{
   if(falta)m='Preencha: '+falta[1]+'.';
   else if(Number.isNaN(row.valor)||!(row.valor>0))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
   else if(cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
+  if(MOD==='pagar'){liqLer();const l=(RLIQ||[]).filter(x=>x.nome||x.valor);
+    if(!m&&l.some(x=>!x.nome||!(x.valor>0)))m='No relatório de líquidos, preencha o nome e o valor de cada pessoa (ou tire a linha).';
+    row.liquidos=l.length?l.map(x=>({nome:x.nome,valor:r2(x.valor)})):null}
   if(!m&&$('rRat').innerHTML){const rt=lerRateio(row.valor);if(rt.erro)m=rt.erro;else row.rateio=rt.partes}
   if(m){err.textContent=m;err.hidden=false;return}
   err.hidden=true;$('rSave').disabled=true;
@@ -2179,6 +2186,8 @@ $('rForm').addEventListener('submit',async e=>{
     let {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();
     // banco ainda sem o v46: salva sem a linha digitável e a chave da nota
     if(e1&&/linha_digitavel|nfe_chave/.test(e1.message||'')){delete row.linha_digitavel;delete row.nfe_chave;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
+    // banco ainda sem o v54: salva sem o relatório de líquidos
+    if(e1&&/liquidos/.test(e1.message||'')){delete row.liquidos;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single());if(!e1)toast('Conta salva sem o relatório de líquidos: rode a atualização v54 do banco.')}
     if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
     if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
@@ -2186,6 +2195,117 @@ $('rForm').addEventListener('submit',async e=>{
     dlgReg.close();toast((REG?'Correção salva':'Lançamento enviado')+(outra?' em '+cli.nome:''));renderMod();
   }catch(ex){fail(ex)}finally{$('rSave').disabled=false}
 });
+// ---------- Relatório de líquidos (v54) ----------
+// Folha, 13º e outros pagamentos para várias pessoas num só arquivo (Carol, 28/10): a conta fica pelo total,
+// e os recibos anexados viram a lista de nome e valor líquido de cada pessoa.
+let RLIQ=null;
+const semAc=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim();
+const MONEYRE=/\d{1,3}(?:\.\d{3})*,\d{2}/g;
+// Lê os recibos de pagamento de um PDF: acha cada "líquido" e o valor ao lado ou logo abaixo, e o nome do
+// colaborador acima dele (pelo cadastro da empresa; senão, pelo campo "Nome"). Vias repetidas contam uma vez.
+async function lerRecibos(buf,cadastro){
+  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise,out=[];
+  const cad=(cadastro||[]).map(n=>({n,k:semAc(n)})).filter(c=>c.k.split(' ').length>=2).sort((a,b)=>b.k.length-a.k.length);
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p),vp=pg.getViewport({scale:1});
+    const its=(await pg.getTextContent()).items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(vp.transform,i.transform);
+      return {s:i.str.trim(),x:t[4],y:t[5],w:i.width,cx:t[4]+i.width/2}}).sort((a,b)=>a.y-b.y||a.x-b.x);
+    const lines=[];its.forEach(i=>{const l=lines.find(l=>Math.abs(l.y-i.y)<3);if(l)l.its.push(i);else lines.push({y:i.y,its:[i]})});
+    lines.forEach(l=>{l.its.sort((a,b)=>a.x-b.x);l.s=l.its.map(i=>i.s).join(' ');l.k=semAc(l.s);l.x0=l.its[0].x;l.x1=Math.max(...l.its.map(i=>i.x+i.w))});
+    const vals=its.filter(i=>/^\D{0,4}\d{1,3}(?:\.\d{3})*,\d{2}\D{0,2}$/.test(i.s)).map(i=>({...i,v:parseMoney(i.s.match(MONEYRE)[0])}));
+    const labs=its.filter(i=>/l[ií]quido/i.test(i.s)&&!/base|bruto|\bdsr\b/i.test(i.s));
+    const nomeAcima=(L,y0)=>{
+      const ac=lines.filter(l=>l.y<L.y-1&&l.y>y0&&l.x1>L.x-vp.width/2&&l.x0<L.x+vp.width/2).sort((a,b)=>b.y-a.y);
+      for(const l of ac){const c=cad.find(c=>l.k.includes(c.k));if(c)return c.n}
+      for(const l of ac){const m=l.s.match(/(?:nome(?: do)?(?: funcion[aá]rio| empregado| colaborador)?|funcion[aá]rio|empregado|colaborador)\s*:?\s*(.*)$/i);if(!m)continue;
+        let t=m[1];if(!/[A-Za-zÀ-ú]{2,}\s+[A-Za-zÀ-ú]{2,}/.test(t)){const nx=lines.find(x=>x.y>l.y&&x.y<l.y+20&&Math.abs(x.x0-l.x0)<vp.width/2);t=nx?nx.s:''}
+        const nm=t.replace(/^[\d\s.\-\/]+/,'').match(/[A-Za-zÀ-ú'´]{2,}(?:\s+[A-Za-zÀ-ú'´]{1,})+/);
+        if(nm)return nm[0].replace(/\s+(cbo|cargo|fun[cç][aã]o|admiss[aã]o|depto|setor|c\.?\s?custo)\b.*$/i,'').trim()}
+      return null};
+    const achados=[];
+    labs.forEach(L=>{
+      let v=null;const den=L.s.match(MONEYRE);if(den)v=parseMoney(den[den.length-1]);
+      if(v==null){const mesma=vals.filter(c=>Math.abs(c.y-L.y)<4&&c.x>L.x).sort((a,b)=>a.x-b.x)[0];
+        const abaixo=vals.filter(c=>c.y>L.y+1&&c.y<L.y+45).sort((a,b)=>(Math.abs(a.cx-L.cx)+(a.y-L.y)*.5)-(Math.abs(b.cx-L.cx)+(b.y-L.y)*.5))[0];
+        v=(mesma||abaixo)?.v??null}
+      if(v==null||!(v>0))return;
+      const ant=achados.filter(a=>a.L.y<L.y-5&&Math.abs(a.L.x-L.x)<vp.width/3).sort((a,b)=>b.L.y-a.L.y)[0];
+      achados.push({L,v,nome:nomeAcima(L,ant?ant.L.y:-1)});
+    });
+    achados.forEach(a=>out.push({nome:a.nome||`(nome não encontrado, pág. ${p})`,valor:r2(a.v),pag:p}));
+  }
+  // vias do empregado e da empresa: o mesmo nome e valor contam uma vez
+  const vis=new Set(),res=out.filter(r=>{const k=semAc(r.nome)+'|'+r.valor;if(vis.has(k))return false;vis.add(k);return true});
+  return res.map(({nome,valor})=>({nome,valor}));
+}
+async function nomesCadastro(cliId){const {data}=await sb.from('funcionarios').select('nome').eq('cliente_id',cliId);return (data||[]).map(f=>f.nome)}
+async function lerLiqDocs(docs,cliId){
+  const pdfs=docs.filter(d=>/\.pdf$/i.test(d.nome_arquivo||'')||d.kind==='pdf');if(!pdfs.length)return null;
+  const urls=await signed(pdfs.filter(d=>d.caminho).map(d=>d.caminho)),cad=await nomesCadastro(cliId);let res=[];
+  for(const d of pdfs){const u=urls[d.caminho];if(!u)continue;try{res=res.concat(await lerRecibos(await (await fetch(u)).arrayBuffer(),cad))}catch(e){console.error(e)}}
+  return res;
+}
+const liqTot=l=>r2((l||[]).reduce((s,x)=>s+(+x.valor||0),0));
+function liqLer(){if(!$('rLiqTab'))return;RLIQ=[...$('rLiqTab').querySelectorAll('tbody tr')].map(tr=>({nome:tr.querySelector('.lqN').value.trim(),valor:parseMoney(tr.querySelector('.lqV').value)}))}
+function liqConf(){const el=$('rLiqRes');if(!el)return;const t=liqTot(RLIQ),v=parseMoney(rCampo('valor')?.value||'');
+  el.innerHTML=`${RLIQ.length} pessoa${RLIQ.length===1?'':'s'} · total dos líquidos <b>${fm(t)}</b>`+(v>0?(Math.abs(t-v)<0.005?' · <span class="pos">✓ bate com o valor da conta</span>':` · <span class="neg">${t<v?'faltam':'passam'} ${fm(Math.abs(r2(v-t)))} ${t<v?'para':'do'} o valor da conta (${fm(v)})</span>`):'')}
+function renderRLiq(){
+  const box=$('rLiq');if(!box)return;
+  if(MOD!=='pagar'){box.innerHTML='';return}
+  const ed=regEditavel();
+  if(!RLIQ){box.innerHTML=ed?'<div class="row"><button type="button" class="btn small" id="rLiqNovo" title="Para folha, 13º e outros arquivos com pagamentos para várias pessoas">👥 Relatório de líquidos (folha, 13º…)</button></div>':'';return}
+  const dis=ed?'':' disabled';
+  box.innerHTML=`<h3>Relatório de líquidos</h3>
+    <div class="tablebox"><table id="rLiqTab"><thead><tr><th class="l">Nome</th><th>Valor líquido</th>${ed?'<th></th>':''}</tr></thead><tbody>${
+      RLIQ.map(x=>`<tr><td class="l"><input class="lqN" value="${esc(x.nome)}"${dis}></td><td><input class="lqV money" inputmode="decimal" value="${showMoney(x.valor)}"${dis} style="text-align:right;max-width:130px"></td>${ed?'<td><button type="button" class="btn small ghost lqDel" aria-label="Tirar">×</button></td>':''}</tr>`).join('')}</tbody></table></div>
+    <p class="note" id="rLiqRes" style="margin:0"></p>
+    <div class="row">${ed?'<button type="button" class="btn small" id="rLiqAdd">+ Pessoa</button><button type="button" class="btn small" id="rLiqLer">Ler de novo dos PDFs</button>':''}<button type="button" class="btn small" id="rLiqPdf">PDF</button><button type="button" class="btn small" id="rLiqXls">Excel</button>${ed?'<button type="button" class="btn small ghost" id="rLiqTira">Tirar o relatório</button>':''}</div>`;
+  liqConf();
+}
+async function liqDosDocs(){
+  const cli=regCli();toast('Lendo os recibos…');
+  const l=await lerLiqDocs(RDOCS,cli.id);
+  if(!l){toast('Anexe o PDF com os recibos de pagamento.');return null}
+  if(!l.length){toast('Não achei recibos com valor líquido nos PDFs. Digite os nomes e valores.');return null}
+  toast(`Li ${l.length} recibo${l.length===1?'':'s'}. Confira os nomes e valores.`);return l;
+}
+$('rLiq').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.id==='rLiqNovo'){RLIQ=(await liqDosDocs())||[{nome:'',valor:null}];renderRLiq()}
+  else if(b.id==='rLiqAdd'){liqLer();RLIQ.push({nome:'',valor:null});renderRLiq();[...$('rLiqTab').querySelectorAll('.lqN')].pop().focus()}
+  else if(b.id==='rLiqLer'){const l=await liqDosDocs();if(l){RLIQ=l;renderRLiq()}}
+  else if(b.id==='rLiqTira'){if(confirm('Tirar o relatório de líquidos desta conta?')){RLIQ=null;renderRLiq()}}
+  else if(b.classList.contains('lqDel')){b.closest('tr').remove();liqLer();liqConf()}
+  else if(b.id==='rLiqPdf'||b.id==='rLiqXls'){liqLer();const r={...(REG||{}),liquidos:RLIQ};
+    ['fornecedor','documento','vencimento','valor'].forEach(k=>{const el=rCampo(k);if(el)r[k]=k==='valor'?parseMoney(el.value):el.value.trim()});
+    (b.id==='rLiqPdf'?liqPdf:liqXls)(r,regCli())}});
+$('rLiq').addEventListener('input',()=>{liqLer();liqConf()});
+$('rFields').addEventListener('input',e=>{if(e.target.dataset.k==='valor'&&RLIQ)liqConf()});
+const liqTitulo=(r,cli)=>`Relatório de líquidos · ${cli?.nome||''}`;
+const liqSub=r=>[r.fornecedor,r.documento?'Doc. '+r.documento:'',r.vencimento?'vencimento '+dBR(r.vencimento):''].filter(Boolean).join(' · ');
+function liqPdf(r,cli){
+  const l=(r.liquidos||[]).filter(x=>x.nome||x.valor);if(!l.length){toast('Nada para imprimir');return}
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
+  const t=liqTot(l),v=+r.valor||0;
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(liqTitulo(r,cli))}</title><style>
+    body{font:12px system-ui,Arial,sans-serif;color:#1b2a2a;margin:24px}h1{font-size:17px;margin:0 0 2px}p{margin:0 0 14px;color:#555}
+    table{border-collapse:collapse;width:100%}th,td{border:1px solid #cfd8d8;padding:5px 8px;text-align:left}th{background:#0f5c57;color:#fff;font-weight:600}
+    tr:nth-child(even) td{background:#f3f7f7}.n{text-align:right;white-space:nowrap;width:150px}tfoot td{font-weight:700;background:#e3eded}@page{size:A4;margin:14mm}</style></head><body>
+    <h1>${esc(liqTitulo(r,cli))}</h1><p>${esc([liqSub(r),'emitido em '+dBR(TODAY)].filter(Boolean).join(' · '))}</p>
+    <table><thead><tr><th style="width:40px">#</th><th>Nome</th><th class="n">Valor líquido</th></tr></thead><tbody>${l.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.nome)}</td><td class="n">${fm(x.valor)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td></td><td>Total (${l.length} pessoa${l.length===1?'':'s'})</td><td class="n">${fm(t)}</td></tr>${v&&Math.abs(v-t)>=0.005?`<tr><td></td><td>Valor da conta / diferença</td><td class="n">${fm(v)} / ${fm(r2(v-t))}</td></tr>`:''}</tfoot></table>
+    <script>window.onload=()=>setTimeout(()=>window.print(),200)<\/script></body></html>`);
+  w.document.close();
+}
+function liqXls(r,cli){
+  const l=(r.liquidos||[]).filter(x=>x.nome||x.valor);if(!l.length){toast('Nada para exportar');return}
+  const ws=XLSX.utils.aoa_to_sheet([[liqTitulo(r,cli)],[liqSub(r)],[],['Nome','Valor líquido'],...l.map(x=>[x.nome,+x.valor||0]),['Total',liqTot(l)]]),n=l.length;
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:1}},{s:{r:1,c:0},e:{r:1,c:1}}];xFaixa(ws,0,0,1,XS.titulo);xFaixa(ws,1,0,1,XS.sub);xFaixa(ws,3,0,1,XS.cab2);
+  for(let i=4;i<=4+n;i++){const k=XLSX.utils.encode_cell({r:i,c:1});if(ws[k])ws[k].z='"R$" #,##0.00'}xFaixa(ws,4+n,0,1,{font:{bold:true}});
+  ws['!cols']=[{wch:45},{wch:16}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Líquidos');
+  XLSX.writeFile(wb,`Relatório de líquidos ${cli?.nome||''} ${(r.vencimento||TODAY).split('-').reverse().join('.')}.xlsx`);
+}
 // ---------- Leitura do boleto e da nota fiscal (v46) ----------
 // Sem IA e sem custo: a linha digitável (ou o código de barras) do boleto traz o valor e o vencimento;
 // a chave de acesso da NF-e traz o CNPJ do emitente e o número da nota. Lê o texto do PDF ou o que for colado.
@@ -4861,6 +4981,11 @@ async function abrirGT(t,tipo){
   if(t?.origem_id){
     const {data}=await sb.from('documentos').select('*').eq('registro_id',t.origem_id);const urls=await signed((data||[]).map(d=>d.caminho));
     if($('gtDocs'))$('gtDocs').innerHTML=(data||[]).length?'Documentos enviados pelo cliente: '+data.map(d=>`<a href="${urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria)}: ${esc(d.nome_arquivo)}</a>`).join(' · '):'O cliente não anexou documento.';
+    // relatório de líquidos da conta enviada pelo cliente (folha, 13º)
+    const {data:cp}=await sb.from('contas_pagar').select('*').eq('id',t.origem_id).maybeSingle();
+    if(cp?.liquidos?.length&&$('gtDocs')){const cli=CLIENTES.find(c=>c.id===cp.cliente_id);
+      $('gtDocs').insertAdjacentHTML('beforeend',`<br>👥 Relatório de líquidos: ${cp.liquidos.length} pessoas, ${fm(liqTot(cp.liquidos))} <button type="button" class="btn small" id="gtLiqPdf">PDF</button> <button type="button" class="btn small" id="gtLiqXls">Excel</button>`);
+      $('gtLiqPdf').onclick=()=>liqPdf(cp,cli);$('gtLiqXls').onclick=()=>liqXls(cp,cli)}
   }
 }
 const gtErr=t=>{$('gtErr').textContent=t;$('gtErr').hidden=false};
