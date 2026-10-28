@@ -6124,13 +6124,10 @@ async function gteAcao(a){
     if(!val('data'))return gtErr('Informe a data.');if(valor==null||isNaN(valor)||valor<=0)return gtErr('Informe o valor, por exemplo 1.234,56.');if(!val('descricao'))return gtErr('Informe a descrição.');
     if(transf&&!val('dest'))return gtErr('Escolha a conta de destino da transferência.');
     const base={data:val('data'),valor:r2(valor),documento:val('documento')},meu=transf?{descricao:val('descricao'),pessoa_nome:null,categoria:null}:{descricao:val('descricao'),pessoa_nome:val('pessoa'),categoria:val('categoria')};
-    let tf=m.transf_id||null;
-    if(transf){ // a perna de entrada na conta de destino
-      tf=tf||crypto.randomUUID();
-      if(GTE.leg){const {error}=await sb.from('fin_movimentos').update({conta_id:val('dest'),...base,descricao:meu.descricao}).eq('id',GTE.leg.id);if(error)throw error}
-      else{const {error}=await sb.from('fin_movimentos').insert({cliente_id:cli.id,conta_id:val('dest'),tipo:'entrada',transf_id:tf,...base,descricao:meu.descricao,tes_id:m.tes_id,tes_chave:m.tes_chave,tes_original:m.tes_original,revisado:true});if(error)throw error}
-    }else if(tf){const {error}=await sb.from('fin_movimentos').delete().eq('transf_id',tf).neq('id',m.id);if(error)throw error;tf=null}
-    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,transf_id:tf,revisado:true,por_regra:false}).eq('id',m.id);if(e1)throw e1;
+    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,revisado:true,por_regra:false}).eq('id',m.id);if(e1)throw e1;
+    // a entrada na conta de destino: liga ao lançamento que o banco já tem (sem duplicar) ou cria (v59)
+    if(transf||m.transf_id){const {error}=await sb.rpc('tes_transferir',{p_mov:m.id,p_conta:transf?val('dest'):null});
+      if(error)throw /tes_transferir|PGRST202/.test((error.message||'')+error.code)?new Error('Para ligar a transferência ao banco, rode a atualização v59 no Supabase.'):error}
     if(!transf&&m.tes_id&&m.tes_chave){const ls=await gteSemelhantes(m);if(ls.length){GTE.sem=meu;toast('Lançamento revisado');return gteMostraSem(m,ls,meu)}}
     dlgGT.close();toast('Lançamento revisado');renderGTes();
   }catch(e){console.error(e);gtErr(v57(e)?v57Msg:e.message||'Não foi possível salvar.')}
