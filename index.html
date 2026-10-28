@@ -673,6 +673,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
+    <p class="note" id="folQuem"></p>
     <p class="note">Valores fixos vêm do cadastro do colaborador e o resto vem dos lançamentos do mês. O escritório pode alterar qualquer célula direto na tabela, inclusive os fixos: a mudança vale só para este mês e a célula fica em amarelo (↺ volta ao valor calculado). Para mudar um fixo de vez, use “Colaboradores e valores fixos”.</p>
     <h2 style="margin-top:22px">Lançamentos do mês</h2>
     <div class="card tablebox"><table id="folLanc"></table></div>
@@ -2795,7 +2796,9 @@ function folTexto(s,k){
 // Colaboradores da folha do mês: ativos e afastados, e quem só sai depois do fim do mês
 function folDoMes(){
   const fim=fimMes(FOL.comp),comLanc=new Set(FOL.lanc.map(l=>l.funcionario_id)),comResc=new Set(FOL.resc.map(r=>r.funcionario_id)),porCargo=folModelo().cargo!==false;
+  // entra na folha quem foi admitido até o último dia do mês, com ou sem ponto e lançamentos (Carol, 28/10)
   return FOL.func.filter(f=>f.situacao!=='Desligado'||(f.desligado_em&&f.desligado_em>fim)||(comLanc.has(f.id)&&!comResc.has(f.id)))
+    .filter(f=>!(f.admissao&&f.admissao>fim)||comLanc.has(f.id))
     .sort((a,b)=>(porCargo?String(a.cargo||'').localeCompare(String(b.cargo||'')):0)||a.nome.localeCompare(b.nome));
 }
 // Cabeçalho no formato da planilha da empresa: grupos (Proventos/Descontos), subtítulos (ex.: Premiação) e colunas.
@@ -2851,6 +2854,8 @@ async function renderFolha(){
     $('folAdd').hidden=$('folRescAdd').hidden=$('folPonto').hidden=true;$('folRescBaixar').hidden=true;$('folParcBox').hidden=true;if(e){renderFolCad();renderFolCols()}return;
   }
   const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
+  const depois=FOL.func.filter(f=>f.situacao!=='Desligado'&&!fs.includes(f));
+  $('folQuem').innerHTML=`${fs.length} ${fs.length===1?'colaborador':'colaboradores'} nesta folha${folModelo().cargo!==false?' (em ordem de cargo; quem está sem cargo fica no topo)':''}.${depois.length?` Fora deste mês por causa da admissão: ${depois.map(f=>`${esc(f.nome)} (${dBR(f.admissao)})`).join(', ')}.`:''}`;
   $('folAdd').hidden=$('folRescAdd').hidden=!lanca;
   $('folPonto').hidden=!temAcesso('ponto')||!eqPode('ponto');
   // barra de situação do mês
