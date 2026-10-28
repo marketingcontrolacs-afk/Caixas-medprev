@@ -320,7 +320,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewMod" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="mTitle"></h1><p class="sub" id="mSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="mFiltro"></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="mFiltro"></select></label><label class="f" id="mPerBox" hidden>De<input type="date" id="mIni"></label><label class="f" id="mPerBox2" hidden>Até<input type="date" id="mFim"></label><label class="f" id="mTipoBox" hidden>Lançamentos<select id="mTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
     </div>
     <div class="tiles" id="mTiles"></div>
     <div id="mConf"></div>
@@ -392,7 +392,10 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     </div>
     <div id="gteAlerta"></div>
     <div class="toolbar">
-      <label class="f">Mês<select id="gteMes"></select></label>
+      <label class="f">Período<select id="gteMes"></select></label>
+      <label class="f" id="gtePerBox" hidden>De<input type="date" id="gteIni"></label>
+      <label class="f" id="gtePerBox2" hidden>Até<input type="date" id="gteFim"></label>
+      <label class="f">Lançamentos<select id="gteTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label>
       <label class="f">Mostrar<select id="gteFiltro"><option value="todos">Todos</option><option value="rev">A revisar e alterados</option><option value="ok">Revisados</option></select></label>
     </div>
     <div class="tiles" id="gteTiles"></div>
@@ -2060,7 +2063,8 @@ function initMod(m){
   const cfg=MODCFG[m],cli=cliAtual();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
-    mFiltro.innerHTML=(m==='pagar'?'<option value="aberto">Em aberto</option>':'')+mesesOpts(m==='pagar'?fut:TODAY.slice(0,7));
+    mFiltro.innerHTML=(m==='pagar'?'<option value="aberto">Em aberto</option>':'')+mesesOpts(m==='pagar'?fut:TODAY.slice(0,7))+(m==='tesouraria'?'<option value="per">Período personalizado…</option>':'');
+    $('mTipo').value='';$('mTipoBox').hidden=m!=='tesouraria';
     mFiltro.value=m==='pagar'?'aberto':TODAY.slice(0,7);
   }
   $('mTitle').textContent=cfg.titulo;
@@ -2069,22 +2073,24 @@ function initMod(m){
   $('mNovo').hidden=!(cli&&podeLancar(cli.id,m));
   renderMod();
 }
-mFiltro.onchange=()=>renderMod();
+['mIni','mFim'].forEach(id=>$(id).onchange=()=>renderMod());mFiltro.onchange=$('mTipo').onchange=()=>renderMod();
 async function renderMod(){
   const cfg=MODCFG[MOD],cli=cliAtual();
   if(!cli||!window.V2)$('mConf').innerHTML='';
   if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   let q=sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
-  const f=mFiltro.value;
-  if(f==='aberto')q=q.eq('conferido',false);else{const [a,b]=monthRange(f);q=q.gte(cfg.dataK,a).lte(cfg.dataK,b)}
+  const f=mFiltro.value,per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
+  if(per&&!$('mIni').value){$('mIni').value=TODAY.slice(0,8)+'01';$('mFim').value=TODAY}
+  const [pIni,pFim]=per?[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31']:f==='aberto'?[]:monthRange(f);
+  if(f==='aberto')q=q.eq('conferido',false);else q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
   REGS=data||[];DOCS={};
   // Tesouraria: saldo acumulado de tudo que foi lançado antes do mês
   let ANT=0;
   if(MOD==='tesouraria'&&f!=='aberto'){
-    const [a]=monthRange(f);
+    const a=pIni;
     for(let i=0;;i+=1000){
       const {data:pa,error:e2}=await sb.from('tesouraria').select('tipo,valor').eq('cliente_id',cli.id).lt('data',a).order('id').range(i,i+999);
       if(e2){fail(e2,'Erro ao carregar');return}
@@ -2112,14 +2118,14 @@ async function renderMod(){
   }else{
     let saldo=ANT;
     head='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th>Saldo</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);return `<tr class="click${aConferir(r)?' pend':''}" data-id="${r.id}" tabindex="0"${aConferir(r)?` title="${esc(r.obs)}"`:''}><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}${r.fechamento_id?' <span class="muted">· automático do caixa</span>':''}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||r.tipo!=='Despesa'?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':aConferir(r)?'<span class="chip c-bad">⚠ Conferir divergência</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
+    body=`<tr><td></td><td class="l"></td><td class="l muted">Saldo anterior</td><td class="l"></td><td></td><td></td><td class="${ANT<0?'neg':''}">${fm(ANT)}</td><td class="l"></td><td class="l"></td></tr>`+REGS.map(r=>{const ent=r.tipo==='Suprimento';saldo=r2(saldo+(ent?1:-1)*r.valor);const tp=$('mTipo').value;if(tp&&(tp==='entrada')!==ent)return '';return `<tr class="click${aConferir(r)?' pend':''}" data-id="${r.id}" tabindex="0"${aConferir(r)?` title="${esc(r.obs)}"`:''}><td>${dBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${esc(r.descricao)}${r.fechamento_id?' <span class="muted">· automático do caixa</span>':''}</td><td class="l">${esc(r.documento||'')}</td><td>${ent?fm(r.valor):''}</td><td>${ent?'':fm(r.valor)}</td><td class="${saldo<0?'neg':''}">${fm(saldo)}</td><td class="l">${nd(r)||r.tipo!=='Despesa'?clip(r).replace('<span class="neg">sem documento</span>','<span class="muted">—</span>'):clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':aConferir(r)?'<span class="chip c-bad">⚠ Conferir divergência</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`}).join('');
     const E=sum(REGS.filter(r=>r.tipo==='Suprimento')),D=sum(REGS.filter(r=>r.tipo==='Depósito bancário')),S=r2(sum(REGS.filter(r=>r.tipo==='Despesa'))),SD=r2(S+D);
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td></td><td>${fm(E)}</td><td>${fm(SD)}</td><td>${fm(r2(ANT+E-SD))}</td><td colspan="2"></td></tr>`:'';
-    tiles=[['Saldo anterior',fm(ANT),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Depósitos no banco',fm(D),(n=>n+(n===1?' depósito':' depósitos'))(REGS.filter(r=>r.tipo==='Depósito bancário').length)],['Saldo atual',fm(r2(ANT+E-SD)),'saldo anterior + entradas − despesas − depósitos'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
+    tiles=[['Saldo anterior',fm(ANT),per?'acumulado antes de '+dBR(pIni):'acumulado até o mês passado'],['Entradas',fm(E),per?'suprimentos do período':'suprimentos do mês'],['Despesas',fm(S),(n=>n+(n===1?' lançamento':' lançamentos'))(REGS.filter(r=>r.tipo==='Despesa').length)],['Depósitos no banco',fm(D),(n=>n+(n===1?' depósito':' depósitos'))(REGS.filter(r=>r.tipo==='Depósito bancário').length)],['Saldo atual',fm(r2(ANT+E-SD)),'saldo anterior + entradas − despesas − depósitos'],['A conferir',String(REGS.filter(r=>!r.conferido).length),'pelo escritório']];
   }
   $('mHead').innerHTML=head;$('mFoot').innerHTML=foot;
   if(MOD==='tesouraria'&&!REGS.length)body='';
-  $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste mês'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
+  $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':per?'neste período':'neste mês'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   if(MOD==='tesouraria')renderTC(cli);else $('mConf').innerHTML='';
   $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
@@ -5988,14 +5994,17 @@ async function gteNovidades(){
 }
 async function renderGTes(){
   const cli=cliAtual();
-  if(!$('gteMes').options.length){$('gteMes').innerHTML=mesesOpts(TODAY.slice(0,7));$('gteMes').value=TODAY.slice(0,7)}
+  if(!$('gteMes').options.length){$('gteMes').innerHTML=mesesOpts(TODAY.slice(0,7))+'<option value="per">Período personalizado…</option>';$('gteMes').value=TODAY.slice(0,7)}
+  const per=$('gteMes').value==='per';$('gtePerBox').hidden=$('gtePerBox2').hidden=!per;
+  if(per&&!$('gteIni').value){$('gteIni').value=TODAY.slice(0,8)+'01';$('gteFim').value=TODAY}
   if(!cli)return gteVazio('Escolha uma empresa.');
   $('gteSub').textContent=`${cli.nome} · Lançamentos que o cliente faz em Financeiro › Tesouraria. Corrija, ponha a categoria e marque como revisado: o lançamento do cliente não muda.`;
   let conta,movs,alt;
   try{
     const {data:c,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cli.id).eq('espelho_tes',true).maybeSingle();if(error)throw error;
     if(!c)return gteVazio('Esta empresa ainda não tem lançamentos na Tesouraria do cliente.');
-    conta=c;const [ini,fim]=monthRange($('gteMes').value);
+    conta=c;const [ini,fim]=per?[$('gteIni').value||'1900-01-01',$('gteFim').value||'2999-12-31']:monthRange($('gteMes').value);
+    if(ini>fim)return gteVazio('A data inicial é depois da data final.');
     [movs,alt]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',c.saldo_data||'1900-01-01').lte('data',fim).order('data').order('criado_em')),
       todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).not('tes_alteracao','is',null).order('data'))]);
     if(cliAtual()?.id!==cli.id||VIEW!=='gftes')return;
@@ -6010,15 +6019,15 @@ function gteSit(m){
   return m.revisado?`<span class="chip c-ok">✓ Revisado${m.por_regra?' (igual a outro)':''}</span>`:'<span class="chip c-none">A revisar</span>';
 }
 function gteDesenha(){
-  const mu=t=>`<span class="muted">${t}</span>`,f=$('gteFiltro').value;let saldo=GTE.ant;
-  const linhas=GTE.per.map(m=>{saldo=r2(saldo+(m.tipo==='entrada'?1:-1)*m.valor);return {m,saldo}}).filter(({m})=>f==='todos'||(f==='rev'?!m.revisado||m.tes_alteracao:m.revisado&&!m.tes_alteracao));
+  const mu=t=>`<span class="muted">${t}</span>`,f=$('gteFiltro').value,tp=$('gteTipo').value,per=$('gteMes').value==='per';let saldo=GTE.ant;
+  const linhas=GTE.per.map(m=>{saldo=r2(saldo+(m.tipo==='entrada'?1:-1)*m.valor);return {m,saldo}}).filter(({m})=>(!tp||m.tipo===tp)&&(f==='todos'||(f==='rev'?!m.revisado||m.tes_alteracao:m.revisado&&!m.tes_alteracao)));
   const E=r2(GTE.per.filter(m=>m.tipo==='entrada').reduce((x,m)=>x+(+m.valor),0)),S=r2(GTE.per.filter(m=>m.tipo==='saida').reduce((x,m)=>x+(+m.valor),0)),F=r2(GTE.ant+E-S);
   const arev=GTE.per.filter(m=>m.tes_id&&!m.revisado),ccat=arev.filter(m=>m.categoria||m.tipo==='entrada'||m.transf_id);
   $('gteHead').innerHTML='<tr><th>Data</th><th class="l">Tipo</th><th class="l">Descrição</th><th class="l">Cliente ou fornecedor</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th><th class="l">Situação</th></tr>';
   $('gteBody').innerHTML=`<tr><td></td><td class="l"></td><td class="l muted" colspan="5">Saldo anterior</td><td class="${GTE.ant<0?'neg':''}"><b>${fm(GTE.ant)}</b></td><td></td></tr>`
     +linhas.map(({m,saldo})=>`<tr class="click${m.tes_alteracao?' pend':''}" data-id="${m.id}" tabindex="0"><td>${dBR(m.data)}</td><td class="l">${esc(m.tes_original?.tipo||(m.tipo==='entrada'?'Entrada':'Saída'))}</td><td class="l">${esc(m.descricao||'')||mu('—')}${m.transf_id?` ${mu('· para o banco')}`:''}<br>${m.categoria?mu(esc(m.categoria)):m.tipo==='saida'&&!m.transf_id?'<span class="neg">sem categoria</span>':''}</td><td class="l">${esc(m.pessoa_nome||'')}</td><td class="l">${esc(m.documento||'')}</td><td class="pos">${m.tipo==='entrada'?fm(m.valor):''}</td><td class="neg">${m.tipo==='saida'?fm(m.valor):''}</td><td class="${saldo<0?'neg':'muted'}">${fm(saldo)}</td><td class="l">${gteSit(m)}</td></tr>`).join('')
-    +(linhas.length?'':`<tr><td class="l muted" colspan="9">Nada ${f==='rev'?'a revisar':f==='ok'?'revisado':'lançado'} neste mês.</td></tr>`);
-  $('gteTiles').innerHTML=[['Saldo anterior',fm(GTE.ant),'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Saídas',fm(S),'despesas e depósitos'],['Saldo final',fm(F),'em '+dBR(GTE.fim)],['A revisar',String(arev.length),'neste mês']]
+    +(linhas.length?'':`<tr><td class="l muted" colspan="9">Nada ${f==='rev'?'a revisar':f==='ok'?'revisado':'lançado'}${tp?(tp==='entrada'?' (só entradas)':' (só saídas)'):''} ${per?'neste período':'neste mês'}.</td></tr>`);
+  $('gteTiles').innerHTML=[['Saldo anterior',fm(GTE.ant),per?'acumulado antes de '+dBR(GTE.ini):'acumulado até o mês passado'],['Entradas',fm(E),'suprimentos do mês'],['Saídas',fm(S),'despesas e depósitos'],['Saldo final',fm(F),'em '+dBR(GTE.fim)],['A revisar',String(arev.length),per?'neste período':'neste mês']]
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===3&&F<0?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gteRevTodos').hidden=!ccat.length;$('gteRevTodos').textContent=ccat.length===1?'Marcar como revisado o que já tem categoria':`Marcar como revisados os ${ccat.length} que já têm categoria`;
   $('gteNote').textContent='Clique num lançamento para corrigir e revisar. Ao revisar, o portal mostra os lançamentos semelhantes para você conferir e revisar todos de uma vez.';
@@ -6050,7 +6059,7 @@ $('gteAlerta').addEventListener('click',e=>{const b=e.target.closest('[data-te],
   if(b.dataset.tcc){if(escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;openView()}return}
   if(b.dataset.te==='abrir')return gteAbrir(GTE.alt.find(m=>m.id===b.dataset.id));
   b.disabled=true;gteResolve(b.closest('[data-tes]').dataset.tes,b.dataset.te)});
-['gteMes','gteFiltro'].forEach(id=>$(id).onchange=()=>id==='gteFiltro'?gteDesenha():renderGTes());
+['gteMes','gteFiltro','gteTipo','gteIni','gteFim'].forEach(id=>$(id).onchange=()=>id==='gteFiltro'||id==='gteTipo'?gteDesenha():renderGTes());
 $('gteBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)gteAbrir(GTE.per.find(m=>m.id===tr.dataset.id))});
 $('gteBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gteAbrir(GTE.per.find(m=>m.id===tr.dataset.id))}});
 $('gteRevTodos').onclick=async()=>{
