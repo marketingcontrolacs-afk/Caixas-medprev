@@ -736,7 +736,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 <dialog id="dlgFer">
   <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
   <div class="db" id="feBody"></div>
-  <div class="df"><button class="btn ghost" id="feDev" hidden>Devolver ao cliente</button><span class="spacer"></span><button class="btn ghost" id="feClose">Fechar</button><button class="btn" id="feSave" hidden>Salvar observações</button><button class="btn primary" id="feOk" hidden>Aprovar</button></div>
+  <div class="df"><button class="btn ghost" id="feDev" hidden>Devolver ao cliente</button><span class="spacer"></span><button class="btn" id="feSol" hidden title="PDF com a venda, a divisão e as datas de gozo, como vão para a contabilidade">Solicitação para a contabilidade</button><button class="btn ghost" id="feClose">Fechar</button><button class="btn" id="feSave" hidden>Salvar observações</button><button class="btn primary" id="feOk" hidden>Aprovar</button></div>
 </dialog>
 <dialog id="dlgCC">
   <div class="dh"><h2 id="ccTitle"></h2><span class="spacer"></span><span class="note" id="ccPos"></span></div>
@@ -2564,9 +2564,24 @@ function abrirFerias(per){
     feResumo();
   }
   $('feSave').hidden=!edita&&!e;$('feSave').textContent=e?'Salvar':'Enviar ao escritório';
+  $('feSol').hidden=!(p&&(ps.length||p.venda_total));
   $('feOk').hidden=!(e&&(aberta||!p));$('feDev').hidden=!(e&&p?.status==='Proposta');
   dlgFer.showModal();
 }
+// solicitação de férias para a contabilidade (Carol, 28/10): venda legal, divisão e as datas de gozo como vão para a contabilidade
+$('feSol').onclick=async()=>{
+  const {r,p}=FERDLG,cli=CLIENTES.find(c=>c.id===r.cliente_id),m=DOCMOD.find(x=>x.k==='ferias_contab');if(!p||!cli)return;
+  const ps=(FPARC[p.id]||[]).slice().sort((a,b)=>a.ordem-b.ordem);
+  const {data:fu}=await sb.from('funcionarios').select('*').eq('id',r.funcionario_id).maybeSingle();
+  const f={nome:r.nome,matricula:r.matricula||'',cpf:fu?.cpf||'',cargo:fu?.cargo||'',admissao:fu?.admissao||r.admissao||''};
+  const x={aq_ini:r.inicio_aquisitivo,aq_fim:r.fim_aquisitivo,venda:Math.min(p.venda_total,Math.floor(r.direito/3)),
+    parcelas:ps.map(q=>({inicio:q.inicio,fim:q.fim_contabilidade,dias:q.dias_contabilidade}))};
+  const D={emp:docEmp(cli),f,x,data:TODAY};
+  if(!docImprime(m,D))return;
+  if(p.status!=='Aprovada')toast('Atenção: esta programação ainda não foi aprovada pelo escritório.');
+  const {error}=await sb.from('rh_documentos').insert({cliente_id:cli.id,funcionario_id:r.funcionario_id,modelo:m.k,nome:r.nome,dados:D});
+  if(error)console.error(error);
+};
 async function salvarFerias(status){
   const {r,edita}=FERDLG,e=ehEsc(),bts=['feSave','feOk','feDev'],err=$('feErr');err.hidden=true;
   const erro=t=>{err.textContent=t;err.hidden=false;err.scrollIntoView({block:'nearest'})};
@@ -4329,6 +4344,18 @@ const DOCMOD=[
     <p>Data: _____/_____/______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Chaves devolvidas: __________</p>
     <p>Condição / observações: _________________________________________________________<br>_____________________________________________________________________________</p>
     <p>Assinatura de quem recebeu: ___________________________________________________</p>`}},
+  {k:'ferias_contab',t:'Solicitação de férias para a contabilidade',so:/$^/,campos:[],
+   corpo:D=>{const E=D.emp,f=D.f,x=D.x,ps=x.parcelas||[],tr=(a,b)=>`<tr><td style="width:42%"><b>${a}</b></td><td>${b}</td></tr>`;return `${cab(E)}
+    <h1>SOLICITAÇÃO DE FÉRIAS</h1>
+    <p>À contabilidade, solicitamos o processamento das férias do(a) colaborador(a) abaixo, conforme as informações a seguir.</p>
+    <table class="epi">${tr('Colaborador(a)',esc(f.nome||''))}${f.cpf?tr('CPF',esc(f.cpf)):''}${f.matricula?tr('Matrícula',esc(f.matricula)):''}${f.cargo?tr('Função',esc(f.cargo)):''}${f.admissao?tr('Admissão',dBR(f.admissao)):''}
+      ${tr('Período aquisitivo',`${dBR(x.aq_ini)} a ${dBR(x.aq_fim)}`)}
+      ${tr('Vende parte das férias (abono pecuniário)?',x.venda?`<b>Sim</b>, ${x.venda} dia${x.venda>1?'s':''}`:'Não')}
+      ${tr('Divide o período de gozo?',ps.length>1?`<b>Sim</b>, em ${ps.length} períodos`:'Não')}</table>
+    <h2>Datas de gozo</h2>
+    ${ps.length?`<table class="epi"><tr><th>Período</th><th>Início</th><th>Fim</th><th>Dias</th></tr>${ps.map((p,i)=>`<tr><td>${i+1}º</td><td>${dBR(p.inicio)}</td><td>${dBR(p.fim)}</td><td>${p.dias}</td></tr>`).join('')}</table>`:'<p>Sem gozo neste pedido (somente a venda).</p>'}
+    <p class="loc">${localData(D)}</p>
+    ${assina('Responsável pela empresa')}`}},
 ];
 const docsDe=cli=>cli?DOCMOD.filter(m=>!m.so||m.so.test(cli.nome||'')):[];
 const FDOC=[['nome','Nome completo'],['cpf','CPF'],['cargo','Função / cargo'],['setor','Setor'],['admissao','Admissão','date']];
