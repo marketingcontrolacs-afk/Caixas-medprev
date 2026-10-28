@@ -3881,13 +3881,14 @@ const cadRow=(f,cs)=>`<tr data-id="${f.id||''}"><td><input data-k="nome" value="
     :tp==='money'?`<input data-k="${k}" class="money" value="${showMoney(v)}" style="max-width:110px">`:tp==='pct'?`<input data-k="${k}" value="${pctIn(v)}" style="max-width:70px">`
     :`<input data-k="${k}" value="${esc(v??'')}" style="min-width:${tp==='texto'?220:120}px">`}</td>`}).join('')}
   <td><select data-k="situacao" style="min-width:110px">${['Ativo','Afastado','Desligado'].map(s=>`<option${(f.situacao||'Ativo')===s?' selected':''}>${s}</option>`).join('')}</select></td>
-  <td><input data-k="motivo_afastamento" value="${esc(f.motivo_afastamento||'')}" placeholder="Ex.: Licença Maternidade" style="min-width:150px"></td><td><input data-k="matricula" value="${esc(f.matricula||'')}" style="max-width:90px"></td></tr>`;
+  <td><input data-k="motivo_afastamento" value="${esc(f.motivo_afastamento||'')}" placeholder="Ex.: Licença Maternidade" style="min-width:150px"></td><td><input data-k="matricula" value="${esc(f.matricula||'')}" style="max-width:90px"></td><td>${f.id?`<button type="button" class="btn small ghost" data-cdel="${f.id}" title="Excluir este cadastro (ex.: cadastrado duas vezes)">Excluir</button>`:''}</td></tr>`;
 function renderFolCad(){
   const mostra=$('folCadTodos').checked,fs=FOL.func.filter(f=>mostra||f.situacao!=='Desligado'),cs=cadCampos();
   $('folCadNota').textContent=['cargo',...cs.map(x=>x[1].replace(/ (R\$|%)$/,'').toLowerCase())].join(', ')+', que entram todo mês';
-  $('folCad').innerHTML=`<thead><tr><th class="l">Colaborador</th><th class="l">Cargo</th>${cs.map(x=>`<th class="l">${esc(x[1])}</th>`).join('')}<th class="l">Situação</th><th class="l">Motivo do afastamento</th><th class="l">Matrícula</th></tr></thead><tbody>${fs.map(f=>cadRow(f,cs)).join('')}</tbody>`;
+  $('folCad').innerHTML=`<thead><tr><th class="l">Colaborador</th><th class="l">Cargo</th>${cs.map(x=>`<th class="l">${esc(x[1])}</th>`).join('')}<th class="l">Situação</th><th class="l">Motivo do afastamento</th><th class="l">Matrícula</th><th></th></tr></thead><tbody>${fs.map(f=>cadRow(f,cs)).join('')}</tbody>`;
 }
 $('folCadTodos').onchange=renderFolCad;
+$('folCad').addEventListener('click',ev=>{const b=ev.target.closest('[data-cdel]');if(b)excluirFunc(FOL.func.find(f=>f.id===b.dataset.cdel),b,renderFolha)});
 $('folCadAdd').onclick=()=>{$('folCad').querySelector('tbody').insertAdjacentHTML('beforeend',cadRow({},cadCampos()));$('folCad').querySelector('tbody tr:last-child input').focus()};
 $('folCadSalvar').onclick=async ev=>{
   const rows=[],erros=[];
@@ -4114,12 +4115,13 @@ function abrirColab(f){
 }
 $('cbClose').onclick=()=>dlgColab.close();
 // excluir o cadastro (ex.: colaborador cadastrado duas vezes, Carol 28/10): apaga junto os lançamentos, férias e benefícios dele
-$('cbDel').onclick=async()=>{const f=COLABDLG;if(!f)return;
+async function excluirFunc(f,b,depois){if(!f)return;
   const {count}=await sb.from('folha_lancamentos').select('id',{count:'exact',head:true}).eq('funcionario_id',f.id);
-  if(!confirm(`Excluir o cadastro de ${f.nome}?${count?` Ele tem ${count} lançamento(s) na folha, que também serão apagados.`:''} Isso não pode ser desfeito. Se a pessoa saiu da empresa, use a situação Desligado.`))return;
-  $('cbDel').disabled=true;const {error}=await sb.from('funcionarios').delete().eq('id',f.id);$('cbDel').disabled=false;
+  if(!confirm(`Excluir o cadastro de ${f.nome}${f.admissao?` (admissão ${dBR(f.admissao)})`:''}?${count?` Ele tem ${count} lançamento(s) na folha, que também serão apagados.`:' Ele não tem lançamentos na folha.'} Isso não pode ser desfeito. Se a pessoa saiu da empresa, use a situação Desligado.`))return;
+  b.disabled=true;const {error}=await sb.from('funcionarios').delete().eq('id',f.id);b.disabled=false;
   if(error){console.error(error);toast('Não foi possível excluir. Verifique a internet e tente de novo.');return}
-  dlgColab.close();toast('Cadastro excluído');renderColab()};
+  toast('Cadastro excluído');depois()}
+$('cbDel').onclick=()=>excluirFunc(COLABDLG,$('cbDel'),()=>{dlgColab.close();renderColab()});
 $('cbSave').onclick=async()=>{
   const err=$('cbErr'),o={};err.hidden=true;
   document.querySelectorAll('#cbBody [data-ck]').forEach(i=>{const k=i.dataset.ck,s=i.value.trim();
