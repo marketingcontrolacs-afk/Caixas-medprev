@@ -4493,6 +4493,31 @@ const DOCMOD=[
     <p>Data: _____/_____/______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Chaves devolvidas: __________</p>
     <p>Condição / observações: _________________________________________________________<br>_____________________________________________________________________________</p>
     <p>Assinatura de quem recebeu: ___________________________________________________</p>`}},
+  {k:'pendencia',t:'Comunicado de pendência operacional',so:VIVA,
+   campos:[{k:'pend',t:'Pendências',tp:'pend'},
+     {k:'obs',t:'Observação (o que a clínica assume, previsão de desconto…)',tp:'area'},
+     {k:'entrega',t:'Data de entrega da notificação (opcional)',tp:'date'},{k:'prazo',t:'Prazo final para resolução (opcional)',tp:'date'},
+     {k:'folha',t:'Folha prevista para eventual desconto (mês/ano)',tp:'text',def:(E,D)=>{const c=D.data||TODAY;return c.slice(5,7)+'/'+c.slice(0,4)}},
+     {k:'provid',t:'Providências e orientações (uma por linha)',tp:'area',def:()=>'O(a) colaborador(a) poderá apresentar esclarecimentos sobre a ocorrência.'},
+     {k:'resp',t:'Quem assina pela empresa (nome)',tp:'text',lembra:1},{k:'resp_cargo',t:'Cargo de quem assina',tp:'text',lembra:1}],
+   corpo:D=>{const E=D.emp,f=D.f,x=D.x,ps=(x.pend||[]).filter(r=>r.some(Boolean)),tot=r2(ps.reduce((s,r)=>s+(parseMoney(r[3])||0),0)),un=`${E.razao}${E.unidade?' - '+E.unidade.toUpperCase():''}`;
+    const li=t=>String(t||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('');return `
+    <div class="emp c"><b>${esc(un)}</b><br>CNPJ: ${esc(E.cnpj)}</div>
+    <h1>COMUNICADO DE PENDÊNCIA OPERACIONAL</h1>
+    <p class="id"><b>Colaborador(a):</b> ${lin(f.nome,40)}</p>
+    <p>Foi identificada a pendência operacional abaixo. Este documento registra a ciência do(a) colaborador(a) e as providências adotadas em relação à ocorrência.</p>
+    <h2>1) PENDÊNCIA IDENTIFICADA</h2>
+    <table class="epi"><tr><th style="width:13%">Data</th><th style="width:20%">Paciente</th><th>Descrição da pendência</th><th style="width:14%">Valor</th></tr>
+      ${ps.map(r=>`<tr><td>${r[0]?dBR(r[0]):'Não informada'}</td><td>${esc(r[1]||'Não informado')}</td><td style="text-align:justify">${esc(r[2]).replace(/\n/g,'<br>')}</td><td style="white-space:nowrap">${parseMoney(r[3])>0?fm(parseMoney(r[3])):''}</td></tr>`).join('')||'<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>'}</table>
+    <p><b>Valor total em análise: ${tot>0?`${fm(tot)} (${esc(extenso(tot))})`:'R$ ____________'}.</b></p>
+    <h2>2) PRAZOS:</h2>
+    <ul><li>Entrega da Notificação: até o dia 10 do mês seguinte ao registro da pendência.</li><li>Prazo para Resolução: até o último dia do mês em que a notificação for recebida.</li><li>Eventual Desconto: na folha do mês seguinte, somente se a pendência não for resolvida e a responsabilidade for confirmada.</li></ul>
+    ${x.obs?`<p><b>OBSERVAÇÃO:</b> ${esc(x.obs).replace(/\n/g,'<br>')}</p>`:''}
+    <h2>3) DATAS DESTE COMUNICADO:</h2>
+    <p class="id">Data de entrega da notificação: ${dLin(x.entrega)}<br>Prazo final para resolução: ${dLin(x.prazo)}<br>Folha prevista para eventual desconto: ${lin(x.folha,10)}</p>
+    ${x.provid?`<h2>4) PROVIDÊNCIAS E ORIENTAÇÕES:</h2><ul>${li(x.provid)}</ul>`:''}
+    <p class="loc">${localData(D)}</p>
+    ${assina(`${esc(f.nome||'')}<br>Colaborador(a)`,`${esc(x.resp||'')}<br>${esc(x.resp_cargo||'Responsável pela empresa')}`)}`}},
   {k:'ferias_contab',t:'Solicitação de férias para a contabilidade',so:/$^/,campos:[],
    corpo:D=>{const E=D.emp,f=D.f,x=D.x,ps=x.parcelas||[],tr=(a,b)=>`<tr><td style="width:42%"><b>${a}</b></td><td>${b}</td></tr>`;return `${cab(E)}
     <h1>SOLICITAÇÃO DE FÉRIAS</h1>
@@ -4597,7 +4622,10 @@ function docCampos(){
   const cli=cliAtual(),m=docModelo($('dcMod').value),f=DOCF.find(x=>x.id===$('dcFunc').value)||{},E=cli?docEmp(cli):{};
   const fx=FDOC.map(([k,t,tp])=>`<label class="f${k==='nome'?' wide':''}">${t}<input data-dk="${k}" type="${tp||'text'}" value="${esc(f[k]||'')}"></label>`).join('');
   const D={data:$('dcData').value};
-  const ex=(m?.campos||[]).map(c=>{const v=c.def?c.def(E,D)||'':'';
+  const ex=(m?.campos||[]).map(c=>{let v=c.def?c.def(E,D)||'':'';if(c.lembra)try{v=localStorage.getItem('doc_'+c.k)||v}catch(e){}
+    if(c.tp==='pend')return `<div class="wide"><table class="mini" id="dcPend"><thead><tr><th>Data</th><th class="l">Paciente</th><th class="l">Descrição da pendência</th><th>Valor (R$)</th></tr></thead><tbody>${
+      Array.from({length:3},()=>'<tr><td><input type="date"></td><td><input placeholder="Não informado"></td><td><textarea rows="2" style="width:100%"></textarea></td><td><input class="money" placeholder="0,00" style="max-width:110px"></td></tr>').join('')}</tbody></table>
+      <p class="note" style="margin:4px 0 0">Preencha uma linha por pendência; linhas em branco não saem. Sem data ou paciente, sai “Não informada”. O total vai por extenso.</p></div>`;
     if(c.tp==='area')return `<label class="f wide">${c.t}<textarea data-dx="${c.k}" rows="3">${esc(v)}</textarea></label>`;
     if(c.tp==='epi')return `<div class="wide"><table class="mini" id="dcEpi"><thead><tr><th>Data</th><th>E/T/D</th><th>Qtde</th><th class="l">Equipamento</th><th class="l">Número</th></tr></thead><tbody>${
       Array.from({length:8},(_,i)=>{const r=EPIPAD[i]||['','','',''];return `<tr><td><input type="date" value="${r[2]?D.data:''}"></td><td><select>${['','E','T','D'].map(o=>`<option${o===r[0]?' selected':''}>${o}</option>`).join('')}</select></td><td><input style="width:50px" value="${esc(r[1])}"></td><td><input value="${esc(r[2])}"></td><td><input value="${esc(r[3])}"></td></tr>`}).join('')}</tbody></table>
@@ -4626,7 +4654,10 @@ function docEmpInfo(){
   };
 }
 $('dcMod').onchange=docCampos;$('dcFunc').onchange=docCampos;
-$('dcData').onchange=()=>{const m=docModelo($('dcMod').value);if(m?.campos.some(c=>c.tp==='epi'||c.def))docCampos()};
+$('dcData').onchange=()=>{const m=docModelo($('dcMod').value),d=$('dcData').value;
+  // no comunicado de pendência, só atualiza a folha prevista (sem apagar as pendências já digitadas)
+  if(m?.campos.some(c=>c.tp==='pend')){const el=document.querySelector('#dcCampos [data-dx="folha"]');if(el&&d)el.value=d.slice(5,7)+'/'+d.slice(0,4);return}
+  if(m?.campos.some(c=>c.tp==='epi'||c.def))docCampos()};
 function docImprime(m,D){
   const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return false}
   w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(m.t)} - ${esc(D.f.nome||'')}</title><style>
@@ -4644,6 +4675,9 @@ $('dcGerar').onclick=async()=>{
   document.querySelectorAll('#dcCampos [data-dk]').forEach(i=>{f[i.dataset.dk]=i.value.trim()});
   document.querySelectorAll('#dcCampos [data-dx]').forEach(i=>{x[i.dataset.dx]=i.value.trim()});
   if($('dcEpi'))x.itens=[...$('dcEpi').querySelectorAll('tbody tr')].map(tr=>{const v=[...tr.querySelectorAll('input,select')].map(i=>i.value.trim());return [v[0],v[1],v[2],v[3],v[4]]}).filter(r=>r[3]);
+  if($('dcPend'))x.pend=[...$('dcPend').querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('input,textarea')].map(i=>i.value.trim())).filter(r=>r.some(Boolean));
+  if(x.pend?.some(r=>r[3]&&!(parseMoney(r[3])>0))){err.textContent='Valor de pendência inválido. Use, por exemplo, 60,00.';err.hidden=false;return}
+  (m.campos||[]).filter(c=>c.lembra&&x[c.k]).forEach(c=>{try{localStorage.setItem('doc_'+c.k,x[c.k])}catch(e){}});
   if(!f.nome){err.textContent='Informe o nome do colaborador.';err.hidden=false;return}
   if(x.fundo&&!(parseMoney(x.fundo)>0)){err.textContent='Valor do fundo de caixa inválido.';err.hidden=false;return}
   const D={emp:docEmp(cli),f,x,data:$('dcData').value||TODAY};
