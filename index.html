@@ -897,6 +897,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="pmBody"></div>
   <div class="df" id="pmFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
 </dialog>
+<dialog id="dlgRegP">
+  <div class="dh"><h2 id="rgTitle"></h2></div>
+  <div class="db" id="rgBody"></div>
+  <div class="df" id="rgFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
+</dialog>
 <dialog id="dlgAv">
   <div class="dh"><h2 id="adTitle"></h2></div>
   <div class="db" id="adBody"></div>
@@ -2220,7 +2225,7 @@ async function renderCadastro(){
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th><th></th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
       <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.filter(([v])=>v!=='admin'||tipoUsr(u)==='admin').map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
-      <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)}</td>
+      <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)+regTxt(u)}</td>
       <td>${u.user_id===ME.user_id?'':'<button type="button" class="btn small ghost" data-senha="1">Trocar senha</button>'}</td></tr>`).join('')}</tbody>`;
   // novo usuário: a equipe só cadastra clientes e colaboradores
   const adm=ME.tipo==='admin'||ME.admin;
@@ -2274,6 +2279,26 @@ $('formUsr').addEventListener('submit',async e=>{
   if(tipo==='cliente'||tipo==='colaborador'){const u=USERS.find(x=>x.email===email);if(u)$('acUsr').value=u.user_id}
 });
 $('tbUsr').addEventListener('click',e=>{const b=e.target.closest('[data-perm]');if(b)abrirPermissoes(USERS.find(x=>x.user_id===b.closest('tr').dataset.id))});
+// regiões dos parceiros (abas da planilha de parceiros): o usuário só vê os parceiros das regiões marcadas
+const REGPARC=[['sj','São José'],['fpolis','Florianópolis'],['lages','Lages'],['palmas','Palmas'],['pb','Pato Branco']];
+const regNome=k=>REGPARC.find(r=>r[0]===k)?.[1]||k;
+const regTxt=u=>tipoUsr(u)==='admin'?'':`<br><span class="muted">Parceiros: ${u.parceiro_regioes?.length?'só '+esc(u.parceiro_regioes.map(regNome).join(', ')):'todas as regiões'}</span>${ehAdm()?' <button type="button" class="btn small ghost" data-reg="1">Regiões dos parceiros</button>':''}`;
+const dlgRegP=$('dlgRegP');let REGU=null;
+$('tbUsr').addEventListener('click',e=>{const b=e.target.closest('[data-reg]');if(!b)return;
+  const u=REGU=USERS.find(x=>x.user_id===b.closest('tr').dataset.id),rs=u.parceiro_regioes?.length?u.parceiro_regioes:null;
+  $('rgTitle').textContent='Parceiros que '+(u.nome||u.email)+' vê';
+  $('rgBody').innerHTML=`<p class="note" style="margin:0">Os parceiros são os mesmos em todas as empresas. Aqui você escolhe de quais regiões (abas da planilha de parceiros) este usuário vê os parceiros. Os parceiros cadastrados pelas empresas, fora da planilha, aparecem sempre.</p>
+    <div class="f"><span>Regiões</span><div class="vis"><label><input type="radio" name="rg_t" value="todas"${rs?'':' checked'}> Todas as regiões</label><label><input type="radio" name="rg_t" value="marcadas"${rs?' checked':''}> Só as marcadas</label></div></div>
+    <div class="chk" id="rgRegs"${rs?'':' hidden'}>${REGPARC.map(([k,n])=>`<label><input type="checkbox" value="${k}"${rs&&rs.includes(k)?' checked':''}> ${n}</label>`).join('')}</div>
+    <p class="err" id="rgErr" hidden></p>`;
+  $('rgBody').querySelectorAll('input[name="rg_t"]').forEach(r=>r.onchange=()=>$('rgRegs').hidden=r.value!=='marcadas');
+  dlgRegP.showModal()});
+$('rgFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgRegP.close();
+  const so=$('rgBody').querySelector('input[name="rg_t"]:checked').value==='marcadas',regs=[...$('rgRegs').querySelectorAll('input:checked')].map(x=>x.value);
+  if(so&&!regs.length){$('rgErr').textContent='Marque pelo menos uma região, ou escolha “Todas as regiões”.';$('rgErr').hidden=false;return}
+  b.disabled=true;const {error}=await sb.from('perfis').update({parceiro_regioes:so?regs:null}).eq('user_id',REGU.user_id);b.disabled=false;
+  if(error){console.error(error);$('rgErr').textContent=/parceiro_regioes/.test(error.message||'')?'Rode a atualização v70 do banco no Supabase.':error.message||'Não foi possível salvar.';$('rgErr').hidden=false;return}
+  toast('Regiões dos parceiros salvas');dlgRegP.close();renderCadastro()});
 const dlgPerm=$('dlgPerm');let PERMU=null;
 function abrirPermissoes(u){
   PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
