@@ -3547,7 +3547,15 @@ function espComparar(){
     const grupos={},info=[];
     p.verbas.forEach(v=>{const m=espColuna(v,cols);if(!m||!((v.venc||v.des||v.ref)>0)){info.push(v);return}(grupos[m.c]=grupos[m.c]||{...m,vs:[]}).vs.push(v)});
     const linhas=[];
-    if(f){cols.forEach(c=>{const g=grupos[c],k=g?g.k:(ESPMAP.find(x=>x[0]===c)||[])[2];if(!k)return;
+    // a contabilidade das Oliveira e da BJ lança a premiação numa verba só, "PRÊMIO" (Carol, 29/10): quando a empresa
+    // tem mais de uma coluna de premiação (Whatsapp, Assiduidade, Prêmio), compara a soma delas com a soma das verbas
+    const PREM=['premio_whats','assiduidade','premio'],pcs=PREM.filter(c=>cols.includes(c)),gen=p.verbas.some(v=>/PREMI/.test(espN(v.desc))&&!/WHATS|ASSIDU/.test(espN(v.desc)));
+    if(f&&gen&&pcs.length>1){const vs=PREM.flatMap(c=>{const g=grupos[c];delete grupos[c];return g?g.vs:[]});
+      const sv=pcs.map(c=>espSistema(f,c,'money')),s={n:sv.some(x=>x.n==null)?null:r2(sv.reduce((a,x)=>a+x.n,0))};s.t=s.n==null?sv.map(x=>x.t).join(' + '):s.n?fm(s.n):'—';
+      const e=espValor(vs,'money');if(vs.length||s.n){const ig=espIgual(s,e,'money');linhas.push({c:'premiacao',t:'Premiação ('+pcs.map(FNOME).map(t=>t.replace(/^Premiação\s*/,'')).join(' + ')+')',s:s.t,e:vs.length?e.t:'—',st:ig==null?'conf':ig?'ok':'dif',vs})}}
+    const pula=f&&gen&&pcs.length>1?new Set(pcs):new Set();
+    if(gen&&pcs.length===1&&pcs[0]!=='premio'&&grupos.premio){const g=grupos.premio;delete grupos.premio;(grupos[pcs[0]]=grupos[pcs[0]]||{c:pcs[0],k:'money',vs:[]}).vs.push(...g.vs)}
+    if(f){cols.forEach(c=>{if(pula.has(c))return;const g=grupos[c],k=g?g.k:(ESPMAP.find(x=>x[0]===c)||[])[2];if(!k)return;
         const s=espSistema(f,c,k),e=g?espValor(g.vs,k):(k==='sim'?{n:0,t:'Não'}:{n:0,a:0,t:'—'});
         if(!g&&!s.n&&s.n!=null)return;
         let ig=espIgual(s,e,k);
