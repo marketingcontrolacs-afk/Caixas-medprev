@@ -387,7 +387,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewRep" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Parceiros: cadastro e alterações</h1><p class="sub" id="pSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="pFiltro"><option value="ativos">Parceiros ativos</option><option value="alerta">Só com alerta</option><option value="inativos">Inativos</option></select></label><button class="btn" id="pDesc" hidden>+ Nova alteração de parceiro</button><button class="btn primary" id="pNovo">+ Novo parceiro</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="pFiltro"><option value="ativos">Parceiros ativos</option><option value="alerta">Só com alerta</option><option value="inativos">Inativos</option></select></label><button class="btn primary" id="pNovo">+ Novo cadastro ou alteração</button></div>
     </div>
     <div class="alerta" id="pAlerta" hidden></div>
     <div class="tiles" id="pTiles"></div>
@@ -6678,8 +6678,7 @@ async function renderRep(){
     .sort((a,b)=>(pAlertas(b).length>0)-(pAlertas(a).length>0)||a.nome.localeCompare(b.nome));
   $('pHead').innerHTML=`<tr><th class="l">Parceiro</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Pix</th><th class="l">Banco · agência · conta</th><th class="l">Titular</th><th class="l">Alertas</th></tr>`;
   $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b></td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
-    ||`<tr><td class="l muted" colspan="6">${f==='alerta'?'Nenhum parceiro com alerta.':PARC.length?'Nenhum parceiro neste filtro.':'Nenhum parceiro cadastrado.'+($('pNovo').hidden?'':' Use “Novo parceiro” para começar.')}</td></tr>`;
-  $('pDesc').hidden=!pDescaveis().length;
+    ||`<tr><td class="l muted" colspan="6">${f==='alerta'?'Nenhum parceiro com alerta.':PARC.length?'Nenhum parceiro neste filtro.':'Nenhum parceiro cadastrado.'+($('pNovo').hidden?'':' Use “Novo cadastro ou alteração” para começar.')}</td></tr>`;
   const ativos=PARC.filter(p=>p.ativo),nAlt=Object.keys(PALT).length,nNovo=ativos.filter(p=>!p.conferido).length;
   const descs=Object.values(PDESC).flat(),vDesc=r2(descs.reduce((x,d)=>x+(+d.valor),0)),semConta=ativos.filter(p=>!p.pix_chave&&!(p.banco&&p.conta)).length;
   $('pTiles').innerHTML=[['Parceiros ativos',ativos.length,todas?'em todas as empresas':'nesta empresa'],['Alterações de conta',nAlt,e?'aplique antes de pagar':'aguardando o escritório'],
@@ -6688,13 +6687,12 @@ async function renderRep(){
   const av=[nAlt?`<b>${nAlt} ${nAlt===1?'parceiro trocou':'parceiros trocaram'} de conta</b>`:'',descs.length?`<b>${descs.length} ${descs.length===1?'desconto':'descontos'} (${fm(vDesc)})</b>`:'',nNovo?`<b>${nNovo} ${nNovo===1?'parceiro novo':'parceiros novos'} para conferir</b>`:'',semConta?`<b>${semConta} sem dados bancários</b>`:''].filter(Boolean);
   $('pAlerta').hidden=!av.length;
   $('pAlerta').innerHTML=av.length?`<span>${e?'Antes de pagar os repasses de quinta-feira, '+dBR(proxQuinta())+':':'Pendências com o escritório:'}</span><span>${av.join(' · ')}</span>`:'';
-  $('pNote').textContent='Clique num parceiro para ver os dados, '+(e?'aplicar a alteração de conta e marcar os descontos como feitos. Todo parceiro entra sozinho em Gestão financeira › Clientes e fornecedores.':'informar alteração de conta ou lançar um desconto (ou use “+ Nova alteração de parceiro”).');
+  $('pNote').textContent='Clique num parceiro para ver os dados, '+(e?'aplicar a alteração de conta e marcar os descontos como feitos. Todo parceiro entra sozinho em Gestão financeira › Clientes e fornecedores.':'informar alteração de conta ou lançar um desconto (ou use “+ Novo cadastro ou alteração”).');
 }
 $('pFiltro').onchange=renderRep;$('pBusca').oninput=()=>{clearTimeout(renderRep.t);renderRep.t=setTimeout(renderRep,250)};
 $('pBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirParceiro(PARC.find(p=>p.id===tr.dataset.id))});
 $('pBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirParceiro(PARC.find(p=>p.id===tr.dataset.id))}});
-$('pNovo').onclick=()=>abrirParceiro(null);
-$('pDesc').onclick=()=>abrirParceiro(null,'novo');
+$('pNovo').onclick=()=>abrirParceiro(null,'novo');
 const dlgRep=$('dlgRep');
 // campos de cadastro; pre = prefixo dos ids (pc = cadastro, pa = alteração de conta)
 function pCampos(pre,p,dis,soConta){
@@ -6713,7 +6711,7 @@ async function abrirParceiro(p,modo){
   PARCDLG=p;PMODO=modo||null;const e=ehEsc();
   const pode=p?podeLancar(p.cliente_id,'repasse'):true,editaCad=!p||e||(pode&&!p.conferido);
   const alt=p&&PALT[p.id],descs=p?PDESC[p.id]||[]:[];
-  $('rpTitle').textContent=p?p.nome:modo==='novo'?'Nova alteração de parceiro':modo==='desc'?'Desconto de valores':modo==='alt'?'Alteração de conta':'Novo parceiro';
+  $('rpTitle').textContent=p?p.nome:modo==='novo'?'Novo cadastro ou alteração':modo==='desc'?'Desconto de valores':modo==='alt'?'Alteração de conta':'Novo parceiro';
   $('rpChip').innerHTML=p?(pAlertas(p).map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'):'';
   let hist=[];
   if(p){const [{data:ha},{data:hd}]=await Promise.all([sb.from('parceiro_alteracoes').select('*').eq('parceiro_id',p.id).neq('status','Pendente').order('solicitado_em',{ascending:false}).limit(10),
@@ -6725,9 +6723,10 @@ async function abrirParceiro(p,modo){
   if(!p&&!modo){const ls=pLancaEm();h+=`<label class="f">Empresa<select id="pc_cliente">${ls.map(c=>`<option value="${c.id}"${c.id===escCli.value?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
   const todas=escCli.value==='*',pOpt=ls=>`<option value=""></option>${ls.map(x=>`<option value="${x.id}"${x.id===p?.id?' selected':''}>${esc(x.nome)}${todas?' · '+esc(CLIENTES.find(c=>c.id===x.cliente_id)?.nome||''):''}</option>`).join('')}`;
   if(modo==='novo'){
-    h+=`<p class="note" style="margin:0">O que você quer informar ao escritório?</p>
-      <div class="row" style="gap:10px;flex-wrap:wrap"><button class="btn" data-act="novoAlt" style="flex:1 1 200px;padding:16px"><b>Alteração de conta</b><br><span class="muted">o parceiro vai receber em outra conta ou Pix</span></button>
-      <button class="btn" data-act="novoDesc" style="flex:1 1 200px;padding:16px"><b>Desconto de valores</b><br><span class="muted">descontar um valor do próximo repasse</span></button></div>`;
+    const tem=pDescaveis().length,op=(act,t,sub)=>`<button class="btn" data-act="${act}" style="flex:1 1 180px;padding:16px"${tem||act==='novoCad'?'':' disabled'}><b>${t}</b><br><span class="muted">${sub}</span></button>`;
+    h+=`<p class="note" style="margin:0">O que você quer fazer?</p>
+      <div class="row" style="gap:10px;flex-wrap:wrap">${op('novoCad','Novo cadastro','um parceiro que ainda não está na lista')}${op('novoAlt','Alteração de conta','o parceiro vai receber em outra conta ou Pix')}${op('novoDesc','Desconto de valores','descontar um valor do próximo repasse')}</div>
+      ${tem?'':'<p class="note" style="margin:0">A alteração de conta e o desconto ficam liberados depois que houver um parceiro cadastrado.</p>'}`;
   }else if(modo==='alt'&&!p){
     h+=`<label class="f">Parceiro *<select id="pa_parc">${pOpt(pDescaveis().filter(x=>!PALT[x.id]))}</select></label>
       <p class="note" style="margin:0">Escolha o parceiro para informar a conta nova. Quem já tem uma alteração aguardando o escritório não aparece na lista.</p>`;
@@ -6778,6 +6777,7 @@ async function rpAcao(act,el){
   try{
     if(act==='fechar')return dlgRep.close();
     if(act==='voltar')return abrirParceiro(p);
+    if(act==='novoCad'){PVOLTA=false;return abrirParceiro(null)}
     if(act==='novoAlt'){PVOLTA=false;return abrirParceiro(null,'alt')}
     if(act==='novoDesc'){PVOLTA=true;return abrirParceiro(null,'desc')}
     if(act==='novoVolta'){PVOLTA=false;return abrirParceiro(null,'novo')}
