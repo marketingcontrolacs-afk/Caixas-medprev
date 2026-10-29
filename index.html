@@ -3550,6 +3550,9 @@ function espComparar(){
         linhas.push({c,t:FNOME(c),s:s.t,e:e.t,st:ig==null?'conf':ig?'ok':'dif',vs:g?.vs||[]})})}
     Object.values(grupos).filter(g=>g.sem||!f).forEach(g=>{const e=espValor(g.vs,g.k);
       linhas.push({c:g.c,t:g.vs.map(v=>v.desc).join(', '),s:f?'sem coluna na planilha':'—',e:e.t,st:'dif',vs:g.vs})});
+    // diferença validada pelo escritório (v67): vale enquanto a folha e o espelho continuarem com os mesmos valores
+    if(f)linhas.forEach(l=>{const V=(FOL.espVal||{})[f.id+'|'+l.c];if(!V||l.st==='ok')return;
+      if(V.sistema===l.s&&V.espelho===l.e){l.st='val';l.obs=V.obs||''}else l.antes=V});
     out.push({p,f,linhas,info});
   });
   const faltam=doMes.filter(f=>!usados.has(f.id));
@@ -3558,16 +3561,19 @@ function espComparar(){
 function renderFolEsp(){
   const box=$('folEsp'),E=FOL.esp;
   if(!E||E.cli!==FOL.cli?.id||E.comp!==FOL.comp.slice(0,7)||!FOL.cli.folha_colunas?.length){box.hidden=true;box.innerHTML='';return}
-  const R=espComparar(),todos=!!E.todos,ndif=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st!=='ok').length,0),semCad=R.rows.filter(r=>!r.f);
+  const R=espComparar(),todos=!!E.todos,ndif=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st==='dif'||l.st==='conf').length,0),
+    nval=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st==='val').length,0),semCad=R.rows.filter(r=>!r.f);
   const avisos=[E.compArq&&E.compArq!==E.comp?`O espelho é de <b>${esc(mesAnoBR(E.compArq))}</b> e a folha aberta é de <b>${esc(mesAnoBR(E.comp))}</b>.`:'',
     E.cnpj&&FOL.cli.cnpj&&E.cnpj.replace(/\D/g,'')!==FOL.cli.cnpj.replace(/\D/g,'')?`O CNPJ do espelho (${esc(E.cnpj)}) não é o desta empresa (${esc(FOL.cli.cnpj)}).`:'',
     E.semTexto?`${E.semTexto} página${E.semTexto===1?'':'s'} sem texto (imagem) não ${E.semTexto===1?'foi lida':'foram lidas'}.`:'',
     E.pessoas.some(p=>!p.ok)?`Os totais de ${E.pessoas.filter(p=>!p.ok).length} recibo(s) não fecharam com as verbas lidas: confira esses no PDF.`:''].filter(Boolean);
-  const chip={ok:'<span class="chip c-ok">✓ Igual</span>',dif:'<span class="chip c-bad">≠ Diferente</span>',conf:'<span class="chip c-warn">Conferir</span>'};
+  const chip={ok:'<span class="chip c-ok">✓ Igual</span>',dif:'<span class="chip c-bad">≠ Diferente</span>',conf:'<span class="chip c-warn">Conferir</span>',val:'<span class="chip c-done">✓ Validado</span>'};
+  const acao=(r,l)=>!r.f||l.st==='ok'?'':l.st==='val'?`<button class="btn small ghost" data-espdes="${r.f.id}|${esc(l.c)}">Desfazer</button>`:`<button class="btn small" data-espok="${r.f.id}|${esc(l.c)}">Validar</button>`;
   const corpo=R.rows.filter(r=>todos||!r.f||r.linhas.some(l=>l.st!=='ok')).map((r,i)=>{const ls=r.linhas.filter(l=>todos||l.st!=='ok');
     return `<tr class="fesp-p"><td class="l" colspan="5"><b>${esc(r.f?.nome||r.p.nome)}</b>${r.f?'':' <span class="chip c-bad">não achei no cadastro</span>'}
       <span class="note">· líquido no espelho ${r.p.liq!=null?fm(r.p.liq):'—'}</span> <button class="btn small ghost" data-espv="${i}">Ver recibo</button></td></tr>${
-      ls.map(l=>`<tr><td></td><td class="l">${esc(l.t)}</td><td class="l">${esc(l.s)}</td><td class="l">${esc(l.e)}</td><td class="l">${chip[l.st]}</td></tr>`).join('')
+      ls.map(l=>`<tr><td></td><td class="l">${esc(l.t)}${l.st==='val'&&l.obs?`<div class="note">📝 ${esc(l.obs)}</div>`:''}${l.antes?`<div class="note">Validado antes com outros valores (folha ${esc(l.antes.sistema||'—')}, espelho ${esc(l.antes.espelho||'—')}): confira de novo.</div>`:''}</td><td class="l">${esc(l.s)}</td><td class="l">${esc(l.e)}</td><td class="l" style="white-space:nowrap">${chip[l.st]} ${acao(r,l)}</td></tr>
+        ${r.f&&l.st!=='ok'&&l.st!=='val'?`<tr hidden data-espobs="${r.f.id}|${esc(l.c)}"><td></td><td class="l" colspan="4"><div class="row" style="align-items:flex-end"><label class="f" style="flex:1">Sua observação (por que está certo)<input data-espobst value="${esc(l.antes?.obs||'')}" placeholder="Ex.: a contabilidade lançou o DSR pelas horas da falta, está correto"></label><button class="btn primary small" data-espsalva="${r.f.id}|${esc(l.c)}" data-s="${esc(l.s)}" data-e="${esc(l.e)}">Dar ok</button><button class="btn small ghost" data-espcanc>Cancelar</button></div></td></tr>`:''}`).join('')
       ||(r.linhas.length?'':'<tr><td></td><td class="l muted" colspan="4">Nenhuma verba das colunas da planilha neste recibo.</td></tr>')}
       <tr hidden data-esprec="${i}"><td></td><td class="l" colspan="4"><table class="mini"><thead><tr><th>Cód.</th><th class="l">Verba</th><th>Ref.</th><th>Vencimentos</th><th>Descontos</th></tr></thead><tbody>${
         r.p.verbas.map(v=>`<tr><td>${esc(v.cod)}</td><td class="l">${esc(v.desc)}</td><td>${v.ref!=null?showMoney(v.ref):''}</td><td>${v.venc?fm(v.venc):''}</td><td>${v.des?fm(v.des):''}</td></tr>`).join('')}</tbody>
@@ -3576,12 +3582,13 @@ function renderFolEsp(){
   box.innerHTML=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Conferência com o espelho da contabilidade</h2>
       <div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folEspTodos" style="width:auto"${todos?' checked':''}> Mostrar o que bateu</label>
       <button class="btn" id="folEspPdf">PDF das diferenças</button><button class="btn ghost" id="folEspFechar">Fechar</button></div></div>
-    <p class="note" style="margin:6px 0 0">${esc(E.arqs.join(', '))} · ${E.pessoas.length} recibo${E.pessoas.length===1?'':'s'} · <b class="${ndif?'neg':'pos'}">${ndif?`${ndif} ${ndif===1?'item para conferir':'itens para conferir'}`:'✓ tudo igual à folha do sistema'}</b>${semCad.length?` · ${semCad.length} sem cadastro`:''}${R.faltam.length?` · ${R.faltam.length} da folha sem recibo`:''}</p>
+    <p class="note" style="margin:6px 0 0">${esc(E.arqs.join(', '))} · ${E.pessoas.length} recibo${E.pessoas.length===1?'':'s'} · <b class="${ndif?'neg':'pos'}">${ndif?`${ndif} ${ndif===1?'item para conferir':'itens para conferir'}`:nval?'✓ nada pendente':'✓ tudo igual à folha do sistema'}</b>${nval?` · ${nval} validad${nval===1?'o':'os'} com observação`:''}${semCad.length?` · ${semCad.length} sem cadastro`:''}${R.faltam.length?` · ${R.faltam.length} da folha sem recibo`:''}</p>
     ${avisos.map(a=>`<p class="neg" style="margin:6px 0 0">⚠ ${a}</p>`).join('')}
+    ${FOL.espVal===null?'<p class="neg" style="margin:6px 0 0">Para validar as diferenças com observação, rode a atualização v67 do banco no Supabase.</p>':''}
     ${R.faltam.length?`<p class="note" style="margin:6px 0 0"><b>Na folha do sistema, mas sem recibo no espelho:</b> ${R.faltam.map(f=>esc(f.nome)).join(', ')}.</p>`:''}
     <div class="tablebox" style="margin-top:8px"><table><thead><tr><th style="width:18px"></th><th class="l">Informação</th><th class="l">Folha do sistema</th><th class="l">Espelho da contabilidade</th><th class="l"></th></tr></thead><tbody>${
       corpo||'<tr><td></td><td class="l pos" colspan="4">Nenhuma diferença: todas as colunas da planilha batem com o espelho.</td></tr>'}</tbody></table></div>
-    <p class="note" style="margin:6px 0 0">Compara as colunas da planilha desta empresa (ajuda de custo, gratificação, insalubridade, quebra de caixa, VA, VT, faltas, DSR, adiantamento…) com as verbas do recibo. Horas normais, INSS, IRRF, abono da CCT, consignado e férias não estão na planilha: veja em “Ver recibo”. Se você corrigir uma célula da folha, a conferência é refeita na hora.</p>`;
+    <p class="note" style="margin:6px 0 0">Compara as colunas da planilha desta empresa (ajuda de custo, gratificação, insalubridade, quebra de caixa, VA, VT, faltas, DSR, adiantamento…) com as verbas do recibo. Horas normais, INSS, IRRF, abono da CCT, consignado e férias não estão na planilha: veja em “Ver recibo”. Se você corrigir uma célula da folha, a conferência é refeita na hora. Diferença que está certa: clique em <b>Validar</b>, escreva a observação e dê ok (fica gravado; se a folha ou o espelho mudarem, ela volta para conferir).</p>`;
 }
 const mesAnoBR=c=>{const [a,m]=String(c).split('-');return `${MESES_EXT[+m-1]?.replace('marco','março')||m}/${a}`};
 $('folEspFile').addEventListener('change',async e=>{const fs=[...(e.target.files||[])];e.target.value='';if(!fs.length)return;
@@ -3590,10 +3597,24 @@ $('folEspFile').addEventListener('change',async e=>{const fs=[...(e.target.files
   try{const E={cli:FOL.cli.id,comp:FOL.comp.slice(0,7),arqs:fs.map(f=>f.name),pessoas:[],semTexto:0,compArq:null,cnpj:null};
     for(const f of fs){const r=await lerEspelho(await f.arrayBuffer());E.pessoas.push(...r.pessoas);E.semTexto+=r.semTexto;E.compArq=E.compArq||r.comp;E.cnpj=E.cnpj||r.cnpj}
     if(!E.pessoas.length){toast(E.semTexto?'Este PDF é só imagem (escaneado ou impresso como imagem): peça à contabilidade o PDF gerado pelo sistema da folha.':'Não achei recibos de pagamento neste PDF.');return}
-    FOL.esp=E;renderFolEsp();$('folEsp').scrollIntoView({behavior:'smooth',block:'start'});
+    FOL.esp=E;await espCarregaVal();renderFolEsp();$('folEsp').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(err){console.error(err);toast('Não consegui ler este PDF.')}});
-$('folEsp').addEventListener('click',e=>{
+// validações gravadas do mês (null: falta a v67 no banco)
+async function espCarregaVal(){const {data,error}=await sb.from('folha_conferencia').select('*').eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp);
+  FOL.espVal=error?null:Object.fromEntries((data||[]).map(v=>[v.funcionario_id+'|'+v.coluna,v]))}
+$('folEsp').addEventListener('click',async e=>{
   if(e.target.id==='folEspFechar'){FOL.esp=null;renderFolEsp();return}
+  const ok=e.target.closest('[data-espok]');if(ok){if(FOL.espVal===null){toast('Rode a atualização v67 do banco no Supabase.');return}
+    const tr=$('folEsp').querySelector(`[data-espobs="${ok.dataset.espok}"]`);tr.hidden=false;tr.querySelector('input').focus();return}
+  if(e.target.closest('[data-espcanc]')){e.target.closest('tr').hidden=true;return}
+  const sv=e.target.closest('[data-espsalva]');if(sv){const [fid,col]=sv.dataset.espsalva.split('|'),obs=sv.closest('tr').querySelector('input').value.trim();
+    if(!obs){toast('Escreva a observação antes de dar ok.');return}
+    sv.disabled=true;const {error}=await sb.from('folha_conferencia').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,funcionario_id:fid,coluna:col,sistema:sv.dataset.s,espelho:sv.dataset.e,obs,validado_em:new Date().toISOString()},{onConflict:'cliente_id,competencia,funcionario_id,coluna'});
+    sv.disabled=false;if(error){if(/folha_conferencia/.test(error.message||'')){console.error(error);toast('Rode a atualização v67 do banco no Supabase.')}else fail(error,'Não foi possível validar');return}
+    toast('Validado');await espCarregaVal();renderFolEsp();return}
+  const des=e.target.closest('[data-espdes]');if(des){const [fid,col]=des.dataset.espdes.split('|');
+    const {error}=await sb.from('folha_conferencia').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('funcionario_id',fid).eq('coluna',col);
+    if(error){fail(error,'Não foi possível desfazer');return}await espCarregaVal();renderFolEsp();return}
   if(e.target.id==='folEspPdf'){espPdf();return}
   const b=e.target.closest('[data-espv]');if(b){const tr=$('folEsp').querySelector(`[data-esprec="${b.dataset.espv}"]`);tr.hidden=!tr.hidden;b.textContent=tr.hidden?'Ver recibo':'Esconder recibo'}});
 $('folEsp').addEventListener('change',e=>{if(e.target.id==='folEspTodos'){FOL.esp.todos=e.target.checked;renderFolEsp()}});
@@ -3607,9 +3628,9 @@ function espPdf(){
     td.p{background:#e3eded;font-weight:700}@page{size:A4;margin:14mm}</style></head><body>
     <h1>${esc(tit)}</h1><p>${esc(FOL.esp.arqs.join(', '))} · emitido em ${dBR(TODAY)}</p>
     ${R.faltam.length?`<p><b>Na folha, sem recibo no espelho:</b> ${R.faltam.map(f=>esc(f.nome)).join(', ')}</p>`:''}
-    <table><thead><tr><th>Informação</th><th>Folha enviada</th><th>Espelho da contabilidade</th></tr></thead><tbody>${
-      rs.map(r=>`<tr><td class="p" colspan="3">${esc(r.f?.nome||r.p.nome)}${r.f?'':' (não achei no cadastro)'}</td></tr>${r.linhas.map(l=>`<tr><td>${esc(l.t)}</td><td>${esc(l.s)}</td><td>${esc(l.e)}</td></tr>`).join('')}`).join('')
-      ||'<tr><td colspan="3">Nenhuma diferença.</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Informação</th><th>Folha enviada</th><th>Espelho da contabilidade</th><th>Situação</th></tr></thead><tbody>${
+      rs.map(r=>`<tr><td class="p" colspan="4">${esc(r.f?.nome||r.p.nome)}${r.f?'':' (não achei no cadastro)'}</td></tr>${r.linhas.map(l=>`<tr><td>${esc(l.t)}</td><td>${esc(l.s)}</td><td>${esc(l.e)}</td><td>${l.st==='val'?'Validado'+(l.obs?': '+esc(l.obs):''):'Conferir'}</td></tr>`).join('')}`).join('')
+      ||'<tr><td colspan="4">Nenhuma diferença.</td></tr>'}</tbody></table>
     <script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);
   w.document.close();
 }
