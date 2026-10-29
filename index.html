@@ -5614,16 +5614,19 @@ async function gfContasDe(cid,forcar){
 // todos os cadastros ativos da empresa (e os que valem para todas), clientes e fornecedores juntos
 let GFPT={cid:null,lista:[]};
 async function gfPessoasTodas(cid){
-  if(GFPT.cid!==cid)GFPT={cid,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,papel').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'))};
+  if(GFPT.cid!==cid)GFPT={cid,lista:await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,papel,parceiro_id').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'))};
   return GFPT.lista;
 }
+// parceiro (repasses) aparece pelo nome local, que fica no nome fantasia do fornecedor; o nome global vai ao lado
+const pesNome=p=>p.parceiro_id&&p.fantasia?p.fantasia:p.nome;
+const pesRot=p=>{const o=pesNome(p)===p.nome?p.fantasia:p.nome;return o&&o!==pesNome(p)?esc(o):''};
 // nas entradas os clientes vêm primeiro; nas saídas, os fornecedores (a lista mostra só o nome, e o nome fantasia quando houver)
 const pesOpts=(ls,ent)=>[...ls].sort((a,b)=>((a.papel===(ent?'fornecedor':'cliente'))-(b.papel===(ent?'fornecedor':'cliente')))||a.nome.localeCompare(b.nome))
-  .map(p=>`<option value="${esc(p.nome)}">${p.fantasia&&p.fantasia!==p.nome?esc(p.fantasia):''}</option>`).join('');
+  .map(p=>`<option value="${esc(pesNome(p))}">${pesRot(p)}</option>`).join('');
 async function gfPessoasDe(cid,papel){
   const key=cid+'|'+papel;
   // todos os cadastros, com os do papel pedido (cliente ou fornecedor) primeiro
-  if(GFP.key!==key){const ls=await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo,papel').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'));
+  if(GFP.key!==key){const ls=await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo,papel,parceiro_id').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'));
     GFP={key,lista:ls.filter(p=>p.papel===papel||p.papel==='ambos').concat(ls.filter(p=>p.papel!==papel&&p.papel!=='ambos'))}}
   return GFP.lista;
 }
@@ -5977,7 +5980,7 @@ async function abrirGT(t,tipo){
   const movs=t?GT.movs[t.id]||[]:[],pago=t?GT.pago[t.id]||0:0,falta=t?Math.max(0,r2(t.valor-pago)):0;
   $('gtdTitle').textContent=t?(t.pessoa_nome||(P?'Conta a pagar':'Conta a receber')):(P?'Nova conta a pagar':'Nova conta a receber')+' · '+cli.nome;
   $('gtdChip').innerHTML=t?(s=>`<span class="chip ${s[0]}">${s[1]}</span>`)(gtSit(t)):'';
-  let h=`<datalist id="gtPesList">${pes.map(p=>`<option value="${esc(p.nome)}">${p.fantasia&&p.fantasia!==p.nome?esc(p.fantasia):''}</option>`).join('')}</datalist>
+  let h=`<datalist id="gtPesList">${pes.map(p=>`<option value="${esc(pesNome(p))}">${pesRot(p)}</option>`).join('')}</datalist>
   <div class="fields">
     <label class="f wide">${P?'Fornecedor':'Cliente'} *<input id="gt_pessoa" list="gtPesList" value="${v('pessoa_nome')}" placeholder="Digite para buscar no cadastro" autocomplete="off"></label>
     <label class="f wide">Descrição<input id="gt_descricao" value="${v('descricao')}" placeholder="${P?'Ex.: aluguel da sala':'Ex.: convênio Unimed, setembro'}"></label>
@@ -7419,10 +7422,10 @@ async function renderRep(){
   PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
   const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
   const f=$('pFiltro').value,q=$('pBusca').value.trim().toLowerCase();
-  const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||p.nome.toLowerCase().includes(q)))
+  const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||[p.nome,p.nome_global,...(p.nomes_locais||[])].some(n=>(n||'').toLowerCase().includes(q))))
     .sort((a,b)=>(pAlertas(b).length>0)-(pAlertas(a).length>0)||a.nome.localeCompare(b.nome));
   $('pHead').innerHTML=`<tr><th class="l">Parceiro</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Pix</th><th class="l">Banco · agência · conta</th><th class="l">Titular</th><th class="l">Alertas</th></tr>`;
-  $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b></td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
+  $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b>${p.nome_global&&p.nome_global!==p.nome?`<br><span class="muted">${esc(p.nome_global)}</span>`:''}</td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="6">${f==='alerta'?'Nenhum parceiro com alerta.':PARC.length?'Nenhum parceiro neste filtro.':'Nenhum parceiro cadastrado.'+($('pNovo').hidden?'':' Use “Novo cadastro ou alteração” para começar.')}</td></tr>`;
   const ativos=PARC.filter(p=>p.ativo),nAlt=Object.keys(PALT).length,nNovo=ativos.filter(p=>!p.conferido).length;
   const descs=Object.values(PDESC).flat(),vDesc=r2(descs.reduce((x,d)=>x+(+d.valor),0)),semConta=ativos.filter(p=>!p.pix_chave&&!(p.banco&&p.conta)).length;
@@ -7444,7 +7447,7 @@ function pCampos(pre,p,dis,soConta){
   const d=dis?' disabled':'',v=k=>esc(p?.[k]||'');
   const sel=(k,t,ops)=>`<label class="f">${t}<select id="${pre}_${k}"${d}><option value=""></option>${ops.map(o=>`<option${p?.[k]===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
   const inp=(k,t,ph)=>`<label class="f">${t}<input id="${pre}_${k}" value="${v(k)}"${ph?` placeholder="${ph}"`:''}${d}></label>`;
-  return `<div class="fields">${soConta?'':inp('nome','Nome do parceiro *')}
+  return `<div class="fields">${soConta?'':inp('nome','Nome local * (como no sistema do cliente)','Ex.: Dra Amanda Ribas- Mpa#')+inp('nome_global','Nome global (razão social)')}
     ${sel('pix_tipo','Tipo da chave Pix',PIXTIPOS)}${inp('pix_chave','Chave Pix')}
     ${inp('banco','Banco','Ex.: Sicredi')}${inp('agencia','Agência')}${inp('conta','Conta','com o dígito')}${sel('tipo_conta','Tipo de conta',TIPOSCONTA)}
     ${inp('titular','Titular da conta','se não for o próprio parceiro')}${inp('cpf_cnpj','CPF/CNPJ do titular')}
@@ -7533,8 +7536,9 @@ async function rpAcao(act,el){
     if(act==='copDesc')return copiar(descTxt(d),'Texto do desconto copiado');
     el.disabled=true;
     if(act==='salvar'){
-      const o=lerCampos('pc',['nome','obs',...CONTAK]);
-      if(!o.nome)return rpErr('Informe o nome do parceiro.');
+      const o=lerCampos('pc',['nome','nome_global','obs',...CONTAK]);
+      if(!o.nome)return rpErr('Informe o nome local do parceiro (como aparece no sistema do cliente).');
+      if(!('nome_global' in (p||PARC[0]||{nome_global:null})))delete o.nome_global;
       if((o.banco||o.agencia||o.conta)&&!temConta(o))return rpErr('Complete banco, agência e conta, ou deixe em branco e preencha depois.');
       if(p){if(e&&$('pc_ativo'))o.ativo=$('pc_ativo').checked;o.atualizado_em=new Date().toISOString();
         const {error}=await sb.from('parceiros').update(o).eq('id',p.id);if(error)throw error;return recarregar('Parceiro salvo')}
