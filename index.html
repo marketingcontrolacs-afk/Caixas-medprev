@@ -243,7 +243,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .msg .q{font-size:12px;color:var(--muted)}.msg .x{white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.mine{background:var(--brand-soft);border-color:transparent}.msg.int{background:var(--warn-soft);border-color:var(--warn)}
 .msg.sys{border:0;padding:0 4px;font-size:12px;color:var(--muted);font-style:italic}
-#dlgTar{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*{min-width:0}
+#dlgTar,#dlgProj{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*,#dlgProj .db>*{min-width:0}
+#pjBody tr{cursor:pointer}#pjBody tr.novo td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
+.pjdec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;background:var(--sunk)}
 .pick{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:10px;max-height:300px;overflow:auto}
 .pick .pkg{display:grid;gap:4px}.pick .pkg>div:first-child{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700}
 .vis{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:14px;font-weight:600}.vis label{display:flex;gap:6px;align-items:center}.vis input{width:auto;margin:0}
@@ -596,6 +598,23 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div id="avLista" style="display:grid;gap:12px;margin-top:16px"></div>
   </section>
 
+  <!-- PROJETOS E MELHORIAS (v65) -->
+  <section id="viewProj" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Projetos e melhorias</h1><p class="sub" id="pjSub"></p></div>
+      <button class="btn primary" id="pjNovo">+ Novo pedido</button>
+    </div>
+    <div class="alerta" id="pjAlerta" hidden></div>
+    <div class="toolbar">
+      <input id="pjBusca" placeholder="Buscar pedido" style="max-width:240px">
+      <label class="f">Situação<select id="pjSit"><option value="abertos">Em aberto</option><option value="aguardando">Aguardando validação</option><option value="ajuste">Precisa de ajuste</option><option value="aprovado">Aprovado</option><option value="andamento">Em andamento</option><option value="concluido">Concluído</option><option value="recusado">Recusado</option><option value="todos">Todos</option></select></label>
+      <label class="f">Tipo<select id="pjTipo"></select></label>
+      <label class="f">Pedido por<select id="pjQuem"><option value="">Todos</option><option value="meus">Só os meus</option></select></label>
+    </div>
+    <div class="card tablebox"><table><thead><tr><th class="l">Pedido</th><th class="l">Tipo</th><th class="l">Empresa</th><th class="l">Pedido por</th><th>Prioridade</th><th>Situação</th></tr></thead><tbody id="pjBody"></tbody></table></div>
+    <p class="note" id="pjNote"></p>
+  </section>
+
   <!-- TAREFAS E RECADOS (Kanban) -->
   <section id="viewTar" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -877,6 +896,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="adBody"></div>
   <div class="df" id="adFoot"></div>
 </dialog>
+<dialog id="dlgProj">
+  <div class="dh"><h2 id="pdTitle"></h2><span class="spacer"></span><span id="pdChip" class="chips"></span></div>
+  <div class="db" id="pdBody"></div>
+  <div class="df" id="pdFoot"></div>
+</dialog>
 <dialog id="dlgTar">
   <div class="dh"><h2 id="tdTitle"></h2><span class="spacer"></span><span id="tdChip" class="chips"></span></div>
   <div class="db" id="tdBody"></div>
@@ -1021,8 +1045,8 @@ let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
-// Tarefas e Avisos são de toda a equipe
-const SEMPRE=['tarefas','avisos'];
+// Tarefas, Avisos e Projetos são de toda a equipe
+const SEMPRE=['tarefas','avisos','projetos'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)||k.startsWith('cfg')&&ME.modulos_equipe.includes('cfg'));
 const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Parceiros: cadastro e alterações',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
@@ -1050,6 +1074,7 @@ const ICO={
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  projetos:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   gfpagar:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 13v4M10 15l2 2 2-2"/>',
   gfrec:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 17v-4M10 15l2-2 2 2"/>',
@@ -1125,6 +1150,8 @@ const NAV=[
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
+  // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
+  {k:'projetos',t:'Projetos e melhorias',g:'Comunicação',s:'Mensagens',ok:ehEsc},
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
   {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'repasse',t:'Parceiros: cadastro e alterações',g:'Comunicação',s:'Dia a dia',ok:()=>temAcesso('repasse')},
@@ -1142,7 +1169,7 @@ const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
-const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
+const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW);
   $('nav').innerHTML=MODS.filter(m=>itens.some(n=>navGrp(n)===m.g)).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
@@ -1195,7 +1222,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos';
+  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
@@ -1204,7 +1231,7 @@ const SECK='portal_secao';
 function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1224,6 +1251,7 @@ function openView(){
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos()}
+  else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfremessa'||VIEW==='gfretorno'){$('viewGR').hidden=false;renderGR()}
@@ -1258,7 +1286,7 @@ async function boot(){
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   show('app');go(ehEsc()&&eqPode('gfdash')?'gfdash':(volta||first).k);   // o escritório abre no dashboard da empresa
-  const novid=()=>{tNovidades();avNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -7391,6 +7419,139 @@ $('adFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-a
     if(quem.length){const {error:e2}=await sb.from('aviso_usuarios').insert(quem.map(u=>({aviso_id:data.id,user_id:u})));if(e2)throw e2}
     toast(a?'Aviso salvo':'Aviso publicado');dlgAv.close();renderAvisos();
   }catch(x){console.error(x);err(x.message&&!x.code?x.message:'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
+  finally{b.disabled=false}
+});
+
+// =====================================================================
+// PROJETOS E MELHORIAS (v65)
+// A equipe pede a criação ou a melhoria de algo; só a administradora (master) aprova, recusa ou devolve.
+// =====================================================================
+const PJTIPO={categoria:'Nova categoria',regra:'Regra',cadastro:'Cadastro',funcionalidade:'Nova funcionalidade',melhoria:'Melhoria de algo que existe',correcao:'Correção de erro',outro:'Outro'};
+const PJSIT={aguardando:['Aguardando validação','c-warn'],ajuste:['Precisa de ajuste','c-bad'],aprovado:['Aprovado','c-ok'],andamento:['Em andamento','c-done'],concluido:['Concluído','c-ok'],recusado:['Recusado','c-none']};
+const PJPRI={baixa:'Baixa',normal:'Normal',alta:'Alta',urgente:'Urgente'};
+const PJABERTOS=['aguardando','ajuste','aprovado','andamento'];
+const pjChip=s=>`<span class="chip ${PJSIT[s][1]}">${PJSIT[s][0]}</span>`;
+const v65=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='PGRST202'||/projeto/.test(e.message||''));
+let PJS=[], PJDLG=null;
+$('pjTipo').innerHTML='<option value="">Todos</option>'+Object.entries(PJTIPO).map(([k,t])=>`<option value="${k}">${t}</option>`).join('');
+async function pjNovidades(){
+  if(!ehEsc())return;
+  const {data,error}=await sb.rpc('projetos_novidades');if(error)return;
+  const n=Number(data)||0;if((NAVBADGE.projetos||0)!==n){NAVBADGE.projetos=n;renderNav()}
+}
+// tem novidade para quem está logado
+const pjNovo=p=>ehAdm()&&p.novo_para_admin||p.criado_por===ME.user_id&&p.novo_para_autor;
+async function renderProj(){
+  const a=ehAdm();
+  $('pjSub').textContent=a?'Pedidos da equipe para criar ou melhorar algo no sistema. Você valida cada um: aprova, devolve para ajuste ou recusa.'
+    :'Peça a criação ou a melhoria de algo (categoria, regra, cadastro, funcionalidade). A administração valida e responde aqui.';
+  const {data,error}=await sb.from('projetos').select('*').order('criado_em',{ascending:false});
+  if(error){console.error(error);$('pjBody').innerHTML=`<tr><td class="l neg" colspan="6">${v65(error)?'Este módulo precisa da atualização v65 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.'}</td></tr>`;return}
+  PJS=data||[];pjDesenha();
+}
+function pjDesenha(){
+  const sit=$('pjSit').value,tipo=$('pjTipo').value,meus=$('pjQuem').value==='meus',busca=$('pjBusca').value.trim().toLowerCase();
+  const l=PJS.filter(p=>(sit==='todos'||(sit==='abertos'?PJABERTOS.includes(p.status):p.status===sit))&&(!tipo||p.tipo===tipo)&&(!meus||p.criado_por===ME.user_id)
+    &&(!busca||[p.titulo,p.descricao,p.criado_por_nome].some(x=>(x||'').toLowerCase().includes(busca))))
+    // novidades e os que aguardam validação primeiro
+    .sort((x,y)=>(pjNovo(y)-pjNovo(x))||((y.status==='aguardando')-(x.status==='aguardando'))||(y.criado_em>x.criado_em?1:-1));
+  const cli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  $('pjBody').innerHTML=l.map(p=>`<tr data-id="${p.id}"${pjNovo(p)?' class="novo"':''}><td class="l"><b>${esc(p.titulo)}</b>${pjNovo(p)?' <span class="chip c-bad">Novo</span>':''}</td>
+    <td class="l">${PJTIPO[p.tipo]||''}</td><td class="l">${esc(cli(p.cliente_id))||'<span class="muted">Geral</span>'}</td>
+    <td class="l">${esc(p.criado_por_nome||'')}<br><span class="muted">${dtBR(p.criado_em)}</span></td>
+    <td>${p.prioridade==='urgente'||p.prioridade==='alta'?`<span class="chip ${p.prioridade==='urgente'?'c-bad':'c-warn'}">${PJPRI[p.prioridade]}</span>`:PJPRI[p.prioridade]}</td><td>${pjChip(p.status)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="6">${PJS.length?'Nenhum pedido com estes filtros.':'Nenhum pedido ainda. Use “Novo pedido” para começar.'}</td></tr>`;
+  const ag=PJS.filter(p=>p.status==='aguardando').length;
+  $('pjAlerta').hidden=!(ehAdm()&&ag);
+  if(ehAdm()&&ag)$('pjAlerta').innerHTML=`<b>${ag} ${ag===1?'pedido aguardando':'pedidos aguardando'} a sua validação.</b><span>Abra cada um para aprovar, devolver para ajuste ou recusar.</span>`;
+  $('pjNote').textContent=ehAdm()?'Só você (administração) muda a situação dos pedidos. A equipe vê todos os pedidos, para não pedir a mesma coisa duas vezes.'
+    :'Você pode editar ou excluir o seu pedido enquanto ele aguarda validação ou precisa de ajuste. Depois de validado, só a administração altera.';
+}
+['pjSit','pjTipo','pjQuem'].forEach(x=>$(x).onchange=pjDesenha);$('pjBusca').oninput=pjDesenha;
+$('pjNovo').onclick=()=>abrirProj(null);
+$('pjBody').addEventListener('click',e=>{const tr=e.target.closest('tr[data-id]');if(tr)abrirProj(PJS.find(p=>p.id===tr.dataset.id))});
+const dlgProj=$('dlgProj');
+function abrirProj(p){
+  PJDLG=p;const a=ehAdm(),meu=!p||p.criado_por===ME.user_id,edita=!p||a||meu&&['aguardando','ajuste'].includes(p.status);
+  $('pdTitle').textContent=p?p.titulo:'Novo pedido';
+  $('pdChip').innerHTML=p?pjChip(p.status):'';
+  const opts=(o,v)=>Object.entries(o).map(([k,t])=>`<option value="${k}"${k===v?' selected':''}>${t}</option>`).join('');
+  let h='';
+  if(!a&&(p?.resposta||p?.decidido_em))h+=`<div class="pjdec"><span class="q" style="font-size:12px;color:var(--muted)">Parecer de ${esc(p.decidido_por_nome||'administração')} · ${dtBR(p.decidido_em)}</span>${p.resposta?`<span style="white-space:pre-wrap">${esc(p.resposta)}</span>`:''}</div>`;
+  if(edita)h+=`<div class="fields"><label class="f wide">O que você precisa *<input id="pd_titulo" maxlength="160" value="${esc(p?.titulo||'')}" placeholder="Ex.: categoria para taxa de maquininha da Stone"></label>
+    <label class="f">Tipo<select id="pd_tipo">${opts(PJTIPO,p?.tipo||'melhoria')}</select></label>
+    <label class="f">Empresa<select id="pd_cli"><option value="">Geral (todas)</option>${CLIENTES.filter(c=>c.ativo!==false||c.id===p?.cliente_id).map(c=>`<option value="${c.id}"${c.id===p?.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>
+    <label class="f">Prioridade<select id="pd_pri">${opts(PJPRI,p?.prioridade||'normal')}</select></label>
+    <label class="f wide">Descrição (como deve funcionar)<textarea id="pd_desc" rows="5">${esc(p?.descricao||'')}</textarea></label>
+    <label class="f wide">Por que precisa (o que melhora)<textarea id="pd_mot" rows="3">${esc(p?.motivo||'')}</textarea></label>
+    <label class="f">Anexo (foto ou PDF)<input type="file" id="pd_file" accept="image/*,application/pdf"></label></div>`;
+  else h+=`<div class="fields"><div class="f wide"><span>Tipo · empresa · prioridade</span>${PJTIPO[p.tipo]} · ${esc(CLIENTES.find(c=>c.id===p.cliente_id)?.nome||'Geral')} · ${PJPRI[p.prioridade]}</div>
+    ${p.descricao?`<div class="f wide"><span>Descrição</span><div style="white-space:pre-wrap">${esc(p.descricao)}</div></div>`:''}
+    ${p.motivo?`<div class="f wide"><span>Por que precisa</span><div style="white-space:pre-wrap">${esc(p.motivo)}</div></div>`:''}</div>`;
+  if(p)h+=`<p class="note" style="margin:0">Pedido por ${esc(p.criado_por_nome||'?')} em ${dtBR(p.criado_em)}${p.anexo_caminho?` · <a href="#" data-act="anexo">📎 ${esc(p.anexo_nome||'anexo')}</a>`:''}</p>`;
+  // a decisão é só da administradora
+  if(p&&a)h+=`<div class="pjdec"><b>Validação</b><label class="f wide">Parecer (aparece para quem pediu)<textarea id="pd_resp" rows="3" placeholder="Ex.: aprovado, crie com o código 3.1.08">${esc(p.resposta||'')}</textarea></label>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${['aprovado','ajuste','recusado','andamento','concluido','aguardando'].filter(s=>s!==p.status).map(s=>`<button type="button" class="btn small ${s==='aprovado'?'primary':'ghost'}" data-st="${s}">${{aprovado:'Aprovar',ajuste:'Devolver para ajuste',recusado:'Recusar',andamento:'Em andamento',concluido:'Concluído',aguardando:'Voltar para aguardando'}[s]}</button>`).join('')}</div></div>`;
+  if(p)h+=`<div class="f wide"><span>Conversa</span><div class="conv" id="pd_conv"><p class="note" style="margin:0">Carregando…</p></div>
+    <textarea id="pd_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
+    <div class="row" style="gap:10px;align-items:center"><input type="file" id="pd_mfile" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF"><span class="spacer"></span><button type="button" class="btn primary small" data-act="enviar">Enviar</button></div></div>`;
+  h+='<p class="err" id="pdErr" hidden></p>';
+  $('pdBody').innerHTML=h;
+  const b=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-act="${act}">${txt}</button>`;
+  const exclui=p&&(a||meu&&['aguardando','ajuste'].includes(p.status));
+  $('pdFoot').innerHTML=(exclui?b('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')
+    +(edita?b('salvar',!p?'Enviar pedido':!a&&p.status==='ajuste'?'Salvar e reenviar':'Salvar','primary'):'');
+  if(!dlgProj.open)dlgProj.showModal();
+  if(p){pjConversa(p);if(pjNovo(p))sb.rpc('projeto_visto',{p:p.id}).then(()=>{if(ehAdm())p.novo_para_admin=false;if(p.criado_por===ME.user_id)p.novo_para_autor=false;pjDesenha();pjNovidades()})}
+  else $('pd_titulo').focus();
+}
+async function pjConversa(p){
+  const {data,error}=await sb.from('projeto_comentarios').select('*').eq('projeto_id',p.id).order('criado_em');
+  const box=$('pd_conv');if(!box||PJDLG?.id!==p.id)return;
+  if(error){box.innerHTML='<p class="neg">Erro ao carregar a conversa.</p>';return}
+  const urls=await signed((data||[]).filter(c=>c.anexo_caminho).map(c=>c.anexo_caminho));
+  box.innerHTML=(data||[]).map(c=>c.sistema?`<div class="msg sys">${esc(c.autor_nome||'')} · ${esc(c.texto)} · ${dtBR(c.criado_em)}</div>`
+    :`<div class="msg${c.autor===ME.user_id?' mine':''}"><span class="q"><b>${esc(c.autor_nome||'?')}</b> · ${dtBR(c.criado_em)}</span>${c.texto?`<span class="x">${esc(c.texto)}</span>`:''}${c.anexo_caminho?`<a href="${urls[c.anexo_caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(c.anexo_nome||'anexo')}</a>`:''}</div>`).join('')
+    ||'<p class="note" style="margin:0">Nenhuma mensagem ainda.</p>';
+  box.scrollTop=box.scrollHeight;
+}
+const pdErr=x=>{$('pdErr').textContent=x;$('pdErr').hidden=false};
+$('pdBody').addEventListener('click',async e=>{
+  const p=PJDLG,st=e.target.closest('[data-st]'),act=e.target.closest('[data-act]')?.dataset.act;
+  if(act==='anexo'){e.preventDefault();const u=await signed([p.anexo_caminho]);if(u[p.anexo_caminho])window.open(u[p.anexo_caminho],'_blank','noopener');return}
+  if(st){
+    const s=st.dataset.st,resposta=$('pd_resp').value.trim()||null;
+    if((s==='ajuste'||s==='recusado')&&!resposta)return pdErr('Escreva no parecer o que precisa ajustar ou o motivo da recusa.');
+    st.disabled=true;
+    const {data,error}=await sb.from('projetos').update({status:s,resposta}).eq('id',p.id).select().single();
+    st.disabled=false;if(error)return fail(error);
+    Object.assign(p,data);toast('Pedido: '+PJSIT[s][0]);abrirProj(p);pjDesenha();pjNovidades();return}
+  if(act==='enviar'){
+    const texto=$('pd_msg').value.trim(),f=$('pd_mfile').files[0];if(!texto&&!f)return;
+    const bt=e.target.closest('[data-act]');bt.disabled=true;
+    try{const r={projeto_id:p.id,texto:texto||null};
+      if(f){const up=await uploadAnexo(f,p.cliente_id||SEMEMP,'projetos');r.anexo_caminho=up.caminho;r.anexo_nome=up.nome_arquivo}
+      const {error}=await sb.from('projeto_comentarios').insert(r);if(error)throw error;
+      $('pd_msg').value='';$('pd_mfile').value='';pjConversa(p)}
+    catch(x){console.error(x);pdErr('Não foi possível enviar.'+(x.message?' Motivo: '+x.message:''))}
+    finally{bt.disabled=false}}
+});
+$('pdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const p=PJDLG;
+  if(b.dataset.act==='fechar')return dlgProj.close();
+  if(b.dataset.act==='excluir'){
+    if(!confirm('Excluir o pedido “'+p.titulo+'”? Não dá para desfazer.'))return;
+    const {error}=await sb.from('projetos').delete().eq('id',p.id);if(error)return fail(error,'Não foi possível excluir');
+    toast('Pedido excluído');dlgProj.close();renderProj();pjNovidades();return}
+  const titulo=$('pd_titulo').value.trim();if(!titulo)return pdErr('Diga o que você precisa.');
+  b.disabled=true;
+  try{
+    const r={titulo,tipo:$('pd_tipo').value,cliente_id:$('pd_cli').value||null,prioridade:$('pd_pri').value,descricao:$('pd_desc').value.trim()||null,motivo:$('pd_mot').value.trim()||null};
+    const f=$('pd_file').files[0];
+    if(f){const up=await uploadAnexo(f,r.cliente_id||SEMEMP,'projetos');r.anexo_caminho=up.caminho;r.anexo_nome=up.nome_arquivo}
+    const {error}=p?await sb.from('projetos').update(r).eq('id',p.id):await sb.from('projetos').insert(r);
+    if(error)throw error;
+    toast(!p?'Pedido enviado para validação':p.status==='ajuste'&&!ehAdm()?'Pedido reenviado para validação':'Pedido salvo');dlgProj.close();renderProj();pjNovidades();
+  }catch(x){console.error(x);pdErr(v65(x)?'Este módulo precisa da atualização v65 do banco. Rode o SQL no Supabase.':'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
   finally{b.disabled=false}
 });
 
