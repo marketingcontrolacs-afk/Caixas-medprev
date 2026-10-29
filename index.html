@@ -876,6 +876,18 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="df"><button type="button" class="btn ghost" id="gfDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="gfClose">Fechar</button><button type="submit" class="btn primary" id="gfSave">Salvar</button></div>
   </form>
 </dialog>
+<dialog id="dlgCatNova" style="max-width:460px">
+  <form id="cnForm" novalidate>
+    <div class="dh"><h2>Nova categoria</h2></div>
+    <div class="db"><div class="fields">
+      <label class="f wide">Nome da categoria *<input id="cn_nome" placeholder="Ex.: Manutenção de equipamentos"></label>
+      <label class="f">Tipo<select id="cn_tipo"><option>Despesa</option><option>Receita</option></select></label>
+      <label class="f">Código<input id="cn_codigo" placeholder="opcional"></label>
+      <p class="note wide" id="cnNota" style="margin:0"></p>
+    </div><p class="err" id="cnErr" hidden></p></div>
+    <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="cnClose">Cancelar</button><button type="submit" class="btn primary" id="cnSave">Cadastrar</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -1910,7 +1922,7 @@ async function renderExConf(){
   box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
     <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">No Bom Controle</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
       EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${r.categoria_ok?'<span class="chip c-ok">categoria ok · falta o fornecedor</span> ':sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
-    <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button></div>
+    <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button><button type="button" class="btn small ghost" data-catnova-input="">+ Cadastrar nova categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
 // resumo do que aguarda o escritório em todas as empresas, para não depender da empresa, origem e mês escolhidos
@@ -1949,7 +1961,7 @@ async function abrirCC(i){
     ${orig==='pagar'?`<p class="note" style="margin:0">${r.conferido?`Paga em ${dBR(r.pago_em||r.vencimento)}${r.banco?' pelo '+esc(r.banco):''}`:'Ainda não paga'}</p>`:''}
     ${FBC.lista.length?(()=>{const k=r.fornecedor_bc&&FBC.map[r.fornecedor_bc]?r.fornecedor_bc:sugerirFbc(r),x=FBC.map[k];
       return `<label class="f"><span>Fornecedor no Bom Controle ${x&&!r.fornecedor_bc?'<span class="chip c-warn">sugerido</span>':''}${x?.bloqueado?' <span class="chip c-bad">bloqueado no BC</span>':''}</span><input id="ccFbc" list="fbcList" value="${x?esc(fbcRotulo(x)):''}" placeholder="Digite o nome ou o CNPJ/CPF"></label>`})():''}
-    <label class="f"><span>Categoria no Bom Controle ${sg&&!r.categoria?'<span class="chip c-warn">sugerida</span>':''}</span><input id="ccCat" list="catsListCC" value="${esc(sg)}" placeholder="Escolha do plano de contas"></label><datalist id="catsListCC">${catOpts()}</datalist>`;
+    <label class="f"><span>Categoria no Bom Controle ${sg&&!r.categoria?'<span class="chip c-warn">sugerida</span>':''}</span><input id="ccCat" list="catsListCC" value="${esc(sg)}" placeholder="Escolha do plano de contas"><button type="button" class="btn small ghost" data-catnova-input="ccCat" style="justify-self:start;margin-top:4px">+ Cadastrar nova categoria</button></label><datalist id="catsListCC">${catOpts()}</datalist>`;
   if(!dlgCC.open)dlgCC.showModal();
 }
 // lista de fornecedores do BC para escolher (uma só, reaproveitada em toda conferência)
@@ -5397,7 +5409,7 @@ async function abrirGT(t,tipo){
     <label class="f wide">${P?'Fornecedor':'Cliente'} *<input id="gt_pessoa" list="gtPesList" value="${v('pessoa_nome')}" placeholder="Digite para buscar no cadastro" autocomplete="off"></label>
     <label class="f wide">Descrição<input id="gt_descricao" value="${v('descricao')}" placeholder="${P?'Ex.: aluguel da sala':'Ex.: convênio Unimed, setembro'}"></label>
     <label class="f">Documento<input id="gt_documento" value="${v('documento')}" placeholder="Nº da NF ou boleto"></label>
-    <label class="f">Categoria<select id="gt_categoria">${opt(cats,t?.categoria||'')}</select></label>
+    <label class="f">Categoria<select id="gt_categoria" data-catnova="${P?'Despesa':'Receita'}">${opt(cats,t?.categoria||'')}${catNovaOpt}</select></label>
     <label class="f">Competência<input type="month" id="gt_competencia" value="${(t?.competencia||'').slice(0,7)}"></label>
     <label class="f">Vencimento *<input type="date" id="gt_vencimento" value="${v('vencimento')}"></label>
     <label class="f">Valor *<input id="gt_valor" class="money" inputmode="decimal" value="${t?showMoney(t.valor):''}" placeholder="0,00"></label>
@@ -6029,7 +6041,7 @@ async function abrirFT(m){
     <label class="f">${m?'Fatura':'Fatura (1ª parcela)'}<input type="month" id="fc_fatura" value="${(m?m.fatura:FT.mes).slice(0,7)}"></label>
     <label class="f wide">Fornecedor *<input id="fc_pessoa" list="ftPesList" value="${v('pessoa_nome')}" autocomplete="off" placeholder="Onde foi a compra"></label>
     <label class="f wide">Descrição<input id="fc_descricao" value="${v('descricao')}" placeholder="Ex.: material de escritório"></label>
-    <label class="f">Categoria<select id="fc_categoria"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+    <label class="f">Categoria<select id="fc_categoria" data-catnova="Despesa"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f">Documento<input id="fc_documento" value="${v('documento')}" placeholder="Nº da NF"></label>
   </div>${m?.parcelas>1?`<p class="note" style="margin:0">Parcela ${m.parcela} de ${m.parcelas}. A correção vale só para esta parcela.</p>`:''}${m?.transf_id?'<p class="note" style="margin:0">Este é o pagamento da fatura. Para desfazer, use a conta a pagar da fatura.</p>':''}${trava?'<p class="note" style="margin:0">A fatura deste lançamento está fechada. Reabra a fatura para corrigir.</p>':''}<p class="err" id="gtErr" hidden></p>`;
   // a fatura acompanha a data da compra até ser mudada à mão
@@ -6108,6 +6120,48 @@ async function planoDe(cli){
   if(!PLANOS[cli.id]){const {data,error}=await sb.from('fin_plano').select('*').eq('cliente_id',cli.id);if(error)throw error;PLANOS[cli.id]=data||[]}
   return PLANOS[cli.id];
 }
+// Cadastrar categoria sem sair do lançamento (pedido da Carol, 29/10): a última opção de cada lista de categorias
+// abre o cadastro; a categoria entra no plano próprio da empresa ou no plano padrão e já fica escolhida.
+const CATNOVA='__nova__',catNovaOpt='<option value="__nova__">+ Cadastrar nova categoria…</option>';
+function catNova(cli,tipo,nome){
+  return new Promise(res=>{
+    const d=$('dlgCatNova');$('cn_nome').value=nome||'';$('cn_codigo').value='';$('cn_tipo').value=tipo==='Receita'?'Receita':'Despesa';$('cnErr').hidden=true;
+    $('cnNota').textContent=cli?.plano_proprio?`Entra no plano de contas próprio de ${cli.nome}.`:'Entra no plano de contas padrão, que vale para todas as empresas sem plano próprio.';
+    let feito=null;
+    const fim=()=>{d.removeEventListener('close',fim);res(feito)};d.addEventListener('close',fim);
+    $('cnClose').onclick=()=>d.close();
+    $('cnForm').onsubmit=async e=>{e.preventDefault();
+      const err=t=>{$('cnErr').textContent=t;$('cnErr').hidden=false};
+      const categoria=$('cn_nome').value.trim().replace(/\s+/g,' '),row={categoria,tipo:$('cn_tipo').value,codigo:$('cn_codigo').value.trim()||null};
+      if(!categoria)return err('Informe o nome da categoria.');
+      let plano=[];try{plano=await planoDe(cli)}catch(x){console.error(x)}
+      const ja=plano.find(c=>chave(c.categoria)===chave(categoria));
+      if(ja&&ja.ativo!==false){feito=ja.categoria;toast('Essa categoria já existe e foi escolhida');return d.close()}
+      $('cnSave').disabled=true;
+      const pr=!!cli?.plano_proprio;
+      const {data,error}=ja?await sb.from(pr?'fin_plano':'plano_contas').update({ativo:true}).eq(pr?'id':'categoria',pr?ja.id:ja.categoria).select().single()
+        :await sb.from(pr?'fin_plano':'plano_contas').insert(pr?{...row,cliente_id:cli.id}:row).select().single();
+      $('cnSave').disabled=false;
+      if(error){console.error(error);return err(error.code==='42501'?'Só o escritório cadastra categorias.':error.message||'Não foi possível cadastrar.')}
+      if(ja)Object.assign(ja,data);else if(pr)(PLANOS[cli.id]||=[]).push(data);else{PCAT.plano.push(data);PCAT.plano.sort((a,b)=>a.categoria.localeCompare(b.categoria))}
+      document.querySelectorAll('#catsList,#catsListEx,#catsListCC').forEach(x=>x.innerHTML=catOpts());
+      feito=data.categoria;toast('Categoria cadastrada');d.close()};
+    d.showModal();$('cn_nome').focus();
+  });
+}
+// selects marcados com data-catnova="Despesa|Receita": guarda o valor anterior e trata a opção de cadastrar
+document.addEventListener('focusin',e=>{const s=e.target.closest?.('select[data-catnova]');if(s&&s.value!==CATNOVA)s.dataset.prev=s.value});
+document.addEventListener('change',async e=>{
+  const s=e.target.closest?.('select[data-catnova]');if(!s||s.value!==CATNOVA)return;
+  e.stopImmediatePropagation();const prev=s.dataset.prev||'';s.value=prev;
+  const nova=await catNova(cliAtual(),s.dataset.catnova);if(!nova)return;
+  if(![...s.options].some(o=>o.value===nova)){const o=document.createElement('option');o.value=o.textContent=nova;s.insertBefore(o,s.querySelector(`option[value="${CATNOVA}"]`))}
+  s.value=nova;s.dataset.prev=nova;s.dispatchEvent(new Event('change',{bubbles:true}));
+},true);
+// nas telas do Bom Controle a categoria é digitada com a lista do plano padrão: botão ao lado
+document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-catnova-input]');if(!b)return;e.preventDefault();
+  const inp=b.dataset.catnovaInput&&$(b.dataset.catnovaInput),nova=await catNova(null,'Despesa',inp&&!PCAT.plano.some(c=>c.categoria===inp.value.trim())?inp.value.trim():'');
+  if(nova&&inp){inp.value=nova;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))}});
 const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
 function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
 async function renderPC(){
@@ -6296,7 +6350,7 @@ async function gteAbrir(m){
     <label class="f wide">Descrição *<input id="te_descricao" value="${v('descricao')}"></label>
     <label class="f" data-pag>${ent?'Cliente':'Fornecedor'}<input id="te_pessoa" list="tePes" value="${v('pessoa_nome')}"><datalist id="tePes">${pesOpts(pes,ent)}</datalist></label>
     <label class="f">Documento<input id="te_documento" value="${v('documento')}"></label>
-    <label class="f wide" data-pag>Categoria<select id="te_categoria"><option value=""></option>${cats.map(x=>`<option${m.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+    <label class="f wide" data-pag>Categoria<select id="te_categoria" data-catnova="${ent?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
   </div>${tr?'<p class="note" style="margin:0">Transferência: a data e o valor valem também para a entrada na conta de destino.</p>':''}
   <p class="err" id="gtErr" hidden></p>`;
   const nat=$('te_natureza');if(nat){const aj=()=>{const t=nat.value==='transf';$('te_destBox').hidden=!t;$('gtdBody').querySelectorAll('[data-pag]').forEach(x=>x.hidden=t)};nat.onchange=aj;aj()}
@@ -6410,7 +6464,7 @@ async function abrirAvulso(m){
     <label class="f">Data *<input type="date" id="ga_data" value="${m?m.data:TODAY}"></label>
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
-    <label class="f">Categoria<select id="ga_categoria"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+    <label class="f">Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}"><datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
   </div>${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}<p class="err" id="gtErr" hidden></p>`;
@@ -6627,7 +6681,7 @@ async function abrirGC(ls){
       <label class="f wide" id="gc_titBox" hidden>Conta em aberto<select id="gc_tit">${tits.map(t=>`<option value="${t.id}">${esc(t.pessoa_nome||'')} · ${esc(t.descricao||'')} · venc. ${dBR(t.vencimento)} · falta ${fm(r2(t.valor-(GC.pago[t.id]||0)))}</option>`).join('')}</select></label>
       <label class="f" id="gc_destBox" hidden>Outra conta<select id="gc_dest">${optContas(outras,cli)}</select></label>
       <label class="f wide" id="gc_descBox">Descrição *<input id="gc_desc" value="${esc(um?(l.nome||l.memo||''):'')}"></label>
-      <label class="f" data-novo>Categoria<select id="gc_cat"><option value=""></option>${cats.map(x=>`<option${sugerirCat(l.nome||'',l.memo)===x?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="f" data-novo>Categoria<select id="gc_cat" data-catnova="${tipo==='saida'?'Despesa':'Receita'}"><option value=""></option>${cats.map(x=>`<option${sugerirCat(l.nome||'',l.memo)===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
       <label class="f" data-novo>${tipo==='saida'?'Fornecedor':'Cliente'}<input id="gc_pes" list="gcPesList" value="${esc(doc?.nome||'')}"></label>
       <label class="wide" id="gc_lembraBox" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="gc_lembra" style="width:auto"${comum?' checked':''}> Lembrar: as próximas linhas do banco com o texto</label>
       <label class="f wide" id="gc_padBox">Texto que identifica (pode encurtar)<input id="gc_pad" value="${esc(comum)}"></label>
