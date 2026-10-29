@@ -3437,6 +3437,7 @@ async function lerEspelho(buf){
       const cod=L1.its.find(i=>/^\d+$/.test(i.s)&&i.x<hN.x-2)?.s||'';
       const nome=L1.its.filter(i=>i.x>=hN.x-2&&(!hCbo||i.x<hCbo.x-25)&&!/^\d+$/.test(i.s)).map(i=>i.s).join(' ').trim();
       const L2=bloco[1],cargo=L2?L2.its.filter(i=>i.x>=hN.x-2&&(!hCbo||i.x<hCbo.x-25)).map(i=>i.s).join(' '):'';
+      const adm=bloco.slice(0,4).map(l=>l.s.match(/admiss[aã]o:?\s*(\d{2})\/(\d{2})\/(\d{4})/i)).find(Boolean),admissao=adm?`${adm[3]}-${adm[2]}-${adm[1]}`:null;
       const H=bloco.find(l=>/descri[cç][aã]o/i.test(l.s)&&/vencimentos/i.test(l.s));if(!nome||!H)return;
       const hx=k=>H.its.find(i=>k.test(i.s)),hD=hx(/^descri/i),hR=hx(/^refer/i),hV=hx(/^vencimentos/i),hDs=hx(/^descontos/i);
       const T=bloco.find(l=>/total de vencimentos/i.test(l.s)),fimV=T?T.y:fimY;
@@ -3457,7 +3458,7 @@ async function lerEspelho(buf){
       const Lq=bloco.find(l=>/valor l[ií]quido/i.test(l.s)),lq=Lq?bloco.filter(l=>Math.abs(l.y-Lq.y)<4).flatMap(l=>l.its).find(i=>num(i.s)!=null):null;
       const totV=tot[0]?num(tot[0].s):null,totD=tot[1]?num(tot[1].s):null;
       const sv=r2(verbas.reduce((s,v)=>s+v.venc,0)),sd=r2(verbas.reduce((s,v)=>s+v.desc_,0));
-      vias.push({cod,nome,cargo,verbas:verbas.map(({y,desc_,...v})=>({...v,des:desc_})),totV,totD,liq:lq?num(lq.s):null,
+      vias.push({cod,nome,cargo,admissao,verbas:verbas.map(({y,desc_,...v})=>({...v,des:desc_})),totV,totD,liq:lq?num(lq.s):null,
         ok:totV!=null&&totD!=null&&Math.abs(sv-totV)<0.01&&Math.abs(sd-totD)<0.01,pag:p});
     });
   }
@@ -3524,11 +3525,16 @@ function espIgual(s,e,k){if(k==='pct'&&e.n==null&&e.m!=null&&s.m!=null)return Ma
 // o primeiro nome pode vir com grafia diferente (Nathalya × Nathalia) quando o resto do nome bate
 const espTok=n=>semAc(String(n||'').replace(/['´`’]/g,'')).split(' ').filter(t=>t.length>1&&!['DA','DE','DO','DAS','DOS'].includes(t));
 const lev=(a,b)=>{const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]};
+// cada parte do nome mais curto tem que estar no mais longo; com 5 letras ou mais, aceita até 2 letras trocadas
+// (Callcchio × Calicchio), mas o nome exato ganha do parecido
+const espParte=(t,u)=>t===u?1:t.length>=5&&u.length>=5&&lev(t,u)<=2?0.5:0;
 function espScore(a,b){const x=espTok(a),y=espTok(b);if(!x.length||!y.length)return 0;if(x.join(' ')===y.join(' '))return 100;
-  const [c,l]=x.length<=y.length?[x,y]:[y,x];
-  if(x[0]===y[0])return c.every(t=>l.includes(t))?c.length:0;
-  return c.length>=3&&x[0].length>=5&&lev(x[0],y[0])<=2&&c.slice(1).every(t=>l.includes(t))?c.length-1:0}
-function espLigar(ps,fs){const pares=[];ps.forEach((p,i)=>fs.forEach(f=>{const s=espScore(p.nome,f.nome);if(s)pares.push({i,f,s})}));
+  const [c,l]=x.length<=y.length?[x,y]:[y,x];if(!espParte(x[0],y[0]))return 0;
+  let sc=0;for(const t of c){const m=Math.max(...l.map(u=>espParte(t,u)));if(!m)return 0;sc+=m}
+  return c.length===1&&sc<1?0:sc}
+const ESPLK='esp_liga';const espLigaGet=()=>{try{return JSON.parse(localStorage.getItem(ESPLK)||'{}')}catch(e){return {}}};
+function espLigar(ps,fs){const pares=[],lk=espLigaGet();
+  ps.forEach((p,i)=>{const id=lk[FOL.cli.id+'|'+semAc(p.nome)],f=id&&fs.find(f=>f.id===id);if(f)pares.push({i,f,s:1000})});ps.forEach((p,i)=>fs.forEach(f=>{const s=espScore(p.nome,f.nome);if(s)pares.push({i,f,s})}));
   const m=new Map(),usa=new Set();pares.sort((a,b)=>b.s-a.s);
   pares.forEach(x=>{if(m.has(x.i)||usa.has(x.f.id))return;
     if(pares.some(y=>y!==x&&y.s===x.s&&(y.i===x.i&&!usa.has(y.f.id)||y.f.id===x.f.id&&!m.has(y.i))))return;
@@ -3550,10 +3556,15 @@ function espComparar(){
         linhas.push({c,t:FNOME(c),s:s.t,e:e.t,st:ig==null?'conf':ig?'ok':'dif',vs:g?.vs||[]})})}
     Object.values(grupos).filter(g=>g.sem||!f).forEach(g=>{const e=espValor(g.vs,g.k);
       linhas.push({c:g.c,t:g.vs.map(v=>v.desc).join(', '),s:f?'sem coluna na planilha':'—',e:e.t,st:'dif',vs:g.vs})});
-    // diferença validada pelo escritório (v67): vale enquanto a folha e o espelho continuarem com os mesmos valores
-    if(f)linhas.forEach(l=>{const V=(FOL.espVal||{})[f.id+'|'+l.c];if(!V||l.st==='ok')return;
+    // diferença validada pelo escritório (v67): vale enquanto a folha e o espelho continuarem com os mesmos valores.
+    // Quem não está no cadastro é guardado pelo nome do recibo (v68); "sempre fora" (ex.: pró-labore) vale para todos os meses
+    const pk=f?f.id:'n:'+semAc(p.nome),VS=FOL.espVal||{},fora=VS[pk+'|*'];
+    linhas.forEach(l=>{const V=VS[pk+'|'+l.c];if(l.st==='ok')return;if(fora){l.st='val';l.obs=fora.obs||'';return}if(!V)return;
       if(V.sistema===l.s&&V.espelho===l.e){l.st='val';l.obs=V.obs||''}else l.antes=V});
-    out.push({p,f,linhas,info});
+    // nome do cadastro com grafia diferente do recibo: o escritório pode trocar pelo nome do espelho (Carol, 29/10)
+    const tc=t=>String(t||'').toLowerCase().replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase()).replace(/\s(D[aeo]s?|E)(?=\s)/g,m=>m.toLowerCase());
+    const nomeDif=f&&espTok(f.nome).some(t=>!espTok(p.nome).includes(t))?tc(p.nome):null;
+    out.push({p,f,pk,fora,linhas,info,nomeDif});
   });
   const faltam=doMes.filter(f=>!usados.has(f.id));
   return {rows:out,faltam};
@@ -3562,19 +3573,25 @@ function renderFolEsp(){
   const box=$('folEsp'),E=FOL.esp;
   if(!E||E.cli!==FOL.cli?.id||E.comp!==FOL.comp.slice(0,7)||!FOL.cli.folha_colunas?.length){box.hidden=true;box.innerHTML='';return}
   const R=espComparar(),todos=!!E.todos,ndif=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st==='dif'||l.st==='conf').length,0),
-    nval=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st==='val').length,0),semCad=R.rows.filter(r=>!r.f);
+    nval=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st==='val').length,0),semCad=R.rows.filter(r=>!r.f&&!r.fora);
   const avisos=[E.compArq&&E.compArq!==E.comp?`O espelho é de <b>${esc(mesAnoBR(E.compArq))}</b> e a folha aberta é de <b>${esc(mesAnoBR(E.comp))}</b>.`:'',
     E.cnpj&&FOL.cli.cnpj&&E.cnpj.replace(/\D/g,'')!==FOL.cli.cnpj.replace(/\D/g,'')?`O CNPJ do espelho (${esc(E.cnpj)}) não é o desta empresa (${esc(FOL.cli.cnpj)}).`:'',
     E.semTexto?`${E.semTexto} página${E.semTexto===1?'':'s'} sem texto (imagem) não ${E.semTexto===1?'foi lida':'foram lidas'}.`:'',
     E.pessoas.some(p=>!p.ok)?`Os totais de ${E.pessoas.filter(p=>!p.ok).length} recibo(s) não fecharam com as verbas lidas: confira esses no PDF.`:''].filter(Boolean);
   const chip={ok:'<span class="chip c-ok">✓ Igual</span>',dif:'<span class="chip c-bad">≠ Diferente</span>',conf:'<span class="chip c-warn">Conferir</span>',val:'<span class="chip c-done">✓ Validado</span>'};
-  const acao=(r,l)=>!r.f||l.st==='ok'?'':l.st==='val'?`<button class="btn small ghost" data-espdes="${r.f.id}|${esc(l.c)}">Desfazer</button>`:`<button class="btn small" data-espok="${r.f.id}|${esc(l.c)}">Validar</button>`;
-  const corpo=R.rows.filter(r=>todos||!r.f||r.linhas.some(l=>l.st!=='ok')).map((r,i)=>{const ls=r.linhas.filter(l=>todos||l.st!=='ok');
-    return `<tr class="fesp-p"><td class="l" colspan="5"><b>${esc(r.f?.nome||r.p.nome)}</b>${r.f?'':' <span class="chip c-bad">não achei no cadastro</span>'}
-      <span class="note">· líquido no espelho ${r.p.liq!=null?fm(r.p.liq):'—'}</span> <button class="btn small ghost" data-espv="${i}">Ver recibo</button></td></tr>${
+  ESPR=R;
+  const obsTr=(k,ph,v)=>`<tr hidden data-espobs="${esc(k)}"><td></td><td class="l" colspan="4"><div class="row" style="align-items:flex-end"><label class="f" style="flex:1">Sua observação (por que está certo)<input data-espobst value="${esc(v||'')}" placeholder="${esc(ph)}"></label><button class="btn primary small" data-espsalva="${esc(k)}">Dar ok</button><button class="btn small ghost" data-espcanc>Cancelar</button></div></td></tr>`;
+  const acao=(r,l)=>l.st==='ok'||r.fora?'':l.st==='val'?`<button class="btn small ghost" data-espdes="${esc(r.pk+'|'+l.c)}">Desfazer</button>`:`<button class="btn small" data-espok="${esc(r.pk+'|'+l.c)}">Validar</button>`;
+  const corpo=R.rows.filter(r=>todos||!r.f||r.linhas.some(l=>l.st!=='ok')).map(r=>{const i=R.rows.indexOf(r),ls=r.fora?[]:r.linhas.filter(l=>todos||l.st!=='ok'),pend=r.linhas.filter(l=>l.st==='dif'||l.st==='conf');
+    return `<tr class="fesp-p"><td class="l" colspan="5"><b>${esc(r.f?.nome||r.p.nome)}</b>${r.f?'':' <span class="chip c-bad">não achei no cadastro</span>'}${r.fora?' <span class="chip c-done">✓ Sempre fora da conferência</span>':''}
+      ${r.nomeDif?` <span class="note">(no recibo: ${esc(r.p.nome)})</span> <button class="btn small" data-espnome="${i}" title="Troca o nome no cadastro pelo nome do recibo da contabilidade">Usar o nome do espelho no cadastro</button>`:''}
+      <span class="note">· líquido no espelho ${r.p.liq!=null?fm(r.p.liq):'—'}</span> <button class="btn small ghost" data-espv="${i}">Ver recibo</button>
+      ${r.fora?`<button class="btn small ghost" data-espdes="${esc(r.pk)}|*">Desfazer</button>${r.fora.obs?`<div class="note">📝 ${esc(r.fora.obs)}</div>`:''}`
+        :`${pend.length>1||!r.f&&pend.length?`<button class="btn small" data-espok="${esc(r.pk)}|+">Validar todas (${pend.length})</button>`:''}${r.f||!R.faltam.length?'':` <select data-esplig="${i}" style="max-width:220px;padding:4px 6px" aria-label="Ligar ao colaborador do cadastro"><option value="">É o colaborador…</option>${R.faltam.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join('')}</select>`}${r.f?'':` <button class="btn small primary" data-espcad="${i}" title="Cadastra com o nome, cargo e admissão do recibo e os valores fixos que estão no recibo (VA, VT, insalubridade, quebra de caixa, gratificação, ajuda de custo)">Cadastrar</button> <button class="btn small" data-espok="${esc(r.pk)}|*" title="Para quem não entra na planilha da folha, como o pró-labore: vale para todos os meses">Sempre fora da conferência</button>`}`}</td></tr>
+      ${r.fora?'':obsTr(r.pk+'|+','Ex.: admitida no fim do mês, está correto',r.f?'':'Não está no cadastro: precisa cadastrar')+(r.f?'':obsTr(r.pk+'|*','Ex.: pró-labore, não entra na planilha da folha','Pró-labore'))}${
       ls.map(l=>`<tr><td></td><td class="l">${esc(l.t)}${l.st==='val'&&l.obs?`<div class="note">📝 ${esc(l.obs)}</div>`:''}${l.antes?`<div class="note">Validado antes com outros valores (folha ${esc(l.antes.sistema||'—')}, espelho ${esc(l.antes.espelho||'—')}): confira de novo.</div>`:''}</td><td class="l">${esc(l.s)}</td><td class="l">${esc(l.e)}</td><td class="l" style="white-space:nowrap">${chip[l.st]} ${acao(r,l)}</td></tr>
-        ${r.f&&l.st!=='ok'&&l.st!=='val'?`<tr hidden data-espobs="${r.f.id}|${esc(l.c)}"><td></td><td class="l" colspan="4"><div class="row" style="align-items:flex-end"><label class="f" style="flex:1">Sua observação (por que está certo)<input data-espobst value="${esc(l.antes?.obs||'')}" placeholder="Ex.: a contabilidade lançou o DSR pelas horas da falta, está correto"></label><button class="btn primary small" data-espsalva="${r.f.id}|${esc(l.c)}" data-s="${esc(l.s)}" data-e="${esc(l.e)}">Dar ok</button><button class="btn small ghost" data-espcanc>Cancelar</button></div></td></tr>`:''}`).join('')
-      ||(r.linhas.length?'':'<tr><td></td><td class="l muted" colspan="4">Nenhuma verba das colunas da planilha neste recibo.</td></tr>')}
+        ${l.st==='dif'||l.st==='conf'?obsTr(r.pk+'|'+l.c,'Ex.: a contabilidade lançou o DSR pelas horas da falta, está correto',l.antes?.obs):''}`).join('')
+      ||(r.linhas.length||r.fora?'':'<tr><td></td><td class="l muted" colspan="4">Nenhuma verba das colunas da planilha neste recibo.</td></tr>')}
       <tr hidden data-esprec="${i}"><td></td><td class="l" colspan="4"><table class="mini"><thead><tr><th>Cód.</th><th class="l">Verba</th><th>Ref.</th><th>Vencimentos</th><th>Descontos</th></tr></thead><tbody>${
         r.p.verbas.map(v=>`<tr><td>${esc(v.cod)}</td><td class="l">${esc(v.desc)}</td><td>${v.ref!=null?showMoney(v.ref):''}</td><td>${v.venc?fm(v.venc):''}</td><td>${v.des?fm(v.des):''}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td></td><td class="l">Totais</td><td></td><td>${r.p.totV!=null?fm(r.p.totV):''}</td><td>${r.p.totD!=null?fm(r.p.totD):''}</td></tr></tfoot></table></td></tr>`}).join('');
@@ -3584,7 +3601,7 @@ function renderFolEsp(){
       <button class="btn" id="folEspPdf">PDF das diferenças</button><button class="btn ghost" id="folEspFechar">Fechar</button></div></div>
     <p class="note" style="margin:6px 0 0">${esc(E.arqs.join(', '))} · ${E.pessoas.length} recibo${E.pessoas.length===1?'':'s'} · <b class="${ndif?'neg':'pos'}">${ndif?`${ndif} ${ndif===1?'item para conferir':'itens para conferir'}`:nval?'✓ nada pendente':'✓ tudo igual à folha do sistema'}</b>${nval?` · ${nval} validad${nval===1?'o':'os'} com observação`:''}${semCad.length?` · ${semCad.length} sem cadastro`:''}${R.faltam.length?` · ${R.faltam.length} da folha sem recibo`:''}</p>
     ${avisos.map(a=>`<p class="neg" style="margin:6px 0 0">⚠ ${a}</p>`).join('')}
-    ${FOL.espVal===null?'<p class="neg" style="margin:6px 0 0">Para validar as diferenças com observação, rode a atualização v67 do banco no Supabase.</p>':''}
+    ${FOL.espVal===null?'<p class="neg" style="margin:6px 0 0">Para validar as diferenças com observação, rode a atualização v67 do banco no Supabase.</p>':FOL.espVal&&!FOL.espV68&&R.rows.some(r=>!r.f)?'<p class="note" style="margin:6px 0 0">Para validar quem não está no cadastro (ex.: pró-labore), rode a atualização v68 do banco no Supabase.</p>':''}
     ${R.faltam.length?`<p class="note" style="margin:6px 0 0"><b>Na folha do sistema, mas sem recibo no espelho:</b> ${R.faltam.map(f=>esc(f.nome)).join(', ')}.</p>`:''}
     <div class="tablebox" style="margin-top:8px"><table><thead><tr><th style="width:18px"></th><th class="l">Informação</th><th class="l">Folha do sistema</th><th class="l">Espelho da contabilidade</th><th class="l"></th></tr></thead><tbody>${
       corpo||'<tr><td></td><td class="l pos" colspan="4">Nenhuma diferença: todas as colunas da planilha batem com o espelho.</td></tr>'}</tbody></table></div>
@@ -3600,24 +3617,51 @@ $('folEspFile').addEventListener('change',async e=>{const fs=[...(e.target.files
     FOL.esp=E;await espCarregaVal();renderFolEsp();$('folEsp').scrollIntoView({behavior:'smooth',block:'start'});
   }catch(err){console.error(err);toast('Não consegui ler este PDF.')}});
 // validações gravadas do mês (null: falta a v67 no banco)
-async function espCarregaVal(){const {data,error}=await sb.from('folha_conferencia').select('*').eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp);
-  FOL.espVal=error?null:Object.fromEntries((data||[]).map(v=>[v.funcionario_id+'|'+v.coluna,v]))}
+let ESPR=null;
+async function espCarregaVal(){let {data,error}=await sb.from('folha_conferencia').select('*').eq('cliente_id',FOL.cli.id).or(`competencia.eq.${FOL.comp},competencia.is.null`);
+  FOL.espV68=!error;if(error&&/nome|competencia/.test(error.message||'')&&!/folha_conferencia/.test(error.message||''))error=null;
+  if(error&&FOL.espV68===false)({data,error}=await sb.from('folha_conferencia').select('*').eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp));
+  FOL.espVal=error?null:Object.fromEntries((data||[]).map(v=>[(v.funcionario_id||'n:'+v.nome)+'|'+v.coluna,v]))}
+// grava ou apaga uma validação: por colaborador (upsert) ou, sem cadastro, pelo nome do recibo (v68)
+async function espGrava(pk,col,reg){const fid=pk.startsWith('n:')?null:pk,nome=fid?null:pk.slice(2),comp=col==='*'?null:FOL.comp;
+  let q=sb.from('folha_conferencia').delete().eq('cliente_id',FOL.cli.id).eq('coluna',col);
+  q=fid?q.eq('funcionario_id',fid):q.is('funcionario_id',null).eq('nome',nome);q=comp?q.eq('competencia',comp):q.is('competencia',null);
+  let {error}=await q;if(error||!reg)return error;
+  ({error}=await sb.from('folha_conferencia').insert({cliente_id:FOL.cli.id,competencia:comp,funcionario_id:fid,...(nome?{nome}:{}),coluna:col,validado_em:new Date().toISOString(),...reg}));return error}
 $('folEsp').addEventListener('click',async e=>{
   if(e.target.id==='folEspFechar'){FOL.esp=null;renderFolEsp();return}
   const ok=e.target.closest('[data-espok]');if(ok){if(FOL.espVal===null){toast('Rode a atualização v67 do banco no Supabase.');return}
     const tr=$('folEsp').querySelector(`[data-espobs="${ok.dataset.espok}"]`);tr.hidden=false;tr.querySelector('input').focus();return}
+  // cadastra quem está no espelho e não no cadastro, com os dados e os fixos do recibo (Carol, 29/10)
+  const cad=e.target.closest('[data-espcad]');if(cad){const r=ESPR.rows[+cad.dataset.espcad],p=r.p,tc=t=>String(t||'').toLowerCase().replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase()).replace(/\s(D[aeo]s?|E)\s/g,m=>m.toLowerCase());
+    const cols=colsDe(FOL.cli),gs={};p.verbas.forEach(v=>{const m=espColuna(v,cols);if(m&&(v.venc||v.des||v.ref)>0)(gs[m.c]=gs[m.c]||[]).push(v)});
+    const pct=c=>{const x=gs[c]?espValor(gs[c],'pct'):null;return x?.n!=null?x.n/100:null};
+    const o={cliente_id:FOL.cli.id,nome:tc(p.nome),cargo:tc(p.cargo)||null,admissao:p.admissao,situacao:'Ativo',folha_va:!!gs.va,folha_vt:!!gs.vt,
+      folha_insalubridade:pct('insalubridade'),folha_quebra_cx:pct('quebra_cx'),folha_gratificacao:pct('gratificacao'),folha_ajuda_custo:gs.ajuda_custo?espValor(gs.ajuda_custo,'money').n:null};
+    const fx=[o.folha_va&&'VA',o.folha_vt&&'VT',o.folha_insalubridade&&`insalubridade ${o.folha_insalubridade*100}%`,o.folha_quebra_cx&&`quebra de caixa ${o.folha_quebra_cx*100}%`,o.folha_gratificacao&&`gratificação ${o.folha_gratificacao*100}%`,o.folha_ajuda_custo&&`ajuda de custo ${fm(o.folha_ajuda_custo)}`].filter(Boolean);
+    if(!confirm(`Cadastrar ${o.nome} em ${FOL.cli.nome}?\n\nCargo: ${o.cargo||'—'}\nAdmissão: ${o.admissao?dBR(o.admissao):'—'}\nFixos pelo recibo: ${fx.join(', ')||'nenhum'}\n\nDepois confira o CPF, o setor e o transporte em Colaboradores.`))return;
+    cad.disabled=true;const {error}=await sb.from('funcionarios').insert(o);cad.disabled=false;if(error){fail(error,'Não foi possível cadastrar');return}
+    toast(o.nome+' cadastrada(o)');renderFolha();return}
+  const nm=e.target.closest('[data-espnome]');if(nm){const r=ESPR.rows[+nm.dataset.espnome];
+    if(!confirm(`Trocar o nome no cadastro?\n\nDe: ${r.f.nome}\nPara: ${r.nomeDif}`))return;
+    nm.disabled=true;const {error}=await sb.from('funcionarios').update({nome:r.nomeDif}).eq('id',r.f.id);nm.disabled=false;
+    if(error){fail(error,'Não foi possível corrigir o nome');return}toast('Nome corrigido no cadastro');renderFolha();return}
   if(e.target.closest('[data-espcanc]')){e.target.closest('tr').hidden=true;return}
-  const sv=e.target.closest('[data-espsalva]');if(sv){const [fid,col]=sv.dataset.espsalva.split('|'),obs=sv.closest('tr').querySelector('input').value.trim();
+  const sv=e.target.closest('[data-espsalva]');if(sv){const k=sv.dataset.espsalva,i=k.lastIndexOf('|'),pk=k.slice(0,i),col=k.slice(i+1),obs=sv.closest('tr').querySelector('input').value.trim();
     if(!obs){toast('Escreva a observação antes de dar ok.');return}
-    sv.disabled=true;const {error}=await sb.from('folha_conferencia').upsert({cliente_id:FOL.cli.id,competencia:FOL.comp,funcionario_id:fid,coluna:col,sistema:sv.dataset.s,espelho:sv.dataset.e,obs,validado_em:new Date().toISOString()},{onConflict:'cliente_id,competencia,funcionario_id,coluna'});
-    sv.disabled=false;if(error){if(/folha_conferencia/.test(error.message||'')){console.error(error);toast('Rode a atualização v67 do banco no Supabase.')}else fail(error,'Não foi possível validar');return}
-    toast('Validado');await espCarregaVal();renderFolEsp();return}
-  const des=e.target.closest('[data-espdes]');if(des){const [fid,col]=des.dataset.espdes.split('|');
-    const {error}=await sb.from('folha_conferencia').delete().eq('cliente_id',FOL.cli.id).eq('competencia',FOL.comp).eq('funcionario_id',fid).eq('coluna',col);
+    if(pk.startsWith('n:')&&!FOL.espV68){toast('Rode a atualização v68 do banco no Supabase para validar quem não está no cadastro.');return}
+    const r=ESPR.rows.find(r=>r.pk===pk),ls=col==='*'?[{c:'*',s:null,e:null}]:col==='+'?r.linhas.filter(l=>l.st==='dif'||l.st==='conf'):r.linhas.filter(l=>l.c===col);
+    sv.disabled=true;let error=null;for(const l of ls){error=await espGrava(pk,l.c,{sistema:l.s,espelho:l.e,obs});if(error)break}sv.disabled=false;
+    if(error){if(/folha_conferencia|nome|null value/.test(error.message||'')){console.error(error);toast(pk.startsWith('n:')?'Rode a atualização v68 do banco no Supabase.':'Rode a atualização v67 do banco no Supabase.')}else fail(error,'Não foi possível validar');return}
+    toast(col==='*'?'Fica fora da conferência em todos os meses':'Validado');await espCarregaVal();renderFolEsp();return}
+  const des=e.target.closest('[data-espdes]');if(des){const k=des.dataset.espdes,i=k.lastIndexOf('|');
+    const error=await espGrava(k.slice(0,i),k.slice(i+1),null);
     if(error){fail(error,'Não foi possível desfazer');return}await espCarregaVal();renderFolEsp();return}
   if(e.target.id==='folEspPdf'){espPdf();return}
   const b=e.target.closest('[data-espv]');if(b){const tr=$('folEsp').querySelector(`[data-esprec="${b.dataset.espv}"]`);tr.hidden=!tr.hidden;b.textContent=tr.hidden?'Ver recibo':'Esconder recibo'}});
-$('folEsp').addEventListener('change',e=>{if(e.target.id==='folEspTodos'){FOL.esp.todos=e.target.checked;renderFolEsp()}});
+$('folEsp').addEventListener('change',e=>{if(e.target.id==='folEspTodos'){FOL.esp.todos=e.target.checked;renderFolEsp();return}
+  const sl=e.target.closest('[data-esplig]');if(sl&&sl.value){const p=ESPR.rows[+sl.dataset.esplig].p,lk=espLigaGet();lk[FOL.cli.id+'|'+semAc(p.nome)]=sl.value;
+    try{localStorage.setItem(ESPLK,JSON.stringify(lk))}catch(err){}toast('Ligado ao cadastro');renderFolEsp()}});
 function espPdf(){
   const R=espComparar(),rs=R.rows.map(r=>({...r,linhas:r.linhas.filter(l=>l.st!=='ok')})).filter(r=>r.linhas.length||!r.f);
   const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
