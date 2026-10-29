@@ -663,7 +663,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
           <button class="btn primary" type="submit">Cadastrar usuário</button>
         </form>
         <div class="alerta" id="nuOk" hidden style="margin:0"></div>
-        <p class="note" style="margin:0"><b>Administração Controlacs</b>: vê tudo e muda o tipo dos usuários. <b>Operador Controlacs</b>: equipe; vê os módulos e as empresas que você escolher em “Escolher módulos e empresas”, mais Tarefas e Avisos. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
+        <p class="note" style="margin:0"><b>Master</b>: só você; vê tudo, é o único que entra em Configurações, Plano de contas e regras das categorias, e muda o tipo e as permissões dos usuários. <b>Operador Controlacs</b>: equipe; vê os módulos e as empresas que você escolher em “Escolher módulos e empresas”, mais Tarefas e Avisos. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -1024,7 +1024,9 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Tarefas e Avisos são de toda a equipe
 const SEMPRE=['tarefas','avisos'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
-const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)||k.startsWith('cfg')&&ME.modulos_equipe.includes('cfg'));
+// Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
+const SO_MASTER=['cfg','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
+const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Parceiros: cadastro e alterações',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas','repasse']],['Contabilidade',['contabil']]];
@@ -1253,7 +1255,7 @@ async function boot(){
   ACESSOS=eac?(ME.papel==='operador'&&ME.cliente_id?[{cliente_id:ME.cliente_id,modulo:'caixa',nivel:'lancamento'}]:[]):(ac||[]);
   window.V2=!eac;
   const nomes=[...new Set(ACESSOS.map(a=>CLIENTES.find(c=>c.id===a.cliente_id)?.nome).filter(Boolean))];
-  $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
+  $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehAdm()?'Master':ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
@@ -2165,8 +2167,9 @@ $('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr')
 
 // ---------- cadastros ----------
 let USERS=[];
-const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Administração Controlacs (vê tudo)'],['equipe','Operador Controlacs'],['cliente','Cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
+const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a tudo)'],['equipe','Operador Controlacs'],['cliente','Cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
 // tipo do usuário; antes da v33 vem do papel
+// só existe um master; o tipo não aparece como opção para os outros usuários
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
@@ -2174,19 +2177,19 @@ async function renderCadastro(){
     CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   // permissões de cada usuário do cliente: empresa › módulos (nível)
-  const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Tudo, inclusive as tarefas restritas';
+  const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Master: tudo, inclusive Configurações, Plano de contas, regras e tarefas restritas';
       const ms=u.modulos_equipe?NAV.filter(n=>u.modulos_equipe.includes(n.k)).map(n=>n.t):null,es=u.empresas_equipe?.length?u.empresas_equipe.map(id=>CLIENTES.find(c=>c.id===id)?.nome).filter(Boolean):null;
       return `${ms?(ms.length?esc(ms.join(', ')):'Só Tarefas e Avisos'):'Todos os módulos'}${ms&&ms.length?' + Tarefas e Avisos':''}<br><span class="muted">${es?'Empresas: '+esc(es.join(', ')):'Todas as empresas'}</span>${ehAdm()?' <button type="button" class="btn small ghost" data-perm="1">Escolher módulos e empresas</button>':''}`}
     const g={};(acs||[]).filter(a=>a.user_id===u.user_id).forEach(a=>(g[a.cliente_id]||=[]).push(`${MODNOME[a.modulo]||a.modulo} (${a.nivel==='lancamento'?'Lançamento':'Consulta'})`));
     return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Libere no quadro Acessos.</span>'};
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th><th></th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
-      <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
+      <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.filter(([v])=>v!=='admin'||tipoUsr(u)==='admin').map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
       <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)}</td>
       <td>${u.user_id===ME.user_id?'':'<button type="button" class="btn small ghost" data-senha="1">Trocar senha</button>'}</td></tr>`).join('')}</tbody>`;
   // novo usuário: a equipe só cadastra clientes e colaboradores
   const adm=ME.tipo==='admin'||ME.admin;
-  $('nuTipo').innerHTML=TIPOSUSR.filter(([v])=>v!=='pendente'&&(adm||v==='cliente'||v==='colaborador')).map(([v,t])=>`<option value="${v}"${v==='cliente'?' selected':''}>${t}</option>`).join('');
+  $('nuTipo').innerHTML=TIPOSUSR.filter(([v])=>v!=='pendente'&&v!=='admin'&&(adm||v==='cliente'||v==='colaborador')).map(([v,t])=>`<option value="${v}"${v==='cliente'?' selected':''}>${t}</option>`).join('');
   if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
@@ -2240,9 +2243,9 @@ const dlgPerm=$('dlgPerm');let PERMU=null;
 function abrirPermissoes(u){
   PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
   const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Gestão financeira':n.g;
-  const grupos=['Rotina diária','Gestão financeira','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
+  const grupos=['Rotina diária','Gestão financeira','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k))})).filter(x=>x.itens.length);
   const ck=(n)=>`<label><input type="checkbox" value="${n.k}"${!ms||ms.includes(n.k)?' checked':''}> ${n.t}</label>`;
-  $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe.</p>
+  $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe. <b>Configurações</b>, <b>Plano de contas</b> e as regras das categorias são só do master.</p>
     <div class="pick" id="pmMods" style="max-height:none"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
       ${grupos.map(x=>`<div class="pkg"><div>${x.g} <button type="button" class="btn small ghost" data-pk="grupo">marcar o grupo</button></div><div class="chk">${x.itens.map(ck).join('')}</div></div>`).join('')}</div>
     <div class="f"><span>Empresas</span><div class="vis"><label><input type="radio" name="pm_emp" value="todas"${es?'':' checked'}> Todas as empresas</label><label><input type="radio" name="pm_emp" value="marcadas"${es?' checked':''}> Só as marcadas</label></div></div>
@@ -2252,12 +2255,12 @@ function abrirPermissoes(u){
   dlgPerm.showModal();
 }
 $('pmFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgPerm.close();
-  const todosMods=NAV.filter(n=>!SEMPRE.includes(n.k)).map(n=>n.k),mods=[...$('pmMods').querySelectorAll('input:checked')].map(x=>x.value);
+  const todosMods=NAV.filter(n=>!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k)).map(n=>n.k),mods=[...$('pmMods').querySelectorAll('input:checked')].map(x=>x.value);
   const soEmp=$('pmBody').querySelector('input[name="pm_emp"]:checked').value==='marcadas',emps=[...$('pmEmps').querySelectorAll('input:checked')].map(x=>x.value);
   if(soEmp&&!emps.length){$('pmErr').textContent='Marque pelo menos uma empresa, ou escolha “Todas as empresas”.';$('pmErr').hidden=false;return}
   const r={modulos_equipe:todosMods.every(k=>mods.includes(k))?null:mods,empresas_equipe:soEmp?emps:null};
   b.disabled=true;const {error}=await sb.from('perfis').update(r).eq('user_id',PERMU.user_id);b.disabled=false;
-  if(error){console.error(error);$('pmErr').textContent=/modulos_equipe|empresas_equipe/.test(error.message||'')&&!/administradora/.test(error.message)?'Rode a atualização v37 do banco no Supabase.':error.message||'Não foi possível salvar.';$('pmErr').hidden=false;return}
+  if(error){console.error(error);$('pmErr').textContent=/modulos_equipe|empresas_equipe/.test(error.message||'')&&!/administradora|master/.test(error.message)?'Rode a atualização v37 do banco no Supabase.':error.message||'Não foi possível salvar.';$('pmErr').hidden=false;return}
   toast('Permissões salvas');dlgPerm.close();renderCadastro()});
 $('tbUsr').addEventListener('click',async e=>{const b=e.target.closest('[data-senha]');if(!b)return;
   const u=USERS.find(x=>x.user_id===b.closest('tr').dataset.id);
@@ -2269,7 +2272,7 @@ $('tbUsr').addEventListener('change',async e=>{const id=e.target.closest('tr').d
   // o tipo define também o papel (o banco ajusta o papel e a administração pelo tipo)
   const r=k!=='tipo'?{[k]:v}:v==='pendente'?{tipo:null,papel:'pendente'}:{tipo:v};
   const {error}=await sb.from('perfis').update(r).eq('user_id',id);
-  if(error){console.error(error);toast(/tipo/.test(error.message||'')&&!/administradora/.test(error.message)?'Rode a atualização v33 do banco para guardar o tipo de usuário.':/administradora/.test(error.message||'')?'Só a administradora muda o tipo de usuário.':'Não foi possível salvar. Verifique a internet e tente de novo.');renderCadastro();return}
+  if(error){console.error(error);toast(/tipo/.test(error.message||'')&&!/administradora|master|perfis_um_master/.test(error.message)?'Rode a atualização v33 do banco para guardar o tipo de usuário.':/administradora|master/.test(error.message||'')?'Só o master muda o tipo de usuário.':'Não foi possível salvar. Verifique a internet e tente de novo.');renderCadastro();return}
   toast('Usuário salvo');if(k==='tipo'){DIRUS=null;renderCadastro()}});
 $('formCli').addEventListener('submit',async e=>{e.preventDefault();const nome=$('novoCli').value.trim();if(!nome)return;
   const {error}=await sb.from('clientes').insert({nome});if(error)fail(error,'Não foi possível criar (o nome já existe?)');else{$('novoCli').value='';toast('Empresa criada');renderCadastro()}});
