@@ -4825,6 +4825,23 @@ const DOCMOD=[
     <p>Data: _____/_____/______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Chaves devolvidas: __________</p>
     <p>Condição / observações: _________________________________________________________<br>_____________________________________________________________________________</p>
     <p>Assinatura de quem recebeu: ___________________________________________________</p>`}},
+  // vale para todas as empresas: a razão social, o CNPJ e a cidade vêm do cadastro da empresa escolhida
+  {k:'chave_acesso',t:'Termo de entrega e responsabilidade por chave de acesso',
+   campos:[{k:'chaves',t:'Quantidade de chaves',tp:'text',def:()=>'1'},{k:'ident',t:'Identificação da(s) chave(s)',tp:'text'},{k:'entrega',t:'Data da entrega',tp:'date',def:(E,D)=>D.data}],
+   corpo:D=>{const E=D.emp,f=D.f,x=D.x,un=`${E.razao.replace(/\s+LTDA\.?$/i,'')}${E.unidade?' – '+E.unidade:''}`.toUpperCase();return `
+    <div class="emp c"><b>${esc(un)}</b><br>CNPJ: ${esc(E.cnpj)}</div>
+    <h1>TERMO DE ENTREGA E RESPONSABILIDADE POR CHAVE DE ACESSO À EMPRESA</h1>
+    <h2>IDENTIFICAÇÃO DO(A) COLABORADOR(A)</h2>
+    <p class="id">Nome: ${lin(f.nome,50)}<br>Cargo/Função: ${lin(f.cargo,30)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Setor: ${lin(f.setor,16)}<br>Data da entrega: ${dLin(x.entrega)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quantidade de chaves: ${lin(x.chaves,6)}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Identificação: ${lin(x.ident,12)}</p>
+    <h2>DECLARAÇÃO E RESPONSABILIDADES</h2>
+    <p>Declaro que recebi da ${esc(un)} a(s) chave(s) acima identificada(s), destinada(s) ao acesso às dependências da empresa para a execução das atividades de abertura e/ou fechamento, conforme autorização e orientações da empresa. Comprometo-me a:</p>
+    <ol><li>Guardar a(s) chave(s) com zelo e segurança, não a(s) emprestando, cedendo ou disponibilizando a terceiros sem autorização expressa da empresa.</li><li>Não realizar cópias, reproduções ou transferências da(s) chave(s) sem autorização prévia da administração.</li><li>Utilizar a(s) chave(s) exclusivamente para fins profissionais e acessar a empresa somente nos horários ou situações autorizados.</li><li>Na abertura e no fechamento, cumprir os procedimentos internos de segurança, inclusive conferência de portas, janelas, acessos, alarmes e demais verificações aplicáveis à sua função.</li><li>Comunicar imediatamente à gestão qualquer perda, furto, extravio, dano, suspeita de acesso indevido ou irregularidade identificada.</li><li>Devolver a(s) chave(s) sempre que solicitado, em caso de alteração de função, suspensão da autorização de acesso ou encerramento do vínculo com a empresa.</li></ol>
+    <p>O recebimento da chave não autoriza, por si só, a entrada de pessoas não autorizadas ou o acesso fora das condições estabelecidas pela empresa. Eventuais ocorrências serão apuradas pela empresa, observadas as normas internas e a legislação aplicável.</p>
+    <p class="loc">${E.cidade?localData(D):`_______________, ${dataExt(D.data)}.`}</p>
+    ${assina('Assinatura do(a) colaborador(a)','Responsável pela entrega')}
+    <h2 style="margin-top:26px">REGISTRO DE DEVOLUÇÃO</h2>
+    <p>Data: _____/_____/______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Quantidade devolvida: ______&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Condição: ______________________</p>
+    ${assina('Assinatura do(a) colaborador(a)','Responsável pelo recebimento')}`}},
   {k:'carta_santander',t:'Carta para conta salário (Santander)',so:/oliveira/i,
    campos:[{k:'endereco',t:'Endereço (rua, nº, bairro, CEP, cidade, UF)',tp:'area'},{k:'salario',t:'Salário nominal mensal (R$)',tp:'money'},
      {k:'celular',t:'Telefone celular',tp:'text',defF:f=>f.telefone},{k:'fixo',t:'Telefone fixo (opcional)',tp:'text'},{k:'email',t:'E-mail (opcional)',tp:'text'},
