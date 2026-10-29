@@ -209,6 +209,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .calh{font-size:12px;font-weight:700;color:var(--muted);text-align:center}
 .cald{min-height:76px;border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--surface);cursor:pointer;text-align:left;font:inherit;font-size:12px;display:flex;flex-direction:column;gap:2px;color:var(--ink);min-width:0;overflow:hidden}
 .cald span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#gtBody tr.sel td{background:var(--brand-soft)}
 .cald.hoje{border-color:var(--brand,#0b5d55)}.cald.sel{outline:2px solid var(--brand,#0b5d55);outline-offset:-1px}.cald.atraso{background:var(--sunk)}
 @media (max-width:600px){.cald{min-height:54px;padding:4px;font-size:10px}}
 .navsub{font-size:12px;font-weight:600;color:var(--muted);padding:8px 10px 2px 12px}
@@ -433,6 +434,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <button class="btn mvf" id="mvXls" hidden>Baixar Excel</button>
     </div>
     <div class="cal" id="gtCal" hidden></div>
+    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
     <p class="note" id="gtNote"></p>
   </section>
@@ -5424,7 +5426,7 @@ function gtTabela(rows,vazio){
 // histórico) com o que falta pagar ou receber (fin_titulos em aberto, pelo vencimento). Aporte = entrada com
 // categoria de aporte (fica fora da DRE, ver relTp).
 const ehAporte=m=>m.tipo==='entrada'&&!m.transf_id&&/aporte/i.test(m.categoria||'');
-const MV={lim:300,asc:false};
+const MV={lim:300,asc:false,sel:new Set()};   // sel: "m:id" ou "t:id" dos lançamentos marcados
 function mvLinhas(){
   const out=GT.todos.map(m=>({k:'m',ref:m,id:m.id,data:m.data,tipo:m.tipo,nat:m.transf_id?'transf':ehAporte(m)?'aporte':m.tipo,conta_id:m.conta_id,pessoa:m.pessoa_nome||'',
     descricao:m.descricao||'',documento:m.documento||'',categoria:m.categoria||'',valor:+m.valor,st:m.ofx_id||m.conciliado?'conciliado':'pago',tit:m.titulo_id}));
@@ -5460,18 +5462,20 @@ function mvDesenha(){
   const L=mvLinhas();mvOpcoes(L);
   const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*(a.data.localeCompare(b.data)||(a.k==='t')-(b.k==='t')));
   const cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
-  $('gtHead').innerHTML=`<tr><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);return `<tr class="click" data-mv="${x.k}:${x.id}" tabindex="0"><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
-    +(rows.length>MV.lim?`<tr><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
-    ||`<tr><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
+  const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
+  const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
+  $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
+    +(rows.length>MV.lim?`<tr><td></td><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
+    ||`<tr><td></td><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
   const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
-  $('gtFoot').innerHTML=rows.length?`<tr><td></td><td class="l" colspan="5">${rows.length} ${rows.length===1?'lançamento':'lançamentos'}</td><td class="pos">${fm(sv(x=>x.tipo==='entrada'))}</td><td class="neg">${fm(sv(x=>x.tipo==='saida'))}</td><td></td></tr>`:'';
+  $('gtFoot').innerHTML=rows.length?`<tr><td></td><td></td><td class="l" colspan="5">${rows.length} ${rows.length===1?'lançamento':'lançamentos'}</td><td class="pos">${fm(sv(x=>x.tipo==='entrada'))}</td><td class="neg">${fm(sv(x=>x.tipo==='saida'))}</td><td></td></tr>`:'';
   const tl=(tp,k)=>rows.filter(x=>x.tipo===tp&&(k==='t'?x.k==='t':x.k==='m'&&fora(x))),atr=tp=>tl(tp,'t').filter(x=>x.st==='atrasado').length;
   const til=(n,tp,k,cl)=>{const l=tl(tp,k),a=k==='t'?atr(tp):0;return [n,fm(r2(l.reduce((s,x)=>s+x.valor,0))),(a?a+(a===1?' atrasado · ':' atrasados · '):'')+qt(l),a?'neg':cl]};
   $('gtTiles').innerHTML=[til('Recebido','entrada','m','pos'),til('Pago','saida','m','neg'),til('A receber em aberto','entrada','t',''),til('A pagar em aberto','saida','t','')]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gtNote').textContent='As contas em aberto aparecem na data do vencimento, com o valor que falta. Recebido e pago não contam as transferências entre contas (a não ser com uma conta escolhida). Clique num lançamento para ver ou corrigir; clique em “Data” para inverter a ordem.';
-  GT.mvRows=rows;
+  GT.mvRows=rows;mvBulk();
   // lançamentos a validar (histórico importado do Bom Controle, v66): aviso no topo até validar todos
   const nv=L.filter(x=>x.ref.validar).length,emV=$('mvSit').value==='validar';
   $('mvAviso').hidden=!nv;
@@ -5489,8 +5493,9 @@ $('mvValida').onclick=async()=>{
   toast(ids.length===1?'Lançamento validado':'Lançamentos validados');GT.key='';renderGT();
 };
 // troca a categoria de todos os lançamentos filtrados de uma vez (ex.: os "Revisar categoria" de devolução)
-$('mvTroca').onclick=async()=>{
-  const cli=cliAtual(),rows=(GT.mvRows||[]).filter(x=>x.nat!=='transf');if(!cli||!rows.length)return;
+$('mvTroca').onclick=()=>mvTrocaAbre(GT.mvRows||[]);
+async function mvTrocaAbre(rows){
+  const cli=cliAtual();rows=rows.filter(x=>x.nat!=='transf');if(!cli||!rows.length)return toast('Transferências não têm categoria.');GT.mvAlvo=rows;
   let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
   const at=plano.filter(c=>c.ativo!==false),ent=rows.filter(x=>x.tipo==='entrada').length;
   const op=tp=>at.filter(c=>(c.tipo||'Despesa')===tp).map(c=>`<option>${esc(c.categoria)}</option>`).join('');
@@ -5500,16 +5505,71 @@ $('mvTroca').onclick=async()=>{
     <p class="note" style="margin:0">${rows.length} ${rows.length===1?'lançamento':'lançamentos'} (${ent} ${ent===1?'entrada':'entradas'} e ${rows.length-ent} ${rows.length-ent===1?'saída':'saídas'}) hoje em: ${de.map(esc).join(', ')}. A mesma categoria vale para entrada e saída: o estorno de uma venda vai na categoria da venda e abate a receita.</p><p class="err" id="gtErr" hidden></p>`;
   $('gtdFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="mv_troca">Trocar</button>';
   dlgGT.showModal();
-};
+}
 async function mvTrocar(){
   const cat=$('mv_cat').value;if(!cat||cat===CATNOVA)return gtErr('Escolha a nova categoria.');
-  const rows=(GT.mvRows||[]).filter(x=>x.nat!=='transf'),rev=rows.some(x=>x.ref.cat_revisar),upd=rev?{categoria:cat,cat_revisar:false}:{categoria:cat};
+  const rows=GT.mvAlvo||[],rev=rows.some(x=>x.ref.cat_revisar),upd=rev?{categoria:cat,cat_revisar:false}:{categoria:cat};
   const mids=rows.filter(x=>x.k==='m').map(x=>x.id),tids=[...new Set([...rows.filter(x=>x.k==='t').map(x=>x.id),...rows.filter(x=>x.k==='m'&&x.tit&&rows.some(y=>y.k==='t'&&y.id===x.tit)).map(x=>x.tit)])];
   if(!confirm(`Trocar a categoria de ${rows.length} ${rows.length===1?'lançamento':'lançamentos'} para “${cat}”?`))return;
   try{for(let i=0;i<mids.length;i+=200){const {error}=await sb.from('fin_movimentos').update(upd).in('id',mids.slice(i,i+200));if(error)throw error}
     for(let i=0;i<tids.length;i+=200){const {error}=await sb.from('fin_titulos').update(upd).in('id',tids.slice(i,i+200));if(error)throw error}}
   catch(e){console.error(e);return gtErr(e.message||'Não foi possível trocar.')}
-  toast('Categoria trocada');dlgGT.close();GT.key='';renderGT();
+  toast('Categoria trocada');dlgGT.close();MV.sel.clear();GT.key='';renderGT();
+}
+// seleção em lote (pedido da Carol, 29/10): marca lançamentos e troca a categoria, a conta ou exclui de uma vez
+const mvSelRows=()=>{const L=mvLinhas();return L.filter(x=>MV.sel.has(x.k+':'+x.id))};
+function mvBulk(){
+  const n=MV.sel.size;$('mvBulk').hidden=!n;if(!n)return;
+  const ls=mvSelRows(),e=r2(ls.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+x.valor,0)),sd=r2(ls.filter(x=>x.tipo==='saida').reduce((a,x)=>a+x.valor,0));
+  const nv=ls.filter(x=>x.k==='m'&&x.ref.validar).length,bv=$('mvBulk').querySelector('[data-mb="valida"]');bv.hidden=!nv;bv.textContent=nv===n?'Marcar como validado':`Marcar ${nv} como ${nv===1?'validado':'validados'}`;
+  $('mvBulkTxt').innerHTML=`<b>${n} ${n===1?'lançamento selecionado':'lançamentos selecionados'}</b> · entradas ${fm(e)} · saídas ${fm(sd)}`;
+}
+$('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
+  if(a==='limpa'){MV.sel.clear();return gtDesenha()}
+  if(a==='cat')return mvTrocaAbre(mvSelRows());
+  if(a==='valida'){const ids=mvSelRows().filter(x=>x.k==='m'&&x.ref.validar).map(x=>x.id);if(!ids.length)return;
+    if(!confirm(`Marcar ${ids.length} ${ids.length===1?'lançamento':'lançamentos'} como ${ids.length===1?'validado':'validados'}?`))return;
+    for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({validar:null}).in('id',ids.slice(i,i+200));if(error)return fail(error)}
+    toast(ids.length===1?'Lançamento validado':`${ids.length} lançamentos validados`);MV.sel.clear();GT.key='';return renderGT()}
+  if(a==='conta')return mvContaAbre(mvSelRows());
+  if(a==='excluir')return mvExcluir(mvSelRows());
+});
+async function mvContaAbre(rows){
+  rows=rows.filter(x=>x.nat!=='transf');if(!rows.length)return toast('Transferências não mudam de conta por aqui: abra a transferência para corrigir.');
+  const cs=(GT.contas||[]).filter(c=>c.ativo!==false);
+  $('gtdTitle').textContent='Trocar a conta';$('gtdChip').innerHTML='';
+  $('gtdBody').innerHTML=`<div class="fields"><label class="f wide">Nova conta *<select id="mv_conta"><option value=""></option>${cs.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></label></div>
+    <p class="note" style="margin:0">${rows.length} ${rows.length===1?'lançamento':'lançamentos'}. Nas contas em aberto muda a conta prevista; nos pagos e recebidos, a conta em que o dinheiro entrou ou saiu (e o extrato das duas contas muda).${rows.some(x=>x.st==='conciliado')?' <b>Atenção:</b> há lançamentos conciliados com o banco; a conciliação deles é desfeita.':''}</p><p class="err" id="gtErr" hidden></p>`;
+  $('gtdFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="mv_conta">Trocar</button>';
+  GT.mvAlvo=rows;dlgGT.showModal();
+}
+async function mvContaTrocar(){
+  const c=$('mv_conta').value;if(!c)return gtErr('Escolha a nova conta.');
+  const rows=GT.mvAlvo||[],mids=rows.filter(x=>x.k==='m').map(x=>x.id),tids=rows.filter(x=>x.k==='t').map(x=>x.id),conc=rows.some(x=>x.k==='m'&&x.ref.ofx_id);
+  try{for(let i=0;i<mids.length;i+=200){const {error}=await sb.from('fin_movimentos').update(conc?{conta_id:c,ofx_id:null}:{conta_id:c}).in('id',mids.slice(i,i+200));if(error)throw error}
+    for(let i=0;i<tids.length;i+=200){const {error}=await sb.from('fin_titulos').update({conta_id:c}).in('id',tids.slice(i,i+200));if(error)throw error}}
+  catch(e){console.error(e);return gtErr(e.message||'Não foi possível trocar.')}
+  toast('Conta trocada');dlgGT.close();MV.sel.clear();GT.key='';renderGT();
+}
+async function mvExcluir(rows){
+  // os que vêm da tesouraria do cliente são corrigidos lá (senão o espelho volta a ficar diferente)
+  const tes=rows.filter(x=>x.k==='m'&&x.ref.tes_id),ok=rows.filter(x=>!(x.k==='m'&&x.ref.tes_id));
+  if(!ok.length)return toast('Esses lançamentos vêm da tesouraria do cliente: exclua ou corrija na Tesouraria.');
+  const conc=ok.filter(x=>x.st==='conciliado').length,tr=new Set(ok.filter(x=>x.nat==='transf').map(x=>x.ref.transf_id)).size;
+  const pagos=ok.filter(x=>x.k==='m'&&x.tit).length,tits=ok.filter(x=>x.k==='t'),comPg=tits.filter(x=>(GT.movs[x.id]||[]).length).length;
+  const av=[`Excluir ${ok.length} ${ok.length===1?'lançamento':'lançamentos'}? Não dá para desfazer.`,
+    tr?`• ${tr} ${tr===1?'transferência sai':'transferências saem'} das duas contas.`:'',
+    pagos?`• ${pagos} ${pagos===1?'pagamento ou recebimento é desfeito':'pagamentos ou recebimentos são desfeitos'}: a conta volta a ficar em aberto.`:'',
+    comPg?`• ${comPg} ${comPg===1?'conta em aberto tem':'contas em aberto têm'} pagamento parcial, que também é apagado.`:'',
+    conc?`• ${conc} ${conc===1?'está conciliado':'estão conciliados'} com o banco.`:'',
+    tes.length?`• ${tes.length} ${tes.length===1?'vem':'vêm'} da tesouraria do cliente e não ${tes.length===1?'será excluído':'serão excluídos'} (corrija na Tesouraria).`:''].filter(Boolean).join('\n');
+  if(!confirm(av))return;
+  const mids=ok.filter(x=>x.k==='m'&&!x.ref.transf_id).map(x=>x.id),tfs=[...new Set(ok.filter(x=>x.k==='m'&&x.ref.transf_id).map(x=>x.ref.transf_id))],tids=tits.map(x=>x.id);
+  try{for(let i=0;i<mids.length;i+=200){const {error}=await sb.from('fin_movimentos').delete().in('id',mids.slice(i,i+200));if(error)throw error}
+    for(let i=0;i<tfs.length;i+=200){const {error}=await sb.from('fin_movimentos').delete().in('transf_id',tfs.slice(i,i+200));if(error)throw error}
+    for(let i=0;i<tids.length;i+=200){const {error}=await sb.from('fin_titulos').delete().in('id',tids.slice(i,i+200));if(error)throw error}}
+  catch(e){console.error(e);GT.key='';renderGT();return fail(e,'Não foi possível excluir tudo')}
+  toast(`${ok.length} ${ok.length===1?'lançamento excluído':'lançamentos excluídos'}`);MV.sel.clear();GT.key='';renderGT();
 }
 function mvAbre(tr){
   const [k,id]=tr.dataset.mv.split(':');
@@ -5569,8 +5629,11 @@ $('gtMes').onchange=gtDesenha;
 $('gtFiltro').onchange=()=>{const f=$('gtFiltro').value;if((f==='baixadas'||f==='todas')&&!$('gtIni').value&&!$('gtFim').value){$('gtIni').value=TODAY.slice(0,8)+'01';$('gtFim').value=fimMes(TODAY)}gtDesenha()};
 $('gtIni').onchange=gtDesenha;$('gtFim').onchange=gtDesenha;$('gtBusca').oninput=()=>{clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,200)};
 const gtAbre=tr=>tr.dataset.mv?mvAbre(tr):abrirGT(GT.lista.find(t=>t.id===tr.dataset.id));
-$('gtBody').addEventListener('click',e=>{if(e.target.id==='mvMais'){MV.lim+=300;return gtDesenha()}const tr=e.target.closest('tr.click');if(tr)gtAbre(tr)});
-$('gtBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gtAbre(tr)}});
+$('gtBody').addEventListener('change',e=>{const k=e.target.dataset?.mvsel;if(!k)return;e.target.checked?MV.sel.add(k):MV.sel.delete(k);e.target.closest('tr').classList.toggle('sel',e.target.checked);
+  const r=GT.mvRows||[],all=r.length&&r.every(x=>MV.sel.has(x.k+':'+x.id));if($('mvTodos'))$('mvTodos').checked=all;mvBulk()});
+$('gtHead').addEventListener('change',e=>{if(e.target.id!=='mvTodos')return;(GT.mvRows||[]).forEach(x=>e.target.checked?MV.sel.add(x.k+':'+x.id):MV.sel.delete(x.k+':'+x.id));gtDesenha()});
+$('gtBody').addEventListener('click',e=>{if(e.target.closest('[data-mvsel]')||e.target.querySelector?.('[data-mvsel]')&&e.target.tagName==='TD'&&e.target.cellIndex===0){const c=e.target.closest('td')?.querySelector('[data-mvsel]');if(c&&e.target!==c){c.checked=!c.checked;c.dispatchEvent(new Event('change',{bubbles:true}))}return}if(e.target.id==='mvMais'){MV.lim+=300;return gtDesenha()}const tr=e.target.closest('tr.click');if(tr)gtAbre(tr)});
+$('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return;const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gtAbre(tr)}});
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
 $('gtRem').onclick=()=>go('gfremessa');
@@ -5648,6 +5711,7 @@ async function gtAcao(a,b){
   if(a.startsWith('rm_'))return rmAcao(a,b);
   if(a.startsWith('ct_'))return ftAcao(a,b);
   if(a==='mv_troca')return mvTrocar();
+  if(a==='mv_conta')return mvContaTrocar();
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=dP(),cli=cliAtual(),t=GTR;
   if(a==='salvar'){
