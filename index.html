@@ -413,6 +413,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <div><h1 id="gtTitle"></h1><p class="sub" id="gtSub"></p></div>
       <div class="row" style="align-items:flex-end"><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button></div>
     </div>
+    <div class="alerta" id="mvAviso" hidden></div>
     <div class="tiles" id="gtTiles"></div>
     <div class="toolbar">
       <label class="f" id="gtFiltroBox">Mostrar<select id="gtFiltro"><option value="aberto">Em aberto</option><option value="vencidas">Vencidas</option><option value="baixadas">Pagas</option><option value="todas">Todas</option></select></label>
@@ -423,16 +424,17 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label class="f mvf" hidden>Tipo<select id="mvTipo"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="transf">Transferências</option><option value="aporte">Aportes</option></select></label>
       <label class="f mvf" hidden>Cliente ou fornecedor<input id="mvPessoa" list="mvPesList" autocomplete="off" style="max-width:200px"><datalist id="mvPesList"></datalist></label>
       <label class="f mvf" hidden>Categoria<select id="mvCat"></select></label>
-      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option></select></label>
+      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option><option value="validar">A validar (histórico)</option></select></label>
       <label class="f mvf" hidden>Valor de<input id="mvVmin" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <label class="f mvf" hidden>até<input id="mvVmax" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <input id="gtBusca" placeholder="Buscar" style="max-width:240px">
       <button class="btn ghost mvf" id="mvLimpa" hidden>Limpar filtros</button>
       <button class="btn mvf" id="mvTroca" hidden>Trocar a categoria dos filtrados</button>
+      <button class="btn mvf" id="mvValida" hidden>Marcar os filtrados como validados</button>
       <button class="btn mvf" id="mvXls" hidden>Baixar Excel</button>
     </div>
     <div class="cal" id="gtCal" hidden></div>
-    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
     <p class="note" id="gtNote"></p>
   </section>
@@ -5341,7 +5343,7 @@ async function gtCarrega(tipo,cli){
 async function renderGT(){
   const M=VIEW,cli=cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
   if(M==='gfmov'&&GT.modo!=='gfmov'){$('gtIni').value='';$('gtFim').value='';MV.lim=300}   // a movimentação abre com tudo
-  GT.modo=M;
+  GT.modo=M;if(M!=='gfmov')$('mvAviso').hidden=true;
   $('gtTitle').textContent=GTMODOS[M][0];$('gtSub').textContent=GTMODOS[M][1];
   $('gtNovo').textContent=tipo==='receber'?'+ Nova conta a receber':'+ Nova conta a pagar';
   $('gtFiltro').options[2].textContent=tipo==='pagar'?'Pagas':tipo==='receber'?'Recebidas':'Pagas e recebidas';
@@ -5448,7 +5450,7 @@ function mvFiltra(L){
     if(tp==='transf'||tp==='aporte'?x.nat!==tp:tp&&(x.tipo!==tp||x.nat==='transf'))return false;
     if(pe&&!chave(x.pessoa).includes(pe))return false;
     if(cat&&(cat==='-'?x.categoria:x.categoria!==cat))return false;
-    if(st==='revisar'?!x.ref.cat_revisar:st&&!(st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
+    if(st==='validar'?!x.ref.validar:st==='revisar'?!x.ref.cat_revisar:st&&!(st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
     if(ini&&x.data<ini||fim&&x.data>fim)return false;
     if(vn>0&&x.valor<vn||vx>0&&x.valor>vx)return false;
     return !q||chave([x.pessoa,x.descricao,x.documento,x.categoria].join(' ')).includes(q)});
@@ -5463,7 +5465,7 @@ function mvDesenha(){
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
     +(rows.length>MV.lim?`<tr><td></td><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
     ||`<tr><td></td><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
   const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
@@ -5474,9 +5476,22 @@ function mvDesenha(){
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gtNote').textContent='As contas em aberto aparecem na data do vencimento, com o valor que falta. Recebido e pago não contam as transferências entre contas (a não ser com uma conta escolhida). Clique num lançamento para ver ou corrigir; clique em “Data” para inverter a ordem.';
   GT.mvRows=rows;mvBulk();
+  // lançamentos a validar (histórico importado do Bom Controle, v66): aviso no topo até validar todos
+  const nv=L.filter(x=>x.ref.validar).length,emV=$('mvSit').value==='validar';
+  $('mvAviso').hidden=!nv;
+  if(nv)$('mvAviso').innerHTML=`<div><b>⚠ ${nv} ${nv===1?'lançamento do histórico precisa':'lançamentos do histórico precisam'} ser ${nv===1?'validado':'validados'}</b><br><span class="note">Transferências que o Bom Controle não diz para onde foram (ou de onde vieram), pendências marcadas no BC e depósitos da tesouraria sem a entrada no banco. Corrija o lançamento (o aviso sai sozinho) ou, se estiver certo, marque como validado.</span></div>${emV?'':'<button type="button" class="btn small" id="mvVerVal">Ver os lançamentos a validar</button>'}`;
+  $('mvValida').hidden=!emV||!rows.some(x=>x.ref.validar);
+  if(!$('mvValida').hidden){const n=rows.filter(x=>x.ref.validar).length;$('mvValida').textContent=n===1?'Marcar o filtrado como validado':`Marcar os ${n} filtrados como validados`}
   const troca=rows.filter(x=>x.nat!=='transf');$('mvTroca').hidden=!troca.length||!($('mvSit').value==='revisar'||$('mvCat').value);
   if(!$('mvTroca').hidden)$('mvTroca').textContent=`Trocar a categoria ${troca.length===1?'do lançamento filtrado':`dos ${troca.length} filtrados`}`;
 }
+$('mvAviso').addEventListener('click',e=>{if(!e.target.closest('#mvVerVal'))return;$('mvSit').value='validar';$('gtIni').value='';$('gtFim').value='';mvDesenha()});
+$('mvValida').onclick=async()=>{
+  const ids=(GT.mvRows||[]).filter(x=>x.k==='m'&&x.ref.validar).map(x=>x.id);if(!ids.length)return;
+  if(!confirm(`Marcar ${ids.length} ${ids.length===1?'lançamento':'lançamentos'} como ${ids.length===1?'validado':'validados'}? O aviso sai e o lançamento fica como está.`))return;
+  for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({validar:null}).in('id',ids.slice(i,i+200));if(error)return fail(error)}
+  toast(ids.length===1?'Lançamento validado':'Lançamentos validados');GT.key='';renderGT();
+};
 // troca a categoria de todos os lançamentos filtrados de uma vez (ex.: os "Revisar categoria" de devolução)
 $('mvTroca').onclick=()=>mvTrocaAbre(GT.mvRows||[]);
 async function mvTrocaAbre(rows){
@@ -5506,11 +5521,16 @@ const mvSelRows=()=>{const L=mvLinhas();return L.filter(x=>MV.sel.has(x.k+':'+x.
 function mvBulk(){
   const n=MV.sel.size;$('mvBulk').hidden=!n;if(!n)return;
   const ls=mvSelRows(),e=r2(ls.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+x.valor,0)),sd=r2(ls.filter(x=>x.tipo==='saida').reduce((a,x)=>a+x.valor,0));
+  const nv=ls.filter(x=>x.k==='m'&&x.ref.validar).length,bv=$('mvBulk').querySelector('[data-mb="valida"]');bv.hidden=!nv;bv.textContent=nv===n?'Marcar como validado':`Marcar ${nv} como ${nv===1?'validado':'validados'}`;
   $('mvBulkTxt').innerHTML=`<b>${n} ${n===1?'lançamento selecionado':'lançamentos selecionados'}</b> · entradas ${fm(e)} · saídas ${fm(sd)}`;
 }
 $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
   if(a==='limpa'){MV.sel.clear();return gtDesenha()}
   if(a==='cat')return mvTrocaAbre(mvSelRows());
+  if(a==='valida'){const ids=mvSelRows().filter(x=>x.k==='m'&&x.ref.validar).map(x=>x.id);if(!ids.length)return;
+    if(!confirm(`Marcar ${ids.length} ${ids.length===1?'lançamento':'lançamentos'} como ${ids.length===1?'validado':'validados'}?`))return;
+    for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({validar:null}).in('id',ids.slice(i,i+200));if(error)return fail(error)}
+    toast(ids.length===1?'Lançamento validado':`${ids.length} lançamentos validados`);MV.sel.clear();GT.key='';return renderGT()}
   if(a==='conta')return mvContaAbre(mvSelRows());
   if(a==='excluir')return mvExcluir(mvSelRows());
 });
@@ -6118,7 +6138,7 @@ function dsDesenha(cli){
   const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length,catRev=REL.movs.filter(m=>m.cat_revisar).length+REL.tits.filter(t=>t.cat_revisar&&relFalta(t)>0.004).length;
   const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
   const pend=[[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
-    [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
+    [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[REL.movs.filter(m=>m.validar).length,qt(REL.movs.filter(m=>m.validar).length,'lançamento do histórico a validar','lançamentos do histórico a validar'),'gfmov:validar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
     [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
   const pendH=pend.map(p=>`<button type="button" class="dr" data-go="${p[2]}"><span>${esc(p[1])}</span><span class="chip c-warn">Ver ›</span></button>`).join('')||'<p class="pos" style="margin:0">✓ Nenhuma pendência.</p>';
   const salH=sal.map(([c,v])=>`<div class="dr"><span>${esc(c.nome)} ${mu(esc(c.tipo||''))}</span><span class="${v<0?'neg':''}">${fm(v)}</span></div>`).join('')
