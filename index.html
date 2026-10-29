@@ -124,6 +124,14 @@ textarea{min-height:64px;resize:vertical}
 .tile .v{font-family:var(--display);font-size:24px;font-weight:700;margin-top:4px}
 .tile .n{font-size:13px;color:var(--muted)}
 /* a tabela rola dentro da caixa (no máximo a altura da tela): a barra de rolagem para o lado fica sempre à vista */
+.dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:12px;margin-top:12px}
+.dash .card{padding:14px 16px;min-width:0}.dash h2{font-size:16px;margin:0 0 8px}.dash .dl{display:grid;gap:2px}
+.dash .dr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.dash .dr:last-child{border-bottom:0}
+.dash button.dr{width:100%;background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;cursor:pointer}.dash button.dr:hover{background:var(--sunk)}
+.dleg{display:flex;gap:14px;font-size:13px;color:var(--muted);margin-bottom:6px}.dleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.dash{--s1:#2a78d6;--s2:#eb6834}.dchart{position:relative}.dash .dr>span:last-child{flex:none;white-space:nowrap}.dchart svg{display:block;width:100%;height:auto;overflow:visible}.dchart text{fill:var(--muted);font-size:11px}
+.dtip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12.5px;padding:6px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-100%);z-index:5}
+@media (prefers-color-scheme: dark){.dash{--s1:#3987e5;--s2:#d95926}}
 .tablebox{overflow:auto;max-height:calc(100vh - 150px);margin-top:14px}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
@@ -429,6 +437,17 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div><h1 id="grTitle"></h1><p class="sub" id="grSub"></p></div>
     <div class="card" id="grBody" style="padding:16px;display:grid;gap:12px"></div>
     <div class="row" id="grFoot" style="margin-top:12px"></div>
+  </section>
+
+  <!-- GESTÃO FINANCEIRA › DASHBOARD DA EMPRESA (escritório; tela inicial) -->
+  <section id="viewDash" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1 id="dsTitle">Dashboard</h1><p class="sub" id="dsSub"></p></div>
+      <button class="btn" id="dsAtual">Atualizar</button>
+    </div>
+    <div class="tiles" id="dsTiles"></div>
+    <div class="dash" id="dsGrid"></div>
+    <p class="note" id="dsNote"></p>
   </section>
 
   <!-- GESTÃO FINANCEIRA › RELATÓRIOS (escritório) -->
@@ -1046,6 +1065,7 @@ const ICO={
   gfdcat:'<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
   gfdforn:'<path d="M3 21V9l9-5 9 5v12"/><path d="M9 21v-6h6v6"/>',
   gfdforma:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  gfdash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   gfmov:'<path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3"/>',
   gfinad:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>',
   gfagenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M12 14h2M16 14h1M8 17h2"/>',
@@ -1068,6 +1088,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('cartao')},
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
+  {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
@@ -1183,7 +1204,7 @@ const SECK='portal_secao';
 function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1207,6 +1228,7 @@ function openView(){
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfremessa'||VIEW==='gfretorno'){$('viewGR').hidden=false;renderGR()}
   else if(RELMODOS[VIEW]){$('viewRel').hidden=false;renderRel()}
+  else if(VIEW==='gfdash'){$('viewDash').hidden=false;renderDash()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gftes'){$('viewGTe').hidden=false;renderGTes()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
@@ -1235,7 +1257,7 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
-  show('app');go((volta||first).k);
+  show('app');go(ehEsc()&&eqPode('gfdash')?'gfdash':(volta||first).k);   // o escritório abre no dashboard da empresa
   const novid=()=>{tNovidades();avNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
@@ -5854,6 +5876,15 @@ const relSemTr=m=>!m.transf_id;   // fora as transferências entre contas
 const mesesEntre=(a,b)=>{const out=[];let [y,m]=a.split('-').map(Number);const [y2,m2]=b.split('-').map(Number);while(y<y2||y===y2&&m<=m2){out.push(`${y}-${String(m).padStart(2,'0')}`);if(++m>12){m=1;y++}}return out};
 const mesCurto=ym=>MESES[+ym.slice(5)-1].slice(0,3)+'/'+ym.slice(2,4);
 const cvl=(v,cl)=>`<td data-v="${r2(v)}" class="${cl||''}">${fm(r2(v))}</td>`;
+// os dados de todos os relatórios e do dashboard: lançamentos, contas a pagar e receber, contas e faturas da empresa
+async function relCarrega(cli){
+  const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
+  REL.plano=await planoDe(cli);
+  REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
+  REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
+  REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
+  movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
+}
 async function renderRel(){
   const M=VIEW,cli=cliAtual();
   $('relTitle').textContent=RELMODOS[M][0];$('relSub').textContent=RELMODOS[M][1];
@@ -5866,12 +5897,7 @@ async function renderRel(){
   if(!cli)return vazio('Escolha uma empresa.');
   vazio('Carregando…');
   try{
-    const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
-    REL.plano=await planoDe(cli);
-    REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
-    REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
-    REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
-    movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
+    await relCarrega(cli);
     if(M==='gforc'){const {data,error}=await sb.from('fin_orcamento').select('*').eq('cliente_id',cli.id);if(error)throw error;REL.orc=data||[]}
   }catch(e){console.error(e);return vazio(e&&/fin_orcamento/.test(e.message||'')||e?.code==='42P01'&&M==='gforc'?'A previsão orçamentária precisa da atualização v50 do banco. Rode o SQL no Supabase.':v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(VIEW!==M||cliAtual()?.id!==cli.id)return;
@@ -5904,6 +5930,86 @@ function relResumo(){
   $('relFoot').innerHTML='';
   $('relNote').textContent='O saldo de cada conta é o saldo inicial do cadastro mais as entradas e saídas lançadas. Confira com o extrato do banco na Conciliação bancária.'+(cts.length?' O cartão não entra no total: o gasto dele vira conta a pagar quando a fatura é fechada.':'');
 }
+// ---------- Dashboard da empresa (tela inicial do escritório) ----------
+// Resumo de tudo: saldos, a pagar e a receber, resultado, cartão, entradas × saídas dos últimos 12 meses,
+// despesas do mês por categoria, próximos vencimentos e pendências (cada uma leva para a tela onde se resolve).
+// Por enquanto só o escritório vê; depois a Carol escolhe o que o cliente vai ver.
+async function renderDash(){
+  const cli=cliAtual(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
+  $('dsTitle').textContent=cli?'Dashboard · '+cli.nome:'Dashboard';$('dsSub').textContent=cli?'Resumo da empresa hoje, '+dBR(TODAY)+'.':'';
+  if(!cli){g.innerHTML='<p class="muted">Escolha uma empresa.</p>';return}
+  g.innerHTML='<p class="muted">Carregando…</p>';
+  try{await relCarrega(cli)}catch(e){console.error(e);g.innerHTML=`<p class="neg">${v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
+  if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
+  dsDesenha(cli);
+}
+$('dsAtual').onclick=renderDash;
+const DS={pm:[]};
+// gráfico de barras desenhado na largura real do quadro (o texto fica do mesmo tamanho no celular e no computador)
+function dsGraf(){
+  const box=$('dsChart');if(!box||!DS.pm.length)return;const pm=DS.pm,mx=Math.max(1,...pm.flatMap(x=>[x.e,x.s])),W=Math.max(280,box.clientWidth),H=W<500?180:240,top=12,bot=28,ch=H-top-bot,bw=W/12,bar=Math.max(3,Math.min(16,(bw-8)/2));
+  const nice=v=>{const p=10**Math.floor(Math.log10(v)),n=v/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p},yt=nice(mx/3),yM=Math.max(yt*3,Math.ceil(mx/yt)*yt),y=v=>top+ch-(v/yM)*ch;
+  const cm=v=>v>=1e6?(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mi':v>=1e3?(v/1e3).toLocaleString('pt-BR',{maximumFractionDigits:0})+' mil':String(Math.round(v));
+  const rb=(x,v,cl)=>{const h=Math.max(0,top+ch-y(v));if(h<0.5)return '';const r=Math.min(4,h);return `<path fill="var(${cl})" d="M${x},${top+ch}V${top+ch-h+r}q0,-${r} ${r},-${r}h${bar-2*r}q${r},0 ${r},${r}V${top+ch}Z"/>`};
+  const svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Entradas e saídas dos últimos 12 meses">
+    ${[...Array(Math.round(yM/yt)+1).keys()].map(i=>`<line x1="0" x2="${W}" y1="${y(i*yt)}" y2="${y(i*yt)}" stroke="var(--line)" stroke-width="1"${i?' stroke-dasharray="2 4"':''}/><text x="0" y="${y(i*yt)-3}">${i?cm(i*yt):''}</text>`).join('')}
+    ${pm.map((x,i)=>{const cx=i*bw+bw/2;return `<g data-i="${i}">${rb(cx-bar-1,x.e,'--s1')}${rb(cx+1,x.s,'--s2')}<rect x="${i*bw}" y="${top}" width="${bw}" height="${ch+bot}" fill="transparent"/><text x="${cx}" y="${H-8}" text-anchor="middle">${MESES[+x.k.slice(5)-1].slice(0,3)}${(x.k.slice(5)==='01'||i===0)&&W>=500?'/'+x.k.slice(2,4):''}</text></g>`}).join('')}</svg>`;
+  box.querySelector('svg')?.remove();box.insertAdjacentHTML('afterbegin',svg);
+}
+window.addEventListener('resize',()=>{if(VIEW==='gfdash'){clearTimeout(dsGraf.t);dsGraf.t=setTimeout(dsGraf,150)}});
+function dsDesenha(cli){
+  const mu=t=>`<span class="muted">${t}</span>`,som=l=>r2(l.reduce((x,t)=>x+relFalta(t),0)),mes=TODAY.slice(0,7),qt=(n,a,b)=>n+' '+(n===1?a:b);
+  const cs=REL.contas.filter(c=>c.ativo!==false&&!ehCartao(c)),sal=cs.map(c=>[c,saldoConta(c,TODAY)]),tot=r2(sal.reduce((x,s)=>x+s[1],0));
+  const cts=REL.contas.filter(c=>c.ativo!==false&&ehCartao(c)).map(c=>[c,r2(-saldoConta(c,TODAY))]),cart=r2(cts.reduce((x,c)=>x+c[1],0));
+  const ab=REL.tits.filter(t=>relFalta(t)>0.004),ar=ab.filter(t=>t.tipo==='receber'),ap=ab.filter(t=>t.tipo==='pagar');
+  const arV=ar.filter(t=>t.vencimento<TODAY),apV=ap.filter(t=>t.vencimento<TODAY);
+  const mm=REL.movs.filter(m=>m.data.startsWith(mes)),ent=r2(mm.filter(m=>relTp(m)==='entrada').reduce((x,m)=>x+relVl(m),0)),sai=r2(mm.filter(m=>relTp(m)==='saida').reduce((x,m)=>x+relVl(m),0));
+  $('dsTiles').innerHTML=tileH([
+    ['Saldo nas contas',fm(tot),'hoje, '+qt(cs.length,'conta','contas'),tot<0?'neg':''],
+    ['A receber em aberto',fm(som(ar)),arV.length?'vencido: '+fm(som(arV)):'nada vencido',arV.length?'neg':''],
+    ['A pagar em aberto',fm(som(ap)),apV.length?'vencido: '+fm(som(apV)):'nada vencido',apV.length?'neg':''],
+    ['Resultado do mês',fm(r2(ent-sai)),MESES[+mes.slice(5)-1]+': receitas menos despesas',ent-sai<0?'neg':'pos'],
+    ...(cts.length?[['Cartão de crédito',fm(cart),'gasto ainda não pago','']]:[])]);
+  // entradas × saídas por mês (regime de caixa, sem transferências e aportes), últimos 12 meses
+  const ms=[...Array(12).keys()].map(i=>somaMes(mes+'-01',i-11).slice(0,7));
+  const pm=ms.map(k=>{const l=REL.movs.filter(m=>m.data.startsWith(k));return {k,e:r2(l.filter(m=>relTp(m)==='entrada').reduce((x,m)=>x+relVl(m),0)),s:r2(l.filter(m=>relTp(m)==='saida').reduce((x,m)=>x+relVl(m),0))}});
+  DS.pm=pm;
+  // despesas do mês por categoria (as 6 maiores e "Outras")
+  const dc={};mm.filter(m=>relTp(m)==='saida').forEach(m=>{const k=m.categoria||'Sem categoria';dc[k]=r2((dc[k]||0)+relVl(m))});
+  let cats=Object.entries(dc).sort((a,b)=>b[1]-a[1]);if(cats.length>7)cats=[...cats.slice(0,6),['Outras',r2(cats.slice(6).reduce((x,c)=>x+c[1],0))]];
+  const cmx=Math.max(1,...cats.map(c=>c[1]));
+  const catH=cats.map(([k,v])=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;align-items:center;font-size:13.5px;padding:3px 0"><div><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</div><div style="height:8px;border-radius:0 4px 4px 0;background:var(--s2);width:${Math.max(1,v/cmx*100)}%"></div></div><div style="text-align:right">${fm(v)} ${mu(sai?Math.round(v/sai*100)+'%':'')}</div></div>`).join('')||`<p class="muted" style="margin:0">Nenhuma despesa lançada em ${MESES[+mes.slice(5)-1].toLowerCase()}.</p>`;
+  // próximos vencimentos (7 dias, com os vencidos)
+  const em7=addDias(TODAY,7),prox=ab.filter(t=>t.vencimento<=em7).sort((a,b)=>a.vencimento.localeCompare(b.vencimento)),pv=prox.slice(0,8);
+  const proxH=pv.map(t=>`<button type="button" class="dr" data-go="${t.tipo==='pagar'?'gfpagar':'gfrec'}"><span><span class="${t.vencimento<TODAY?'neg':''}">${dBR(t.vencimento)}</span> · <b>${esc(t.pessoa_nome||'—')}</b> ${mu(t.tipo==='pagar'?'a pagar':'a receber')}</span><span class="${t.tipo==='pagar'?'neg':'pos'}">${fm(relFalta(t))}</span></button>`).join('')
+    +(prox.length>pv.length?`<button type="button" class="dr" data-go="gfagenda">${mu('Mais '+(prox.length-pv.length)+' na agenda financeira')}<span>›</span></button>`:'')||'<p class="muted" style="margin:0">Nada vence nos próximos 7 dias.</p>';
+  // pendências
+  const d90=addDias(TODAY,-90),d10=addDias(TODAY,10);
+  const semCat=REL.movs.filter(m=>!m.transf_id&&!m.categoria&&m.data>=d90).length;
+  const naoConc=REL.movs.filter(m=>!REL.cart.has(m.conta_id)&&!m.ofx_id&&!m.conciliado&&m.data>=addDias(TODAY,-30)&&m.data<=TODAY).length;
+  const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length;
+  const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
+  const pend=[[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
+    [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
+    [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
+  const pendH=pend.map(p=>`<button type="button" class="dr" data-go="${p[2]}"><span>${esc(p[1])}</span><span class="chip c-warn">Ver ›</span></button>`).join('')||'<p class="pos" style="margin:0">✓ Nenhuma pendência.</p>';
+  const salH=sal.map(([c,v])=>`<div class="dr"><span>${esc(c.nome)} ${mu(esc(c.tipo||''))}</span><span class="${v<0?'neg':''}">${fm(v)}</span></div>`).join('')
+    +(sal.length?`<div class="dr"><b>Total</b><b class="${tot<0?'neg':''}">${fm(tot)}</b></div>`:'<p class="muted" style="margin:0">Nenhuma conta cadastrada.</p>')
+    +cts.map(([c,v])=>`<div class="dr"><span>${esc(c.nome)} ${mu('gasto não pago')}</span><span>${fm(v)}</span></div>`).join('');
+  $('dsGrid').innerHTML=`<div class="card" style="grid-column:1/-1"><h2>Entradas e saídas dos últimos 12 meses</h2><div class="dleg"><span><i style="background:var(--s1)"></i>Entradas</span><span><i style="background:var(--s2)"></i>Saídas</span></div><div class="dchart" id="dsChart"><div class="dtip" hidden></div></div></div>
+    <div class="card"><h2>Pendências</h2><div class="dl">${pendH}</div></div>
+    <div class="card"><h2>Próximos 7 dias ${mu('(com os vencidos)')}</h2><div class="dl">${proxH}</div></div>
+    <div class="card"><h2>Despesas de ${MESES[+mes.slice(5)-1].toLowerCase()} por categoria</h2>${catH}</div>
+    <div class="card"><h2>Saldo das contas</h2><div class="dl">${salH}</div></div>`;
+  dsGraf();
+  const box=$('dsChart'),tip=box.querySelector('.dtip');
+  box.onmousemove=e=>{const gi=e.target.closest('g[data-i]');if(!gi){tip.hidden=true;return}const x=DS.pm[+gi.dataset.i],r=box.getBoundingClientRect();
+    tip.innerHTML=`<b>${MESES[+x.k.slice(5)-1]}/${x.k.slice(0,4)}</b><br>Entradas ${fm(x.e)}<br>Saídas ${fm(x.s)}<br>Resultado ${fm(r2(x.e-x.s))}`;tip.hidden=false;
+    tip.style.left=Math.min(Math.max(e.clientX-r.left,70),r.width-70)+'px';tip.style.top=(e.clientY-r.top-10)+'px'};
+  box.onmouseleave=()=>tip.hidden=true;
+  $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas. Por enquanto só o escritório vê este painel.';
+}
+$('dsGrid').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
 function relFluxo(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return $('relBody').innerHTML='<tr><td class="l muted">Escolha o período.</td></tr>';
   const dia=dObj(fim)-dObj(ini)<=62*864e5,bk=d=>dia?d:d.slice(0,7);
