@@ -124,6 +124,14 @@ textarea{min-height:64px;resize:vertical}
 .tile .v{font-family:var(--display);font-size:24px;font-weight:700;margin-top:4px}
 .tile .n{font-size:13px;color:var(--muted)}
 /* a tabela rola dentro da caixa (no máximo a altura da tela): a barra de rolagem para o lado fica sempre à vista */
+.dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:12px;margin-top:12px}
+.dash .card{padding:14px 16px;min-width:0}.dash h2{font-size:16px;margin:0 0 8px}.dash .dl{display:grid;gap:2px}
+.dash .dr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.dash .dr:last-child{border-bottom:0}
+.dash button.dr{width:100%;background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left;cursor:pointer}.dash button.dr:hover{background:var(--sunk)}
+.dleg{display:flex;gap:14px;font-size:13px;color:var(--muted);margin-bottom:6px}.dleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.dash{--s1:#2a78d6;--s2:#eb6834}.dchart{position:relative}.dash .dr>span:last-child{flex:none;white-space:nowrap}.dchart svg{display:block;width:100%;height:auto;overflow:visible}.dchart text{fill:var(--muted);font-size:11px}
+.dtip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12.5px;padding:6px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-100%);z-index:5}
+@media (prefers-color-scheme: dark){.dash{--s1:#3987e5;--s2:#d95926}}
 .tablebox{overflow:auto;max-height:calc(100vh - 150px);margin-top:14px}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
@@ -235,7 +243,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .msg .q{font-size:12px;color:var(--muted)}.msg .x{white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.mine{background:var(--brand-soft);border-color:transparent}.msg.int{background:var(--warn-soft);border-color:var(--warn)}
 .msg.sys{border:0;padding:0 4px;font-size:12px;color:var(--muted);font-style:italic}
-#dlgTar{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*{min-width:0}
+#dlgTar,#dlgProj{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*,#dlgProj .db>*{min-width:0}
+#pjBody tr{cursor:pointer}#pjBody tr.novo td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
+.pjdec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;background:var(--sunk)}
 .pick{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:10px;max-height:300px;overflow:auto}
 .pick .pkg{display:grid;gap:4px}.pick .pkg>div:first-child{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700}
 .vis{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:14px;font-weight:600}.vis label{display:flex;gap:6px;align-items:center}.vis input{width:auto;margin:0}
@@ -408,7 +418,17 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label class="f" id="gtIniBox">Vencimento de<input type="date" id="gtIni"></label>
       <label class="f" id="gtFimBox">até<input type="date" id="gtFim"></label>
       <label class="f" id="gtMesBox" hidden>Mês<input type="month" id="gtMes"></label>
+      <label class="f mvf" hidden>Conta<select id="mvConta"></select></label>
+      <label class="f mvf" hidden>Tipo<select id="mvTipo"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="transf">Transferências</option><option value="aporte">Aportes</option></select></label>
+      <label class="f mvf" hidden>Cliente ou fornecedor<input id="mvPessoa" list="mvPesList" autocomplete="off" style="max-width:200px"><datalist id="mvPesList"></datalist></label>
+      <label class="f mvf" hidden>Categoria<select id="mvCat"></select></label>
+      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option></select></label>
+      <label class="f mvf" hidden>Valor de<input id="mvVmin" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
+      <label class="f mvf" hidden>até<input id="mvVmax" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <input id="gtBusca" placeholder="Buscar" style="max-width:240px">
+      <button class="btn ghost mvf" id="mvLimpa" hidden>Limpar filtros</button>
+      <button class="btn mvf" id="mvTroca" hidden>Trocar a categoria dos filtrados</button>
+      <button class="btn mvf" id="mvXls" hidden>Baixar Excel</button>
     </div>
     <div class="cal" id="gtCal" hidden></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
@@ -420,6 +440,17 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div><h1 id="grTitle"></h1><p class="sub" id="grSub"></p></div>
     <div class="card" id="grBody" style="padding:16px;display:grid;gap:12px"></div>
     <div class="row" id="grFoot" style="margin-top:12px"></div>
+  </section>
+
+  <!-- GESTÃO FINANCEIRA › DASHBOARD DA EMPRESA (escritório; tela inicial) -->
+  <section id="viewDash" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1 id="dsTitle">Dashboard</h1><p class="sub" id="dsSub"></p></div>
+      <button class="btn" id="dsAtual">Atualizar</button>
+    </div>
+    <div class="tiles" id="dsTiles"></div>
+    <div class="dash" id="dsGrid"></div>
+    <p class="note" id="dsNote"></p>
   </section>
 
   <!-- GESTÃO FINANCEIRA › RELATÓRIOS (escritório) -->
@@ -537,10 +568,10 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="proprio" style="width:auto;margin-top:4px"><span><b>Usar um plano próprio desta empresa</b><br><span class="muted">Começa como uma cópia do padrão. Depois pode incluir, renomear e desativar categorias só para esta empresa.</span></span></label>
     </div>
     <form class="card row" id="pcForm" hidden style="padding:16px 18px;margin-top:16px;align-items:flex-end">
-      <label class="f">Código<input id="pcCod" placeholder="Ex.: 2.1.05" style="max-width:130px"></label>
+      <label class="f">Grupo na DRE<select id="pcGrupo"></select></label>
       <label class="f" style="flex:1 1 220px">Categoria<input id="pcCat" placeholder="Nome da categoria"></label>
-      <label class="f">Grupo na DRE<input id="pcGrupo" list="pcGrupos" placeholder="Ex.: DESPESAS FIXAS"></label>
-      <label class="f">Tipo<select id="pcTipo"><option>Despesa</option><option>Receita</option></select></label>
+      <label class="f">Código<input id="pcCod" readonly placeholder="automático" style="max-width:110px" title="O código é o próximo da sequência do grupo"></label>
+      <label class="f">Tipo<select id="pcTipo" disabled><option>Despesa</option><option>Receita</option></select></label>
       <button class="btn primary" type="submit">Adicionar categoria</button>
     </form>
     <div class="toolbar"><input id="pcBusca" placeholder="Buscar categoria ou código" style="max-width:260px"><label class="f">Mostrar<select id="pcFiltro"><option value="ativos">Ativas</option><option value="inativos">Inativas</option><option value="todos">Todas</option></select></label></div>
@@ -566,6 +597,23 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <div class="row" style="align-items:flex-end"><label class="f" id="avFiltroBox">Mostrar<select id="avFiltro"><option value="ativos">Em vigor</option><option value="todos">Todos, inclusive vencidos</option></select></label><button class="btn primary" id="avNovo">+ Novo aviso</button></div>
     </div>
     <div id="avLista" style="display:grid;gap:12px;margin-top:16px"></div>
+  </section>
+
+  <!-- PROJETOS E MELHORIAS (v65) -->
+  <section id="viewProj" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Projetos e melhorias</h1><p class="sub" id="pjSub"></p></div>
+      <button class="btn primary" id="pjNovo">+ Novo pedido</button>
+    </div>
+    <div class="alerta" id="pjAlerta" hidden></div>
+    <div class="toolbar">
+      <input id="pjBusca" placeholder="Buscar pedido" style="max-width:240px">
+      <label class="f">Situação<select id="pjSit"><option value="abertos">Em aberto</option><option value="aguardando">Aguardando validação</option><option value="ajuste">Precisa de ajuste</option><option value="aprovado">Aprovado</option><option value="andamento">Em andamento</option><option value="concluido">Concluído</option><option value="recusado">Recusado</option><option value="todos">Todos</option></select></label>
+      <label class="f">Tipo<select id="pjTipo"></select></label>
+      <label class="f">Pedido por<select id="pjQuem"><option value="">Todos</option><option value="meus">Só os meus</option></select></label>
+    </div>
+    <div class="card tablebox"><table><thead><tr><th class="l">Pedido</th><th class="l">Tipo</th><th class="l">Empresa</th><th class="l">Pedido por</th><th>Prioridade</th><th>Situação</th></tr></thead><tbody id="pjBody"></tbody></table></div>
+    <p class="note" id="pjNote"></p>
   </section>
 
   <!-- TAREFAS E RECADOS (Kanban) -->
@@ -635,7 +683,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
           <button class="btn primary" type="submit">Cadastrar usuário</button>
         </form>
         <div class="alerta" id="nuOk" hidden style="margin:0"></div>
-        <p class="note" style="margin:0"><b>Administração Controlacs</b>: vê tudo e muda o tipo dos usuários. <b>Operador Controlacs</b>: equipe; vê os módulos e as empresas que você escolher em “Escolher módulos e empresas”, mais Tarefas e Avisos. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
+        <p class="note" style="margin:0"><b>Master</b>: só você; vê tudo, é o único que entra em Configurações, Plano de contas e regras das categorias, e muda o tipo e as permissões dos usuários. <b>Operador Controlacs</b>: equipe; vê os módulos e as empresas que você escolher em “Escolher módulos e empresas”, mais Tarefas e Avisos. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -671,9 +719,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <p class="note" id="catAviso" style="margin:16px 0 0"></p>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Plano de contas</h2>
-        <p class="note" style="margin:0">Categorias do Bom Controle, com os nomes exatamente iguais. Cole uma categoria por linha (pode copiar a coluna do Excel). As que já existem são mantidas.</p>
+        <p class="note" style="margin:0">Plano de contas padrão, que vale para todas as empresas sem plano próprio. Use “+ Nova categoria” para cadastrar uma, ou cole várias, uma por linha (pode copiar a coluna do Excel); as que já existem são mantidas. O grupo e o plano de cada empresa ficam em Gestão financeira › Plano de contas.</p>
         <textarea id="catCola" rows="4" placeholder="Energia elétrica&#10;Aluguel&#10;Material de escritório"></textarea>
-        <div class="row"><button class="btn small primary" id="catImport">Adicionar categorias</button><span class="note" id="catTotal"></span></div>
+        <div class="row"><button class="btn small primary" id="catNovaBtn">+ Nova categoria</button><button class="btn small" id="catImport">Adicionar as coladas</button><span class="note" id="catTotal"></span></div>
         <div class="tablebox" style="margin:0;max-height:260px;overflow:auto"><table class="cfg" id="tbPlano"></table></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -849,6 +897,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="adBody"></div>
   <div class="df" id="adFoot"></div>
 </dialog>
+<dialog id="dlgProj">
+  <div class="dh"><h2 id="pdTitle"></h2><span class="spacer"></span><span id="pdChip" class="chips"></span></div>
+  <div class="db" id="pdBody"></div>
+  <div class="df" id="pdFoot"></div>
+</dialog>
 <dialog id="dlgTar">
   <div class="dh"><h2 id="tdTitle"></h2><span class="spacer"></span><span id="tdChip" class="chips"></span></div>
   <div class="db" id="tdBody"></div>
@@ -881,8 +934,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="dh"><h2>Nova categoria</h2></div>
     <div class="db"><div class="fields">
       <label class="f wide">Nome da categoria *<input id="cn_nome" placeholder="Ex.: Manutenção de equipamentos"></label>
-      <label class="f">Tipo<select id="cn_tipo"><option>Despesa</option><option>Receita</option></select></label>
-      <label class="f">Código<input id="cn_codigo" placeholder="opcional"></label>
+      <label class="f wide">Grupo *<select id="cn_grupo"></select></label>
+      <label class="f">Tipo<select id="cn_tipo" disabled><option>Despesa</option><option>Receita</option></select></label>
+      <label class="f">Código<input id="cn_codigo" readonly placeholder="escolha o grupo" title="O código é o próximo da sequência do grupo"></label>
       <p class="note wide" id="cnNota" style="margin:0"></p>
     </div><p class="err" id="cnErr" hidden></p></div>
     <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="cnClose">Cancelar</button><button type="submit" class="btn primary" id="cnSave">Cadastrar</button></div>
@@ -993,10 +1047,12 @@ let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
-// Tarefas e Avisos são de toda a equipe
-const SEMPRE=['tarefas','avisos'];
+// Tarefas, Avisos e Projetos são de toda a equipe
+const SEMPRE=['tarefas','avisos','projetos'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
-const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)||k.startsWith('cfg')&&ME.modulos_equipe.includes('cfg'));
+// Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
+const SO_MASTER=['cfg','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
+const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Parceiros: cadastro e alterações',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas','repasse']],['Contabilidade',['contabil']]];
@@ -1022,6 +1078,7 @@ const ICO={
   repasse:'<path d="M7 7h13l-3-3M17 17H4l3 3"/><circle cx="12" cy="12" r="2.2"/>',
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+  projetos:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   gfpagar:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 13v4M10 15l2 2 2-2"/>',
   gfrec:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 17v-4M10 15l2-2 2 2"/>',
@@ -1037,6 +1094,7 @@ const ICO={
   gfdcat:'<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
   gfdforn:'<path d="M3 21V9l9-5 9 5v12"/><path d="M9 21v-6h6v6"/>',
   gfdforma:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  gfdash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   gfmov:'<path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3"/>',
   gfinad:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/>',
   gfagenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M12 14h2M16 14h1M8 17h2"/>',
@@ -1059,6 +1117,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('cartao')},
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
+  {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
@@ -1095,6 +1154,8 @@ const NAV=[
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
+  // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
+  {k:'projetos',t:'Projetos e melhorias',g:'Comunicação',s:'Mensagens',ok:ehEsc},
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
   {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'repasse',t:'Parceiros: cadastro e alterações',g:'Comunicação',s:'Dia a dia',ok:()=>temAcesso('repasse')},
@@ -1112,7 +1173,7 @@ const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
-const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
+const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW);
   $('nav').innerHTML=MODS.filter(m=>itens.some(n=>navGrp(n)===m.g)).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
@@ -1165,7 +1226,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos';
+  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
@@ -1174,7 +1235,7 @@ const SECK='portal_secao';
 function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
-  ['viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1194,10 +1255,12 @@ function openView(){
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos()}
+  else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfremessa'||VIEW==='gfretorno'){$('viewGR').hidden=false;renderGR()}
   else if(RELMODOS[VIEW]){$('viewRel').hidden=false;renderRel()}
+  else if(VIEW==='gfdash'){$('viewDash').hidden=false;renderDash()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gftes'){$('viewGTe').hidden=false;renderGTes()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
@@ -1222,12 +1285,12 @@ async function boot(){
   ACESSOS=eac?(ME.papel==='operador'&&ME.cliente_id?[{cliente_id:ME.cliente_id,modulo:'caixa',nivel:'lancamento'}]:[]):(ac||[]);
   window.V2=!eac;
   const nomes=[...new Set(ACESSOS.map(a=>CLIENTES.find(c=>c.id===a.cliente_id)?.nome).filter(Boolean))];
-  $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
+  $('who').innerHTML=`<b>${esc(ME.nome||ME.email)}</b>${ehAdm()?'Master':ehEsc()?'Escritório':esc(nomes.length>2?nomes.length+' empresas':nomes.join(', '))}`;
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
-  show('app');go((volta||first).k);
-  const novid=()=>{tNovidades();avNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  show('app');go(ehEsc()&&eqPode('gfdash')?'gfdash':(volta||first).k);   // o escritório abre no dashboard da empresa
+  const novid=()=>{tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -2114,11 +2177,12 @@ async function renderCats(){
 }
 $('catImport').onclick=async()=>{
   const linhas=[...new Set($('catCola').value.split(/\r?\n/).map(l=>l.split('\t')[0].trim()).filter(Boolean))];
-  if(!linhas.length){toast('Cole as categorias, uma por linha.');return}
+  if(!linhas.length)return $('catNovaBtn').click();
   const {error}=await sb.from('plano_contas').upsert(linhas.map(c=>({categoria:c})),{onConflict:'categoria',ignoreDuplicates:true});
   if(error){fail(error);return}
   $('catCola').value='';toast(linhas.length+' categorias adicionadas');renderCats();
 };
+$('catNovaBtn').onclick=async()=>{if(await catNova(null,'Despesa'))renderCats()};
 $('formRegra').addEventListener('submit',async e=>{e.preventDefault();
   const palavra=$('rgPalavra').value.trim(),categoria=$('rgCat').value.trim();
   if(!palavra||!categoria){toast('Informe a palavra e a categoria.');return}
@@ -2133,8 +2197,9 @@ $('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr')
 
 // ---------- cadastros ----------
 let USERS=[];
-const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Administração Controlacs (vê tudo)'],['equipe','Operador Controlacs'],['cliente','Cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
+const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a tudo)'],['equipe','Operador Controlacs'],['cliente','Cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
 // tipo do usuário; antes da v33 vem do papel
+// só existe um master; o tipo não aparece como opção para os outros usuários
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
@@ -2142,19 +2207,19 @@ async function renderCadastro(){
     CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   // permissões de cada usuário do cliente: empresa › módulos (nível)
-  const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Tudo, inclusive as tarefas restritas';
+  const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Master: tudo, inclusive Configurações, Plano de contas, regras e tarefas restritas';
       const ms=u.modulos_equipe?NAV.filter(n=>u.modulos_equipe.includes(n.k)).map(n=>n.t):null,es=u.empresas_equipe?.length?u.empresas_equipe.map(id=>CLIENTES.find(c=>c.id===id)?.nome).filter(Boolean):null;
       return `${ms?(ms.length?esc(ms.join(', ')):'Só Tarefas e Avisos'):'Todos os módulos'}${ms&&ms.length?' + Tarefas e Avisos':''}<br><span class="muted">${es?'Empresas: '+esc(es.join(', ')):'Todas as empresas'}</span>${ehAdm()?' <button type="button" class="btn small ghost" data-perm="1">Escolher módulos e empresas</button>':''}`}
     const g={};(acs||[]).filter(a=>a.user_id===u.user_id).forEach(a=>(g[a.cliente_id]||=[]).push(`${MODNOME[a.modulo]||a.modulo} (${a.nivel==='lancamento'?'Lançamento':'Consulta'})`));
     return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Libere no quadro Acessos.</span>'};
   $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th><th></th></tr></thead><tbody>${
     USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
-      <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
+      <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.filter(([v])=>v!=='admin'||tipoUsr(u)==='admin').map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
       <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)}</td>
       <td>${u.user_id===ME.user_id?'':'<button type="button" class="btn small ghost" data-senha="1">Trocar senha</button>'}</td></tr>`).join('')}</tbody>`;
   // novo usuário: a equipe só cadastra clientes e colaboradores
   const adm=ME.tipo==='admin'||ME.admin;
-  $('nuTipo').innerHTML=TIPOSUSR.filter(([v])=>v!=='pendente'&&(adm||v==='cliente'||v==='colaborador')).map(([v,t])=>`<option value="${v}"${v==='cliente'?' selected':''}>${t}</option>`).join('');
+  $('nuTipo').innerHTML=TIPOSUSR.filter(([v])=>v!=='pendente'&&v!=='admin'&&(adm||v==='cliente'||v==='colaborador')).map(([v,t])=>`<option value="${v}"${v==='cliente'?' selected':''}>${t}</option>`).join('');
   if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
@@ -2208,9 +2273,9 @@ const dlgPerm=$('dlgPerm');let PERMU=null;
 function abrirPermissoes(u){
   PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
   const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Gestão financeira':n.g;
-  const grupos=['Rotina diária','Gestão financeira','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k))})).filter(x=>x.itens.length);
+  const grupos=['Rotina diária','Gestão financeira','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k))})).filter(x=>x.itens.length);
   const ck=(n)=>`<label><input type="checkbox" value="${n.k}"${!ms||ms.includes(n.k)?' checked':''}> ${n.t}</label>`;
-  $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe.</p>
+  $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe. <b>Configurações</b>, <b>Plano de contas</b> e as regras das categorias são só do master.</p>
     <div class="pick" id="pmMods" style="max-height:none"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
       ${grupos.map(x=>`<div class="pkg"><div>${x.g} <button type="button" class="btn small ghost" data-pk="grupo">marcar o grupo</button></div><div class="chk">${x.itens.map(ck).join('')}</div></div>`).join('')}</div>
     <div class="f"><span>Empresas</span><div class="vis"><label><input type="radio" name="pm_emp" value="todas"${es?'':' checked'}> Todas as empresas</label><label><input type="radio" name="pm_emp" value="marcadas"${es?' checked':''}> Só as marcadas</label></div></div>
@@ -2220,12 +2285,12 @@ function abrirPermissoes(u){
   dlgPerm.showModal();
 }
 $('pmFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgPerm.close();
-  const todosMods=NAV.filter(n=>!SEMPRE.includes(n.k)).map(n=>n.k),mods=[...$('pmMods').querySelectorAll('input:checked')].map(x=>x.value);
+  const todosMods=NAV.filter(n=>!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k)).map(n=>n.k),mods=[...$('pmMods').querySelectorAll('input:checked')].map(x=>x.value);
   const soEmp=$('pmBody').querySelector('input[name="pm_emp"]:checked').value==='marcadas',emps=[...$('pmEmps').querySelectorAll('input:checked')].map(x=>x.value);
   if(soEmp&&!emps.length){$('pmErr').textContent='Marque pelo menos uma empresa, ou escolha “Todas as empresas”.';$('pmErr').hidden=false;return}
   const r={modulos_equipe:todosMods.every(k=>mods.includes(k))?null:mods,empresas_equipe:soEmp?emps:null};
   b.disabled=true;const {error}=await sb.from('perfis').update(r).eq('user_id',PERMU.user_id);b.disabled=false;
-  if(error){console.error(error);$('pmErr').textContent=/modulos_equipe|empresas_equipe/.test(error.message||'')&&!/administradora/.test(error.message)?'Rode a atualização v37 do banco no Supabase.':error.message||'Não foi possível salvar.';$('pmErr').hidden=false;return}
+  if(error){console.error(error);$('pmErr').textContent=/modulos_equipe|empresas_equipe/.test(error.message||'')&&!/administradora|master/.test(error.message)?'Rode a atualização v37 do banco no Supabase.':error.message||'Não foi possível salvar.';$('pmErr').hidden=false;return}
   toast('Permissões salvas');dlgPerm.close();renderCadastro()});
 $('tbUsr').addEventListener('click',async e=>{const b=e.target.closest('[data-senha]');if(!b)return;
   const u=USERS.find(x=>x.user_id===b.closest('tr').dataset.id);
@@ -2237,7 +2302,7 @@ $('tbUsr').addEventListener('change',async e=>{const id=e.target.closest('tr').d
   // o tipo define também o papel (o banco ajusta o papel e a administração pelo tipo)
   const r=k!=='tipo'?{[k]:v}:v==='pendente'?{tipo:null,papel:'pendente'}:{tipo:v};
   const {error}=await sb.from('perfis').update(r).eq('user_id',id);
-  if(error){console.error(error);toast(/tipo/.test(error.message||'')&&!/administradora/.test(error.message)?'Rode a atualização v33 do banco para guardar o tipo de usuário.':/administradora/.test(error.message||'')?'Só a administradora muda o tipo de usuário.':'Não foi possível salvar. Verifique a internet e tente de novo.');renderCadastro();return}
+  if(error){console.error(error);toast(/tipo/.test(error.message||'')&&!/administradora|master|perfis_um_master/.test(error.message)?'Rode a atualização v33 do banco para guardar o tipo de usuário.':/administradora|master/.test(error.message||'')?'Só o master muda o tipo de usuário.':'Não foi possível salvar. Verifique a internet e tente de novo.');renderCadastro();return}
   toast('Usuário salvo');if(k==='tipo'){DIRUS=null;renderCadastro()}});
 $('formCli').addEventListener('submit',async e=>{e.preventDefault();const nome=$('novoCli').value.trim();if(!nome)return;
   const {error}=await sb.from('clientes').insert({nome});if(error)fail(error,'Não foi possível criar (o nome já existe?)');else{$('novoCli').value='';toast('Empresa criada');renderCadastro()}});
@@ -5256,7 +5321,7 @@ function gtSit(t){const pg=GT.pago[t.id]||0,sd=r2(t.valor-pg);
 }
 function gtVazio(t,cl){$('gtHead').innerHTML='';$('gtFoot').innerHTML='';$('gtTiles').innerHTML='';$('gtBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gtNote').textContent=''}
 const GTMODOS={
-  gfmov:['Movimentação financeira','Contas a pagar e a receber juntas. Ao registrar o pagamento ou o recebimento, o valor entra no extrato da conta.'],
+  gfmov:['Movimentação financeira','Todos os lançamentos da empresa por data: o que foi pago e recebido, as transferências, os lançamentos avulsos e as contas em aberto. Use os filtros para ver só o que precisa.'],
   gfpagar:['Contas a pagar','Tudo o que a empresa tem para pagar. Ao registrar o pagamento, o valor entra no extrato da conta usada.'],
   gfrec:['Contas a receber','Tudo o que a empresa tem para receber. Ao registrar o recebimento, o valor entra no extrato da conta.'],
   gfinad:['Inadimplência','Contas a receber vencidas e ainda não recebidas, por cliente e por tempo de atraso.'],
@@ -5264,20 +5329,23 @@ const GTMODOS={
 async function gtCarrega(tipo,cli){
   const key=tipo+'|'+cli.id;if(key===GT.key)return;
   const tq=()=>{let q=sb.from('fin_titulos').select('*').eq('cliente_id',cli.id);if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
-  const [lista,movs]=await Promise.all([todas(tq),todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).not('titulo_id','is',null).order('data')),gfContasDe(cli.id,true)]);
-  GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;
-  movs.forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
+  const mq=()=>{let q=sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id);if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
+  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),gfContasDe(cli.id,true)]);
+  GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;
+  movs.filter(m=>m.titulo_id).forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
   GT.rem=tipo!=='receber'?await rmItensDe(cli.id):{};
   GT.key=key;
 }
 async function renderGT(){
   const M=VIEW,cli=cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
+  if(M==='gfmov'&&GT.modo!=='gfmov'){$('gtIni').value='';$('gtFim').value='';MV.lim=300}   // a movimentação abre com tudo
   GT.modo=M;
   $('gtTitle').textContent=GTMODOS[M][0];$('gtSub').textContent=GTMODOS[M][1];
   $('gtNovo').textContent=tipo==='receber'?'+ Nova conta a receber':'+ Nova conta a pagar';
   $('gtFiltro').options[2].textContent=tipo==='pagar'?'Pagas':tipo==='receber'?'Recebidas':'Pagas e recebidas';
   const lista=M!=='gfinad'&&M!=='gfagenda';
-  ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
+  ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtFiltroBox').hidden=!lista||M==='gfmov';
+  document.querySelectorAll('.mvf').forEach(x=>x.hidden=M!=='gfmov');(pt=>{if(pt?.classList.contains('per'))pt.firstElementChild.textContent=M==='gfmov'?'Data':'Vencimento'})($('gtIniBox').previousElementSibling);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
   $('gtNovo').hidden=!cli;$('gtNovoR').hidden=!cli||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||M!=='gfpagar';
   if(!cli)return gtVazio('Escolha uma empresa.');
   if(GT.key!==tipo+'|'+cli.id){gtVazio('Carregando…');
@@ -5320,6 +5388,7 @@ function gtDesenha(){
   $('gtCal').hidden=GT.modo!=='gfagenda';
   if(GT.modo==='gfinad')return gtInad();
   if(GT.modo==='gfagenda')return gtAgenda();
+  if(GT.modo==='gfmov')return mvDesenha();
   const P=gtP(),MV=GT.tipo==='mov',f=$('gtFiltro').value,ini=$('gtIni').value,fim=$('gtFim').value,q=chave($('gtBusca').value);
   const rows=GT.lista.filter(t=>{const s=gtSit(t)[2];
     if(f==='aberto'&&s==='baixada'||f==='vencidas'&&s!=='vencida'||f==='baixadas'&&s!=='baixada')return false;
@@ -5348,6 +5417,104 @@ function gtTabela(rows,vazio){
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td></td></tr>`
     :rows.length?`<tr><td></td><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td colspan="4" class="l">A receber ${fm(sv(t=>t.tipo==='receber'?gtFalta(t):0))} · a pagar ${fm(sv(t=>t.tipo==='pagar'?gtFalta(t):0))} em aberto</td></tr>`:'';
 }
+// ---------- Movimentação financeira: todos os lançamentos por data (pedido da Carol, 29/10) ----------
+// Junta o que já entrou ou saiu das contas (fin_movimentos: pagamentos, recebimentos, avulsos, transferências e o
+// histórico) com o que falta pagar ou receber (fin_titulos em aberto, pelo vencimento). Aporte = entrada com
+// categoria de aporte (fica fora da DRE, ver relTp).
+const ehAporte=m=>m.tipo==='entrada'&&!m.transf_id&&/aporte/i.test(m.categoria||'');
+const MV={lim:300,asc:false};
+function mvLinhas(){
+  const out=GT.todos.map(m=>({k:'m',ref:m,id:m.id,data:m.data,tipo:m.tipo,nat:m.transf_id?'transf':ehAporte(m)?'aporte':m.tipo,conta_id:m.conta_id,pessoa:m.pessoa_nome||'',
+    descricao:m.descricao||'',documento:m.documento||'',categoria:m.categoria||'',valor:+m.valor,st:m.ofx_id||m.conciliado?'conciliado':'pago',tit:m.titulo_id}));
+  GT.lista.forEach(t=>{const f=gtFalta(t);if(f<=0.004)return;
+    out.push({k:'t',ref:t,id:t.id,data:t.vencimento,tipo:t.tipo==='pagar'?'saida':'entrada',nat:t.tipo==='pagar'?'saida':'entrada',conta_id:t.conta_id,pessoa:t.pessoa_nome||'',
+      descricao:t.descricao||'',documento:t.documento||'',categoria:t.categoria||'',valor:f,st:t.vencimento<TODAY?'atrasado':'aberto',parc:t.parcelas>1?t.parcela+'/'+t.parcelas:''})});
+  return out;
+}
+function mvOpcoes(L){
+  const ct=$('mvConta'),cc=ct.value,cat=$('mvCat'),ca=cat.value;
+  ct.innerHTML='<option value="">Todas</option>'+(GT.contas||[]).map(c=>`<option value="${c.id}">${esc(c.nome)}${c.ativo===false?' (inativa)':''}</option>`).join('');ct.value=cc;
+  const cats=[...new Set(L.map(x=>x.categoria).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  cat.innerHTML='<option value="">Todas</option><option value="-">Sem categoria</option>'+cats.map(c=>`<option>${esc(c)}</option>`).join('');cat.value=cats.includes(ca)||ca==='-'?ca:'';
+  $('mvPesList').innerHTML=[...new Set(L.map(x=>x.pessoa).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).map(p=>`<option value="${esc(p)}">`).join('');
+}
+function mvFiltra(L){
+  const ct=$('mvConta').value,tp=$('mvTipo').value,pe=chave($('mvPessoa').value),cat=$('mvCat').value,st=$('mvSit').value,ini=$('gtIni').value,fim=$('gtFim').value,q=chave($('gtBusca').value);
+  const vn=parseMoney($('mvVmin').value),vx=parseMoney($('mvVmax').value);
+  return L.filter(x=>{
+    if(ct&&x.conta_id!==ct)return false;
+    if(tp==='transf'||tp==='aporte'?x.nat!==tp:tp&&(x.tipo!==tp||x.nat==='transf'))return false;
+    if(pe&&!chave(x.pessoa).includes(pe))return false;
+    if(cat&&(cat==='-'?x.categoria:x.categoria!==cat))return false;
+    if(st==='revisar'?!x.ref.cat_revisar:st&&!(st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
+    if(ini&&x.data<ini||fim&&x.data>fim)return false;
+    if(vn>0&&x.valor<vn||vx>0&&x.valor>vx)return false;
+    return !q||chave([x.pessoa,x.descricao,x.documento,x.categoria].join(' ')).includes(q)});
+}
+const MVST={aberto:['c-none','Em aberto'],atrasado:['c-bad','Atrasado'],conciliado:['c-done','✓ Conciliado']};
+const mvSt=x=>MVST[x.st]||['c-done',x.tipo==='entrada'?'Recebido':'Pago'];
+const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tipo==='entrada'?'Entrada':'Saída';
+function mvDesenha(){
+  const L=mvLinhas();mvOpcoes(L);
+  const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*(a.data.localeCompare(b.data)||(a.k==='t')-(b.k==='t')));
+  const cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
+  $('gtHead').innerHTML=`<tr><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);return `<tr class="click" data-mv="${x.k}:${x.id}" tabindex="0"><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
+    +(rows.length>MV.lim?`<tr><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
+    ||`<tr><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
+  const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
+  $('gtFoot').innerHTML=rows.length?`<tr><td></td><td class="l" colspan="5">${rows.length} ${rows.length===1?'lançamento':'lançamentos'}</td><td class="pos">${fm(sv(x=>x.tipo==='entrada'))}</td><td class="neg">${fm(sv(x=>x.tipo==='saida'))}</td><td></td></tr>`:'';
+  const tl=(tp,k)=>rows.filter(x=>x.tipo===tp&&(k==='t'?x.k==='t':x.k==='m'&&fora(x))),atr=tp=>tl(tp,'t').filter(x=>x.st==='atrasado').length;
+  const til=(n,tp,k,cl)=>{const l=tl(tp,k),a=k==='t'?atr(tp):0;return [n,fm(r2(l.reduce((s,x)=>s+x.valor,0))),(a?a+(a===1?' atrasado · ':' atrasados · '):'')+qt(l),a?'neg':cl]};
+  $('gtTiles').innerHTML=[til('Recebido','entrada','m','pos'),til('Pago','saida','m','neg'),til('A receber em aberto','entrada','t',''),til('A pagar em aberto','saida','t','')]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('gtNote').textContent='As contas em aberto aparecem na data do vencimento, com o valor que falta. Recebido e pago não contam as transferências entre contas (a não ser com uma conta escolhida). Clique num lançamento para ver ou corrigir; clique em “Data” para inverter a ordem.';
+  GT.mvRows=rows;
+  const troca=rows.filter(x=>x.nat!=='transf');$('mvTroca').hidden=!troca.length||!($('mvSit').value==='revisar'||$('mvCat').value);
+  if(!$('mvTroca').hidden)$('mvTroca').textContent=`Trocar a categoria ${troca.length===1?'do lançamento filtrado':`dos ${troca.length} filtrados`}`;
+}
+// troca a categoria de todos os lançamentos filtrados de uma vez (ex.: os "Revisar categoria" de devolução)
+$('mvTroca').onclick=async()=>{
+  const cli=cliAtual(),rows=(GT.mvRows||[]).filter(x=>x.nat!=='transf');if(!cli||!rows.length)return;
+  let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
+  const at=plano.filter(c=>c.ativo!==false),ent=rows.filter(x=>x.tipo==='entrada').length;
+  const op=tp=>at.filter(c=>(c.tipo||'Despesa')===tp).map(c=>`<option>${esc(c.categoria)}</option>`).join('');
+  const de=[...new Set(rows.map(x=>x.categoria||'Sem categoria'))];
+  $('gtdTitle').textContent='Trocar a categoria';$('gtdChip').innerHTML='';
+  $('gtdBody').innerHTML=`<div class="fields"><label class="f wide">Nova categoria *<select id="mv_cat" data-catnova="Receita"><option value=""></option><optgroup label="Receitas">${op('Receita')}</optgroup><optgroup label="Despesas">${op('Despesa')}</optgroup>${catNovaOpt}</select></label></div>
+    <p class="note" style="margin:0">${rows.length} ${rows.length===1?'lançamento':'lançamentos'} (${ent} ${ent===1?'entrada':'entradas'} e ${rows.length-ent} ${rows.length-ent===1?'saída':'saídas'}) hoje em: ${de.map(esc).join(', ')}. A mesma categoria vale para entrada e saída: o estorno de uma venda vai na categoria da venda e abate a receita.</p><p class="err" id="gtErr" hidden></p>`;
+  $('gtdFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="mv_troca">Trocar</button>';
+  dlgGT.showModal();
+};
+async function mvTrocar(){
+  const cat=$('mv_cat').value;if(!cat||cat===CATNOVA)return gtErr('Escolha a nova categoria.');
+  const rows=(GT.mvRows||[]).filter(x=>x.nat!=='transf'),rev=rows.some(x=>x.ref.cat_revisar),upd=rev?{categoria:cat,cat_revisar:false}:{categoria:cat};
+  const mids=rows.filter(x=>x.k==='m').map(x=>x.id),tids=[...new Set([...rows.filter(x=>x.k==='t').map(x=>x.id),...rows.filter(x=>x.k==='m'&&x.tit&&rows.some(y=>y.k==='t'&&y.id===x.tit)).map(x=>x.tit)])];
+  if(!confirm(`Trocar a categoria de ${rows.length} ${rows.length===1?'lançamento':'lançamentos'} para “${cat}”?`))return;
+  try{for(let i=0;i<mids.length;i+=200){const {error}=await sb.from('fin_movimentos').update(upd).in('id',mids.slice(i,i+200));if(error)throw error}
+    for(let i=0;i<tids.length;i+=200){const {error}=await sb.from('fin_titulos').update(upd).in('id',tids.slice(i,i+200));if(error)throw error}}
+  catch(e){console.error(e);return gtErr(e.message||'Não foi possível trocar.')}
+  toast('Categoria trocada');dlgGT.close();GT.key='';renderGT();
+}
+function mvAbre(tr){
+  const [k,id]=tr.dataset.mv.split(':');
+  if(k==='t')return abrirGT(GT.lista.find(t=>t.id===id));
+  const m=GT.todos.find(x=>x.id===id);if(!m)return;
+  if(m.titulo_id){const t=GT.lista.find(x=>x.id===m.titulo_id);if(t)return abrirGT(t)}
+  GX.conta=(GT.contas||[]).find(c=>c.id===m.conta_id)||CGRUPO.find(c=>c.id===m.conta_id)||{id:m.conta_id,nome:contaNome(m.conta_id)||'Conta'};abrirAvulso(m);
+}
+['mvConta','mvTipo','mvCat','mvSit'].forEach(id=>$(id).onchange=()=>{MV.lim=300;gtDesenha()});
+['mvPessoa','mvVmin','mvVmax'].forEach(id=>$(id).oninput=()=>{MV.lim=300;clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,250)});
+$('gtHead').addEventListener('click',e=>{if(e.target.id==='mvOrd'){MV.asc=!MV.asc;gtDesenha()}});
+$('mvLimpa').onclick=()=>{['mvConta','mvTipo','mvCat','mvSit','mvPessoa','mvVmin','mvVmax','gtIni','gtFim','gtBusca'].forEach(id=>$(id).value='');MV.lim=300;gtDesenha()};
+$('mvXls').onclick=()=>{
+  const cli=cliAtual(),rows=GT.mvRows||[],cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'';
+  const aoa=[[`Movimentação financeira · ${cli?.nome||''}`],[],['Data','Tipo','Conta','Fornecedor ou cliente','Descrição','Categoria','Documento','Entrada','Saída','Situação']];
+  rows.forEach(x=>aoa.push([dBR(x.data),mvNat(x),cn(x.conta_id),x.pessoa,x.descricao,x.categoria,x.documento,x.tipo==='entrada'?x.valor:'',x.tipo==='saida'?x.valor:'',mvSt(x)[1].replace('✓ ','')]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:11},{wch:14},{wch:26},{wch:30},{wch:40},{wch:26},{wch:14},{wch:14},{wch:14},{wch:14}];
+  for(let r=3;r<aoa.length;r++)for(const col of [7,8]){const c=ws[XLSX.utils.encode_cell({r,c:col})];if(c&&c.t==='n')c.z='#,##0.00'}
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Movimentação');XLSX.writeFile(wb,`Movimentação ${cli?.nome||''}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
+};
 // inadimplência: contas a receber vencidas, agrupadas por cliente
 function gtInad(){
   const q=chave($('gtBusca').value),dias=t=>Math.round((dObj(TODAY)-dObj(t.vencimento))/864e5),mu=t=>`<span class="muted">${t}</span>`;
@@ -5386,8 +5553,9 @@ $('gtMes').onchange=gtDesenha;
 // pagas ou todas: sem período escolhido, mostra o mês atual
 $('gtFiltro').onchange=()=>{const f=$('gtFiltro').value;if((f==='baixadas'||f==='todas')&&!$('gtIni').value&&!$('gtFim').value){$('gtIni').value=TODAY.slice(0,8)+'01';$('gtFim').value=fimMes(TODAY)}gtDesenha()};
 $('gtIni').onchange=gtDesenha;$('gtFim').onchange=gtDesenha;$('gtBusca').oninput=()=>{clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,200)};
-$('gtBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)abrirGT(GT.lista.find(t=>t.id===tr.dataset.id))});
-$('gtBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirGT(GT.lista.find(t=>t.id===tr.dataset.id))}});
+const gtAbre=tr=>tr.dataset.mv?mvAbre(tr):abrirGT(GT.lista.find(t=>t.id===tr.dataset.id));
+$('gtBody').addEventListener('click',e=>{if(e.target.id==='mvMais'){MV.lim+=300;return gtDesenha()}const tr=e.target.closest('tr.click');if(tr)gtAbre(tr)});
+$('gtBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gtAbre(tr)}});
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
 $('gtRem').onclick=()=>go('gfremessa');
@@ -5398,8 +5566,10 @@ async function abrirGT(t,tipo){
   let plano=[];try{[pes,contas,plano]=await Promise.all([gfPessoasDe(cli.id,P?'fornecedor':'cliente'),gfContasDe(cli.id),planoDe(cli)])}catch(e){console.error(e)}
   const v=k=>esc(t?.[k]??''),mu=x=>`<span class="muted">${x}</span>`;
   const opt=(ls,cur,vazio)=>`<option value="">${vazio||''}</option>`+ls.map(o=>{const [val,txt]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${cur===val?' selected':''}>${esc(txt)}</option>`}).join('');
-  const doTipo=plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')===(P?'Despesa':'Receita'));
-  const cats=(doTipo.length?doTipo:plano.filter(c=>c.ativo!==false)).map(c=>c.categoria);if(t?.categoria&&!cats.includes(t.categoria))cats.unshift(t.categoria);
+  // a categoria vale para entrada e saída (como uma conta contábil): o estorno usa a mesma categoria da venda.
+  // As do tipo da conta (despesa para pagar, receita para receber) vêm primeiro.
+  const tp=P?'Despesa':'Receita',ativ=plano.filter(c=>c.ativo!==false);
+  const cats=[...ativ.filter(c=>(c.tipo||'Despesa')===tp),...ativ.filter(c=>(c.tipo||'Despesa')!==tp)].map(c=>c.categoria);if(t?.categoria&&!cats.includes(t.categoria))cats.unshift(t.categoria);
   const ativas=contas.filter(c=>c.ativo!==false||c.id===t?.conta_id).map(c=>[c.id,c.nome]);
   const movs=t?GT.movs[t.id]||[]:[],pago=t?GT.pago[t.id]||0:0,falta=t?Math.max(0,r2(t.valor-pago)):0;
   $('gtdTitle').textContent=t?(t.pessoa_nome||(P?'Conta a pagar':'Conta a receber')):(P?'Nova conta a pagar':'Nova conta a receber')+' · '+cli.nome;
@@ -5462,6 +5632,7 @@ async function gtAcao(a,b){
   if(a.startsWith('te_'))return gteAcao(a);
   if(a.startsWith('rm_'))return rmAcao(a,b);
   if(a.startsWith('ct_'))return ftAcao(a,b);
+  if(a==='mv_troca')return mvTrocar();
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=dP(),cli=cliAtual(),t=GTR;
   if(a==='salvar'){
@@ -5476,7 +5647,11 @@ async function gtAcao(a,b){
     if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
     let error;
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
-      ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id))}
+      const rev=t.cat_revisar||(GT.movs[t.id]||[]).some(m=>m.cat_revisar);if(rev)row.cat_revisar=false;
+      ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id));
+      // a categoria corrigida vale também para os pagamentos já feitos (é deles que saem os relatórios)
+      if(!error&&(row.categoria!==t.categoria||rev)){const q=sb.from('fin_movimentos').update(rev?{categoria:row.categoria,cat_revisar:false}:{categoria:row.categoria}).eq('titulo_id',t.id);
+        ({error}=await (t.categoria?q.eq('categoria',t.categoria):q.is('categoria',null)))}}
     else{
       const n=Math.max(1,Math.min(120,parseInt($('gt_parcelas').value)||1)),tot=$('gt_vparc').value==='total';
       const base=tot?Math.floor(valor/n*100)/100:valor,grupo=n>1?crypto.randomUUID():null;
@@ -5766,6 +5941,15 @@ const relSemTr=m=>!m.transf_id;   // fora as transferências entre contas
 const mesesEntre=(a,b)=>{const out=[];let [y,m]=a.split('-').map(Number);const [y2,m2]=b.split('-').map(Number);while(y<y2||y===y2&&m<=m2){out.push(`${y}-${String(m).padStart(2,'0')}`);if(++m>12){m=1;y++}}return out};
 const mesCurto=ym=>MESES[+ym.slice(5)-1].slice(0,3)+'/'+ym.slice(2,4);
 const cvl=(v,cl)=>`<td data-v="${r2(v)}" class="${cl||''}">${fm(r2(v))}</td>`;
+// os dados de todos os relatórios e do dashboard: lançamentos, contas a pagar e receber, contas e faturas da empresa
+async function relCarrega(cli){
+  const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
+  REL.plano=await planoDe(cli);REL.nat=Object.fromEntries(REL.plano.filter(c=>c.tipo).map(c=>[c.categoria,c.tipo]));
+  REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
+  REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
+  REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
+  movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
+}
 async function renderRel(){
   const M=VIEW,cli=cliAtual();
   $('relTitle').textContent=RELMODOS[M][0];$('relSub').textContent=RELMODOS[M][1];
@@ -5778,12 +5962,7 @@ async function renderRel(){
   if(!cli)return vazio('Escolha uma empresa.');
   vazio('Carregando…');
   try{
-    const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
-    REL.plano=await planoDe(cli);
-    REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
-    REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
-    REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
-    movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
+    await relCarrega(cli);
     if(M==='gforc'){const {data,error}=await sb.from('fin_orcamento').select('*').eq('cliente_id',cli.id);if(error)throw error;REL.orc=data||[]}
   }catch(e){console.error(e);return vazio(e&&/fin_orcamento/.test(e.message||'')||e?.code==='42P01'&&M==='gforc'?'A previsão orçamentária precisa da atualização v50 do banco. Rode o SQL no Supabase.':v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(VIEW!==M||cliAtual()?.id!==cli.id)return;
@@ -5791,8 +5970,12 @@ async function renderRel(){
 }
 ['relIni','relFim','relSem','relBase'].forEach(id=>$(id).onchange=renderRel);
 // no cartão, a compra é despesa e o estorno abate a despesa; transferências ficam fora
-const relTp=m=>!relSemTr(m)?null:REL.cart.has(m.conta_id)?'saida':m.tipo;
-const relVl=m=>REL.cart.has(m.conta_id)&&m.tipo==='entrada'?-m.valor:+m.valor;
+// A categoria funciona como uma conta contábil (pedido da Carol, 29/10): ela é de receita ou de despesa
+// (o tipo no plano de contas) e recebe lançamentos dos dois lados. Na receita, a entrada soma e a saída
+// (estorno, devolução) abate; na despesa, o contrário. Sem categoria (ou fora do plano), vale o lado do
+// lançamento; no cartão, sem categoria, tudo é despesa. Transferências e aportes ficam fora.
+const relTp=m=>{if(!relSemTr(m)||ehAporte(m))return null;const n=REL.nat?.[m.categoria];return n?(n==='Receita'?'entrada':'saida'):REL.cart.has(m.conta_id)?'saida':m.tipo};
+const relVl=m=>{const tp=relTp(m),lado=REL.cart.has(m.conta_id)&&!REL.nat?.[m.categoria]?'saida':m.tipo;return tp&&lado!==tp?-m.valor:+m.valor};
 // para o caixa: só as contas bancárias; o pagamento da fatura (transferência para o cartão) é saída de caixa
 const relCaixa=m=>!REL.cart.has(m.conta_id)&&(!m.transf_id||REL.trCart.has(m.transf_id));
 const relFalta=t=>Math.max(0,r2(t.valor-(REL.pago[t.id]||0)));
@@ -5816,6 +5999,86 @@ function relResumo(){
   $('relFoot').innerHTML='';
   $('relNote').textContent='O saldo de cada conta é o saldo inicial do cadastro mais as entradas e saídas lançadas. Confira com o extrato do banco na Conciliação bancária.'+(cts.length?' O cartão não entra no total: o gasto dele vira conta a pagar quando a fatura é fechada.':'');
 }
+// ---------- Dashboard da empresa (tela inicial do escritório) ----------
+// Resumo de tudo: saldos, a pagar e a receber, resultado, cartão, entradas × saídas dos últimos 12 meses,
+// despesas do mês por categoria, próximos vencimentos e pendências (cada uma leva para a tela onde se resolve).
+// Por enquanto só o escritório vê; depois a Carol escolhe o que o cliente vai ver.
+async function renderDash(){
+  const cli=cliAtual(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
+  $('dsTitle').textContent=cli?'Dashboard · '+cli.nome:'Dashboard';$('dsSub').textContent=cli?'Resumo da empresa hoje, '+dBR(TODAY)+'.':'';
+  if(!cli){g.innerHTML='<p class="muted">Escolha uma empresa.</p>';return}
+  g.innerHTML='<p class="muted">Carregando…</p>';
+  try{await relCarrega(cli)}catch(e){console.error(e);g.innerHTML=`<p class="neg">${v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
+  if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
+  dsDesenha(cli);
+}
+$('dsAtual').onclick=renderDash;
+const DS={pm:[]};
+// gráfico de barras desenhado na largura real do quadro (o texto fica do mesmo tamanho no celular e no computador)
+function dsGraf(){
+  const box=$('dsChart');if(!box||!DS.pm.length)return;const pm=DS.pm,mx=Math.max(1,...pm.flatMap(x=>[x.e,x.s])),W=Math.max(280,box.clientWidth),H=W<500?180:240,top=12,bot=28,ch=H-top-bot,bw=W/12,bar=Math.max(3,Math.min(16,(bw-8)/2));
+  const nice=v=>{const p=10**Math.floor(Math.log10(v)),n=v/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p},yt=nice(mx/3),yM=Math.max(yt*3,Math.ceil(mx/yt)*yt),y=v=>top+ch-(v/yM)*ch;
+  const cm=v=>v>=1e6?(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mi':v>=1e3?(v/1e3).toLocaleString('pt-BR',{maximumFractionDigits:0})+' mil':String(Math.round(v));
+  const rb=(x,v,cl)=>{const h=Math.max(0,top+ch-y(v));if(h<0.5)return '';const r=Math.min(4,h);return `<path fill="var(${cl})" d="M${x},${top+ch}V${top+ch-h+r}q0,-${r} ${r},-${r}h${bar-2*r}q${r},0 ${r},${r}V${top+ch}Z"/>`};
+  const svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Entradas e saídas dos últimos 12 meses">
+    ${[...Array(Math.round(yM/yt)+1).keys()].map(i=>`<line x1="0" x2="${W}" y1="${y(i*yt)}" y2="${y(i*yt)}" stroke="var(--line)" stroke-width="1"${i?' stroke-dasharray="2 4"':''}/><text x="0" y="${y(i*yt)-3}">${i?cm(i*yt):''}</text>`).join('')}
+    ${pm.map((x,i)=>{const cx=i*bw+bw/2;return `<g data-i="${i}">${rb(cx-bar-1,x.e,'--s1')}${rb(cx+1,x.s,'--s2')}<rect x="${i*bw}" y="${top}" width="${bw}" height="${ch+bot}" fill="transparent"/><text x="${cx}" y="${H-8}" text-anchor="middle">${MESES[+x.k.slice(5)-1].slice(0,3)}${(x.k.slice(5)==='01'||i===0)&&W>=500?'/'+x.k.slice(2,4):''}</text></g>`}).join('')}</svg>`;
+  box.querySelector('svg')?.remove();box.insertAdjacentHTML('afterbegin',svg);
+}
+window.addEventListener('resize',()=>{if(VIEW==='gfdash'){clearTimeout(dsGraf.t);dsGraf.t=setTimeout(dsGraf,150)}});
+function dsDesenha(cli){
+  const mu=t=>`<span class="muted">${t}</span>`,som=l=>r2(l.reduce((x,t)=>x+relFalta(t),0)),mes=TODAY.slice(0,7),qt=(n,a,b)=>n+' '+(n===1?a:b);
+  const cs=REL.contas.filter(c=>c.ativo!==false&&!ehCartao(c)),sal=cs.map(c=>[c,saldoConta(c,TODAY)]),tot=r2(sal.reduce((x,s)=>x+s[1],0));
+  const cts=REL.contas.filter(c=>c.ativo!==false&&ehCartao(c)).map(c=>[c,r2(-saldoConta(c,TODAY))]),cart=r2(cts.reduce((x,c)=>x+c[1],0));
+  const ab=REL.tits.filter(t=>relFalta(t)>0.004),ar=ab.filter(t=>t.tipo==='receber'),ap=ab.filter(t=>t.tipo==='pagar');
+  const arV=ar.filter(t=>t.vencimento<TODAY),apV=ap.filter(t=>t.vencimento<TODAY);
+  const mm=REL.movs.filter(m=>m.data.startsWith(mes)),ent=r2(mm.filter(m=>relTp(m)==='entrada').reduce((x,m)=>x+relVl(m),0)),sai=r2(mm.filter(m=>relTp(m)==='saida').reduce((x,m)=>x+relVl(m),0));
+  $('dsTiles').innerHTML=tileH([
+    ['Saldo nas contas',fm(tot),'hoje, '+qt(cs.length,'conta','contas'),tot<0?'neg':''],
+    ['A receber em aberto',fm(som(ar)),arV.length?'vencido: '+fm(som(arV)):'nada vencido',arV.length?'neg':''],
+    ['A pagar em aberto',fm(som(ap)),apV.length?'vencido: '+fm(som(apV)):'nada vencido',apV.length?'neg':''],
+    ['Resultado do mês',fm(r2(ent-sai)),MESES[+mes.slice(5)-1]+': receitas menos despesas',ent-sai<0?'neg':'pos'],
+    ...(cts.length?[['Cartão de crédito',fm(cart),'gasto ainda não pago','']]:[])]);
+  // entradas × saídas por mês (regime de caixa, sem transferências e aportes), últimos 12 meses
+  const ms=[...Array(12).keys()].map(i=>somaMes(mes+'-01',i-11).slice(0,7));
+  const pm=ms.map(k=>{const l=REL.movs.filter(m=>m.data.startsWith(k));return {k,e:r2(l.filter(m=>relTp(m)==='entrada').reduce((x,m)=>x+relVl(m),0)),s:r2(l.filter(m=>relTp(m)==='saida').reduce((x,m)=>x+relVl(m),0))}});
+  DS.pm=pm;
+  // despesas do mês por categoria (as 6 maiores e "Outras")
+  const dc={};mm.filter(m=>relTp(m)==='saida').forEach(m=>{const k=m.categoria||'Sem categoria';dc[k]=r2((dc[k]||0)+relVl(m))});
+  let cats=Object.entries(dc).sort((a,b)=>b[1]-a[1]);if(cats.length>7)cats=[...cats.slice(0,6),['Outras',r2(cats.slice(6).reduce((x,c)=>x+c[1],0))]];
+  const cmx=Math.max(1,...cats.map(c=>c[1]));
+  const catH=cats.map(([k,v])=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;align-items:center;font-size:13.5px;padding:3px 0"><div><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</div><div style="height:8px;border-radius:0 4px 4px 0;background:var(--s2);width:${Math.max(1,v/cmx*100)}%"></div></div><div style="text-align:right">${fm(v)} ${mu(sai?Math.round(v/sai*100)+'%':'')}</div></div>`).join('')||`<p class="muted" style="margin:0">Nenhuma despesa lançada em ${MESES[+mes.slice(5)-1].toLowerCase()}.</p>`;
+  // próximos vencimentos (7 dias, com os vencidos)
+  const em7=addDias(TODAY,7),prox=ab.filter(t=>t.vencimento<=em7).sort((a,b)=>a.vencimento.localeCompare(b.vencimento)),pv=prox.slice(0,8);
+  const proxH=pv.map(t=>`<button type="button" class="dr" data-go="${t.tipo==='pagar'?'gfpagar':'gfrec'}"><span><span class="${t.vencimento<TODAY?'neg':''}">${dBR(t.vencimento)}</span> · <b>${esc(t.pessoa_nome||'—')}</b> ${mu(t.tipo==='pagar'?'a pagar':'a receber')}</span><span class="${t.tipo==='pagar'?'neg':'pos'}">${fm(relFalta(t))}</span></button>`).join('')
+    +(prox.length>pv.length?`<button type="button" class="dr" data-go="gfagenda">${mu('Mais '+(prox.length-pv.length)+' na agenda financeira')}<span>›</span></button>`:'')||'<p class="muted" style="margin:0">Nada vence nos próximos 7 dias.</p>';
+  // pendências
+  const d90=addDias(TODAY,-90),d10=addDias(TODAY,10);
+  const semCat=REL.movs.filter(m=>!m.transf_id&&!m.categoria&&m.data>=d90).length;
+  const naoConc=REL.movs.filter(m=>!REL.cart.has(m.conta_id)&&!m.ofx_id&&!m.conciliado&&m.data>=addDias(TODAY,-30)&&m.data<=TODAY).length;
+  const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length,catRev=REL.movs.filter(m=>m.cat_revisar).length+REL.tits.filter(t=>t.cat_revisar&&relFalta(t)>0.004).length;
+  const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
+  const pend=[[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
+    [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
+    [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
+  const pendH=pend.map(p=>`<button type="button" class="dr" data-go="${p[2]}"><span>${esc(p[1])}</span><span class="chip c-warn">Ver ›</span></button>`).join('')||'<p class="pos" style="margin:0">✓ Nenhuma pendência.</p>';
+  const salH=sal.map(([c,v])=>`<div class="dr"><span>${esc(c.nome)} ${mu(esc(c.tipo||''))}</span><span class="${v<0?'neg':''}">${fm(v)}</span></div>`).join('')
+    +(sal.length?`<div class="dr"><b>Total</b><b class="${tot<0?'neg':''}">${fm(tot)}</b></div>`:'<p class="muted" style="margin:0">Nenhuma conta cadastrada.</p>')
+    +cts.map(([c,v])=>`<div class="dr"><span>${esc(c.nome)} ${mu('gasto não pago')}</span><span>${fm(v)}</span></div>`).join('');
+  $('dsGrid').innerHTML=`<div class="card" style="grid-column:1/-1"><h2>Entradas e saídas dos últimos 12 meses</h2><div class="dleg"><span><i style="background:var(--s1)"></i>Entradas</span><span><i style="background:var(--s2)"></i>Saídas</span></div><div class="dchart" id="dsChart"><div class="dtip" hidden></div></div></div>
+    <div class="card"><h2>Pendências</h2><div class="dl">${pendH}</div></div>
+    <div class="card"><h2>Próximos 7 dias ${mu('(com os vencidos)')}</h2><div class="dl">${proxH}</div></div>
+    <div class="card"><h2>Despesas de ${MESES[+mes.slice(5)-1].toLowerCase()} por categoria</h2>${catH}</div>
+    <div class="card"><h2>Saldo das contas</h2><div class="dl">${salH}</div></div>`;
+  dsGraf();
+  const box=$('dsChart'),tip=box.querySelector('.dtip');
+  box.onmousemove=e=>{const gi=e.target.closest('g[data-i]');if(!gi){tip.hidden=true;return}const x=DS.pm[+gi.dataset.i],r=box.getBoundingClientRect();
+    tip.innerHTML=`<b>${MESES[+x.k.slice(5)-1]}/${x.k.slice(0,4)}</b><br>Entradas ${fm(x.e)}<br>Saídas ${fm(x.s)}<br>Resultado ${fm(r2(x.e-x.s))}`;tip.hidden=false;
+    tip.style.left=Math.min(Math.max(e.clientX-r.left,70),r.width-70)+'px';tip.style.top=(e.clientY-r.top-10)+'px'};
+  box.onmouseleave=()=>tip.hidden=true;
+  $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas. Por enquanto só o escritório vê este painel.';
+}
+$('dsGrid').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;const [v,sit]=b.dataset.go.split(':');if(sit)$('mvSit').value=sit;go(v)});
 function relFluxo(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return $('relBody').innerHTML='<tr><td class="l muted">Escolha o período.</td></tr>';
   const dia=dObj(fim)-dObj(ini)<=62*864e5,bk=d=>dia?d:d.slice(0,7);
@@ -6122,19 +6385,36 @@ async function planoDe(cli){
 }
 // Cadastrar categoria sem sair do lançamento (pedido da Carol, 29/10): a última opção de cada lista de categorias
 // abre o cadastro; a categoria entra no plano próprio da empresa ou no plano padrão e já fica escolhida.
+// Grupos do plano de contas com o prefixo do código (2.4 · DESPESAS VARIÁVEIS) e o próximo código de cada um:
+// a nova categoria escolhe o grupo e recebe o código na sequência (pedido da Carol, 29/10), para o plano não virar bagunça.
+function gruposDe(plano){
+  const g={};plano.forEach(c=>{if(!c.grupo)return;const x=g[c.grupo]||={grupo:c.grupo,pref:{},tipo:{},max:{}};
+    const m=/^(\d+\.\d+)\.(\d+)$/.exec(c.codigo||'');if(m){x.pref[m[1]]=(x.pref[m[1]]||0)+1;x.max[m[1]]=Math.max(x.max[m[1]]||0,+m[2])}
+    x.tipo[c.tipo||'Despesa']=(x.tipo[c.tipo||'Despesa']||0)+1});
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  return Object.values(g).map(x=>{const pf=top(x.pref);return {grupo:x.grupo,pref:pf||'',tipo:top(x.tipo)||'Despesa',prox:pf?`${pf}.${String((x.max[pf]||0)+1).padStart(2,'0')}`:null}})
+    .sort((a,b)=>(a.pref||'9').localeCompare(b.pref||'9',undefined,{numeric:true})||a.grupo.localeCompare(b.grupo));
+}
+const grupoOpts=(gs,tipo)=>'<option value="">Escolha o grupo</option>'+['Receita','Despesa'].map(tp=>{const l=gs.filter(g=>g.tipo===tp);return l.length?`<optgroup label="${tp==='Receita'?'Receitas':'Despesas'}">${l.map(g=>`<option value="${esc(g.grupo)}">${esc((g.pref?g.pref+' · ':'')+g.grupo)}</option>`).join('')}</optgroup>`:''}).join('');
 const CATNOVA='__nova__',catNovaOpt='<option value="__nova__">+ Cadastrar nova categoria…</option>';
 function catNova(cli,tipo,nome){
   return new Promise(res=>{
     const d=$('dlgCatNova');$('cn_nome').value=nome||'';$('cn_codigo').value='';$('cn_tipo').value=tipo==='Receita'?'Receita':'Despesa';$('cnErr').hidden=true;
+    let gs=[];$('cn_grupo').innerHTML='<option value="">Carregando…</option>';
+    planoDe(cli).then(pl=>{gs=gruposDe(pl);$('cn_grupo').innerHTML=grupoOpts(gs);$('cn_grupo').closest('label').hidden=!gs.length;$('cn_tipo').disabled=!!gs.length;$('cn_codigo').readOnly=!!gs.length;$('cn_codigo').placeholder=gs.length?'escolha o grupo':'opcional'}).catch(console.error);
+    $('cn_grupo').onchange=()=>{const g=gs.find(x=>x.grupo===$('cn_grupo').value);$('cn_codigo').value=g?.prox||'';if(g)$('cn_tipo').value=g.tipo};
     $('cnNota').textContent=cli?.plano_proprio?`Entra no plano de contas próprio de ${cli.nome}.`:'Entra no plano de contas padrão, que vale para todas as empresas sem plano próprio.';
     let feito=null;
     const fim=()=>{d.removeEventListener('close',fim);res(feito)};d.addEventListener('close',fim);
     $('cnClose').onclick=()=>d.close();
     $('cnForm').onsubmit=async e=>{e.preventDefault();
       const err=t=>{$('cnErr').textContent=t;$('cnErr').hidden=false};
-      const categoria=$('cn_nome').value.trim().replace(/\s+/g,' '),row={categoria,tipo:$('cn_tipo').value,codigo:$('cn_codigo').value.trim()||null};
+      const categoria=$('cn_nome').value.trim().replace(/\s+/g,' ');
       if(!categoria)return err('Informe o nome da categoria.');
       let plano=[];try{plano=await planoDe(cli)}catch(x){console.error(x)}
+      const gs2=gruposDe(plano),g=gs2.find(x=>x.grupo===$('cn_grupo').value);
+      if(gs2.length&&!g)return err('Escolha o grupo da categoria.');
+      const row={categoria,tipo:g?.tipo||$('cn_tipo').value,codigo:g?g.prox:$('cn_codigo').value.trim()||null,...(g?{grupo:g.grupo}:{})};   // o código é recalculado na hora de salvar
       const ja=plano.find(c=>chave(c.categoria)===chave(categoria));
       if(ja&&ja.ativo!==false){feito=ja.categoria;toast('Essa categoria já existe e foi escolhida');return d.close()}
       $('cnSave').disabled=true;
@@ -6164,6 +6444,8 @@ document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-ca
   if(nova&&inp){inp.value=nova;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))}});
 const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
 function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
+let PC_GS=[];
+$('pcGrupo').onchange=()=>{const g=PC_GS.find(x=>x.grupo===$('pcGrupo').value);$('pcCod').value=g?.prox||'';if(g)$('pcTipo').value=g.tipo};
 async function renderPC(){
   const cli=cliAtual();$('pcModo').hidden=$('pcForm').hidden=$('pcXls').hidden=true;
   if(!cli){$('pcSub').textContent='';return pcVazio('Escolha uma empresa.')}
@@ -6174,6 +6456,8 @@ async function renderPC(){
   let ls;try{delete PLANOS[cli.id];ls=await planoDe(cli)}catch(e){console.error(e);return pcVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(cliAtual()?.id!==cli.id||VIEW!=='gfplano')return;
   $('pcForm').hidden=false;$('pcXls').hidden=!ls.length;
+  const gs=gruposDe(ls),gv=$('pcGrupo').value;PC_GS=gs;$('pcGrupo').innerHTML=grupoOpts(gs);if(gs.some(g=>g.grupo===gv))$('pcGrupo').value=gv;
+  $('pcTipo').disabled=$('pcCod').readOnly=!!gs.length;$('pcCod').placeholder=gs.length?'automático':'Ex.: 2.1.05';$('pcGrupo').onchange();
   const f=$('pcFiltro').value,q=chave($('pcBusca').value);
   const rows=ordPlano(ls).filter(p=>(f==='todos'||(f==='ativos')===(p.ativo!==false))&&(!q||chave((p.codigo||'')+' '+p.categoria+' '+(p.grupo||'')).includes(q)));
   // o padrão vale para todas as empresas que não têm plano próprio; o próprio só para esta
@@ -6198,10 +6482,11 @@ $('pcModo').addEventListener('change',async e=>{
   renderPC();
 });
 $('pcForm').addEventListener('submit',async e=>{e.preventDefault();
-  const cli=cliAtual(),cat=$('pcCat').value.trim(),cod=$('pcCod').value.trim()||null,pr=!!cli?.plano_proprio;if(!cli||!cat)return toast('Digite o nome da categoria.');
-  if((await planoDe(cli)).some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
-  const {error}=pr?await sb.from('fin_plano').insert({cliente_id:cli.id,codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true})
-    :await sb.from('plano_contas').insert({codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true});
+  const cli=cliAtual(),cat=$('pcCat').value.trim().replace(/\s+/g,' '),pr=!!cli?.plano_proprio;if(!cli||!cat)return toast('Digite o nome da categoria.');
+  const pl=await planoDe(cli);if(pl.some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
+  const gs=gruposDe(pl),g=gs.find(x=>x.grupo===$('pcGrupo').value);if(gs.length&&!g)return toast('Escolha o grupo da categoria.');
+  const row={codigo:g?.prox||(gs.length?null:$('pcCod').value.trim()||null),categoria:cat,grupo:g?.grupo||null,tipo:g?.tipo||$('pcTipo').value,ativo:true};
+  const {error}=pr?await sb.from('fin_plano').insert({...row,cliente_id:cli.id}):await sb.from('plano_contas').insert(row);
   if(!pr)PCAT.ok=false;
   if(error)return fail(error,'Não foi possível adicionar');$('pcCat').value='';$('pcCod').value='';toast('Categoria adicionada');renderPC();
 });
@@ -6386,7 +6671,7 @@ async function gteAcao(a){
     if(!val('data'))return gtErr('Informe a data.');if(valor==null||isNaN(valor)||valor<=0)return gtErr('Informe o valor, por exemplo 1.234,56.');if(!val('descricao'))return gtErr('Informe a descrição.');
     if(transf&&!val('dest'))return gtErr('Escolha a conta de destino da transferência.');
     const base={data:val('data'),valor:r2(valor),documento:val('documento')},meu=transf?{descricao:val('descricao'),pessoa_nome:null,categoria:null}:{descricao:val('descricao'),pessoa_nome:val('pessoa'),categoria:val('categoria')};
-    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,revisado:true,por_regra:false}).eq('id',m.id);if(e1)throw e1;
+    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,revisado:true,por_regra:false,...(m.cat_revisar?{cat_revisar:false}:{})}).eq('id',m.id);if(e1)throw e1;
     // a entrada na conta de destino: liga ao lançamento que o banco já tem (sem duplicar) ou cria (v59)
     if(transf||m.transf_id){const {error}=await sb.rpc('tes_transferir',{p_mov:m.id,p_conta:transf?val('dest'):null});
       if(error)throw /tes_transferir|PGRST202/.test((error.message||'')+error.code)?new Error('Para ligar a transferência ao banco, rode a atualização v59 no Supabase.'):error}
@@ -6477,7 +6762,7 @@ async function gxAcao(a){
   if(a==='av_apagar'){
     if(!confirm(m.transf_id?'Apagar a transferência (sai das duas contas)?':'Apagar este lançamento?'))return;
     const {error}=m.transf_id?await sb.from('fin_movimentos').delete().eq('transf_id',m.transf_id):await sb.from('fin_movimentos').delete().eq('id',m.id);
-    if(error)return fail(error,'Não foi possível apagar');toast('Lançamento apagado');dlgGT.close();return renderGX();
+    if(error)return fail(error,'Não foi possível apagar');toast('Lançamento apagado');dlgGT.close();return gxVolta();
   }
   const val=k=>($('ga_'+k)?.value||'').trim()||null,valor=parseMoney($('ga_valor').value),tipo=$('ga_tipo').value;
   if(!val('data'))return gtErr('Informe a data.');if(!(valor>0))return gtErr('Informe o valor.');if(!val('descricao'))return gtErr('Informe a descrição.');
@@ -6485,15 +6770,17 @@ async function gxAcao(a){
   let error;
   if(m){
     if(m.transf_id){({error}=await sb.from('fin_movimentos').update({data:base.data,valor:base.valor,descricao:base.descricao,documento:base.documento}).eq('transf_id',m.transf_id));
-      if(!error)({error}=await sb.from('fin_movimentos').update({categoria:base.categoria,pessoa_nome:base.pessoa_nome}).eq('id',m.id))}
-    else ({error}=await sb.from('fin_movimentos').update(base).eq('id',m.id));
+      if(!error)({error}=await sb.from('fin_movimentos').update({categoria:base.categoria,pessoa_nome:base.pessoa_nome,...(m.cat_revisar?{cat_revisar:false}:{})}).eq('id',m.id))}
+    else ({error}=await sb.from('fin_movimentos').update(m.cat_revisar?{...base,cat_revisar:false}:base).eq('id',m.id));
   }else if(tipo==='transf'){
     const dest=val('dest'),tid=crypto.randomUUID();if(!dest)return gtErr('Escolha a conta de destino.');
     ({error}=await sb.from('fin_movimentos').insert([{...base,cliente_id:cli.id,conta_id:c.id,tipo:'saida',transf_id:tid},{...base,cliente_id:CGRUPO.find(x=>x.id===dest)?.cliente_id||cli.id,conta_id:dest,tipo:'entrada',transf_id:tid}]));
   }else ({error}=await sb.from('fin_movimentos').insert({...base,cliente_id:cli.id,conta_id:c.id,tipo}));
   if(error){console.error(error);return gtErr(v45(error)?v45Msg:error.message||'Não foi possível salvar.')}
-  toast('Lançamento salvo');dlgGT.close();renderGX();
+  toast('Lançamento salvo');dlgGT.close();gxVolta();
 }
+// o avulso também abre pela Movimentação financeira
+const gxVolta=()=>VIEW==='gfmov'?(GT.key='',renderGT()):renderGX();
 // ---------- Gestão financeira › Conciliação bancária pelo OFX (v47) ----------
 // Cada linha do extrato do banco (fin_ofx) é ligada a um lançamento do sistema (fin_movimentos.ofx_id).
 // Sugestões, nesta ordem: lançamento já feito com o mesmo valor (até 3 dias), conta a pagar/receber em aberto
@@ -7195,6 +7482,139 @@ $('adFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-a
     if(quem.length){const {error:e2}=await sb.from('aviso_usuarios').insert(quem.map(u=>({aviso_id:data.id,user_id:u})));if(e2)throw e2}
     toast(a?'Aviso salvo':'Aviso publicado');dlgAv.close();renderAvisos();
   }catch(x){console.error(x);err(x.message&&!x.code?x.message:'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
+  finally{b.disabled=false}
+});
+
+// =====================================================================
+// PROJETOS E MELHORIAS (v65)
+// A equipe pede a criação ou a melhoria de algo; só a administradora (master) aprova, recusa ou devolve.
+// =====================================================================
+const PJTIPO={categoria:'Nova categoria',regra:'Regra',cadastro:'Cadastro',funcionalidade:'Nova funcionalidade',melhoria:'Melhoria de algo que existe',correcao:'Correção de erro',outro:'Outro'};
+const PJSIT={aguardando:['Aguardando validação','c-warn'],ajuste:['Precisa de ajuste','c-bad'],aprovado:['Aprovado','c-ok'],andamento:['Em andamento','c-done'],concluido:['Concluído','c-ok'],recusado:['Recusado','c-none']};
+const PJPRI={baixa:'Baixa',normal:'Normal',alta:'Alta',urgente:'Urgente'};
+const PJABERTOS=['aguardando','ajuste','aprovado','andamento'];
+const pjChip=s=>`<span class="chip ${PJSIT[s][1]}">${PJSIT[s][0]}</span>`;
+const v65=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='PGRST202'||/projeto/.test(e.message||''));
+let PJS=[], PJDLG=null;
+$('pjTipo').innerHTML='<option value="">Todos</option>'+Object.entries(PJTIPO).map(([k,t])=>`<option value="${k}">${t}</option>`).join('');
+async function pjNovidades(){
+  if(!ehEsc())return;
+  const {data,error}=await sb.rpc('projetos_novidades');if(error)return;
+  const n=Number(data)||0;if((NAVBADGE.projetos||0)!==n){NAVBADGE.projetos=n;renderNav()}
+}
+// tem novidade para quem está logado
+const pjNovo=p=>ehAdm()&&p.novo_para_admin||p.criado_por===ME.user_id&&p.novo_para_autor;
+async function renderProj(){
+  const a=ehAdm();
+  $('pjSub').textContent=a?'Pedidos da equipe para criar ou melhorar algo no sistema. Você valida cada um: aprova, devolve para ajuste ou recusa.'
+    :'Peça a criação ou a melhoria de algo (categoria, regra, cadastro, funcionalidade). A administração valida e responde aqui.';
+  const {data,error}=await sb.from('projetos').select('*').order('criado_em',{ascending:false});
+  if(error){console.error(error);$('pjBody').innerHTML=`<tr><td class="l neg" colspan="6">${v65(error)?'Este módulo precisa da atualização v65 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.'}</td></tr>`;return}
+  PJS=data||[];pjDesenha();
+}
+function pjDesenha(){
+  const sit=$('pjSit').value,tipo=$('pjTipo').value,meus=$('pjQuem').value==='meus',busca=$('pjBusca').value.trim().toLowerCase();
+  const l=PJS.filter(p=>(sit==='todos'||(sit==='abertos'?PJABERTOS.includes(p.status):p.status===sit))&&(!tipo||p.tipo===tipo)&&(!meus||p.criado_por===ME.user_id)
+    &&(!busca||[p.titulo,p.descricao,p.criado_por_nome].some(x=>(x||'').toLowerCase().includes(busca))))
+    // novidades e os que aguardam validação primeiro
+    .sort((x,y)=>(pjNovo(y)-pjNovo(x))||((y.status==='aguardando')-(x.status==='aguardando'))||(y.criado_em>x.criado_em?1:-1));
+  const cli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  $('pjBody').innerHTML=l.map(p=>`<tr data-id="${p.id}"${pjNovo(p)?' class="novo"':''}><td class="l"><b>${esc(p.titulo)}</b>${pjNovo(p)?' <span class="chip c-bad">Novo</span>':''}</td>
+    <td class="l">${PJTIPO[p.tipo]||''}</td><td class="l">${esc(cli(p.cliente_id))||'<span class="muted">Geral</span>'}</td>
+    <td class="l">${esc(p.criado_por_nome||'')}<br><span class="muted">${dtBR(p.criado_em)}</span></td>
+    <td>${p.prioridade==='urgente'||p.prioridade==='alta'?`<span class="chip ${p.prioridade==='urgente'?'c-bad':'c-warn'}">${PJPRI[p.prioridade]}</span>`:PJPRI[p.prioridade]}</td><td>${pjChip(p.status)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="6">${PJS.length?'Nenhum pedido com estes filtros.':'Nenhum pedido ainda. Use “Novo pedido” para começar.'}</td></tr>`;
+  const ag=PJS.filter(p=>p.status==='aguardando').length;
+  $('pjAlerta').hidden=!(ehAdm()&&ag);
+  if(ehAdm()&&ag)$('pjAlerta').innerHTML=`<b>${ag} ${ag===1?'pedido aguardando':'pedidos aguardando'} a sua validação.</b><span>Abra cada um para aprovar, devolver para ajuste ou recusar.</span>`;
+  $('pjNote').textContent=ehAdm()?'Só você (administração) muda a situação dos pedidos. A equipe vê todos os pedidos, para não pedir a mesma coisa duas vezes.'
+    :'Você pode editar ou excluir o seu pedido enquanto ele aguarda validação ou precisa de ajuste. Depois de validado, só a administração altera.';
+}
+['pjSit','pjTipo','pjQuem'].forEach(x=>$(x).onchange=pjDesenha);$('pjBusca').oninput=pjDesenha;
+$('pjNovo').onclick=()=>abrirProj(null);
+$('pjBody').addEventListener('click',e=>{const tr=e.target.closest('tr[data-id]');if(tr)abrirProj(PJS.find(p=>p.id===tr.dataset.id))});
+const dlgProj=$('dlgProj');
+function abrirProj(p){
+  PJDLG=p;const a=ehAdm(),meu=!p||p.criado_por===ME.user_id,edita=!p||a||meu&&['aguardando','ajuste'].includes(p.status);
+  $('pdTitle').textContent=p?p.titulo:'Novo pedido';
+  $('pdChip').innerHTML=p?pjChip(p.status):'';
+  const opts=(o,v)=>Object.entries(o).map(([k,t])=>`<option value="${k}"${k===v?' selected':''}>${t}</option>`).join('');
+  let h='';
+  if(!a&&(p?.resposta||p?.decidido_em))h+=`<div class="pjdec"><span class="q" style="font-size:12px;color:var(--muted)">Parecer de ${esc(p.decidido_por_nome||'administração')} · ${dtBR(p.decidido_em)}</span>${p.resposta?`<span style="white-space:pre-wrap">${esc(p.resposta)}</span>`:''}</div>`;
+  if(edita)h+=`<div class="fields"><label class="f wide">O que você precisa *<input id="pd_titulo" maxlength="160" value="${esc(p?.titulo||'')}" placeholder="Ex.: categoria para taxa de maquininha da Stone"></label>
+    <label class="f">Tipo<select id="pd_tipo">${opts(PJTIPO,p?.tipo||'melhoria')}</select></label>
+    <label class="f">Empresa<select id="pd_cli"><option value="">Geral (todas)</option>${CLIENTES.filter(c=>c.ativo!==false||c.id===p?.cliente_id).map(c=>`<option value="${c.id}"${c.id===p?.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>
+    <label class="f">Prioridade<select id="pd_pri">${opts(PJPRI,p?.prioridade||'normal')}</select></label>
+    <label class="f wide">Descrição (como deve funcionar)<textarea id="pd_desc" rows="5">${esc(p?.descricao||'')}</textarea></label>
+    <label class="f wide">Por que precisa (o que melhora)<textarea id="pd_mot" rows="3">${esc(p?.motivo||'')}</textarea></label>
+    <label class="f">Anexo (foto ou PDF)<input type="file" id="pd_file" accept="image/*,application/pdf"></label></div>`;
+  else h+=`<div class="fields"><div class="f wide"><span>Tipo · empresa · prioridade</span>${PJTIPO[p.tipo]} · ${esc(CLIENTES.find(c=>c.id===p.cliente_id)?.nome||'Geral')} · ${PJPRI[p.prioridade]}</div>
+    ${p.descricao?`<div class="f wide"><span>Descrição</span><div style="white-space:pre-wrap">${esc(p.descricao)}</div></div>`:''}
+    ${p.motivo?`<div class="f wide"><span>Por que precisa</span><div style="white-space:pre-wrap">${esc(p.motivo)}</div></div>`:''}</div>`;
+  if(p)h+=`<p class="note" style="margin:0">Pedido por ${esc(p.criado_por_nome||'?')} em ${dtBR(p.criado_em)}${p.anexo_caminho?` · <a href="#" data-act="anexo">📎 ${esc(p.anexo_nome||'anexo')}</a>`:''}</p>`;
+  // a decisão é só da administradora
+  if(p&&a)h+=`<div class="pjdec"><b>Validação</b><label class="f wide">Parecer (aparece para quem pediu)<textarea id="pd_resp" rows="3" placeholder="Ex.: aprovado, crie com o código 3.1.08">${esc(p.resposta||'')}</textarea></label>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${['aprovado','ajuste','recusado','andamento','concluido','aguardando'].filter(s=>s!==p.status).map(s=>`<button type="button" class="btn small ${s==='aprovado'?'primary':'ghost'}" data-st="${s}">${{aprovado:'Aprovar',ajuste:'Devolver para ajuste',recusado:'Recusar',andamento:'Em andamento',concluido:'Concluído',aguardando:'Voltar para aguardando'}[s]}</button>`).join('')}</div></div>`;
+  if(p)h+=`<div class="f wide"><span>Conversa</span><div class="conv" id="pd_conv"><p class="note" style="margin:0">Carregando…</p></div>
+    <textarea id="pd_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
+    <div class="row" style="gap:10px;align-items:center"><input type="file" id="pd_mfile" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF"><span class="spacer"></span><button type="button" class="btn primary small" data-act="enviar">Enviar</button></div></div>`;
+  h+='<p class="err" id="pdErr" hidden></p>';
+  $('pdBody').innerHTML=h;
+  const b=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-act="${act}">${txt}</button>`;
+  const exclui=p&&(a||meu&&['aguardando','ajuste'].includes(p.status));
+  $('pdFoot').innerHTML=(exclui?b('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')
+    +(edita?b('salvar',!p?'Enviar pedido':!a&&p.status==='ajuste'?'Salvar e reenviar':'Salvar','primary'):'');
+  if(!dlgProj.open)dlgProj.showModal();
+  if(p){pjConversa(p);if(pjNovo(p))sb.rpc('projeto_visto',{p:p.id}).then(()=>{if(ehAdm())p.novo_para_admin=false;if(p.criado_por===ME.user_id)p.novo_para_autor=false;pjDesenha();pjNovidades()})}
+  else $('pd_titulo').focus();
+}
+async function pjConversa(p){
+  const {data,error}=await sb.from('projeto_comentarios').select('*').eq('projeto_id',p.id).order('criado_em');
+  const box=$('pd_conv');if(!box||PJDLG?.id!==p.id)return;
+  if(error){box.innerHTML='<p class="neg">Erro ao carregar a conversa.</p>';return}
+  const urls=await signed((data||[]).filter(c=>c.anexo_caminho).map(c=>c.anexo_caminho));
+  box.innerHTML=(data||[]).map(c=>c.sistema?`<div class="msg sys">${esc(c.autor_nome||'')} · ${esc(c.texto)} · ${dtBR(c.criado_em)}</div>`
+    :`<div class="msg${c.autor===ME.user_id?' mine':''}"><span class="q"><b>${esc(c.autor_nome||'?')}</b> · ${dtBR(c.criado_em)}</span>${c.texto?`<span class="x">${esc(c.texto)}</span>`:''}${c.anexo_caminho?`<a href="${urls[c.anexo_caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(c.anexo_nome||'anexo')}</a>`:''}</div>`).join('')
+    ||'<p class="note" style="margin:0">Nenhuma mensagem ainda.</p>';
+  box.scrollTop=box.scrollHeight;
+}
+const pdErr=x=>{$('pdErr').textContent=x;$('pdErr').hidden=false};
+$('pdBody').addEventListener('click',async e=>{
+  const p=PJDLG,st=e.target.closest('[data-st]'),act=e.target.closest('[data-act]')?.dataset.act;
+  if(act==='anexo'){e.preventDefault();const u=await signed([p.anexo_caminho]);if(u[p.anexo_caminho])window.open(u[p.anexo_caminho],'_blank','noopener');return}
+  if(st){
+    const s=st.dataset.st,resposta=$('pd_resp').value.trim()||null;
+    if((s==='ajuste'||s==='recusado')&&!resposta)return pdErr('Escreva no parecer o que precisa ajustar ou o motivo da recusa.');
+    st.disabled=true;
+    const {data,error}=await sb.from('projetos').update({status:s,resposta}).eq('id',p.id).select().single();
+    st.disabled=false;if(error)return fail(error);
+    Object.assign(p,data);toast('Pedido: '+PJSIT[s][0]);abrirProj(p);pjDesenha();pjNovidades();return}
+  if(act==='enviar'){
+    const texto=$('pd_msg').value.trim(),f=$('pd_mfile').files[0];if(!texto&&!f)return;
+    const bt=e.target.closest('[data-act]');bt.disabled=true;
+    try{const r={projeto_id:p.id,texto:texto||null};
+      if(f){const up=await uploadAnexo(f,p.cliente_id||SEMEMP,'projetos');r.anexo_caminho=up.caminho;r.anexo_nome=up.nome_arquivo}
+      const {error}=await sb.from('projeto_comentarios').insert(r);if(error)throw error;
+      $('pd_msg').value='';$('pd_mfile').value='';pjConversa(p)}
+    catch(x){console.error(x);pdErr('Não foi possível enviar.'+(x.message?' Motivo: '+x.message:''))}
+    finally{bt.disabled=false}}
+});
+$('pdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const p=PJDLG;
+  if(b.dataset.act==='fechar')return dlgProj.close();
+  if(b.dataset.act==='excluir'){
+    if(!confirm('Excluir o pedido “'+p.titulo+'”? Não dá para desfazer.'))return;
+    const {error}=await sb.from('projetos').delete().eq('id',p.id);if(error)return fail(error,'Não foi possível excluir');
+    toast('Pedido excluído');dlgProj.close();renderProj();pjNovidades();return}
+  const titulo=$('pd_titulo').value.trim();if(!titulo)return pdErr('Diga o que você precisa.');
+  b.disabled=true;
+  try{
+    const r={titulo,tipo:$('pd_tipo').value,cliente_id:$('pd_cli').value||null,prioridade:$('pd_pri').value,descricao:$('pd_desc').value.trim()||null,motivo:$('pd_mot').value.trim()||null};
+    const f=$('pd_file').files[0];
+    if(f){const up=await uploadAnexo(f,r.cliente_id||SEMEMP,'projetos');r.anexo_caminho=up.caminho;r.anexo_nome=up.nome_arquivo}
+    const {error}=p?await sb.from('projetos').update(r).eq('id',p.id):await sb.from('projetos').insert(r);
+    if(error)throw error;
+    toast(!p?'Pedido enviado para validação':p.status==='ajuste'&&!ehAdm()?'Pedido reenviado para validação':'Pedido salvo');dlgProj.close();renderProj();pjNovidades();
+  }catch(x){console.error(x);pdErr(v65(x)?'Este módulo precisa da atualização v65 do banco. Rode o SQL no Supabase.':'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
   finally{b.disabled=false}
 });
 
