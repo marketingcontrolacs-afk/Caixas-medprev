@@ -420,11 +420,12 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label class="f mvf" hidden>Tipo<select id="mvTipo"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="transf">Transferências</option><option value="aporte">Aportes</option></select></label>
       <label class="f mvf" hidden>Cliente ou fornecedor<input id="mvPessoa" list="mvPesList" autocomplete="off" style="max-width:200px"><datalist id="mvPesList"></datalist></label>
       <label class="f mvf" hidden>Categoria<select id="mvCat"></select></label>
-      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option></select></label>
+      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option></select></label>
       <label class="f mvf" hidden>Valor de<input id="mvVmin" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <label class="f mvf" hidden>até<input id="mvVmax" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <input id="gtBusca" placeholder="Buscar" style="max-width:240px">
       <button class="btn ghost mvf" id="mvLimpa" hidden>Limpar filtros</button>
+      <button class="btn mvf" id="mvTroca" hidden>Trocar a categoria dos filtrados</button>
       <button class="btn mvf" id="mvXls" hidden>Baixar Excel</button>
     </div>
     <div class="cal" id="gtCal" hidden></div>
@@ -565,10 +566,10 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="proprio" style="width:auto;margin-top:4px"><span><b>Usar um plano próprio desta empresa</b><br><span class="muted">Começa como uma cópia do padrão. Depois pode incluir, renomear e desativar categorias só para esta empresa.</span></span></label>
     </div>
     <form class="card row" id="pcForm" hidden style="padding:16px 18px;margin-top:16px;align-items:flex-end">
-      <label class="f">Código<input id="pcCod" placeholder="Ex.: 2.1.05" style="max-width:130px"></label>
+      <label class="f">Grupo na DRE<select id="pcGrupo"></select></label>
       <label class="f" style="flex:1 1 220px">Categoria<input id="pcCat" placeholder="Nome da categoria"></label>
-      <label class="f">Grupo na DRE<input id="pcGrupo" list="pcGrupos" placeholder="Ex.: DESPESAS FIXAS"></label>
-      <label class="f">Tipo<select id="pcTipo"><option>Despesa</option><option>Receita</option></select></label>
+      <label class="f">Código<input id="pcCod" readonly placeholder="automático" style="max-width:110px" title="O código é o próximo da sequência do grupo"></label>
+      <label class="f">Tipo<select id="pcTipo" disabled><option>Despesa</option><option>Receita</option></select></label>
       <button class="btn primary" type="submit">Adicionar categoria</button>
     </form>
     <div class="toolbar"><input id="pcBusca" placeholder="Buscar categoria ou código" style="max-width:260px"><label class="f">Mostrar<select id="pcFiltro"><option value="ativos">Ativas</option><option value="inativos">Inativas</option><option value="todos">Todas</option></select></label></div>
@@ -909,8 +910,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="dh"><h2>Nova categoria</h2></div>
     <div class="db"><div class="fields">
       <label class="f wide">Nome da categoria *<input id="cn_nome" placeholder="Ex.: Manutenção de equipamentos"></label>
-      <label class="f">Tipo<select id="cn_tipo"><option>Despesa</option><option>Receita</option></select></label>
-      <label class="f">Código<input id="cn_codigo" placeholder="opcional"></label>
+      <label class="f wide">Grupo *<select id="cn_grupo"></select></label>
+      <label class="f">Tipo<select id="cn_tipo" disabled><option>Despesa</option><option>Receita</option></select></label>
+      <label class="f">Código<input id="cn_codigo" readonly placeholder="escolha o grupo" title="O código é o próximo da sequência do grupo"></label>
       <p class="note wide" id="cnNota" style="margin:0"></p>
     </div><p class="err" id="cnErr" hidden></p></div>
     <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="cnClose">Cancelar</button><button type="submit" class="btn primary" id="cnSave">Cadastrar</button></div>
@@ -5413,7 +5415,7 @@ function mvFiltra(L){
     if(tp==='transf'||tp==='aporte'?x.nat!==tp:tp&&(x.tipo!==tp||x.nat==='transf'))return false;
     if(pe&&!chave(x.pessoa).includes(pe))return false;
     if(cat&&(cat==='-'?x.categoria:x.categoria!==cat))return false;
-    if(st&&!(st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
+    if(st==='revisar'?!x.ref.cat_revisar:st&&!(st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
     if(ini&&x.data<ini||fim&&x.data>fim)return false;
     if(vn>0&&x.valor<vn||vx>0&&x.valor>vx)return false;
     return !q||chave([x.pessoa,x.descricao,x.documento,x.categoria].join(' ')).includes(q)});
@@ -5426,7 +5428,7 @@ function mvDesenha(){
   const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*(a.data.localeCompare(b.data)||(a.k==='t')-(b.k==='t')));
   const cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
   $('gtHead').innerHTML=`<tr><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);return `<tr class="click" data-mv="${x.k}:${x.id}" tabindex="0"><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);return `<tr class="click" data-mv="${x.k}:${x.id}" tabindex="0"><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}</td><td class="l">${esc(x.documento)||mu('—')}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
     +(rows.length>MV.lim?`<tr><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
     ||`<tr><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
   const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
@@ -5437,6 +5439,31 @@ function mvDesenha(){
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v ${t[3]||''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gtNote').textContent='As contas em aberto aparecem na data do vencimento, com o valor que falta. Recebido e pago não contam as transferências entre contas (a não ser com uma conta escolhida). Clique num lançamento para ver ou corrigir; clique em “Data” para inverter a ordem.';
   GT.mvRows=rows;
+  const troca=rows.filter(x=>x.nat!=='transf');$('mvTroca').hidden=!troca.length||!($('mvSit').value==='revisar'||$('mvCat').value);
+  if(!$('mvTroca').hidden)$('mvTroca').textContent=`Trocar a categoria ${troca.length===1?'do lançamento filtrado':`dos ${troca.length} filtrados`}`;
+}
+// troca a categoria de todos os lançamentos filtrados de uma vez (ex.: os "Revisar categoria" de devolução)
+$('mvTroca').onclick=async()=>{
+  const cli=cliAtual(),rows=(GT.mvRows||[]).filter(x=>x.nat!=='transf');if(!cli||!rows.length)return;
+  let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
+  const at=plano.filter(c=>c.ativo!==false),ent=rows.filter(x=>x.tipo==='entrada').length;
+  const op=tp=>at.filter(c=>(c.tipo||'Despesa')===tp).map(c=>`<option>${esc(c.categoria)}</option>`).join('');
+  const de=[...new Set(rows.map(x=>x.categoria||'Sem categoria'))];
+  $('gtdTitle').textContent='Trocar a categoria';$('gtdChip').innerHTML='';
+  $('gtdBody').innerHTML=`<div class="fields"><label class="f wide">Nova categoria *<select id="mv_cat" data-catnova="Receita"><option value=""></option><optgroup label="Receitas">${op('Receita')}</optgroup><optgroup label="Despesas">${op('Despesa')}</optgroup>${catNovaOpt}</select></label></div>
+    <p class="note" style="margin:0">${rows.length} ${rows.length===1?'lançamento':'lançamentos'} (${ent} ${ent===1?'entrada':'entradas'} e ${rows.length-ent} ${rows.length-ent===1?'saída':'saídas'}) hoje em: ${de.map(esc).join(', ')}. A mesma categoria vale para entrada e saída: o estorno de uma venda vai na categoria da venda e abate a receita.</p><p class="err" id="gtErr" hidden></p>`;
+  $('gtdFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="mv_troca">Trocar</button>';
+  dlgGT.showModal();
+};
+async function mvTrocar(){
+  const cat=$('mv_cat').value;if(!cat||cat===CATNOVA)return gtErr('Escolha a nova categoria.');
+  const rows=(GT.mvRows||[]).filter(x=>x.nat!=='transf'),rev=rows.some(x=>x.ref.cat_revisar),upd=rev?{categoria:cat,cat_revisar:false}:{categoria:cat};
+  const mids=rows.filter(x=>x.k==='m').map(x=>x.id),tids=[...new Set([...rows.filter(x=>x.k==='t').map(x=>x.id),...rows.filter(x=>x.k==='m'&&x.tit&&rows.some(y=>y.k==='t'&&y.id===x.tit)).map(x=>x.tit)])];
+  if(!confirm(`Trocar a categoria de ${rows.length} ${rows.length===1?'lançamento':'lançamentos'} para “${cat}”?`))return;
+  try{for(let i=0;i<mids.length;i+=200){const {error}=await sb.from('fin_movimentos').update(upd).in('id',mids.slice(i,i+200));if(error)throw error}
+    for(let i=0;i<tids.length;i+=200){const {error}=await sb.from('fin_titulos').update(upd).in('id',tids.slice(i,i+200));if(error)throw error}}
+  catch(e){console.error(e);return gtErr(e.message||'Não foi possível trocar.')}
+  toast('Categoria trocada');dlgGT.close();GT.key='';renderGT();
 }
 function mvAbre(tr){
   const [k,id]=tr.dataset.mv.split(':');
@@ -5508,8 +5535,10 @@ async function abrirGT(t,tipo){
   let plano=[];try{[pes,contas,plano]=await Promise.all([gfPessoasDe(cli.id,P?'fornecedor':'cliente'),gfContasDe(cli.id),planoDe(cli)])}catch(e){console.error(e)}
   const v=k=>esc(t?.[k]??''),mu=x=>`<span class="muted">${x}</span>`;
   const opt=(ls,cur,vazio)=>`<option value="">${vazio||''}</option>`+ls.map(o=>{const [val,txt]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${cur===val?' selected':''}>${esc(txt)}</option>`}).join('');
-  const doTipo=plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')===(P?'Despesa':'Receita'));
-  const cats=(doTipo.length?doTipo:plano.filter(c=>c.ativo!==false)).map(c=>c.categoria);if(t?.categoria&&!cats.includes(t.categoria))cats.unshift(t.categoria);
+  // a categoria vale para entrada e saída (como uma conta contábil): o estorno usa a mesma categoria da venda.
+  // As do tipo da conta (despesa para pagar, receita para receber) vêm primeiro.
+  const tp=P?'Despesa':'Receita',ativ=plano.filter(c=>c.ativo!==false);
+  const cats=[...ativ.filter(c=>(c.tipo||'Despesa')===tp),...ativ.filter(c=>(c.tipo||'Despesa')!==tp)].map(c=>c.categoria);if(t?.categoria&&!cats.includes(t.categoria))cats.unshift(t.categoria);
   const ativas=contas.filter(c=>c.ativo!==false||c.id===t?.conta_id).map(c=>[c.id,c.nome]);
   const movs=t?GT.movs[t.id]||[]:[],pago=t?GT.pago[t.id]||0:0,falta=t?Math.max(0,r2(t.valor-pago)):0;
   $('gtdTitle').textContent=t?(t.pessoa_nome||(P?'Conta a pagar':'Conta a receber')):(P?'Nova conta a pagar':'Nova conta a receber')+' · '+cli.nome;
@@ -5572,6 +5601,7 @@ async function gtAcao(a,b){
   if(a.startsWith('te_'))return gteAcao(a);
   if(a.startsWith('rm_'))return rmAcao(a,b);
   if(a.startsWith('ct_'))return ftAcao(a,b);
+  if(a==='mv_troca')return mvTrocar();
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=dP(),cli=cliAtual(),t=GTR;
   if(a==='salvar'){
@@ -5586,7 +5616,11 @@ async function gtAcao(a,b){
     if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
     let error;
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
-      ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id))}
+      const rev=t.cat_revisar||(GT.movs[t.id]||[]).some(m=>m.cat_revisar);if(rev)row.cat_revisar=false;
+      ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id));
+      // a categoria corrigida vale também para os pagamentos já feitos (é deles que saem os relatórios)
+      if(!error&&(row.categoria!==t.categoria||rev)){const q=sb.from('fin_movimentos').update(rev?{categoria:row.categoria,cat_revisar:false}:{categoria:row.categoria}).eq('titulo_id',t.id);
+        ({error}=await (t.categoria?q.eq('categoria',t.categoria):q.is('categoria',null)))}}
     else{
       const n=Math.max(1,Math.min(120,parseInt($('gt_parcelas').value)||1)),tot=$('gt_vparc').value==='total';
       const base=tot?Math.floor(valor/n*100)/100:valor,grupo=n>1?crypto.randomUUID():null;
@@ -5879,7 +5913,7 @@ const cvl=(v,cl)=>`<td data-v="${r2(v)}" class="${cl||''}">${fm(r2(v))}</td>`;
 // os dados de todos os relatórios e do dashboard: lançamentos, contas a pagar e receber, contas e faturas da empresa
 async function relCarrega(cli){
   const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
-  REL.plano=await planoDe(cli);
+  REL.plano=await planoDe(cli);REL.nat=Object.fromEntries(REL.plano.filter(c=>c.tipo).map(c=>[c.categoria,c.tipo]));
   REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
   REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
   REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
@@ -5905,8 +5939,12 @@ async function renderRel(){
 }
 ['relIni','relFim','relSem','relBase'].forEach(id=>$(id).onchange=renderRel);
 // no cartão, a compra é despesa e o estorno abate a despesa; transferências ficam fora
-const relTp=m=>!relSemTr(m)||ehAporte(m)?null:REL.cart.has(m.conta_id)?'saida':m.tipo;
-const relVl=m=>REL.cart.has(m.conta_id)&&m.tipo==='entrada'?-m.valor:+m.valor;
+// A categoria funciona como uma conta contábil (pedido da Carol, 29/10): ela é de receita ou de despesa
+// (o tipo no plano de contas) e recebe lançamentos dos dois lados. Na receita, a entrada soma e a saída
+// (estorno, devolução) abate; na despesa, o contrário. Sem categoria (ou fora do plano), vale o lado do
+// lançamento; no cartão, sem categoria, tudo é despesa. Transferências e aportes ficam fora.
+const relTp=m=>{if(!relSemTr(m)||ehAporte(m))return null;const n=REL.nat?.[m.categoria];return n?(n==='Receita'?'entrada':'saida'):REL.cart.has(m.conta_id)?'saida':m.tipo};
+const relVl=m=>{const tp=relTp(m),lado=REL.cart.has(m.conta_id)&&!REL.nat?.[m.categoria]?'saida':m.tipo;return tp&&lado!==tp?-m.valor:+m.valor};
 // para o caixa: só as contas bancárias; o pagamento da fatura (transferência para o cartão) é saída de caixa
 const relCaixa=m=>!REL.cart.has(m.conta_id)&&(!m.transf_id||REL.trCart.has(m.transf_id));
 const relFalta=t=>Math.max(0,r2(t.valor-(REL.pago[t.id]||0)));
@@ -5987,10 +6025,10 @@ function dsDesenha(cli){
   const d90=addDias(TODAY,-90),d10=addDias(TODAY,10);
   const semCat=REL.movs.filter(m=>!m.transf_id&&!m.categoria&&m.data>=d90).length;
   const naoConc=REL.movs.filter(m=>!REL.cart.has(m.conta_id)&&!m.ofx_id&&!m.conciliado&&m.data>=addDias(TODAY,-30)&&m.data<=TODAY).length;
-  const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length;
+  const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length,catRev=REL.movs.filter(m=>m.cat_revisar).length+REL.tits.filter(t=>t.cat_revisar&&relFalta(t)>0.004).length;
   const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
   const pend=[[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
-    [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
+    [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
     [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
   const pendH=pend.map(p=>`<button type="button" class="dr" data-go="${p[2]}"><span>${esc(p[1])}</span><span class="chip c-warn">Ver ›</span></button>`).join('')||'<p class="pos" style="margin:0">✓ Nenhuma pendência.</p>';
   const salH=sal.map(([c,v])=>`<div class="dr"><span>${esc(c.nome)} ${mu(esc(c.tipo||''))}</span><span class="${v<0?'neg':''}">${fm(v)}</span></div>`).join('')
@@ -6009,7 +6047,7 @@ function dsDesenha(cli){
   box.onmouseleave=()=>tip.hidden=true;
   $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas. Por enquanto só o escritório vê este painel.';
 }
-$('dsGrid').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
+$('dsGrid').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;const [v,sit]=b.dataset.go.split(':');if(sit)$('mvSit').value=sit;go(v)});
 function relFluxo(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return $('relBody').innerHTML='<tr><td class="l muted">Escolha o período.</td></tr>';
   const dia=dObj(fim)-dObj(ini)<=62*864e5,bk=d=>dia?d:d.slice(0,7);
@@ -6316,19 +6354,36 @@ async function planoDe(cli){
 }
 // Cadastrar categoria sem sair do lançamento (pedido da Carol, 29/10): a última opção de cada lista de categorias
 // abre o cadastro; a categoria entra no plano próprio da empresa ou no plano padrão e já fica escolhida.
+// Grupos do plano de contas com o prefixo do código (2.4 · DESPESAS VARIÁVEIS) e o próximo código de cada um:
+// a nova categoria escolhe o grupo e recebe o código na sequência (pedido da Carol, 29/10), para o plano não virar bagunça.
+function gruposDe(plano){
+  const g={};plano.forEach(c=>{if(!c.grupo)return;const x=g[c.grupo]||={grupo:c.grupo,pref:{},tipo:{},max:{}};
+    const m=/^(\d+\.\d+)\.(\d+)$/.exec(c.codigo||'');if(m){x.pref[m[1]]=(x.pref[m[1]]||0)+1;x.max[m[1]]=Math.max(x.max[m[1]]||0,+m[2])}
+    x.tipo[c.tipo||'Despesa']=(x.tipo[c.tipo||'Despesa']||0)+1});
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  return Object.values(g).map(x=>{const pf=top(x.pref);return {grupo:x.grupo,pref:pf||'',tipo:top(x.tipo)||'Despesa',prox:pf?`${pf}.${String((x.max[pf]||0)+1).padStart(2,'0')}`:null}})
+    .sort((a,b)=>(a.pref||'9').localeCompare(b.pref||'9',undefined,{numeric:true})||a.grupo.localeCompare(b.grupo));
+}
+const grupoOpts=(gs,tipo)=>'<option value="">Escolha o grupo</option>'+['Receita','Despesa'].map(tp=>{const l=gs.filter(g=>g.tipo===tp);return l.length?`<optgroup label="${tp==='Receita'?'Receitas':'Despesas'}">${l.map(g=>`<option value="${esc(g.grupo)}">${esc((g.pref?g.pref+' · ':'')+g.grupo)}</option>`).join('')}</optgroup>`:''}).join('');
 const CATNOVA='__nova__',catNovaOpt='<option value="__nova__">+ Cadastrar nova categoria…</option>';
 function catNova(cli,tipo,nome){
   return new Promise(res=>{
     const d=$('dlgCatNova');$('cn_nome').value=nome||'';$('cn_codigo').value='';$('cn_tipo').value=tipo==='Receita'?'Receita':'Despesa';$('cnErr').hidden=true;
+    let gs=[];$('cn_grupo').innerHTML='<option value="">Carregando…</option>';
+    planoDe(cli).then(pl=>{gs=gruposDe(pl);$('cn_grupo').innerHTML=grupoOpts(gs);$('cn_grupo').closest('label').hidden=!gs.length;$('cn_tipo').disabled=!!gs.length;$('cn_codigo').readOnly=!!gs.length;$('cn_codigo').placeholder=gs.length?'escolha o grupo':'opcional'}).catch(console.error);
+    $('cn_grupo').onchange=()=>{const g=gs.find(x=>x.grupo===$('cn_grupo').value);$('cn_codigo').value=g?.prox||'';if(g)$('cn_tipo').value=g.tipo};
     $('cnNota').textContent=cli?.plano_proprio?`Entra no plano de contas próprio de ${cli.nome}.`:'Entra no plano de contas padrão, que vale para todas as empresas sem plano próprio.';
     let feito=null;
     const fim=()=>{d.removeEventListener('close',fim);res(feito)};d.addEventListener('close',fim);
     $('cnClose').onclick=()=>d.close();
     $('cnForm').onsubmit=async e=>{e.preventDefault();
       const err=t=>{$('cnErr').textContent=t;$('cnErr').hidden=false};
-      const categoria=$('cn_nome').value.trim().replace(/\s+/g,' '),row={categoria,tipo:$('cn_tipo').value,codigo:$('cn_codigo').value.trim()||null};
+      const categoria=$('cn_nome').value.trim().replace(/\s+/g,' ');
       if(!categoria)return err('Informe o nome da categoria.');
       let plano=[];try{plano=await planoDe(cli)}catch(x){console.error(x)}
+      const gs2=gruposDe(plano),g=gs2.find(x=>x.grupo===$('cn_grupo').value);
+      if(gs2.length&&!g)return err('Escolha o grupo da categoria.');
+      const row={categoria,tipo:g?.tipo||$('cn_tipo').value,codigo:g?g.prox:$('cn_codigo').value.trim()||null,...(g?{grupo:g.grupo}:{})};   // o código é recalculado na hora de salvar
       const ja=plano.find(c=>chave(c.categoria)===chave(categoria));
       if(ja&&ja.ativo!==false){feito=ja.categoria;toast('Essa categoria já existe e foi escolhida');return d.close()}
       $('cnSave').disabled=true;
@@ -6358,6 +6413,8 @@ document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-ca
   if(nova&&inp){inp.value=nova;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))}});
 const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
 function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
+let PC_GS=[];
+$('pcGrupo').onchange=()=>{const g=PC_GS.find(x=>x.grupo===$('pcGrupo').value);$('pcCod').value=g?.prox||'';if(g)$('pcTipo').value=g.tipo};
 async function renderPC(){
   const cli=cliAtual();$('pcModo').hidden=$('pcForm').hidden=$('pcXls').hidden=true;
   if(!cli){$('pcSub').textContent='';return pcVazio('Escolha uma empresa.')}
@@ -6368,6 +6425,8 @@ async function renderPC(){
   let ls;try{delete PLANOS[cli.id];ls=await planoDe(cli)}catch(e){console.error(e);return pcVazio(v52(e)?v52Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   if(cliAtual()?.id!==cli.id||VIEW!=='gfplano')return;
   $('pcForm').hidden=false;$('pcXls').hidden=!ls.length;
+  const gs=gruposDe(ls),gv=$('pcGrupo').value;PC_GS=gs;$('pcGrupo').innerHTML=grupoOpts(gs);if(gs.some(g=>g.grupo===gv))$('pcGrupo').value=gv;
+  $('pcTipo').disabled=$('pcCod').readOnly=!!gs.length;$('pcCod').placeholder=gs.length?'automático':'Ex.: 2.1.05';$('pcGrupo').onchange();
   const f=$('pcFiltro').value,q=chave($('pcBusca').value);
   const rows=ordPlano(ls).filter(p=>(f==='todos'||(f==='ativos')===(p.ativo!==false))&&(!q||chave((p.codigo||'')+' '+p.categoria+' '+(p.grupo||'')).includes(q)));
   // o padrão vale para todas as empresas que não têm plano próprio; o próprio só para esta
@@ -6392,10 +6451,11 @@ $('pcModo').addEventListener('change',async e=>{
   renderPC();
 });
 $('pcForm').addEventListener('submit',async e=>{e.preventDefault();
-  const cli=cliAtual(),cat=$('pcCat').value.trim(),cod=$('pcCod').value.trim()||null,pr=!!cli?.plano_proprio;if(!cli||!cat)return toast('Digite o nome da categoria.');
-  if((await planoDe(cli)).some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
-  const {error}=pr?await sb.from('fin_plano').insert({cliente_id:cli.id,codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true})
-    :await sb.from('plano_contas').insert({codigo:cod,categoria:cat,grupo:$('pcGrupo').value.trim()||null,tipo:$('pcTipo').value,ativo:true});
+  const cli=cliAtual(),cat=$('pcCat').value.trim().replace(/\s+/g,' '),pr=!!cli?.plano_proprio;if(!cli||!cat)return toast('Digite o nome da categoria.');
+  const pl=await planoDe(cli);if(pl.some(p=>chave(p.categoria)===chave(cat)))return toast('Esta categoria já existe no plano.');
+  const gs=gruposDe(pl),g=gs.find(x=>x.grupo===$('pcGrupo').value);if(gs.length&&!g)return toast('Escolha o grupo da categoria.');
+  const row={codigo:g?.prox||(gs.length?null:$('pcCod').value.trim()||null),categoria:cat,grupo:g?.grupo||null,tipo:g?.tipo||$('pcTipo').value,ativo:true};
+  const {error}=pr?await sb.from('fin_plano').insert({...row,cliente_id:cli.id}):await sb.from('plano_contas').insert(row);
   if(!pr)PCAT.ok=false;
   if(error)return fail(error,'Não foi possível adicionar');$('pcCat').value='';$('pcCod').value='';toast('Categoria adicionada');renderPC();
 });
@@ -6580,7 +6640,7 @@ async function gteAcao(a){
     if(!val('data'))return gtErr('Informe a data.');if(valor==null||isNaN(valor)||valor<=0)return gtErr('Informe o valor, por exemplo 1.234,56.');if(!val('descricao'))return gtErr('Informe a descrição.');
     if(transf&&!val('dest'))return gtErr('Escolha a conta de destino da transferência.');
     const base={data:val('data'),valor:r2(valor),documento:val('documento')},meu=transf?{descricao:val('descricao'),pessoa_nome:null,categoria:null}:{descricao:val('descricao'),pessoa_nome:val('pessoa'),categoria:val('categoria')};
-    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,revisado:true,por_regra:false}).eq('id',m.id);if(e1)throw e1;
+    const {error:e1}=await sb.from('fin_movimentos').update({...base,...meu,revisado:true,por_regra:false,...(m.cat_revisar?{cat_revisar:false}:{})}).eq('id',m.id);if(e1)throw e1;
     // a entrada na conta de destino: liga ao lançamento que o banco já tem (sem duplicar) ou cria (v59)
     if(transf||m.transf_id){const {error}=await sb.rpc('tes_transferir',{p_mov:m.id,p_conta:transf?val('dest'):null});
       if(error)throw /tes_transferir|PGRST202/.test((error.message||'')+error.code)?new Error('Para ligar a transferência ao banco, rode a atualização v59 no Supabase.'):error}
@@ -6679,8 +6739,8 @@ async function gxAcao(a){
   let error;
   if(m){
     if(m.transf_id){({error}=await sb.from('fin_movimentos').update({data:base.data,valor:base.valor,descricao:base.descricao,documento:base.documento}).eq('transf_id',m.transf_id));
-      if(!error)({error}=await sb.from('fin_movimentos').update({categoria:base.categoria,pessoa_nome:base.pessoa_nome}).eq('id',m.id))}
-    else ({error}=await sb.from('fin_movimentos').update(base).eq('id',m.id));
+      if(!error)({error}=await sb.from('fin_movimentos').update({categoria:base.categoria,pessoa_nome:base.pessoa_nome,...(m.cat_revisar?{cat_revisar:false}:{})}).eq('id',m.id))}
+    else ({error}=await sb.from('fin_movimentos').update(m.cat_revisar?{...base,cat_revisar:false}:base).eq('id',m.id));
   }else if(tipo==='transf'){
     const dest=val('dest'),tid=crypto.randomUUID();if(!dest)return gtErr('Escolha a conta de destino.');
     ({error}=await sb.from('fin_movimentos').insert([{...base,cliente_id:cli.id,conta_id:c.id,tipo:'saida',transf_id:tid},{...base,cliente_id:CGRUPO.find(x=>x.id===dest)?.cliente_id||cli.id,conta_id:dest,tipo:'entrada',transf_id:tid}]));
