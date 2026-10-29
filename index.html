@@ -828,11 +828,12 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <section id="viewFolha" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Folha de pagamento</h1><p class="sub" id="folSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folCheia" title="Abrir a folha na tela inteira (Esc fecha)">⛶ Tela cheia</button><button class="btn" id="folPonto" title="A importação do ponto fica na seção Espelho de ponto">Espelho de ponto ›</button><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folCheia" title="Abrir a folha na tela inteira (Esc fecha)">⛶ Tela cheia</button><button class="btn" id="folPonto" title="A importação do ponto fica na seção Espelho de ponto">Espelho de ponto ›</button><span class="btn fotobtn" id="folEspBtn" title="Importe os recibos (PDF) que a contabilidade devolveu para comparar com esta folha">Conferir espelho da contabilidade<input type="file" id="folEspFile" accept=".pdf" multiple aria-label="Importar o espelho da folha da contabilidade"></span><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
     <p class="note" id="folQuem"></p>
+    <div class="card block" id="folEsp" hidden style="margin-top:12px"></div>
     <p class="note">Valores fixos vêm do cadastro do colaborador e o resto vem dos lançamentos do mês. O escritório pode alterar qualquer célula direto na tabela, inclusive os fixos: a mudança vale só para este mês e a célula fica em amarelo (↺ volta ao valor calculado). Para mudar um fixo de vez, use “Colaboradores e valores fixos”.</p>
     <h2 style="margin-top:22px">Lançamentos do mês</h2>
     <div class="card tablebox"><table id="folLanc"></table></div>
@@ -3344,10 +3345,10 @@ function initFolha(){
 folMes.onchange=()=>renderFolha();
 async function renderFolha(){
   const cli=cliAtual(),e=ehEsc();FOL.cli=cli;
-  const vazio=t=>{$('folGrid').innerHTML=`<tbody><tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr></tbody>`;['folLanc','folResc'].forEach(x=>$(x).innerHTML='');$('folBar').innerHTML=''};
+  const vazio=t=>{$('folGrid').innerHTML=`<tbody><tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr></tbody>`;['folLanc','folResc'].forEach(x=>$(x).innerHTML='');$('folBar').innerHTML='';renderFolEsp()};
   $('folSub').textContent=e?'Lance as informações ao longo do mês. No fechamento, confira, ajuste o que precisar e baixe a planilha para a contabilidade.'
     :'Lance as informações dos colaboradores ao longo do mês. O escritório confere e envia para a contabilidade.';
-  ['folCadBox','folColBox'].forEach(x=>$(x).hidden=!e);
+  ['folCadBox','folColBox','folEspBtn'].forEach(x=>$(x).hidden=!e);
   if(!cli){vazio([e?'Nenhuma empresa com BPO de RH. Marque o RH no cadastro da empresa.':'Nenhuma empresa liberada para a folha.']);return}
   const comp=FOL.comp=folMes.value+'-01',fim=fimMes(comp);
   const [rf,rm,rl,ra,rr]=await Promise.all([sb.from('funcionarios').select('*').eq('cliente_id',cli.id).order('nome'),
@@ -3406,6 +3407,211 @@ async function renderFolha(){
   $('folRescBaixar').hidden=!(e&&FOL.resc.length)||!!M.resc_itens;
   renderFolParc(cols,lanca);
   if(e){renderFolCad();renderFolCols()}
+  renderFolEsp();
+}
+// ---------- Espelho da folha da contabilidade ----------
+// Lê os recibos de pagamento (PDF com texto) que a contabilidade devolve para conferência: por recibo, o
+// colaborador (código e nome) e cada verba com referência, vencimento e desconto. As duas vias contam uma vez.
+const MESES_EXT=['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+async function lerEspelho(buf){
+  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise,vias=[];let comp=null,cnpj=null,semTexto=0;
+  const num=s=>/^-?\d{1,3}(?:\.\d{3})*,\d{2}$/.test(s)?parseMoney(s):null;
+  for(let p=1;p<=Math.min(doc.numPages,200);p++){
+    const pg=await doc.getPage(p),vp=pg.getViewport({scale:1});
+    const its=(await pg.getTextContent()).items.filter(i=>i.str.trim()).map(i=>{const t=pdfjsLib.Util.transform(vp.transform,i.transform);
+      return {s:i.str.trim(),x:t[4],y:t[5],w:i.width,cx:t[4]+i.width/2}});
+    if(its.length<5){semTexto++;continue}
+    its.sort((a,b)=>a.y-b.y||a.x-b.x);
+    const lines=[];its.forEach(i=>{const l=lines.find(l=>Math.abs(l.y-i.y)<3);if(l)l.its.push(i);else lines.push({y:i.y,its:[i]})});
+    lines.forEach(l=>{l.its.sort((a,b)=>a.x-b.x);l.s=l.its.map(i=>i.s).join(' ')});
+    const txt=lines.map(l=>l.s).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if(!comp){const m=txt.match(new RegExp(`(${MESES_EXT.join('|')}) de (\\d{4})`));if(m)comp=m[2]+'-'+pad(MESES_EXT.indexOf(m[1])+1)}
+    if(!cnpj){const m=lines.map(l=>l.s).join(' ').match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);if(m)cnpj=m[0]}
+    // cada via começa no cabeçalho "Nome do Funcionário"
+    const cabs=lines.filter(l=>/nome do funcion/i.test(l.s));
+    cabs.forEach((C,ci)=>{
+      const fimY=cabs[ci+1]?cabs[ci+1].y:Infinity,bloco=lines.filter(l=>l.y>C.y&&l.y<fimY);
+      const hN=C.its.find(i=>/^nome/i.test(i.s)),hCbo=C.its.find(i=>/^cbo$/i.test(i.s));
+      const L1=bloco[0];if(!L1)return;
+      const cod=L1.its.find(i=>/^\d+$/.test(i.s)&&i.x<hN.x-2)?.s||'';
+      const nome=L1.its.filter(i=>i.x>=hN.x-2&&(!hCbo||i.x<hCbo.x-25)&&!/^\d+$/.test(i.s)).map(i=>i.s).join(' ').trim();
+      const L2=bloco[1],cargo=L2?L2.its.filter(i=>i.x>=hN.x-2&&(!hCbo||i.x<hCbo.x-25)).map(i=>i.s).join(' '):'';
+      const H=bloco.find(l=>/descri[cç][aã]o/i.test(l.s)&&/vencimentos/i.test(l.s));if(!nome||!H)return;
+      const hx=k=>H.its.find(i=>k.test(i.s)),hD=hx(/^descri/i),hR=hx(/^refer/i),hV=hx(/^vencimentos/i),hDs=hx(/^descontos/i);
+      const T=bloco.find(l=>/total de vencimentos/i.test(l.s)),fimV=T?T.y:fimY;
+      const area=bloco.filter(l=>l.y>H.y+1&&l.y<fimV-1);
+      // a descrição é a âncora da verba; o código e os valores podem vir um pouco acima ou abaixo da linha
+      const descs=[];area.forEach(l=>{const d=l.its.filter(i=>i.x>=hD.x-110&&i.x<(hR?hR.x-20:hV.x-60)&&!(num(i.s)!=null&&i.x>hD.x)&&!(/^\d+$/.test(i.s)&&i.x<hD.x-90));
+        if(d.length&&d.some(i=>/[A-Za-z]/.test(i.s)))descs.push({y:l.y,desc:d.map(i=>i.s).join(' '),x0:d[0].x})});
+      const vals=area.flatMap(l=>l.its).filter(i=>num(i.s)!=null&&i.x>(hR?hR.x-40:hD.x+100));
+      const cods=area.flatMap(l=>l.its).filter(i=>/^\d+$/.test(i.s)&&i.x<hD.x-90);
+      const perto=(arr,y)=>{let b=null;arr.forEach(i=>{const d=Math.abs(i.y-y);if(d<6&&(!b||d<b.d))b={i,d}});return b};
+      const verbas=descs.map(d=>({cod:'',desc:d.desc,ref:null,venc:0,desc_:0,y:d.y}));
+      cods.forEach(c=>{const v=perto(verbas,c.y);if(v&&!v.i.cod)v.i.cod=c.s});
+      vals.forEach(i=>{const v=perto(verbas,i.y);if(!v)return;const cols=[['ref',hR],['venc',hV],['desc_',hDs]].filter(c=>c[1]);
+        const k=cols.sort((a,b)=>Math.abs(a[1].cx-i.cx)-Math.abs(b[1].cx-i.cx))[0][0];
+        // valor que não cabe na coluna mais perto (ex.: referência já preenchida) vai para a próxima
+        if(k==='ref'&&v.i.ref!=null)return;v.i[k]=k==='ref'?num(i.s):r2((v.i[k]||0)+num(i.s))});
+      const tot=T?bloco.filter(l=>l.y>T.y&&l.y<T.y+30).flatMap(l=>l.its).filter(i=>num(i.s)!=null).sort((a,b)=>a.x-b.x):[];
+      const Lq=bloco.find(l=>/valor l[ií]quido/i.test(l.s)),lq=Lq?bloco.filter(l=>Math.abs(l.y-Lq.y)<4).flatMap(l=>l.its).find(i=>num(i.s)!=null):null;
+      const totV=tot[0]?num(tot[0].s):null,totD=tot[1]?num(tot[1].s):null;
+      const sv=r2(verbas.reduce((s,v)=>s+v.venc,0)),sd=r2(verbas.reduce((s,v)=>s+v.desc_,0));
+      vias.push({cod,nome,cargo,verbas:verbas.map(({y,desc_,...v})=>({...v,des:desc_})),totV,totD,liq:lq?num(lq.s):null,
+        ok:totV!=null&&totD!=null&&Math.abs(sv-totV)<0.01&&Math.abs(sd-totD)<0.01,pag:p});
+    });
+  }
+  // duas vias do mesmo recibo: fica a que fecha com os totais
+  const pessoas=[];vias.forEach(v=>{const k=v.cod+'|'+semAc(v.nome),j=pessoas.findIndex(x=>x.k===k);
+    if(j<0)pessoas.push({...v,k});else if(!pessoas[j].ok&&v.ok)pessoas[j]={...v,k}});
+  return {comp,cnpj,pessoas,semTexto,paginas:doc.numPages};
+}
+// Conferência da folha com o espelho da contabilidade (Carol, 29/10): cada verba do recibo é ligada à coluna da
+// planilha desta empresa e comparada com a célula da folha do sistema. Verbas legais (horas normais, INSS, IRRF,
+// abono da CCT, consignado, férias) não têm coluna na planilha: ficam só no recibo, para consulta.
+const ESPMAP=[
+  ['ajuda_custo',/AJUDA DE CUSTO/,'money'],['ajuda_dia',/AJUDA DE CUSTO/,'money'],
+  ['gratificacao',/GRATIFICA/,'pct'],['gratificacoes',/GRATIFICA/,'money'],
+  ['he50',/EXTRA.*\b50\b/,'horas'],['he65',/EXTRA.*\b65\b/,'horas'],['he75',/EXTRA.*\b75\b/,'horas'],['he100',/EXTRA.*\b100\b/,'horas'],['horas_extras',/HORAS? EXTRA/,'horas'],
+  ['dif_salario',/DIFERENCA DE SAL/,'money'],
+  ['quebra_cx',/QUEBRA DE (CAIXA|CX)/,'pct','V'],['quebra_cx_desc',/QUEBRA DE (CAIXA|CX)/,'money','D'],
+  ['insalubridade',/INSALUB/,'pct'],
+  ['va',/VALE ALIMENTA|\bV\s?A\b/,'sim','D'],['vt',/VALE TRANSPORTE|\bV\s?T\b/,'sim','D'],
+  ['descontos_diversos',/DESCONTOS? DIVERSOS/,'money','D'],
+  ['dsr',/FALTA.*\bDSR\b|\bDSR\b.*FALTA/,'sim','D'],
+  ['faltas_dias',/FALTA.*\bDIAS?\b|\bDIAS?\b.*FALTA/,'dias','D'],['faltas_horas',/FALTA/,'horas','D'],
+  ['adiantamento',/ADIANTAMENTO/,'money','D'],
+  ['premio_whats',/WHATS/,'money'],['assiduidade',/ASSIDU/,'money'],['premio',/PREMI/,'money'],
+  ['vale_mp',/VALE.*(ATEND|\bMP\b)/,'money','D'],
+];
+// verbas que nunca vão para a planilha da folha (reflexos, férias, 13º, licenças e afastamentos)
+const ESPFORA=/REFLEXO|FERIAS|\b13\b|DECIMO|AFAST|ESTORNO|PROVISAO/;
+const espN=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+function espColuna(v,cols){const d=espN(v.desc),lado=v.des>0&&!(v.venc>0)?'D':'V';if(ESPFORA.test(d))return null;
+  const ok=ESPMAP.filter(([k,re,,g])=>re.test(d)&&(!g||g===lado));if(!ok.length)return null;
+  let m=ok.find(x=>cols.includes(x[0]));
+  // gratificação: com % na descrição é a coluna de percentual; em reais, a de valor (quando a empresa tem as duas)
+  if(/GRATIFICA/.test(d)&&cols.includes('gratificacao')&&cols.includes('gratificacoes'))m=ok.find(x=>x[0]===(/%/.test(v.desc)?'gratificacao':'gratificacoes'));
+  return m?{c:m[0],k:m[2]}:{c:ok[0][0],k:ok[0][2],sem:true}}
+const espPct=v=>{const m=v.desc.match(/(\d+(?:[.,]\d+)?)\s*%/);return m?+m[1].replace(',','.'):v.ref!=null&&v.ref<=100&&Math.abs(v.ref-(v.venc||v.des))>0.005?v.ref:null};
+// valor do espelho para a coluna
+function espValor(vs,k){
+  if(k==='sim')return {n:vs.some(v=>(v.venc||v.des||v.ref)>0)?1:0,t:vs.length?'Sim':'Não'};
+  if(k==='money'){const n=r2(vs.reduce((s,v)=>s+(v.venc||v.des||0),0));return {n,t:fm(n)}}
+  // em reais (ex.: "GRATIFICACOES 72,80"): compara o valor com o que foi digitado na célula
+  if(k==='pct'){const ps=vs.map(espPct),m=r2(vs.reduce((s,v)=>s+(v.venc||v.des||0),0));if(ps.some(p=>p==null))return {n:null,m,t:fm(m)};
+    const n=Math.max(...ps);return {n,t:String(n).replace('.',',')+'%'}}
+  // a referência das horas vem em decimal (7,33 = 7:20); se a contabilidade usar horas,minutos, também bate
+  if(k==='horas'){const r=r2(vs.reduce((s,v)=>s+(v.ref||0),0)),n=r*60,a=vs.reduce((s,v)=>s+Math.trunc(v.ref||0)*60+Math.round(((v.ref||0)%1)*100),0);
+    return {n,a,t:`${showMoney(r)} h (${hhmm(n)})`}}
+  if(k==='dias'){const n=vs.reduce((s,v)=>s+(v.ref||0),0);return {n,t:String(n).replace('.',',')}}
+}
+// valor da folha do sistema, no mesmo formato (null em n: texto que não dá para comparar sozinho)
+function espSistema(f,c,k){const x=folCelula(f,c),v=x.v,t=x.txt||'';
+  if(k==='sim')return {n:c==='dsr'?(/sim/i.test(t)?1:0):(v==='Sim'?1:0),t:c==='dsr'?(t||'Não'):(v==='Sim'?'Sim':'Não')};
+  if(v==null||v===''||v==='Não')return {n:0,t:'—'};
+  if(k==='money'){if(typeof v==='number')return {n:r2(v),t};const n=/^[R$\s\d.,]+$/.test(v)?parseMoney(v.replace(/R\$/,'')):NaN;return {n:isFinite(n)?n:null,t}}
+  if(k==='pct'){if(typeof v==='number')return {n:Math.round(v*1000)/10,t};const m=String(v).match(/^(\d+(?:[.,]\d+)?)\s*%$/),r=/^[R$\s\d.,]+$/.test(v)?parseMoney(v.replace(/R\$/,'')):NaN;
+    return {n:m?+m[1].replace(',','.'):null,m:isFinite(r)?r:null,t}}
+  if(k==='horas')return {n:typeof v==='number'?Math.round(v*1440):null,t};
+  if(k==='dias'){const m=String(v).match(/^\d+(?:[.,]\d+)?/);return {n:m?+m[0].replace(',','.'):null,t}}
+  return {n:null,t}}
+function espIgual(s,e,k){if(k==='pct'&&e.n==null&&e.m!=null&&s.m!=null)return Math.abs(s.m-e.m)<0.005;if(s.n==null||e.n==null)return null;
+  if(k==='horas')return Math.abs(s.n-e.n)<=1||Math.abs(s.n-e.a)<=1;
+  return Math.abs(s.n-e.n)<(k==='pct'?0.05:0.005)}
+// liga o nome do recibo ao cadastro: o nome mais curto tem que estar todo dentro do mais longo, com o mesmo primeiro nome
+// (o cadastro às vezes tem só parte do nome). Empate entre dois candidatos (ex.: duas "Maria Eduarda") não liga.
+// o primeiro nome pode vir com grafia diferente (Nathalya × Nathalia) quando o resto do nome bate
+const espTok=n=>semAc(String(n||'').replace(/['´`’]/g,'')).split(' ').filter(t=>t.length>1&&!['DA','DE','DO','DAS','DOS'].includes(t));
+const lev=(a,b)=>{const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]};
+function espScore(a,b){const x=espTok(a),y=espTok(b);if(!x.length||!y.length)return 0;if(x.join(' ')===y.join(' '))return 100;
+  const [c,l]=x.length<=y.length?[x,y]:[y,x];
+  if(x[0]===y[0])return c.every(t=>l.includes(t))?c.length:0;
+  return c.length>=3&&x[0].length>=5&&lev(x[0],y[0])<=2&&c.slice(1).every(t=>l.includes(t))?c.length-1:0}
+function espLigar(ps,fs){const pares=[];ps.forEach((p,i)=>fs.forEach(f=>{const s=espScore(p.nome,f.nome);if(s)pares.push({i,f,s})}));
+  const m=new Map(),usa=new Set();pares.sort((a,b)=>b.s-a.s);
+  pares.forEach(x=>{if(m.has(x.i)||usa.has(x.f.id))return;
+    if(pares.some(y=>y!==x&&y.s===x.s&&(y.i===x.i&&!usa.has(y.f.id)||y.f.id===x.f.id&&!m.has(y.i))))return;
+    m.set(x.i,x.f);usa.add(x.f.id)});
+  return m}
+function espComparar(){
+  const E=FOL.esp,cols=colsDe(FOL.cli).filter(c=>!['observacoes','faltas_data'].includes(c)),doMes=folDoMes(),out=[],lig=espLigar(E.pessoas,FOL.func),usados=new Set([...lig.values()].map(f=>f.id));
+  E.pessoas.forEach((p,i)=>{
+    const f=lig.get(i)||null;
+    const grupos={},info=[];
+    p.verbas.forEach(v=>{const m=espColuna(v,cols);if(!m||!((v.venc||v.des||v.ref)>0)){info.push(v);return}(grupos[m.c]=grupos[m.c]||{...m,vs:[]}).vs.push(v)});
+    const linhas=[];
+    if(f){cols.forEach(c=>{const g=grupos[c],k=g?g.k:(ESPMAP.find(x=>x[0]===c)||[])[2];if(!k)return;
+        const s=espSistema(f,c,k),e=g?espValor(g.vs,k):(k==='sim'?{n:0,t:'Não'}:{n:0,a:0,t:'—'});
+        if(!g&&!s.n&&s.n!=null)return;
+        let ig=espIgual(s,e,k);
+        // a contabilidade às vezes desconta a falta direto nas horas normais (sem verba de falta): mostra as horas para conferir
+        if(!g&&ig===false&&/^(faltas|dsr$)/.test(c)){const hn=p.verbas.find(v=>/HORAS NORMAIS/.test(espN(v.desc)));if(hn?.ref!=null){e.t+=` (horas normais ${showMoney(hn.ref)})`;ig=null}}
+        linhas.push({c,t:FNOME(c),s:s.t,e:e.t,st:ig==null?'conf':ig?'ok':'dif',vs:g?.vs||[]})})}
+    Object.values(grupos).filter(g=>g.sem||!f).forEach(g=>{const e=espValor(g.vs,g.k);
+      linhas.push({c:g.c,t:g.vs.map(v=>v.desc).join(', '),s:f?'sem coluna na planilha':'—',e:e.t,st:'dif',vs:g.vs})});
+    out.push({p,f,linhas,info});
+  });
+  const faltam=doMes.filter(f=>!usados.has(f.id));
+  return {rows:out,faltam};
+}
+function renderFolEsp(){
+  const box=$('folEsp'),E=FOL.esp;
+  if(!E||E.cli!==FOL.cli?.id||E.comp!==FOL.comp.slice(0,7)||!FOL.cli.folha_colunas?.length){box.hidden=true;box.innerHTML='';return}
+  const R=espComparar(),todos=!!E.todos,ndif=R.rows.reduce((s,r)=>s+r.linhas.filter(l=>l.st!=='ok').length,0),semCad=R.rows.filter(r=>!r.f);
+  const avisos=[E.compArq&&E.compArq!==E.comp?`O espelho é de <b>${esc(mesAnoBR(E.compArq))}</b> e a folha aberta é de <b>${esc(mesAnoBR(E.comp))}</b>.`:'',
+    E.cnpj&&FOL.cli.cnpj&&E.cnpj.replace(/\D/g,'')!==FOL.cli.cnpj.replace(/\D/g,'')?`O CNPJ do espelho (${esc(E.cnpj)}) não é o desta empresa (${esc(FOL.cli.cnpj)}).`:'',
+    E.semTexto?`${E.semTexto} página${E.semTexto===1?'':'s'} sem texto (imagem) não ${E.semTexto===1?'foi lida':'foram lidas'}.`:'',
+    E.pessoas.some(p=>!p.ok)?`Os totais de ${E.pessoas.filter(p=>!p.ok).length} recibo(s) não fecharam com as verbas lidas: confira esses no PDF.`:''].filter(Boolean);
+  const chip={ok:'<span class="chip c-ok">✓ Igual</span>',dif:'<span class="chip c-bad">≠ Diferente</span>',conf:'<span class="chip c-warn">Conferir</span>'};
+  const corpo=R.rows.filter(r=>todos||!r.f||r.linhas.some(l=>l.st!=='ok')).map((r,i)=>{const ls=r.linhas.filter(l=>todos||l.st!=='ok');
+    return `<tr class="fesp-p"><td class="l" colspan="5"><b>${esc(r.f?.nome||r.p.nome)}</b>${r.f?'':' <span class="chip c-bad">não achei no cadastro</span>'}
+      <span class="note">· líquido no espelho ${r.p.liq!=null?fm(r.p.liq):'—'}</span> <button class="btn small ghost" data-espv="${i}">Ver recibo</button></td></tr>${
+      ls.map(l=>`<tr><td></td><td class="l">${esc(l.t)}</td><td class="l">${esc(l.s)}</td><td class="l">${esc(l.e)}</td><td class="l">${chip[l.st]}</td></tr>`).join('')
+      ||(r.linhas.length?'':'<tr><td></td><td class="l muted" colspan="4">Nenhuma verba das colunas da planilha neste recibo.</td></tr>')}
+      <tr hidden data-esprec="${i}"><td></td><td class="l" colspan="4"><table class="mini"><thead><tr><th>Cód.</th><th class="l">Verba</th><th>Ref.</th><th>Vencimentos</th><th>Descontos</th></tr></thead><tbody>${
+        r.p.verbas.map(v=>`<tr><td>${esc(v.cod)}</td><td class="l">${esc(v.desc)}</td><td>${v.ref!=null?showMoney(v.ref):''}</td><td>${v.venc?fm(v.venc):''}</td><td>${v.des?fm(v.des):''}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td></td><td class="l">Totais</td><td></td><td>${r.p.totV!=null?fm(r.p.totV):''}</td><td>${r.p.totD!=null?fm(r.p.totD):''}</td></tr></tfoot></table></td></tr>`}).join('');
+  box.hidden=false;
+  box.innerHTML=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Conferência com o espelho da contabilidade</h2>
+      <div class="row"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="folEspTodos" style="width:auto"${todos?' checked':''}> Mostrar o que bateu</label>
+      <button class="btn" id="folEspPdf">PDF das diferenças</button><button class="btn ghost" id="folEspFechar">Fechar</button></div></div>
+    <p class="note" style="margin:6px 0 0">${esc(E.arqs.join(', '))} · ${E.pessoas.length} recibo${E.pessoas.length===1?'':'s'} · <b class="${ndif?'neg':'pos'}">${ndif?`${ndif} ${ndif===1?'item para conferir':'itens para conferir'}`:'✓ tudo igual à folha do sistema'}</b>${semCad.length?` · ${semCad.length} sem cadastro`:''}${R.faltam.length?` · ${R.faltam.length} da folha sem recibo`:''}</p>
+    ${avisos.map(a=>`<p class="neg" style="margin:6px 0 0">⚠ ${a}</p>`).join('')}
+    ${R.faltam.length?`<p class="note" style="margin:6px 0 0"><b>Na folha do sistema, mas sem recibo no espelho:</b> ${R.faltam.map(f=>esc(f.nome)).join(', ')}.</p>`:''}
+    <div class="tablebox" style="margin-top:8px"><table><thead><tr><th style="width:18px"></th><th class="l">Informação</th><th class="l">Folha do sistema</th><th class="l">Espelho da contabilidade</th><th class="l"></th></tr></thead><tbody>${
+      corpo||'<tr><td></td><td class="l pos" colspan="4">Nenhuma diferença: todas as colunas da planilha batem com o espelho.</td></tr>'}</tbody></table></div>
+    <p class="note" style="margin:6px 0 0">Compara as colunas da planilha desta empresa (ajuda de custo, gratificação, insalubridade, quebra de caixa, VA, VT, faltas, DSR, adiantamento…) com as verbas do recibo. Horas normais, INSS, IRRF, abono da CCT, consignado e férias não estão na planilha: veja em “Ver recibo”. Se você corrigir uma célula da folha, a conferência é refeita na hora.</p>`;
+}
+const mesAnoBR=c=>{const [a,m]=String(c).split('-');return `${MESES_EXT[+m-1]?.replace('marco','março')||m}/${a}`};
+$('folEspFile').addEventListener('change',async e=>{const fs=[...(e.target.files||[])];e.target.value='';if(!fs.length)return;
+  if(fs.some(f=>!/\.pdf$/i.test(f.name))){toast('Envie o espelho da folha em PDF (os recibos de pagamento que a contabilidade mandou).');return}
+  toast('Lendo o espelho…');
+  try{const E={cli:FOL.cli.id,comp:FOL.comp.slice(0,7),arqs:fs.map(f=>f.name),pessoas:[],semTexto:0,compArq:null,cnpj:null};
+    for(const f of fs){const r=await lerEspelho(await f.arrayBuffer());E.pessoas.push(...r.pessoas);E.semTexto+=r.semTexto;E.compArq=E.compArq||r.comp;E.cnpj=E.cnpj||r.cnpj}
+    if(!E.pessoas.length){toast(E.semTexto?'Este PDF é só imagem (escaneado ou impresso como imagem): peça à contabilidade o PDF gerado pelo sistema da folha.':'Não achei recibos de pagamento neste PDF.');return}
+    FOL.esp=E;renderFolEsp();$('folEsp').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){console.error(err);toast('Não consegui ler este PDF.')}});
+$('folEsp').addEventListener('click',e=>{
+  if(e.target.id==='folEspFechar'){FOL.esp=null;renderFolEsp();return}
+  if(e.target.id==='folEspPdf'){espPdf();return}
+  const b=e.target.closest('[data-espv]');if(b){const tr=$('folEsp').querySelector(`[data-esprec="${b.dataset.espv}"]`);tr.hidden=!tr.hidden;b.textContent=tr.hidden?'Ver recibo':'Esconder recibo'}});
+$('folEsp').addEventListener('change',e=>{if(e.target.id==='folEspTodos'){FOL.esp.todos=e.target.checked;renderFolEsp()}});
+function espPdf(){
+  const R=espComparar(),rs=R.rows.map(r=>({...r,linhas:r.linhas.filter(l=>l.st!=='ok')})).filter(r=>r.linhas.length||!r.f);
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
+  const tit=`Conferência da folha × espelho · ${FOL.cli.nome} · ${mesAnoBR(FOL.comp.slice(0,7))}`;
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(tit)}</title><style>
+    body{font:12px system-ui,Arial,sans-serif;color:#1b2a2a;margin:24px}h1{font-size:17px;margin:0 0 2px}p{margin:0 0 12px;color:#555}
+    table{border-collapse:collapse;width:100%}th,td{border:1px solid #cfd8d8;padding:5px 8px;text-align:left}th{background:#0f5c57;color:#fff;font-weight:600}
+    td.p{background:#e3eded;font-weight:700}@page{size:A4;margin:14mm}</style></head><body>
+    <h1>${esc(tit)}</h1><p>${esc(FOL.esp.arqs.join(', '))} · emitido em ${dBR(TODAY)}</p>
+    ${R.faltam.length?`<p><b>Na folha, sem recibo no espelho:</b> ${R.faltam.map(f=>esc(f.nome)).join(', ')}</p>`:''}
+    <table><thead><tr><th>Informação</th><th>Folha enviada</th><th>Espelho da contabilidade</th></tr></thead><tbody>${
+      rs.map(r=>`<tr><td class="p" colspan="3">${esc(r.f?.nome||r.p.nome)}${r.f?'':' (não achei no cadastro)'}</td></tr>${r.linhas.map(l=>`<tr><td>${esc(l.t)}</td><td>${esc(l.s)}</td><td>${esc(l.e)}</td></tr>`).join('')}`).join('')
+      ||'<tr><td colspan="3">Nenhuma diferença.</td></tr>'}</tbody></table>
+    <script>onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`);
+  w.document.close();
 }
 $('folBar').addEventListener('click',async ev=>{
   if(ev.target.id==='folBaixar'){baixarFolha();return}
