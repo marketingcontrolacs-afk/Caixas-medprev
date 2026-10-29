@@ -3445,12 +3445,14 @@ async function lerEspelho(buf){
       // a descrição é a âncora da verba; o código e os valores podem vir um pouco acima ou abaixo da linha
       const descs=[];area.forEach(l=>{const d=l.its.filter(i=>i.x>=hD.x-110&&i.x<(hR?hR.x-20:hV.x-60)&&!(num(i.s)!=null&&i.x>hD.x)&&!(/^\d+$/.test(i.s)&&i.x<hD.x-90));
         if(d.length&&d.some(i=>/[A-Za-z]/.test(i.s)))descs.push({y:l.y,desc:d.map(i=>i.s).join(' '),x0:d[0].x})});
-      const vals=area.flatMap(l=>l.its).filter(i=>num(i.s)!=null&&i.x>(hR?hR.x-40:hD.x+100));
+      // referência em horas pode vir como 14:50 (Oliveira) ou em decimal, 14,83 (Viva)
+      const hora=s=>{const m=s.match(/^(\d{1,3}):(\d{2})$/);return m?+m[1]+ +m[2]/60:null};
+      const vals=area.flatMap(l=>l.its).filter(i=>(num(i.s)!=null||hora(i.s)!=null)&&i.x>(hR?hR.x-40:hD.x+100));
       const cods=area.flatMap(l=>l.its).filter(i=>/^\d+$/.test(i.s)&&i.x<hD.x-90);
       const perto=(arr,y)=>{let b=null;arr.forEach(i=>{const d=Math.abs(i.y-y);if(d<6&&(!b||d<b.d))b={i,d}});return b};
       const verbas=descs.map(d=>({cod:'',desc:d.desc,ref:null,venc:0,desc_:0,y:d.y}));
       cods.forEach(c=>{const v=perto(verbas,c.y);if(v&&!v.i.cod)v.i.cod=c.s});
-      vals.forEach(i=>{const v=perto(verbas,i.y);if(!v)return;const cols=[['ref',hR],['venc',hV],['desc_',hDs]].filter(c=>c[1]);
+      vals.forEach(i=>{const v=perto(verbas,i.y);if(!v)return;const h=hora(i.s);if(h!=null){if(v.i.ref==null){v.i.ref=h;v.i.refTxt=i.s}return}const cols=[['ref',hR],['venc',hV],['desc_',hDs]].filter(c=>c[1]);
         const k=cols.sort((a,b)=>Math.abs(a[1].cx-i.cx)-Math.abs(b[1].cx-i.cx))[0][0];
         // valor que não cabe na coluna mais perto (ex.: referência já preenchida) vai para a próxima
         if(k==='ref'&&v.i.ref!=null)return;v.i[k]=k==='ref'?num(i.s):r2((v.i[k]||0)+num(i.s))});
@@ -3504,7 +3506,7 @@ function espValor(vs,k){
     const n=Math.max(...ps);return {n,t:String(n).replace('.',',')+'%'}}
   // a referência das horas vem em decimal (7,33 = 7:20); se a contabilidade usar horas,minutos, também bate
   if(k==='horas'){const r=r2(vs.reduce((s,v)=>s+(v.ref||0),0)),n=r*60,a=vs.reduce((s,v)=>s+Math.trunc(v.ref||0)*60+Math.round(((v.ref||0)%1)*100),0);
-    return {n,a,t:`${showMoney(r)} h (${hhmm(n)})`}}
+    return {n,a,t:vs.every(v=>v.refTxt)?hhmm(n):`${showMoney(r)} h (${hhmm(n)})`}}
   if(k==='dias'){const n=vs.reduce((s,v)=>s+(v.ref||0),0);return {n,t:String(n).replace('.',',')}}
 }
 // valor da folha do sistema, no mesmo formato (null em n: texto que não dá para comparar sozinho)
@@ -3550,10 +3552,12 @@ function espComparar(){
     // a contabilidade das Oliveira e da BJ lança a premiação numa verba só, "PRÊMIO" (Carol, 29/10): quando a empresa
     // tem mais de uma coluna de premiação (Whatsapp, Assiduidade, Prêmio), compara a soma delas com a soma das verbas
     const PREM=['premio_whats','assiduidade','premio'],pcs=PREM.filter(c=>cols.includes(c)),gen=p.verbas.some(v=>/PREMI/.test(espN(v.desc))&&!/WHATS|ASSIDU/.test(espN(v.desc)));
-    if(f&&gen&&pcs.length>1){const vs=PREM.flatMap(c=>{const g=grupos[c];delete grupos[c];return g?g.vs:[]});
+    const sobra=pcs.filter(c=>!grupos[c]||c==='premio'),uma=gen&&pcs.length>1&&sobra.length===1&&grupos.premio&&sobra[0]!=='premio';
+    if(uma){const g=grupos.premio;delete grupos.premio;(grupos[sobra[0]]=grupos[sobra[0]]||{c:sobra[0],k:'money',vs:[]}).vs.push(...g.vs)}
+    if(f&&gen&&pcs.length>1&&!uma){const vs=PREM.flatMap(c=>{const g=grupos[c];delete grupos[c];return g?g.vs:[]});
       const sv=pcs.map(c=>espSistema(f,c,'money')),s={n:sv.some(x=>x.n==null)?null:r2(sv.reduce((a,x)=>a+x.n,0))};s.t=s.n==null?sv.map(x=>x.t).join(' + '):s.n?fm(s.n):'—';
       const e=espValor(vs,'money');if(vs.length||s.n){const ig=espIgual(s,e,'money');linhas.push({c:'premiacao',t:'Premiação ('+pcs.map(FNOME).map(t=>t.replace(/^Premiação\s*/,'')).join(' + ')+')',s:s.t,e:vs.length?e.t:'—',st:ig==null?'conf':ig?'ok':'dif',vs})}}
-    const pula=f&&gen&&pcs.length>1?new Set(pcs):new Set();
+    const pula=f&&gen&&pcs.length>1&&!uma?new Set(pcs):new Set();
     if(gen&&pcs.length===1&&pcs[0]!=='premio'&&grupos.premio){const g=grupos.premio;delete grupos.premio;(grupos[pcs[0]]=grupos[pcs[0]]||{c:pcs[0],k:'money',vs:[]}).vs.push(...g.vs)}
     if(f){cols.forEach(c=>{if(pula.has(c))return;const g=grupos[c],k=g?g.k:(ESPMAP.find(x=>x[0]===c)||[])[2];if(!k)return;
         const s=espSistema(f,c,k),e=g?espValor(g.vs,k):(k==='sim'?{n:0,t:'Não'}:{n:0,a:0,t:'—'});
@@ -3601,7 +3605,7 @@ function renderFolEsp(){
         ${l.st==='dif'||l.st==='conf'?obsTr(r.pk+'|'+l.c,'Ex.: a contabilidade lançou o DSR pelas horas da falta, está correto',l.antes?.obs):''}`).join('')
       ||(r.linhas.length||r.fora?'':'<tr><td></td><td class="l muted" colspan="4">Nenhuma verba das colunas da planilha neste recibo.</td></tr>')}
       <tr hidden data-esprec="${i}"><td></td><td class="l" colspan="4"><table class="mini"><thead><tr><th>Cód.</th><th class="l">Verba</th><th>Ref.</th><th>Vencimentos</th><th>Descontos</th></tr></thead><tbody>${
-        r.p.verbas.map(v=>`<tr><td>${esc(v.cod)}</td><td class="l">${esc(v.desc)}</td><td>${v.ref!=null?showMoney(v.ref):''}</td><td>${v.venc?fm(v.venc):''}</td><td>${v.des?fm(v.des):''}</td></tr>`).join('')}</tbody>
+        r.p.verbas.map(v=>`<tr><td>${esc(v.cod)}</td><td class="l">${esc(v.desc)}</td><td>${v.refTxt?esc(v.refTxt):v.ref!=null?showMoney(v.ref):''}</td><td>${v.venc?fm(v.venc):''}</td><td>${v.des?fm(v.des):''}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td></td><td class="l">Totais</td><td></td><td>${r.p.totV!=null?fm(r.p.totV):''}</td><td>${r.p.totD!=null?fm(r.p.totD):''}</td></tr></tfoot></table></td></tr>`}).join('');
   box.hidden=false;
   box.innerHTML=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Conferência com o espelho da contabilidade</h2>
