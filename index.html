@@ -789,6 +789,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <h2 style="margin-top:18px">Alimentação</h2>
     <div class="card tablebox"><table id="bnVa"></table></div>
     <p class="note">Dias = dias úteis do mês de uso + sábados da escala − faltas, atestados e férias. Passagens = dias × 2. Alimentação por dia = dias × valor do dia; alimentação fixa (Viva) = valor fixo, que atestado não desconta, mais a assiduidade, que a pessoa perde se faltar sem atestado. Perdeu o cartão do vale alimentação ou do combustível: marque “2ª via” e a taxa de R$ 9,00 sai do valor do benefício. As faltas e atestados vêm do Espelho de ponto do mês do pedido (importado na seção Espelho de ponto); se o ponto for importado depois de salvar, o rascunho atualiza as faltas sozinho. Dá para mudar qualquer número antes de salvar.</p>
+    <h2 style="margin-top:22px">Contas a pagar do pedido</h2>
+    <div class="card tablebox"><table id="bnCp"></table></div>
+    <p class="note" id="bnCpNote">Ao marcar o pedido como feito, o sistema cria uma conta a pagar por fornecedor nesta empresa: valor do pedido + taxa do boleto do fornecedor. Anexe aqui o boleto de cada fornecedor: o sistema lê o boleto e avisa se o valor não bate, se o boleto é de outra empresa (CNPJ do pagador) ou se o mesmo boleto já está em outra conta.</p>
     <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Pendências</h2><button class="btn" id="bnPendAdd">+ Pendência</button></div>
     <div class="card tablebox"><table id="bnPend"></table></div>
     <div id="bnCadBox" hidden>
@@ -2415,7 +2418,7 @@ async function renderMod(){
     const st=r=>{if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
       return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
   }else if(MOD==='cartao'){
@@ -2474,6 +2477,7 @@ async function openReg(r){
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
   $('rBaixa').innerHTML=(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
+  if(MOD==='pagar'&&r?.origem==='beneficios')$('rFields').insertAdjacentHTML('afterbegin',`<div class="note wide" style="margin:0">Conta do pedido de benefícios de ${ymTxt(r.beneficio_comp.slice(0,7))}: pedido ${fm(r.valor_pedido)} + taxa do boleto ${fm(r.taxa_boleto)} = <b>${fm(+r.valor_pedido+(+r.taxa_boleto||0))}</b>.${r.boleto_alerta?` <span class="chip c-bad">${esc(r.boleto_alerta)}</span>`:''}</div>`);
   renderRateio(r,ed);ajustaDeposito();
   $('rErr').hidden=true;
   $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||ehEsc()));
@@ -2514,6 +2518,9 @@ $('rForm').addEventListener('submit',async e=>{
     if(!m&&l.some(x=>!x.nome||!(x.valor>0)))m='No relatório de líquidos, preencha o nome e o valor de cada pessoa (ou tire a linha).';
     row.liquidos=l.length?l.map(x=>({nome:x.nome,valor:r2(x.valor)})):null}
   if(!m&&$('rRat').innerHTML){const rt=lerRateio(row.valor);if(rt.erro)m=rt.erro;else row.rateio=rt.partes}
+  if(!m&&MOD==='pagar'&&row.linha_digitavel){const rp=await boletoRepetido(boletoDe(row.linha_digitavel)||{linha:row.linha_digitavel},REG?.id);
+    if(rp.length){const t='Este boleto já está lançado em outra conta: '+repetidoTxt(rp)+'.';
+      if(!ehEsc())m=t+' Confira se é o boleto certo desta empresa.';else if(!confirm(t+'\n\nSalvar mesmo assim?'))return}}
   if(m){err.textContent=m;err.hidden=false;return}
   err.hidden=true;$('rSave').disabled=true;
   try{
@@ -2524,6 +2531,7 @@ $('rForm').addEventListener('submit',async e=>{
     if(e1&&/linha_digitavel|nfe_chave/.test(e1.message||'')){delete row.linha_digitavel;delete row.nfe_chave;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
     // banco ainda sem o v54: salva sem o relatório de líquidos
     if(e1&&/liquidos/.test(e1.message||'')){delete row.liquidos;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single());if(!e1)toast('Conta salva sem o relatório de líquidos: rode a atualização v54 do banco.')}
+    if(e1&&/BOLETO_REPETIDO/.test(e1.message||'')){err.textContent='Este boleto já está lançado em outra conta a pagar. Confira se é o boleto certo desta empresa.';err.hidden=false;return}
     if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
     if(RDOCS.length){const {error:e3}=await sb.from('documentos').insert(RDOCS.map(d=>({cliente_id:cli.id,modulo:MOD,registro_id:sv.id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e3)throw e3}
@@ -2725,14 +2733,17 @@ async function pdfTexto(file){
 }
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
-async function aplicarLeitura({bol,nfe},origem){
+async function aplicarLeitura({bol,nfe,cnpjs},origem){
   const avisos=[],lidos=[];
   const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=el.classList.contains('money')?showMoney(v):v;lidos.push(txt+' '+(fmt?fmt(v):v))}
     else if(String(el.classList.contains('money')?r2(atual):atual)!==String(v))avisos.push(`${txt} no ${origem}: ${fmt?fmt(v):v}, diferente do digitado`)};
   if(bol){const el=rCampo('linha_digitavel');if(el&&!soDig(el.value))el.value=bol.linha||bol.barra;
-    poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR)}
+    poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR);
+    // o mesmo boleto em outra conta (de qualquer empresa) e boleto de outra empresa (v72)
+    const rp=await boletoRepetido(bol,REG?.id);if(rp.length)avisos.push('ESTE BOLETO JÁ ESTÁ LANÇADO EM OUTRA CONTA: '+repetidoTxt(rp));
+    const pg=cnpjs&&regCli()&&benPagador(cnpjs,regCli());if(pg)avisos.push(pg)}
   if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº');
     const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:nfe.cnpj}).then(r=>r,()=>({data:null}));
     if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
@@ -2741,7 +2752,7 @@ async function aplicarLeitura({bol,nfe},origem){
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'');
 }
 $('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf$/i.test(f.type||f.name)||!regEditavel())return;
-  try{const r=lerTextoDoc(await pdfTexto(f));if(r.bol||r.nfe)await aplicarLeitura(r,'PDF');else if($('rLeitura')&&!soDig(rCampo('linha_digitavel')?.value))$('rLeitura').innerHTML='<span class="muted">Não achei a linha digitável neste PDF. Se for boleto, cole a linha digitável acima.</span>'}
+  try{const t=await pdfTexto(f),r={...lerTextoDoc(t),cnpjs:cnpjsDoTexto(t)};if(r.bol||r.nfe)await aplicarLeitura(r,'PDF');else if($('rLeitura')&&!soDig(rCampo('linha_digitavel')?.value))$('rLeitura').innerHTML='<span class="muted">Não achei a linha digitável neste PDF. Se for boleto, cole a linha digitável acima.</span>'}
   catch(err){console.error(err)}});
 $('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitavel')return;const d=soDig(e.target.value),box=$('rLeitura');
   if(d.length<44){if(box)box.innerHTML='';return}
@@ -4306,7 +4317,7 @@ async function renderBen(){
     ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelo ponto (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
   $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;
   $('bnVtTit').textContent=R.combustivel?'Vale transporte e combustível':'Vale transporte';
-  benEscala(lanca);benTabelas(lanca);renderBenPend(lanca);
+  benEscala(lanca);benTabelas(lanca);renderBenPend(lanca);renderBenCp(lanca);
   $('bnCadBox').hidden=!e;if(e)renderBenCad();
 }
 const benNome=id=>BEN.func.find(f=>f.id===id)?.nome||'?';
@@ -4378,8 +4389,119 @@ $('bnBar').addEventListener('click',async ev=>{
   else{const fm2={...(BEN.cli.folha_modelo||{}),beneficios:{...benRegra(BEN.cli),desconta:a==='regra',confirmado:true}};
     ({error}=await sb.from('clientes').update({folha_modelo:fm2}).eq('id',BEN.cli.id));if(!error)BEN.cli.folha_modelo=fm2}
   if(error){fail(error);b.disabled=false;return}
+  if(a==='feito'){if(await benGerarCps())toast('Pedido feito. Contas a pagar criadas: anexe o boleto de cada fornecedor.')}else
   toast({feito:'Pedido marcado como feito',reabrir:'Pedido voltou para rascunho',refazer:'Pedido montado de novo (ainda não salvo)',regra:'Regra confirmada',naodesc:'Regra salva: não desconta na folha'}[a]);renderBen();
 });
+// ---------- Contas a pagar do pedido (v72) ----------
+// O mesmo boleto foi salvo em duas empresas e pago na errada (Carol, 29/10): o pedido feito gera uma conta por
+// fornecedor (pedido + taxa do boleto) e o boleto é anexado aqui, conferido com o pedido, com o CNPJ da empresa
+// e com as outras contas de todas as empresas.
+const chaveForn=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
+const BEN_SEMF='Fornecedor não informado';
+const cnpjsDoTexto=t=>[...new Set((String(t).match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/g)||[]).map(soDig).filter(x=>x.length===14))];
+const cnpjFmt=d=>d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5');
+// o boleto é desta empresa? procura o CNPJ dela no texto do PDF (pagador); se achar o de outra empresa, diz qual
+function benPagador(cnpjs,cli){
+  const meu=soDig(cli.cnpj);if(!cnpjs.length||meu.length!==14)return null;
+  if(cnpjs.includes(meu))return null;
+  const outra=CLIENTES.find(c=>c.id!==cli.id&&cnpjs.includes(soDig(c.cnpj)));
+  if(outra)return `O boleto é de ${outra.nome} (CNPJ ${cnpjFmt(soDig(outra.cnpj))}), não de ${cli.nome}`;
+  const raiz=cnpjs.find(c=>c.slice(0,8)===meu.slice(0,8));
+  if(raiz)return `O CNPJ do boleto (${cnpjFmt(raiz)}) é de outra unidade, não de ${cli.nome} (${cnpjFmt(meu)})`;
+  return `O CNPJ de ${cli.nome} (${cnpjFmt(meu)}) não aparece no boleto. Confira se o pagador é esta empresa`;
+}
+// mesmo boleto já lançado em outra conta (todas as empresas)
+async function boletoRepetido(bol,contaId){
+  const ls=[bol?.linha,bol?.barra].filter(Boolean);if(!ls.length)return [];
+  const {data,error}=await sb.rpc('boleto_ja_lancado',{linhas:ls,conta:contaId||null});
+  if(error){console.error(error);return []}return data||[];
+}
+const repetidoTxt=xs=>xs.map(x=>`${x.empresa}: ${x.fornecedor||''} ${fm(x.valor)}, vencimento ${dBR(x.vencimento)}${x.pago?' (JÁ PAGO)':''}, em ${x.onde}`).join('; ');
+// o que o pedido vai gerar (antes de marcar como feito): uma linha por fornecedor
+function benGrupos(){
+  const g={};BEN.rows.forEach(r=>{const nome=(r.empresa||'').trim()||BEN_SEMF,k=chaveForn(nome);
+    const x=g[k]=g[k]||{chave:k,nome,total:0,tipos:new Set()};x.total=r2(x.total+(+r.total||0));x.tipos.add(r.tipo==='va'?'vale alimentação':r.tipo==='comb'?'combustível':'vale transporte')});
+  return Object.values(g).filter(x=>x.total>0).sort((a,b)=>a.nome.localeCompare(b.nome));
+}
+async function renderBenCp(lanca){
+  const feito=BEN.mes?.status==='Pedido feito',[rc,rt]=await Promise.all([
+    sb.from('contas_pagar').select('*').eq('cliente_id',BEN.cli.id).eq('origem','beneficios').eq('beneficio_comp',BEN.comp).order('fornecedor'),
+    sb.from('beneficios_taxas').select('*')]);
+  if(rc.error||rt.error){const e=rc.error||rt.error;console.error(e);
+    $('bnCp').innerHTML=`<tbody><tr><td class="l ${/origem|beneficio|beneficios_taxas/.test(e.message||'')||e.code==='PGRST205'||e.code==='42703'?'neg">Falta rodar a atualização v72 do banco no Supabase.':'neg">Erro ao carregar as contas a pagar do pedido.'}</td></tr></tbody>`;return}
+  BEN.cps=rc.data||[];BEN.taxas=Object.fromEntries((rt.data||[]).map(t=>[t.chave,+t.taxa||0]));
+  const ids=BEN.cps.map(c=>c.id),docs={};
+  if(ids.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',ids);(dd||[]).forEach(d=>(docs[d.registro_id]=docs[d.registro_id]||[]).push(d))}
+  BEN.cpDocs=docs;
+  const dis=lanca?'':' disabled',grupos=benGrupos(),
+    taxaIn=(k,nome)=>`<input data-btaxa="${esc(k)}" data-bnome="${esc(nome)}" value="${showMoney(BEN.taxas[k]||0)}" inputmode="decimal" style="width:70px;min-width:70px;padding:5px 6px;text-align:right" title="Taxa cobrada no boleto deste fornecedor (vale para todas as empresas)"${dis}>`;
+  if(!feito&&!BEN.cps.length){
+    $('bnCp').innerHTML=grupos.length?`<thead><tr><th class="l">Fornecedor</th><th class="l">Benefícios</th><th>R$ Pedido</th><th>R$ Taxa do boleto</th><th>R$ Boleto esperado</th></tr></thead><tbody>${
+      grupos.map(x=>`<tr><td class="l"><b>${esc(x.nome)}</b>${x.nome===BEN_SEMF?' <span class="chip c-bad">preencha a empresa nas linhas</span>':''}</td><td class="l">${[...x.tipos].join(', ')}</td><td>${fm(x.total)}</td><td>${taxaIn(x.chave,x.nome)}</td><td><b>${fm(x.total+(BEN.taxas[x.chave]||0))}</b></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td class="l" colspan="5"><span class="chip c-none">As contas a pagar são criadas quando marcar o pedido como feito</span></td></tr></tfoot>`
+      :'<tbody><tr><td class="l muted">Sem valores no pedido.</td></tr></tbody>';
+    return}
+  const st=c=>{const d=docs[c.id]||[];if(c.conferido)return `<span class="chip c-done">✓ Paga${c.pago_em?' '+dBR(c.pago_em).slice(0,5):''}</span>`;
+    if(c.boleto_alerta)return `<span class="chip c-bad" style="white-space:normal;display:inline-block;max-width:340px;border-radius:8px">⚠ ${esc(c.boleto_alerta)}</span>`;
+    if(!d.length&&!c.linha_digitavel)return '<span class="chip c-warn">Falta anexar o boleto</span>';
+    return '<span class="chip c-ok">✓ Boleto confere</span>'};
+  const mudou=feito?0:BEN.cps.filter(c=>!c.conferido&&r2(+c.valor_pedido)!==r2(grupos.find(x=>x.chave===c.beneficio_fornecedor)?.total||0)).length;
+  $('bnCp').innerHTML=`<thead><tr><th class="l">Fornecedor</th><th class="l">Benefícios</th><th>R$ Pedido</th><th>R$ Taxa do boleto</th><th>R$ Boleto esperado</th><th>R$ Boleto lido</th><th>Vencimento</th><th class="l">Boleto</th><th class="l">Situação</th></tr></thead><tbody>${
+    BEN.cps.map(c=>{const ab=lanca&&!c.conferido,d=docs[c.id]||[],dif=c.boleto_valor!=null&&r2(+c.boleto_valor)!==r2(+c.valor);
+      return `<tr data-cp="${c.id}"><td class="l"><b>${esc(c.fornecedor)}</b></td><td class="l">${esc((c.sobre||'').replace(/^Pedido de benefícios \(|\) de .*$/g,''))}</td><td>${fm(c.valor_pedido)}</td><td>${ab?taxaIn(c.beneficio_fornecedor,c.fornecedor):fm(c.taxa_boleto)}</td><td><b>${fm(c.valor)}</b></td><td${dif?' class="neg"':''}>${c.boleto_valor!=null?`<b>${fm(c.boleto_valor)}</b>`:'<span class="muted">—</span>'}</td>
+        <td>${ab?`<input type="date" data-bcv value="${c.vencimento}" style="width:140px">`:dBR(c.vencimento)}</td>
+        <td class="l">${d.map(x=>`<a href="#" data-bcdoc="${esc(x.caminho)}" class="note">📎 ${esc(x.nome_arquivo)}</a>`).join('<br>')}${ab?`<div class="row" style="gap:6px;margin-top:4px;flex-wrap:nowrap"><span class="btn small fotobtn">📎 ${d.length?'Trocar':'Anexar'} boleto<input type="file" accept="${ACCEPT}" data-bcf aria-label="Anexar o boleto de ${esc(c.fornecedor)}"></span><input data-bcl placeholder="ou cole a linha digitável" value="${esc(c.linha_digitavel||'')}" inputmode="numeric" style="width:210px;padding:5px 6px"></div>`:''}</td>
+        <td class="l">${st(c)}</td></tr>`}).join('')}</tbody>
+    <tfoot><tr><td class="l" colspan="9">${!feito?`<span class="chip c-warn">Pedido voltou para rascunho: as contas são atualizadas quando marcar como feito de novo${mudou?` (${mudou} com valor diferente do pedido)`:''}</span>`:'<span class="note" style="margin:0">As contas também aparecem em Boletos e notas fiscais a pagar, para o pagamento.</span>'}</td></tr></tfoot>`;
+}
+async function benGerarCps(){
+  const venc=BEN.cps?.find(c=>!c.conferido)?.vencimento||addDias(TODAY,5);
+  const {error}=await sb.rpc('gerar_contas_beneficios',{cli:BEN.cli.id,comp:BEN.comp,venc});
+  if(error){console.error(error);toast(/gerar_contas_beneficios|function/.test(error.message||'')?'Pedido feito, mas falta rodar a atualização v72 do banco para criar as contas a pagar.':'Não foi possível criar as contas a pagar do pedido. Tente de novo.');return false}
+  return true;
+}
+// taxa do boleto do fornecedor
+$('bnCp').addEventListener('change',async ev=>{
+  const t=ev.target.closest('[data-btaxa]');
+  if(t){const n=parseMoney(t.value);if(n==null||Number.isNaN(n)||n<0){toast('Taxa inválida. Ex.: 3,50');return}
+    const {error}=await sb.from('beneficios_taxas').upsert({chave:t.dataset.btaxa,fornecedor:t.dataset.bnome,taxa:r2(n),alterado_em:new Date().toISOString()});
+    if(error){fail(error);return}
+    if(BEN.mes?.status==='Pedido feito')await benGerarCps();
+    toast(`Taxa do boleto de ${t.dataset.bnome} salva: ${fm(n)}`);renderBenCp(true);return}
+  const tr=ev.target.closest('tr[data-cp]');if(!tr)return;const c=BEN.cps.find(x=>x.id===tr.dataset.cp);
+  if(ev.target.matches('[data-bcv]')){if(!ev.target.value)return;const {error}=await sb.from('contas_pagar').update({vencimento:ev.target.value}).eq('id',c.id);if(error)fail(error);else toast('Vencimento salvo');return}
+  if(ev.target.matches('[data-bcf]')&&ev.target.files[0]){const f=ev.target.files[0];ev.target.value='';await benAnexaBoleto(c,f,null)}
+  if(ev.target.matches('[data-bcl]')){const d=soDig(ev.target.value);if(!d||d===c.linha_digitavel)return;const b=boletoDe(d);
+    if(!b){toast('Esta linha digitável não confere. Verifique os números.');return}await benAnexaBoleto(c,null,b)}
+});
+$('bnCp').addEventListener('click',async ev=>{const a=ev.target.closest('[data-bcdoc]');if(!a)return;ev.preventDefault();
+  const u=await signed([a.dataset.bcdoc]);if(u[a.dataset.bcdoc])window.open(u[a.dataset.bcdoc],'_blank');else toast('Não foi possível abrir o arquivo')});
+// lê o boleto e confere: valor (pedido + taxa), empresa do pagador e se já está em outra conta
+async function benAnexaBoleto(c,file,bol){
+  let cnpjs=[],up=null;
+  try{
+    if(file&&/pdf$/i.test(file.type||file.name)){const txt=await pdfTexto(file);bol=bol||lerTextoDoc(txt).bol;cnpjs=cnpjsDoTexto(txt)}
+    if(!bol&&!c.linha_digitavel){toast(file?'Não achei a linha digitável neste arquivo. Cole a linha digitável ao lado do botão.':'Linha digitável inválida.');if(!file)return}
+    const linha=bol?bol.linha||bol.barra:c.linha_digitavel;
+    const rep=bol?await boletoRepetido(bol,c.id):[];
+    if(rep.length){const t='ESTE BOLETO JÁ ESTÁ LANÇADO EM OUTRA CONTA: '+repetidoTxt(rep)+'.';
+      if(!ehEsc()){alert(t+'\n\nNão foi anexado. Confira se é o boleto certo desta empresa.');return}
+      if(!confirm(t+'\n\nAnexar mesmo assim nesta conta?'))return}
+    const avisos=[];
+    if(!bol)avisos.push('Não consegui ler o boleto: confira o valor e o vencimento à mão');
+    if(bol?.valor&&r2(bol.valor)!==r2(+c.valor))avisos.push(`Valor do boleto ${fm(bol.valor)} diferente do pedido + taxa (${fm(c.valor)})`);
+    const pg=benPagador(cnpjs,BEN.cli);if(pg)avisos.push(pg);
+    if(rep.length)avisos.push('Boleto repetido em outra conta: '+repetidoTxt(rep));
+    if(file)up=await uploadAnexo(file,BEN.cli.id,`beneficios/${BEN.comp.slice(0,7)}`);
+    const upd={linha_digitavel:soDig(linha)||null,boleto_valor:bol?.valor!=null?r2(bol.valor):c.boleto_valor,boleto_alerta:avisos.join('. ')||null};
+    if(bol?.venc)upd.vencimento=bol.venc;
+    const {error}=await sb.from('contas_pagar').update(upd).eq('id',c.id);if(error)throw error;
+    if(up){const {error:e2}=await sb.from('documentos').insert({cliente_id:BEN.cli.id,modulo:'pagar',registro_id:c.id,categoria:'Boleto',nome_arquivo:up.nome_arquivo,caminho:up.caminho});if(e2)throw e2}
+    if(avisos.length)alert('ATENÇÃO, '+c.fornecedor+':\n\n'+avisos.join('\n')+'\n\nO boleto ficou anexado com o alerta. Confira antes de pagar.');
+    else toast(bol?`Boleto de ${c.fornecedor} confere: ${fm(bol.valor||c.valor)}${bol.venc?', vence '+dBR(bol.venc):''}`:'Boleto anexado');
+  }catch(ex){console.error(ex);toast(/BOLETO_REPETIDO/.test(ex.message||'')?'Este boleto já está lançado em outra conta a pagar. Não foi anexado.':'Não foi possível anexar o boleto. Verifique a internet e tente de novo.')}
+  renderBenCp(true);
+}
 // pendências: o que descontar ou recarregar a mais nos próximos pedidos
 function renderBenPend(lanca){
   const ab=BEN.pend.filter(p=>!p.resolvida),fe=BEN.pend.filter(p=>p.resolvida).slice(-5);$('bnPendAdd').hidden=!lanca;
@@ -6014,7 +6136,9 @@ async function abrirGT(t,tipo){
   // colar a linha digitável preenche o vencimento e o valor que estiverem vazios
   $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
     if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
-    if(P&&!$('gt_forma').value)$('gt_forma').value='Boleto'});
+    if(P&&!$('gt_forma').value)$('gt_forma').value='Boleto';
+    // o mesmo boleto já lançado em outra conta, de qualquer empresa (v72)
+    boletoRepetido(b,t?.origem_id||t?.id||null).then(rp=>{if(rp.length)alert('ATENÇÃO: este boleto já está lançado em outra conta: '+repetidoTxt(rp)+'.')})});
   dlgGT.showModal();if(!t)$('gt_pessoa').focus();
   if(t?.origem_id){
     const {data}=await sb.from('documentos').select('*').eq('registro_id',t.origem_id);const urls=await signed((data||[]).map(d=>d.caminho));
