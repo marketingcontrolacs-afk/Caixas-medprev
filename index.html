@@ -680,9 +680,9 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
       <p class="note" id="catAviso" style="margin:16px 0 0"></p>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Plano de contas</h2>
-        <p class="note" style="margin:0">Categorias do Bom Controle, com os nomes exatamente iguais. Cole uma categoria por linha (pode copiar a coluna do Excel). As que já existem são mantidas.</p>
+        <p class="note" style="margin:0">Plano de contas padrão, que vale para todas as empresas sem plano próprio. Use “+ Nova categoria” para cadastrar uma, ou cole várias, uma por linha (pode copiar a coluna do Excel); as que já existem são mantidas. O grupo e o plano de cada empresa ficam em Gestão financeira › Plano de contas.</p>
         <textarea id="catCola" rows="4" placeholder="Energia elétrica&#10;Aluguel&#10;Material de escritório"></textarea>
-        <div class="row"><button class="btn small primary" id="catImport">Adicionar categorias</button><span class="note" id="catTotal"></span></div>
+        <div class="row"><button class="btn small primary" id="catNovaBtn">+ Nova categoria</button><button class="btn small" id="catImport">Adicionar as coladas</button><span class="note" id="catTotal"></span></div>
         <div class="tablebox" style="margin:0;max-height:260px;overflow:auto"><table class="cfg" id="tbPlano"></table></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -2123,11 +2123,12 @@ async function renderCats(){
 }
 $('catImport').onclick=async()=>{
   const linhas=[...new Set($('catCola').value.split(/\r?\n/).map(l=>l.split('\t')[0].trim()).filter(Boolean))];
-  if(!linhas.length){toast('Cole as categorias, uma por linha.');return}
+  if(!linhas.length)return $('catNovaBtn').click();
   const {error}=await sb.from('plano_contas').upsert(linhas.map(c=>({categoria:c})),{onConflict:'categoria',ignoreDuplicates:true});
   if(error){fail(error);return}
   $('catCola').value='';toast(linhas.length+' categorias adicionadas');renderCats();
 };
+$('catNovaBtn').onclick=async()=>{if(await catNova(null,'Despesa'))renderCats()};
 $('formRegra').addEventListener('submit',async e=>{e.preventDefault();
   const palavra=$('rgPalavra').value.trim(),categoria=$('rgCat').value.trim();
   if(!palavra||!categoria){toast('Informe a palavra e a categoria.');return}
