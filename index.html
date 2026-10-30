@@ -115,6 +115,7 @@ textarea{min-height:64px;resize:vertical}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .c-ok{background:var(--ok-soft);color:var(--ok)}.c-warn{background:var(--warn-soft);color:var(--warn)}.c-bad{background:var(--bad-soft);color:var(--bad)}
 .c-done{background:var(--brand-soft);color:var(--brand)}.c-none{background:var(--sunk);color:var(--muted)}
+.rngrp td{background:var(--sunk)}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:16px;overflow-x:auto}
 .tabs button{border:0;background:none;font:600 14px var(--body);color:var(--muted);padding:10px 14px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand)}
@@ -527,6 +528,26 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <p class="note" id="gcNote"></p>
   </section>
 
+  <!-- GESTÃO FINANCEIRA › REPASSE DE PARCEIROS (escritório) -->
+  <section id="viewRN" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Repasse de parceiros</h1><p class="sub">Importe o relatório de restituições da semana. O sistema separa quem emite nota fiscal e quem não emite e traz a conta e o Pix de cada parceiro. Você escolhe em qual empresa do grupo cada repasse vai ser pago e gera as contas a pagar.</p></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="rnCfg" hidden>Empresas do grupo</button><span class="btn fotobtn" id="rnCtrl" hidden>Importar controle de NF<input type="file" id="rnCtrlArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF dos parceiros"></span><button class="btn" id="rnXls" hidden>Baixar Excel</button><span class="btn primary fotobtn" id="rnImp" hidden>Importar relatório de repasses<input type="file" id="rnArq" accept=".xls,.xlsx" aria-label="Importar o relatório de restituições"></span></div>
+    </div>
+    <div class="toolbar" id="rnBar" hidden>
+      <label class="f">Relatório<select id="rnLote"></select></label>
+      <label class="f">Pagamento em<input type="date" id="rnVenc"></label>
+      <label class="f">Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option></select></label>
+      <label class="f">Empresa<select id="rnEmpF"></select></label>
+      <input id="rnBusca" placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
+    </div>
+    <div class="tiles" id="rnTiles"></div>
+    <div class="alerta" id="rnBulk" hidden><span id="rnBulkTxt"></span><span class="row" style="gap:8px;flex-wrap:wrap" id="rnBulkBtns"></span></div>
+    <div class="card tablebox"><table><thead id="rnHead"></thead><tbody id="rnBody"></tbody></table></div>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn primary" id="rnGerar" hidden></button></div>
+    <p class="note" id="rnNote"></p>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › FATURA DO CARTÃO DE CRÉDITO (escritório) -->
   <section id="viewFat" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -901,6 +922,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="pmBody"></div>
   <div class="df" id="pmFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
 </dialog>
+<dialog id="dlgRN">
+  <div class="dh"><h2 id="rnDTit"></h2></div>
+  <div class="db" id="rnDBody"></div>
+  <div class="df" id="rnDFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
+</dialog>
 <dialog id="dlgRegP">
   <div class="dh"><h2 id="rgTitle"></h2></div>
   <div class="db" id="rgBody"></div>
@@ -1104,6 +1130,7 @@ const ICO={
   gftes:'<path d="M3 7h18v12H3z"/><path d="M3 11h18M7 15h3"/>',
   gfext:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   gfconc:'<path d="M4 7h11l-3-3M20 17H9l3 3"/><path d="M17 7l3 0M4 17h1"/>',
+  gfrepasse:'<circle cx="8" cy="8" r="3"/><path d="M3 19a5 5 0 0 1 10 0M14 9h7M18 6l3 3-3 3M14 16h7"/>',
   gfpes:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
   gfcontas:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
   gfresumo:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15l3-3 3 2 4-5"/>',
@@ -1147,6 +1174,8 @@ const NAV=[
   {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  // repasses da semana (relatório de restituições): separa quem emite NF e gera as contas a pagar em cada empresa do grupo (Carol, 30/10)
+  {k:'gfrepasse',t:'Repasse de parceiros',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
@@ -1275,7 +1304,7 @@ function viewDaEmp(){
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1304,6 +1333,7 @@ function openView(){
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gftes'){$('viewGTe').hidden=false;renderGTes()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
+  else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;renderRN()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
@@ -8476,6 +8506,297 @@ async function ctbPendencias(){
   const n=(data||[]).filter(r=>!r.plano||!r.layout||!r.confirmados||(ehEsc()&&!r.contador)).length;
   if((NAVBADGE.ctbexp||0)!==n){NAVBADGE.ctbexp=n;renderNav()}
 }
+// =====================================================================
+// GESTÃO FINANCEIRA › REPASSE DE PARCEIROS
+// Pedido da Carol (30/10/2026): ela importa toda semana o relatório de restituições (repasses a fazer).
+// O sistema separa quem emite NF (controle de NF dos parceiros) e quem não emite, traz a conta e o Pix
+// de cada parceiro, e ela escolhe em qual empresa do grupo cada repasse vai ser pago.
+// Quem emite NF tem prioridade em Coronel, Chopinzinho e MP; quem não emite, na MPA (mas quem decide é ela).
+// Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida. Precisa da atualização v75 do banco.
+// =====================================================================
+const RNSIT={emite:['Emite NF','c-ok'],nao_emitido:['Não emitido NF','c-warn'],nao_emitir:['Não emitir NF','c-none'],sem:['Não encontrado no controle','c-bad']};
+const RN={grupos:[],grupo:null,lotes:[],lote:null,itens:[],nf:[],parc:[],pes:[],desc:[],tits:{},sel:new Set()};
+const v75=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/repasse_(grupos|lotes|itens)|parceiros_nf/.test(e.message||''));
+const v75Msg='Esta tela precisa da atualização v75 do banco (Repasse de parceiros). Rode o SQL no Supabase.';
+// nome comparável: sem acento, sem pontuação, sem o "- Mpa #" do fim e sem Ltda/ME/Eireli
+const rnChave=t=>{const w=String(t||'').replace(/ /g,' ').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(' ').filter(Boolean);
+  while(w.length&&['mpa','mp','m'].includes(w[w.length-1]))w.pop();return w.filter(x=>!['ltda','me','epp','eireli','eirel','s','c'].includes(x)).join(' ')};
+const rnDig=t=>String(t||'').replace(/\D/g,'').replace(/^0+/,'');
+// parecido: pares de letras em comum (os nomes do relatório às vezes vêm cortados ou abreviados)
+function rnSim(a,b){if(!a||!b)return 0;const pa=s=>{const m=new Map();for(let i=0;i<s.length-1;i++){const k=s.slice(i,i+2);m.set(k,(m.get(k)||0)+1)}return m};
+  const A=pa(a),B=pa(b);let n=0;A.forEach((v,k)=>n+=Math.min(v,B.get(k)||0));return 2*n/Math.max(1,a.length-1+b.length-1)}
+// acha na lista o registro cujo nome bate: igual, começo igual (nome cortado) ou muito parecido
+function rnAcha(nome,lista,nomesDe){
+  const a=rnChave(nome);if(!a)return [null,''];let best=null,bs=0;
+  for(const x of lista)for(const n of nomesDe(x)){const b=rnChave(n);if(!b)continue;if(b===a)return [x,'nome']}
+  for(const x of lista)for(const n of nomesDe(x)){const b=rnChave(n);if(Math.min(a.length,b.length)>=25&&(a.startsWith(b)||b.startsWith(a)))return [x,'nome']}
+  for(const x of lista)for(const n of nomesDe(x)){const s=rnSim(a,rnChave(n));if(s>bs){bs=s;best=x}}
+  return bs>=0.86?[best,'parecido']:[null,''];
+}
+const rnNfNomes=x=>[x.nome,...(x.nomes||[])];
+const rnParcNomes=p=>[p.nome,p.nome_global,p.titular,...(p.nomes_locais||[])].filter(Boolean);
+const rnNf=it=>RN.nf.find(x=>x.id===it.parceiro_nf_id)||null;
+const rnSitDe=it=>rnNf(it)?.situacao||'sem';
+const rnGrupoSit=s=>s==='emite'?'emite':s==='sem'?'sem':'nao';
+const rnEmpNome=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+// parceiro cadastrado (conta e Pix): o da empresa escolhida; se não houver empresa, o primeiro do grupo com conta
+function rnParc(it,emp){
+  const nf=rnNf(it),doc=rnDig(nf?.cpf_cnpj),cand=RN.parc.filter(p=>!emp||p.cliente_id===emp);
+  let p=doc?cand.find(x=>rnDig(x.cpf_cnpj)===doc):null;
+  if(!p)p=rnAcha(it.nome,cand,rnParcNomes)[0]||(nf?rnAcha(nf.nome,cand,rnParcNomes)[0]:null);
+  if(!p&&!emp)return null;
+  if(!emp&&p&&!rnTemConta(p)){const o=RN.parc.find(x=>x!==p&&rnChave(x.nome)===rnChave(p.nome)&&rnTemConta(x));if(o)p=o}
+  return p||(emp?rnParc(it,null):null);
+}
+const rnTemConta=p=>!!(p&&(p.pix_chave||p.conta));
+const rnConta=p=>!p?'':[p.titular&&p.titular!==p.nome&&p.titular!==p.nome_global?'Titular: '+esc(p.titular)+(p.cpf_cnpj?' · '+esc(p.cpf_cnpj):''):'',
+  p.conta?[p.banco&&esc(p.banco),p.agencia&&'ag. '+esc(p.agencia),'c/c '+esc(p.conta)].filter(Boolean).join(' · '):'',p.pix_chave?'Pix '+(p.pix_tipo?esc(p.pix_tipo)+' ':'')+esc(p.pix_chave):''].filter(Boolean).join('<br>');
+const rnDescPend=p=>p?RN.desc.filter(d=>d.parceiro_id===p.id||RN.parc.some(x=>x.id===d.parceiro_id&&rnChave(x.nome)===rnChave(p.nome))):[];
+function rnVazio(t,cls){$('rnBar').hidden=true;$('rnTiles').innerHTML='';$('rnBulk').hidden=true;$('rnGerar').hidden=true;$('rnHead').innerHTML='';$('rnBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('rnNote').innerHTML=''}
+async function renderRN(recarrega=true){
+  const cli=cliAtual();['rnImp','rnCfg','rnCtrl','rnXls'].forEach(id=>$(id).hidden=true);
+  if(!cli)return rnVazio('Escolha uma empresa.');
+  if(recarrega){
+    rnVazio('Carregando…');
+    const {data:g,error}=await sb.from('repasse_grupos').select('*').order('nome');
+    if(error){console.error(error);return rnVazio(v75(error)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+    RN.grupos=g||[];
+  }
+  RN.grupo=RN.grupos.find(x=>(x.empresas||[]).includes(cli.id))||null;$('rnCfg').hidden=false;
+  if(!RN.grupo)return rnVazio(`${esc(cli.nome)} não está em nenhum grupo de repasse. Use “Empresas do grupo” para escolher as empresas que dividem os repasses (ex.: MP, MP Coronel, MP Chopinzinho e MPA Pato Branco).`);
+  ['rnImp','rnCtrl'].forEach(id=>$(id).hidden=false);
+  if(recarrega){
+    const G=RN.grupo,emp=G.empresas;
+    try{
+      const [l,nf,pa,pe,de]=await Promise.all([
+        todas(()=>sb.from('repasse_lotes').select('*').eq('grupo_id',G.id).order('data_relatorio',{ascending:false}).order('criado_em',{ascending:false})),
+        todas(()=>sb.from('parceiros_nf').select('*').eq('grupo_id',G.id).order('nome')),
+        todas(()=>sb.from('parceiros').select('*').in('cliente_id',emp).eq('ativo',true)),
+        todas(()=>sb.from('fin_pessoas').select('id,cliente_id,nome,fantasia,parceiro_id,pix_chave').in('cliente_id',emp).not('parceiro_id','is',null)),
+        todas(()=>sb.from('repasse_descontos').select('*').in('cliente_id',emp).eq('status','Pendente'))]);
+      Object.assign(RN,{lotes:l,nf,parc:pa,pes:pe,desc:de});
+    }catch(e){console.error(e);return rnVazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  }
+  const sel=$('rnLote'),cur=sel.value;
+  sel.innerHTML=RN.lotes.map(l=>`<option value="${l.id}">${dBR(l.data_relatorio)}${l.arquivo?' · '+esc(l.arquivo):''}${l.status==='finalizado'?' · finalizado':''}</option>`).join('')||'<option value="">Nenhum relatório importado</option>';
+  if(RN.lotes.some(l=>l.id===cur))sel.value=cur;
+  RN.lote=RN.lotes.find(l=>l.id===sel.value)||null;
+  if(!RN.lote){rnVazio(`Nenhum relatório importado no grupo ${esc(RN.grupo.nome)}. Use “Importar relatório de repasses” com o relatório de restituições (.xls).`+(RN.nf.length?'':' Importe também o controle de NF dos parceiros, para o sistema saber quem emite nota.'));return}
+  if(recarrega||RN.itens[0]?.lote_id!==RN.lote.id){
+    try{RN.itens=await todas(()=>sb.from('repasse_itens').select('*').eq('lote_id',RN.lote.id).order('nome'));
+      const ids=RN.itens.map(i=>i.titulo_id).filter(Boolean);RN.tits={};
+      for(let i=0;i<ids.length;i+=200){const [t,m]=await Promise.all([sb.from('fin_titulos').select('id,cliente_id,valor,vencimento').in('id',ids.slice(i,i+200)),sb.from('fin_movimentos').select('titulo_id,valor').in('titulo_id',ids.slice(i,i+200))]);
+        if(t.error)throw t.error;t.data.forEach(x=>RN.tits[x.id]={...x,pago:0});(m.data||[]).forEach(x=>{if(RN.tits[x.titulo_id])RN.tits[x.titulo_id].pago=r2(RN.tits[x.titulo_id].pago+(+x.valor))})}
+    }catch(e){console.error(e);return rnVazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+    RN.sel.clear();
+  }
+  $('rnBar').hidden=false;['rnXls'].forEach(id=>$(id).hidden=false);$('rnVenc').value=RN.lote.vencimento||'';
+  const ef=$('rnEmpF'),ec=ef.value;ef.innerHTML='<option value="">Todas</option>'+RN.grupo.empresas.map(id=>`<option value="${id}">${esc(rnEmpNome(id))}</option>`).join('')+'<option value="-">Sem empresa</option>';
+  if([...ef.options].some(o=>o.value===ec))ef.value=ec;
+  rnDesenha();
+}
+function rnFiltrados(){
+  const f=$('rnFiltro').value,ef=$('rnEmpF').value,q=rnChave($('rnBusca').value),qd=$('rnBusca').value.trim();
+  return RN.itens.filter(it=>{const s=rnSitDe(it);
+    if(f==='emite'&&s!=='emite'||f==='nao'&&rnGrupoSit(s)!=='nao'||f==='sem'&&s!=='sem'||f==='semEmp'&&it.empresa_id||f==='semConta'&&rnTemConta(rnParc(it,it.empresa_id)))return false;
+    if(ef==='-'&&it.empresa_id||ef&&ef!=='-'&&it.empresa_id!==ef)return false;
+    return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)});
+}
+function rnDesenha(){
+  const rows=rnFiltrados(),G=RN.grupo,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+(+i.valor||0),0));
+  const opEmp=it=>`<select class="rnemp" style="min-width:190px;padding:6px 8px"${it.titulo_id?' disabled title="A conta a pagar já foi gerada. Desfaça para trocar a empresa."':''}><option value=""></option>${G.empresas.map(id=>`<option value="${id}"${it.empresa_id===id?' selected':''}>${esc(rnEmpNome(id))}</option>`).join('')}</select>`;
+  const opSit=it=>{const s=rnSitDe(it);return `<select class="rnsit ${RNSIT[s][1]}" style="min-width:150px;padding:6px 8px;font-weight:600" title="Situação no controle de NF. Ao trocar, o controle guarda para os próximos relatórios.">${(s==='sem'?['sem']:[]).concat(['emite','nao_emitido','nao_emitir']).map(k=>`<option value="${k}"${k===s?' selected':''}>${RNSIT[k][0]}</option>`).join('')}</select>`};
+  const linha=it=>{const s=rnSitDe(it),nf=rnNf(it),p=rnParc(it,it.empresa_id),t=it.titulo_id&&RN.tits[it.titulo_id],ds=rnDescPend(p);
+    const ct=it.titulo_id?(t?(t.pago>=t.valor-0.004?'<span class="chip c-done">✓ Pago</span>':`<span class="chip c-ok">✓ Conta a pagar</span><br><button type="button" class="btn small ghost" data-rn="desfaz">Desfazer</button>`):'<span class="chip c-none">conta excluída</span>'):'';
+    return `<tr data-id="${it.id}"><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${it.titulo_id?' disabled':''}></td>
+      <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}</td>
+      <td>${it.guias??''}</td><td><b>${fm(it.valor)}</b></td><td class="l">${opSit(it)}</td>
+      <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}</td>
+      <td>${opEmp(it)}</td><td class="l">${ct}</td><td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td></tr>`};
+  $('rnHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="rnTodas" style="width:auto" title="Selecionar todos do filtro"${rows.length&&rows.filter(i=>!i.titulo_id).every(i=>RN.sel.has(i.id))?' checked':''}></th><th class="l">Parceiro</th><th>Guias</th><th>Valor</th><th class="l">Nota fiscal</th><th class="l">Conta e Pix</th><th>Pagar em</th><th class="l">Conta a pagar</th><th class="l">Protocolo</th></tr>`;
+  const blocos=[['emite','Emitem nota fiscal'],['nao','Não emitem nota fiscal'],['sem','Não encontrados no controle de NF']];
+  $('rnBody').innerHTML=blocos.map(([k,t])=>{const l=rows.filter(i=>rnGrupoSit(rnSitDe(i))===k);if(!l.length)return '';
+    return `<tr class="rngrp"><td></td><td class="l" colspan="8"><b>${t}</b> ${mu(`· ${l.length} ${l.length===1?'parceiro':'parceiros'} · ${fm(soma(l))}`)}</td></tr>`+l.map(linha).join('')}).join('')
+    ||`<tr><td></td><td class="l muted" colspan="8">${RN.itens.length?'Nada neste filtro.':'Este relatório não tem repasses.'}</td></tr>`;
+  const it=RN.itens,por=k=>it.filter(i=>rnGrupoSit(rnSitDe(i))===k),semE=it.filter(i=>!i.empresa_id);
+  $('rnTiles').innerHTML=[['Repasses',fm(soma(it)),`${it.length} parceiros`],['Emitem NF',fm(soma(por('emite'))),`${por('emite').length} parceiros`],['Não emitem NF',fm(soma(por('nao'))),`${por('nao').length} parceiros`],
+    ...(por('sem').length?[['Não encontrados',fm(soma(por('sem'))),`${por('sem').length} parceiros · escolha a situação`]]:[]),
+    ...G.empresas.map(id=>{const l=it.filter(i=>i.empresa_id===id);return [esc(rnEmpNome(id)),fm(soma(l)),`${l.length} ${l.length===1?'repasse':'repasses'}${l.length?' · '+l.filter(i=>i.titulo_id).length+' com conta a pagar':''}`]}),
+    ['Sem empresa',fm(soma(semE)),semE.length?`${semE.length} para escolher`:'todos escolhidos']]
+    .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${t[0]==='Sem empresa'&&semE.length||t[0]==='Não encontrados'?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  const ns=RN.sel.size;$('rnBulk').hidden=!ns;
+  $('rnBulkTxt').textContent=`${ns} ${ns===1?'repasse selecionado':'repasses selecionados'} · ${fm(soma(it.filter(i=>RN.sel.has(i.id))))}`;
+  $('rnBulkBtns').innerHTML=G.empresas.map(id=>`<button type="button" class="btn small primary" data-rb="${id}">Pagar em ${esc(rnEmpNome(id))}</button>`).join('')+'<button type="button" class="btn small" data-rb="-">Tirar a empresa</button><button type="button" class="btn small ghost" data-rb="limpa">Limpar seleção</button>';
+  const prontos=it.filter(i=>i.empresa_id&&!i.titulo_id);$('rnGerar').hidden=!prontos.length;
+  $('rnGerar').textContent=`Gerar ${prontos.length} ${prontos.length===1?'conta':'contas'} a pagar (${fm(soma(prontos))})`;
+  const faltaG=G.empresas.length<4?`<b>O grupo ${esc(G.nome)} tem ${G.empresas.length} ${G.empresas.length===1?'empresa':'empresas'}. Confira em “Empresas do grupo”.</b><br>`:'';
+  $('rnNote').innerHTML=faltaG+(RN.nf.length?'':'<b>O controle de NF está vazio: importe a planilha de controle de NF dos parceiros.</b><br>')
+    +'A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
+}
+['rnLote'].forEach(id=>$(id).onchange=()=>renderRN(false));
+$('rnFiltro').onchange=$('rnEmpF').onchange=()=>rnDesenha();
+$('rnBusca').oninput=()=>{clearTimeout(rnDesenha.t);rnDesenha.t=setTimeout(rnDesenha,200)};
+$('rnVenc').onchange=async()=>{const v=$('rnVenc').value||null;const {error}=await sb.from('repasse_lotes').update({vencimento:v}).eq('id',RN.lote.id);if(error)return fail(error);RN.lote.vencimento=v;toast('Data de pagamento salva')};
+$('rnHead').addEventListener('change',e=>{if(e.target.id!=='rnTodas')return;rnFiltrados().filter(i=>!i.titulo_id).forEach(i=>e.target.checked?RN.sel.add(i.id):RN.sel.delete(i.id));rnDesenha()});
+$('rnBody').addEventListener('change',async e=>{const tr=e.target.closest('tr[data-id]');if(!tr)return;const it=RN.itens.find(x=>x.id===tr.dataset.id);
+  if(e.target.classList.contains('rnck')){e.target.checked?RN.sel.add(it.id):RN.sel.delete(it.id);return rnDesenha()}
+  if(e.target.classList.contains('rnemp'))return rnEmpresa([it],e.target.value||null);
+  if(e.target.classList.contains('rnsit'))return rnSituacao(it,e.target.value);
+});
+$('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-rn]');if(!b)return;const it=RN.itens.find(x=>x.id===b.closest('tr').dataset.id);
+  if(b.dataset.rn==='desfaz'){b.disabled=true;await rnDesfaz(it);b.disabled=false}});
+$('rnBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-rb]');if(!b)return;
+  if(b.dataset.rb==='limpa'){RN.sel.clear();return rnDesenha()}
+  const ls=RN.itens.filter(i=>RN.sel.has(i.id)&&!i.titulo_id);b.disabled=true;await rnEmpresa(ls,b.dataset.rb==='-'?null:b.dataset.rb);RN.sel.clear();rnDesenha()});
+async function rnEmpresa(ls,emp){
+  if(!ls.length)return;
+  for(let i=0;i<ls.length;i+=200){const {error}=await sb.from('repasse_itens').update({empresa_id:emp}).in('id',ls.slice(i,i+200).map(x=>x.id)).is('titulo_id',null);if(error){fail(error);return renderRN(false)}}
+  ls.forEach(x=>x.empresa_id=emp);rnDesenha();
+}
+// a situação trocada vai para o controle de NF (vale para os próximos relatórios)
+async function rnSituacao(it,sit){
+  if(sit==='sem')return;
+  try{
+    let nf=rnNf(it);
+    if(nf){const {error}=await sb.from('parceiros_nf').update({situacao:sit,atualizado_em:new Date().toISOString()}).eq('id',nf.id);if(error)throw error;nf.situacao=sit}
+    else{const {data,error}=await sb.from('parceiros_nf').insert({grupo_id:RN.grupo.id,nome:it.nome.trim(),nomes:[it.nome.trim()],situacao:sit,obs:'Incluído pelo relatório de repasses de '+dBR(RN.lote.data_relatorio)}).select().single();if(error)throw error;
+      RN.nf.push(data);nf=data;
+      const mesmos=RN.itens.filter(x=>!x.parceiro_nf_id&&rnChave(x.nome)===rnChave(it.nome));
+      const {error:e2}=await sb.from('repasse_itens').update({parceiro_nf_id:data.id,nf_via:'manual'}).in('id',mesmos.map(x=>x.id));if(e2)throw e2;mesmos.forEach(x=>{x.parceiro_nf_id=data.id;x.nf_via='manual'})}
+    if(it.nf_via==='parecido'){await sb.from('repasse_itens').update({nf_via:'manual'}).eq('id',it.id);it.nf_via='manual'}
+    toast(`${it.nome.trim()}: ${RNSIT[sit][0]}`);
+  }catch(e){fail(e)}
+  rnDesenha();
+}
+// lê o relatório de restituições online (.xls): Empresa, Guias, Valor, Protocolo e Última alteração
+function rnLeRelatorio(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]],L=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const txt=v=>v==null?'':String(v).replace(/ /g,' ').trim();
+  let h=-1,col={};
+  for(let r=0;r<L.length&&h<0;r++){const row=L[r]||[];const ix=k=>row.findIndex(c=>chave(txt(c)).startsWith(k));
+    if(ix('empresa')>=0&&ix('protocolo')>=0){h=r;col={nome:ix('empresa'),guias:ix('guias'),valor:ix('valor'),prot:ix('protocolo'),alt:ix('ultima altera')}}}
+  if(h<0)throw new Error('Não achei as colunas Empresa e Protocolo. Use o “Relatório de restituições online” em Excel.');
+  let data=null;for(const row of L.slice(0,h)){const s=(row||[]).map(txt).join(' ');const m=/(\d{2})\/(\d{2})\/(\d{4})\s*a\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(s);if(m){data=`${m[6]}-${m[5]}-${m[4]}`;break}}
+  // as células do relatório vêm mescladas: o valor pode estar uma ou duas colunas antes ou depois do título
+  const perto=(row,c,ok)=>{if(c<0)return null;for(const d of [0,-1,1,-2,2]){const v=row[c+d];if(v!=null&&txt(v)!==''&&ok(v))return v}return null};
+  const num=v=>typeof v==='number'?v:parseMoney(String(v)),ehNum=v=>typeof v==='number'||/^[\d.,]+$/.test(txt(v));
+  const out=[];
+  for(const row of L.slice(h+1)){if(!row)continue;const nome=txt(row[col.nome]);
+    if(!nome||/^totaliza/i.test(nome))continue;
+    const prot=txt(perto(row,col.prot,v=>/^W?\d{6,}/i.test(txt(v))));
+    const valor=r2(num(perto(row,col.valor,ehNum)));if(!(valor>0))continue;
+    const g=perto(row,col.guias,ehNum),alt=perto(row,col.alt,v=>v instanceof Date||/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}/.test(txt(v)));
+    out.push({nome,guias:g==null?null:Math.round(num(g)),valor,protocolo:prot||null,alterado_em:alt instanceof Date?alt.toISOString():alt?txt(alt):null});
+  }
+  return {data,itens:out};
+}
+$('rnArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!RN.grupo)return;
+  let rel;try{rel=rnLeRelatorio(XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}))}catch(err){console.error(err);return alert(err.message||'Não foi possível ler o arquivo.')}
+  if(!rel.itens.length)return alert('O arquivo não tem repasses.');
+  // o relatório traz os pendentes: o que já veio num relatório anterior não entra de novo
+  const prots=rel.itens.map(i=>i.protocolo).filter(Boolean),ja=new Set();
+  try{for(let i=0;i<prots.length;i+=200){const {data,error}=await sb.from('repasse_itens').select('protocolo').eq('grupo_id',RN.grupo.id).in('protocolo',prots.slice(i,i+200));if(error)throw error;data.forEach(x=>ja.add(x.protocolo))}}
+  catch(err){return alert(v75(err)?v75Msg:'Erro ao conferir o relatório. Verifique a internet.')}
+  const novos=rel.itens.filter(i=>!i.protocolo||!ja.has(i.protocolo)),tot=r2(rel.itens.reduce((x,i)=>x+i.valor,0));
+  if(!novos.length)return alert(`Todos os ${rel.itens.length} repasses deste relatório já foram importados.`);
+  if(!confirm(`Relatório de ${rel.data?dBR(rel.data):'data não informada'}: ${rel.itens.length} repasses, ${fm(tot)}.`+(ja.size?`\n${ja.size} já estavam num relatório anterior e não entram de novo.`:'')+`\n\nImportar ${novos.length} repasses?`))return;
+  try{
+    const {data:lote,error}=await sb.from('repasse_lotes').insert({grupo_id:RN.grupo.id,data_relatorio:rel.data||TODAY,arquivo:f.name,vencimento:proxQuinta()}).select().single();if(error)throw error;
+    const rows=novos.map(i=>{const [nf,via]=rnAcha(i.nome,RN.nf,rnNfNomes);return {...i,lote_id:lote.id,grupo_id:RN.grupo.id,parceiro_nf_id:nf?.id||null,nf_via:nf?via:null}});
+    for(let i=0;i<rows.length;i+=200){const {error:e2}=await sb.from('repasse_itens').insert(rows.slice(i,i+200));if(e2)throw e2}
+    toast(`${rows.length} repasses importados`);$('rnLote').innerHTML=`<option value="${lote.id}"></option>`;$('rnLote').value=lote.id;$('rnFiltro').value='todos';$('rnEmpF').value='';renderRN();
+  }catch(err){console.error(err);alert(v75(err)?v75Msg:'Não foi possível importar: '+(err.message||err))}
+};
+// planilha de controle de NF (aba "Controle NF"): Situação, Parceiro, Nome global, CPF/CNPJ, Nome na planilha de NFs
+$('rnCtrlArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!RN.grupo)return;
+  let rows=[];
+  try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),nm=wb.SheetNames.find(n=>chave(n)==='controle nf')||wb.SheetNames[0];
+    const L=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''}),h=L.findIndex(r=>r.some(c=>chave(c)==='situacao'));
+    if(h<0)throw new Error('Não achei a coluna Situação. Use a planilha “Controle NF parceiros”.');
+    const H=L[h].map(chave),ix=k=>H.findIndex(c=>c.startsWith(k)),cS=ix('situacao'),cN=ix('parceiro'),cG=ix('nome global'),cD=ix('cpf'),cX=ix('nome na planilha'),cO=ix('observ');
+    const sit=t=>{const c=chave(t);return c.startsWith('emite')?'emite':c.startsWith('nao emitir')?'nao_emitir':c.startsWith('nao emitido')?'nao_emitido':null};
+    for(const r of L.slice(h+1)){const s=sit(r[cS]),n=String(r[cN]||'').trim();if(!s||!n)continue;
+      const nomes=[...new Set([n,...String(cX>=0?r[cX]:'').split(';').map(x=>x.trim()).filter(Boolean)])];
+      rows.push({grupo_id:RN.grupo.id,nome:n,nomes,nome_global:String(cG>=0?r[cG]:'').trim()||null,cpf_cnpj:String(cD>=0?r[cD]:'').trim()||null,situacao:s,obs:String(cO>=0?r[cO]:'').trim()||null})}
+  }catch(err){console.error(err);return alert(err.message||'Não foi possível ler a planilha.')}
+  if(!rows.length)return alert('A planilha não tem parceiros.');
+  const n=k=>rows.filter(r=>r.situacao===k).length;
+  if(!confirm(`Controle de NF com ${rows.length} parceiros: ${n('emite')} emitem NF, ${n('nao_emitido')} não emitidos e ${n('nao_emitir')} não emitir.\n\nEle substitui o controle atual do grupo ${RN.grupo.nome}${RN.nf.length?` (${RN.nf.length} parceiros)`:''}. Os relatórios já importados são ligados de novo pelo nome. Continuar?`))return;
+  try{
+    const {error}=await sb.rpc('repasse_controle_nf',{grupo:RN.grupo.id,linhas:rows});if(error)throw error;
+    RN.nf=await todas(()=>sb.from('parceiros_nf').select('*').eq('grupo_id',RN.grupo.id).order('nome'));
+    // liga de novo os repasses ainda sem conta a pagar
+    const abertos=await todas(()=>sb.from('repasse_itens').select('id,nome').eq('grupo_id',RN.grupo.id).is('titulo_id',null));
+    const por={};abertos.forEach(i=>{const [nf,via]=rnAcha(i.nome,RN.nf,rnNfNomes);const k=(nf?.id||'')+'|'+(nf?via:'');(por[k]||=[]).push(i.id)});
+    for(const [k,ids] of Object.entries(por)){const [id,via]=k.split('|');for(let i=0;i<ids.length;i+=200){const {error:e2}=await sb.from('repasse_itens').update({parceiro_nf_id:id||null,nf_via:via||null}).in('id',ids.slice(i,i+200));if(e2)throw e2}}
+    toast('Controle de NF importado');renderRN();
+  }catch(err){console.error(err);alert(v75(err)?v75Msg:'Não foi possível importar: '+(err.message||err))}
+};
+// cada repasse com empresa escolhida vira uma conta a pagar na empresa (fornecedor = parceiro daquela empresa)
+$('rnGerar').onclick=async()=>{
+  const ls=RN.itens.filter(i=>i.empresa_id&&!i.titulo_id),venc=RN.lote.vencimento||proxQuinta();if(!ls.length)return;
+  const semC=ls.filter(i=>!rnTemConta(rnParc(i,i.empresa_id)));
+  if(!confirm(`Gerar ${ls.length} contas a pagar com vencimento em ${dBR(venc)}?\n\n`+RN.grupo.empresas.map(id=>{const l=ls.filter(i=>i.empresa_id===id);return l.length?`${rnEmpNome(id)}: ${l.length} · ${fm(r2(l.reduce((x,i)=>x+(+i.valor),0)))}`:''}).filter(Boolean).join('\n')
+    +(semC.length?`\n\nAtenção: ${semC.length} sem conta nem Pix no cadastro do parceiro.`:'')))return;
+  const b=$('rnGerar');b.disabled=true;let n=0;
+  try{
+    for(const id of RN.grupo.empresas){const l=ls.filter(i=>i.empresa_id===id);if(!l.length)continue;
+      const cli=CLIENTES.find(c=>c.id===id);let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
+      const cat=(plano.find(c=>/repasse/.test(chave(c.categoria))&&/parceir/.test(chave(c.categoria)))||plano.find(c=>/repasse/.test(chave(c.categoria))))?.categoria||null;
+      for(const it of l){const p=rnParc(it,id),pe=p&&RN.pes.find(x=>x.parceiro_id===p.id&&x.cliente_id===id);
+        const row={cliente_id:id,tipo:'pagar',pessoa_id:pe?.id||null,pessoa_nome:pe?.nome||p?.nome_global||p?.nome||it.nome.trim(),
+          descricao:`Repasse de parceiro (restituição)${it.guias?` · ${it.guias} ${it.guias===1?'guia':'guias'}`:''} · relatório ${dBR(RN.lote.data_relatorio)}`,
+          documento:it.protocolo,categoria:cat,competencia:venc.slice(0,8)+'01',vencimento:venc,valor:r2(it.valor),parcela:1,parcelas:1,
+          forma:p?.pix_chave?'Pix':p?.conta?'Transferência':null,pix_chave:p?.pix_chave||null,origem:'repasse',
+          obs:[it.nome.trim(),RNSIT[rnSitDe(it)][0],p&&p.conta?[p.banco,p.agencia&&'ag. '+p.agencia,'c/c '+p.conta].filter(Boolean).join(' '):''].filter(Boolean).join(' · ')};
+        const {data,error}=await sb.from('fin_titulos').insert(row).select('id,cliente_id,valor,vencimento').single();if(error)throw error;
+        const {error:e2}=await sb.from('repasse_itens').update({titulo_id:data.id}).eq('id',it.id);if(e2)throw e2;
+        it.titulo_id=data.id;RN.tits[data.id]={...data,pago:0};n++}}
+    if(RN.itens.every(i=>i.titulo_id)){await sb.from('repasse_lotes').update({status:'finalizado',finalizado_em:new Date().toISOString()}).eq('id',RN.lote.id);RN.lote.status='finalizado'}
+    toast(`${n} contas a pagar geradas`);
+  }catch(e){console.error(e);alert((v45(e)?v45Msg:'Parou no meio: '+(e.message||e))+(n?`\n${n} contas já foram geradas.`:''))}
+  b.disabled=false;GT.key='';renderRN(false);
+};
+async function rnDesfaz(it){
+  const t=RN.tits[it.titulo_id];
+  if(t&&t.pago>0)return alert('Esta conta a pagar já tem pagamento. Desfaça o pagamento em Contas a pagar antes.');
+  if(!confirm(`Excluir a conta a pagar de ${it.nome.trim()} em ${rnEmpNome(it.empresa_id)}? O repasse volta para ser separado.`))return;
+  try{const {error}=await sb.from('repasse_itens').update({titulo_id:null}).eq('id',it.id);if(error)throw error;
+    if(t){const {error:e2}=await sb.from('fin_titulos').delete().eq('id',t.id);if(e2)throw e2}
+    it.titulo_id=null;if(RN.lote.status==='finalizado'){await sb.from('repasse_lotes').update({status:'aberto',finalizado_em:null}).eq('id',RN.lote.id);RN.lote.status='aberto'}
+    toast('Conta a pagar excluída');GT.key='';
+  }catch(e){fail(e)}
+  rnDesenha();
+}
+$('rnXls').onclick=()=>{
+  const H=['Situação','Parceiro','Guias','Valor','Pagar em','Conta a pagar','Titular','CPF/CNPJ','Banco','Agência','Conta','Pix','Protocolo'];
+  const lin=it=>{const p=rnParc(it,it.empresa_id);return [RNSIT[rnSitDe(it)][0],it.nome.trim(),it.guias,+it.valor,rnEmpNome(it.empresa_id),it.titulo_id?'Gerada':'',p?.titular||p?.nome_global||'',p?.cpf_cnpj||rnNf(it)?.cpf_cnpj||'',p?.banco||'',p?.agencia||'',p?.conta||'',p?.pix_chave||'',it.protocolo||'']};
+  const ord=l=>[...l].sort((a,b)=>a.nome.localeCompare(b.nome)),wb=XLSX.utils.book_new();
+  [['Todos',RN.itens],['Emite NF',RN.itens.filter(i=>rnSitDe(i)==='emite')],['Não emite NF',RN.itens.filter(i=>rnGrupoSit(rnSitDe(i))==='nao')],['Não encontrados',RN.itens.filter(i=>rnSitDe(i)==='sem')],
+   ...RN.grupo.empresas.map(id=>[rnEmpNome(id).slice(0,31),RN.itens.filter(i=>i.empresa_id===id)])].forEach(([n,l])=>{if(!l.length&&n!=='Todos')return;
+    const rows=ord(l).map(lin),ws=XLSX.utils.aoa_to_sheet([H,...rows,['Total','',null,r2(l.reduce((x,i)=>x+(+i.valor),0))]]);
+    ws['!cols']=H.map((h,i)=>({wch:i===1?48:i===6?40:i===11||i===12?28:14}));xTabela(ws,{money:[3],texto:[1,6]});XLSX.utils.book_append_sheet(wb,ws,n.replace(/[\\/?*[\]:]/g,' '))});
+  XLSX.writeFile(wb,`Repasses ${RN.grupo.nome} ${dBR(RN.lote.data_relatorio).replace(/\//g,'-')}.xlsx`);
+};
+// empresas que dividem os repasses do grupo (ex.: MP, MP Coronel, MP Chopinzinho e MPA Pato Branco)
+const dlgRN=$('dlgRN');
+$('rnCfg').onclick=()=>{const g=RN.grupo,cli=cliAtual(),lista=CLIENTES.filter(c=>c.ativo!==false&&c.bpo_financeiro!==false);
+  const marc=g?g.empresas:[cli.id];
+  $('rnDTit').textContent=g?'Empresas do grupo '+g.nome:'Novo grupo de repasse';
+  $('rnDBody').innerHTML=`<p class="note" style="margin:0">Os repasses do relatório são divididos entre estas empresas. Na tela aparecem as empresas marcadas para você escolher onde cada repasse vai ser pago.</p>
+    <label class="f">Nome do grupo<input id="rnGNome" value="${esc(g?.nome||'Pato Branco')}"></label>
+    <div class="f"><span>Empresas</span><div class="chk" id="rnGEmps">${lista.map(c=>`<label><input type="checkbox" value="${c.id}"${marc.includes(c.id)?' checked':''}${RN.grupos.some(x=>x!==g&&(x.empresas||[]).includes(c.id))?' disabled title="Já está em outro grupo"':''}> ${esc(c.nome)}</label>`).join('')}</div></div>
+    <p class="err" id="rnGErr" hidden></p>`;
+  dlgRN.showModal()};
+$('rnDFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgRN.close();
+  const nome=$('rnGNome').value.trim(),emps=[...$('rnGEmps').querySelectorAll('input:checked')].map(x=>x.value),err=t=>{$('rnGErr').textContent=t;$('rnGErr').hidden=false};
+  if(!nome)return err('Informe o nome do grupo.');if(!emps.length)return err('Marque pelo menos uma empresa.');
+  const tira=RN.grupo?RN.grupo.empresas.filter(id=>!emps.includes(id)):[];
+  if(tira.length&&RN.lote&&RN.itens.some(i=>tira.includes(i.empresa_id)&&!i.titulo_id))return err('Há repasses separados para uma empresa que você desmarcou. Tire a empresa desses repasses antes.');
+  b.disabled=true;const q=RN.grupo?sb.from('repasse_grupos').update({nome,empresas:emps}).eq('id',RN.grupo.id):sb.from('repasse_grupos').insert({nome,empresas:emps});
+  const {error}=await q;b.disabled=false;
+  if(error){console.error(error);return err(v75(error)?v75Msg:error.message||'Não foi possível salvar.')}
+  toast('Grupo salvo');dlgRN.close();renderRN()});
 // período no modelo do Bom Controle em todas as telas com De/Até
 [['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gteIni','gteFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
