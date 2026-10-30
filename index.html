@@ -8012,7 +8012,20 @@ async function abrirParceiro(p,modo){
   }
   $('rpFoot').innerHTML=f;
   if(modo==='alt'&&!p)$('pa_parc').onchange=ev=>{const x=PARC.find(y=>y.id===ev.target.value);if(x){PVOLTA=true;abrirParceiro(x,'alt')}};
+  ['pa_parc','pd_parc'].forEach(pBuscaParc);
   if(!dlgRep.open)dlgRep.showModal();
+  $('pa_parc_b')?.focus();$('pd_parc_b')?.focus();
+}
+// escolher o parceiro digitando o nome (Carol, 30/10): o campo mostra os parceiros que têm o que foi digitado;
+// a lista de antes continua por baixo e recebe a escolha
+function pBuscaParc(id){
+  const sel=$(id);if(!sel)return;sel.hidden=true;
+  const ops=[...sel.options].filter(o=>o.value),dl=id+'_l';
+  sel.insertAdjacentHTML('beforebegin',`<input id="${id}_b" list="${dl}" autocomplete="off" placeholder="Digite o nome do parceiro"><datalist id="${dl}">${ops.map(o=>`<option value="${esc(o.textContent)}">`).join('')}</datalist>`);
+  const inp=$(id+'_b');
+  const acha=()=>{const t=chave(inp.value),o=ops.find(x=>chave(x.textContent)===t)||(t.length>2?(l=>l.length===1?l[0]:null)(ops.filter(x=>chave(x.textContent).includes(t))):null);
+    if(!o||sel.value===o.value)return;sel.value=o.value;inp.value=o.textContent;sel.dispatchEvent(new Event('change'))};
+  inp.addEventListener('change',acha);inp.addEventListener('input',()=>{if(ops.some(x=>x.textContent===inp.value))acha()});
 }
 const rpErr=t=>{$('rpErr').textContent=t;$('rpErr').hidden=false};
 async function rpAcao(act,el){
@@ -8420,8 +8433,9 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
-  {k:'2026-10-30b',data:'2026-10-30',t:'Conta e Pix direto no Repasse de parceiros',itens:[
-    {x:'Gestão financeira › Repasse de parceiros: o botão “Editar” ao lado da conta e Pix grava os dados no cadastro do parceiro (e nas outras empresas do grupo, se quiser). Quem não tem cadastro ganha o botão “Cadastrar”.',para:'esc'}]},
+  {k:'2026-10-30b',data:'2026-10-30',t:'Parceiros mais rápidos de achar e de atualizar',itens:[
+    {x:'Gestão financeira › Repasse de parceiros: o botão “Editar” ao lado da conta e Pix grava os dados no cadastro do parceiro (e nas outras empresas do grupo, se quiser). Quem não tem cadastro ganha o botão “Cadastrar”.',para:'esc'},
+    {x:'Comunicação › Parceiros: na alteração de conta e no desconto, é só digitar o nome do parceiro para encontrá-lo, sem procurar na lista.',mods:['repasse']}]},
   {k:'2026-10-30',data:'2026-10-30',t:'Portal com visual novo e Dashboard para todos',itens:[
     {x:'Visual novo do portal, mais limpo e moderno. Tudo continua no mesmo lugar.'},
     {x:'O Dashboard (primeiro botão da linha de módulos) agora é a tela inicial de todos, com o resumo do que você tem acesso.'},
