@@ -6787,7 +6787,7 @@ async function renderDash(){
   const cli=cliOuTodas(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
   const hr=new Date().getHours(),nome=(ME?.nome||'').split(' ')[0];
   $('dsHello').textContent=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(nome?', '+nome:'');
-  $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?'Resumo da empresa em '+dBR(TODAY)+'.':'';
+  $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?(cli.id==='*'?'Resumo de todas as empresas em ':'Resumo da empresa em ')+dBR(TODAY)+'.':'';
   if(!cli){g.innerHTML='<p class="muted">Escolha uma empresa.</p>';return}
   g.innerHTML='<p class="muted">Carregando…</p>';
   if(!dsFin(cli))return dsModulos(cli);
