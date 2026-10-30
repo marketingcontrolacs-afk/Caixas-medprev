@@ -583,6 +583,12 @@ body.lg header.top .logo{visibility:hidden}
     <div class="row" id="grFoot" style="margin-top:12px"></div>
   </section>
 
+  <!-- TODAS AS EMPRESAS numa tela que é de uma empresa só: lista das empresas para abrir -->
+  <section id="viewTodas" hidden>
+    <div><h1 id="tdTitle"></h1><p class="sub">Todas as empresas: esta tela mostra uma empresa por vez. Escolha a empresa para abrir.</p></div>
+    <div class="card" style="margin-top:16px;padding:18px 20px"><div class="dlinks" id="tdLista"></div></div>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › DASHBOARD DA EMPRESA (escritório; tela inicial) -->
   <section id="viewDash" hidden>
     <div class="dshead">
@@ -1419,14 +1425,16 @@ function empresasMod(m){
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':m==='ponto'?'ponto':mod)));
 }
 const escCli=$('escCli');
+$('tdLista').addEventListener('click',e=>{const b=e.target.closest('[data-emp]');if(!b)return;escCli.value=b.dataset.emp;guardaEmp();openView()});
 // a empresa é escolhida uma vez no topo e vale para todos os módulos, inclusive depois de atualizar a página
 const EMPK='portal_empresa';
 let EMP=(()=>{try{return localStorage.getItem(EMPK)||''}catch(e){return ''}})();
 function guardaEmp(){const v=escCli.value;if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
 function fillClientes(){
-  // "Todas as empresas" continua escolhida ao trocar entre contas a pagar, a receber, agenda e inadimplência
-  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,ant=escCli.dataset.mod,v=(cur==='*'||cur==='int')&&(ant===m||cur==='*'&&GTTODAS.includes(ant)&&GTTODAS.includes(m))?cur:EMP||cur;escCli.dataset.mod=m;
-  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas'||GTTODAS.includes(m)&&ehEsc())&&(doMod.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
+  // "Todas as empresas" continua escolhida ao trocar de módulo
+  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,ant=escCli.dataset.mod,v=cur==='*'||cur==='int'&&ant===m?cur:EMP||cur;escCli.dataset.mod=m;
+  // "Todas as empresas" em todos os módulos para quem vê mais de uma empresa (Carol, 30/10)
+  const todas=!telaSemEmp(m)&&(doMod.length>1||lista.length>1&&ehEsc()||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
@@ -1446,11 +1454,22 @@ function viewDaEmp(){
 // com "Todas as empresas" nas contas, a conta aberta usa a empresa dela (CLIDLG)
 let CLIDLG=null;
 const cliAtual=()=>CLIDLG||CLIENTES.find(c=>c.id===escCli.value);
+function renderTodas(){
+  const n=NAV.find(x=>x.k===VIEW);$('tdTitle').textContent=n?n.t:'';
+  $('tdLista').innerHTML=empresasDe(VIEW).map(c=>`<button type="button" class="dlink" data-emp="${c.id}">${svgI(ICO[VIEW]?VIEW:'m_esc')}<span>${esc(c.nome)}</span></button>`).join('')||'<p class="muted" style="margin:0">Nenhuma empresa.</p>';
+}
 // telas da Gestão financeira que somam todas as empresas, para o pagamento do dia não esquecer nenhuma (Carol, 30/10)
-const GTTODAS=['gfpagar','gfrec','gfagenda','gfinad'];
+const GTTODAS=['gfpagar','gfrec','gfagenda','gfinad','gfmov'];
+const TODAS={id:'*',nome:'Todas as empresas',bpo_financeiro:true};
+const cliOuTodas=()=>escCli.value==='*'?TODAS:cliAtual();
+// telas que somam todas as empresas; nas outras, "Todas as empresas" mostra a lista das empresas para abrir a tela de cada uma
+const SOMA_TODAS=new Set([...GTTODAS,'gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
+// a conta ou o lançamento aberto com "Todas as empresas" usa a empresa dele; ao fechar a janela, volta
+document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -2576,7 +2595,7 @@ const MODCFG={
 let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
 const mFiltro=$('mFiltro');
 function initMod(m){
-  const cfg=MODCFG[m],cli=cliAtual();
+  const cfg=MODCFG[m],cli=cliOuTodas();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
     mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option>':'';
@@ -2586,16 +2605,16 @@ function initMod(m){
   $('mTitle').textContent=cfg.titulo;
   $('mSub').textContent=(cli?cli.nome+(m==='cartao'&&cli.cartao_final?' · cartão final '+cli.cartao_final:'')+' · ':'')+cfg.sub;
   $('mNovo').textContent='+ '+cfg.novo;
-  $('mNovo').hidden=!(cli&&podeLancar(cli.id,m));
+  $('mNovo').hidden=!(cli&&cli.id!=='*'&&podeLancar(cli.id,m));
   renderMod();
 }
 ['mIni','mFim'].forEach(id=>$(id).onchange=()=>renderMod());mFiltro.onchange=$('mTipo').onchange=()=>renderMod();
 async function renderMod(){
-  const cfg=MODCFG[MOD],cli=cliAtual();
+  const cfg=MODCFG[MOD],cli=cliOuTodas(),tod=cli?.id==='*';
   if(!cli||!window.V2)$('mConf').innerHTML='';
   if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
-  let q=sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
+  let q=tod?sb.from(cfg.tabela).select('*').in('cliente_id',empresasDe(MOD).map(c=>c.id)):sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
   const f=MOD==='pagar'?mFiltro.value:'per',per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
   const [pIni,pFim]=[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31'];
   if(f==='aberto')q=q.eq('conferido',false);else q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
@@ -2617,17 +2636,19 @@ async function renderMod(){
   if(REGS.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',REGS.map(r=>r.id));(dd||[]).forEach(d=>(DOCS[d.registro_id]=DOCS[d.registro_id]||[]).push(d))}
   const nd=r=>(DOCS[r.id]||[]).length, clip=r=>nd(r)?`<span class="muted" title="Documentos">📎${nd(r)}</span>`:'<span class="neg">sem documento</span>';
   const sum=a=>r2(a.reduce((x,r)=>x+(+r.valor),0));
+  // "Todas as empresas": cada linha mostra a empresa dela
+  const empC=r=>tod?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===r.cliente_id)?.nome||'')}</span>`:'';
   let head,body,foot='',tiles;
   if(MOD==='pagar'){
     const st=r=>{if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
       return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
   }else if(MOD==='cartao'){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
     tiles=[['Compras do período',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
   }else{
@@ -2642,8 +2663,8 @@ async function renderMod(){
   if(MOD==='tesouraria'&&!REGS.length)body='';
   $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste período'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  if(MOD==='tesouraria')renderTC(cli);else $('mConf').innerHTML='';
-  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
+  if(MOD==='tesouraria'&&!tod)renderTC(cli);else $('mConf').innerHTML='';
+  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
 }
 $('mNovo').onclick=()=>openReg(null);
 $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openReg(REGS.find(r=>r.id===tr.dataset.id))});
@@ -2658,6 +2679,7 @@ function ajustaDeposito(){
   const d=$('rFields').querySelector('[data-k="descricao"]');if(d)d.closest('label').hidden=dep;
 }
 async function openReg(r){
+  if(escCli.value==='*')CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null;
   if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
   const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
   const ed=regEditavel(),dis=ed?'':' disabled';
@@ -6178,6 +6200,8 @@ function mvBulk(){
   const n=MV.sel.size;$('mvBulk').hidden=!n;if(!n)return;
   const ls=mvSelRows(),e=r2(ls.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+x.valor,0)),sd=r2(ls.filter(x=>x.tipo==='saida').reduce((a,x)=>a+x.valor,0));
   const nv=ls.filter(x=>x.k==='m'&&x.ref.validar).length,bv=$('mvBulk').querySelector('[data-mb="valida"]');bv.hidden=!nv;bv.textContent=nv===n?'Marcar como validado':`Marcar ${nv} como ${nv===1?'validado':'validados'}`;
+  // com "Todas as empresas", conta e categoria são de cada empresa: trocar só abrindo a empresa
+  $('mvBulk').querySelectorAll('[data-mb="cat"],[data-mb="conta"]').forEach(x=>x.hidden=!!GT.todasE);
   $('mvBulkTxt').innerHTML=`<b>${n} ${n===1?'lançamento selecionado':'lançamentos selecionados'}</b> · entradas <b class="pos">${fm(e)}</b> · saídas <b class="neg">${fm(sd)}</b> · total <b class="tot ${e-sd<0?'neg':'pos'}">${fm(r2(e-sd))}</b>`;
 }
 $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
@@ -6229,6 +6253,7 @@ async function mvExcluir(rows){
 }
 function mvAbre(tr){
   const [k,id]=tr.dataset.mv.split(':');
+  if(GT.todasE){const r=(k==='t'?GT.lista:GT.todos).find(x=>x.id===id);CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null}
   if(k==='t')return abrirGT(GT.lista.find(t=>t.id===id));
   const m=GT.todos.find(x=>x.id===id);if(!m)return;
   if(m.titulo_id){const t=GT.lista.find(x=>x.id===m.titulo_id);if(t)return abrirGT(t)}
@@ -6294,7 +6319,7 @@ $('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
 $('gtRem').onclick=()=>{RM.so=null;go('gfremessa')};
-const dlgGT=$('dlgGT');dlgGT.addEventListener('close',()=>{CLIDLG=null});
+const dlgGT=$('dlgGT');
 async function abrirGT(t,tipo){
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
   let pes=[],contas=GFC.lista;
@@ -6696,15 +6721,17 @@ const mesCurto=ym=>MESES[+ym.slice(5)-1].slice(0,3)+'/'+ym.slice(2,4);
 const cvl=(v,cl)=>`<td data-v="${r2(v)}" class="${cl||''}">${fm(r2(v))}</td>`;
 // os dados de todos os relatórios e do dashboard: lançamentos, contas a pagar e receber, contas e faturas da empresa
 async function relCarrega(cli){
-  const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
+  const tod=cli.id==='*',ids=tod?empresasDe(VIEW).filter(c=>c.bpo_financeiro!==false).map(c=>c.id):[cli.id],emp=q=>tod?q.in('cliente_id',ids):q.eq('cliente_id',cli.id);
+  const [movs,tits,contas]=await Promise.all([todas(()=>emp(sb.from('fin_movimentos').select('*')).order('data')),todas(()=>emp(sb.from('fin_titulos').select('*')).order('vencimento')),
+    tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')).then(l=>l.map(c=>({...c,nome:(CLIENTES.find(x=>x.id===c.cliente_id)?.nome||'')+' · '+c.nome}))):gfContasDe(cli.id,true)]);
   REL.plano=await planoDe(cli);REL.nat=Object.fromEntries(REL.plano.filter(c=>c.tipo).map(c=>[c.categoria,c.tipo]));
-  REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
+  REL.fats=await todas(()=>emp(sb.from('fin_faturas').select('*'))).catch(()=>[]);   // antes do v52 não existe
   REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
   REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
   movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
 }
 async function renderRel(){
-  const M=VIEW,cli=cliAtual();
+  const M=VIEW,cli=cliOuTodas();
   $('relTitle').textContent=RELMODOS[M][0];$('relSub').textContent=RELMODOS[M][1];
   $('relIniBox').hidden=$('relFimBox').hidden=M==='gfresumo'||M==='gforc';$('relSemBox').hidden=M!=='gforc';
   $('relBaseBox').hidden=!['gfdcat','gfdforn','gfdforma'].includes(M);$('relSalvar').hidden=M!=='gforc';
@@ -6718,7 +6745,7 @@ async function renderRel(){
     await relCarrega(cli);
     if(M==='gforc'){const {data,error}=await sb.from('fin_orcamento').select('*').eq('cliente_id',cli.id);if(error)throw error;REL.orc=data||[]}
   }catch(e){console.error(e);return vazio(e&&/fin_orcamento/.test(e.message||'')||e?.code==='42P01'&&M==='gforc'?'A previsão orçamentária precisa da atualização v50 do banco. Rode o SQL no Supabase.':v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
-  if(VIEW!==M||cliAtual()?.id!==cli.id)return;
+  if(VIEW!==M||cliOuTodas()?.id!==cli.id)return;
   ({gfresumo:relResumo,gffluxo:relFluxo,gforc:relOrc,gfdre:relDre,gfdcat:relDesp,gfdforn:relDesp,gfdforma:relDesp})[M]();
 }
 ['relIni','relFim','relSem','relBase'].forEach(id=>$(id).onchange=renderRel);
@@ -6757,7 +6784,7 @@ function relResumo(){
 // despesas do mês por categoria, próximos vencimentos e pendências (cada uma leva para a tela onde se resolve).
 // Por enquanto só o escritório vê; depois a Carol escolhe o que o cliente vai ver.
 async function renderDash(){
-  const cli=cliAtual(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
+  const cli=cliOuTodas(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
   const hr=new Date().getHours(),nome=(ME?.nome||'').split(' ')[0];
   $('dsHello').textContent=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(nome?', '+nome:'');
   $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?'Resumo da empresa em '+dBR(TODAY)+'.':'';
@@ -6765,7 +6792,7 @@ async function renderDash(){
   g.innerHTML='<p class="muted">Carregando…</p>';
   if(!dsFin(cli))return dsModulos(cli);
   try{await relCarrega(cli)}catch(e){console.error(e);g.innerHTML=`<p class="neg">${v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
-  if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
+  if(VIEW!=='gfdash'||cliOuTodas()?.id!==cli.id)return;
   dsDesenha(cli);
 }
 $('dsAtual').onclick=renderDash;
@@ -6775,7 +6802,7 @@ const dsFin=cli=>ehEsc()&&cli.bpo_financeiro!==false&&(ehAdm()||!ME.modulos_equi
 // Dashboard de quem não vê a parte financeira (operadoras do caixa e da tesouraria, RH, cliente): um quadro por
 // módulo que a pessoa tem liberado nesta empresa, as tarefas dela e os atalhos (Carol, 30/10)
 async function dsModulos(cli){
-  const g=$('dsGrid'),pv=m=>podeVer(cli.id,m)&&eqPode(m)&&empresasDe(m).some(c=>c.id===cli.id),tem={caixa:pv('caixa'),tes:pv('tesouraria'),pagar:pv('pagar'),cartao:pv('cartao'),tar:temAcesso('tarefas')};
+  const g=$('dsGrid'),pv=m=>cli.id!=='*'&&podeVer(cli.id,m)&&eqPode(m)&&empresasDe(m).some(c=>c.id===cli.id),tem={caixa:pv('caixa'),tes:pv('tesouraria'),pagar:pv('pagar'),cartao:pv('cartao'),tar:temAcesso('tarefas')};
   const d14=addDias(TODAY,-14),lista=r=>r.error?[]:r.data||[];
   let F,T,TS,TC,P,C;
   try{[F,T,TS,TC,P,C]=await Promise.all([
@@ -6786,7 +6813,7 @@ async function dsModulos(cli){
     tem.pagar?sb.from('contas_pagar').select('*').eq('cliente_id',cli.id).eq('conferido',false).order('vencimento').limit(300).then(lista):null,
     tem.cartao?sb.from('cartao_notas').select('valor,data').eq('cliente_id',cli.id).gte('data',TODAY.slice(0,8)+'01').then(lista):null])}
   catch(e){console.error(e);g.innerHTML='<p class="neg">Erro ao carregar. Verifique a internet e tente de novo.</p>';return}
-  if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
+  if(VIEW!=='gfdash'||cliOuTodas()?.id!==cli.id)return;
   DS.cli=cli.id;DS.mod={cli,F,T,TS,TC,P,C,tem};dsModDesenha();
 }
 function dsModDesenha(){
@@ -6795,7 +6822,7 @@ function dsModDesenha(){
   const kpi=(cl,ic,go,k,v,n)=>`<button type="button" class="dskpi ${cl}" data-go="${go}"><span class="ic">${ic}</span><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n}</span></button>`;
   const ks=[],cards=[];
   // tarefas da pessoa
-  const tars=TPEND.filter(t=>t.cliente_id===cli.id),late=tars.filter(tpLate).length,outras=TPEND.length-tars.length;
+  const tars=TPEND.filter(t=>cli.id==='*'||t.cliente_id===cli.id),late=tars.filter(tpLate).length,outras=TPEND.length-tars.length;
   // caixa: últimos 14 dias, cada caixa do dia
   if(tem.caixa){
     const n=nCx(cli),por={};F.forEach(f=>por[f.data+'|'+(f.caixa||1)]=f);const dias=[];
@@ -6832,7 +6859,7 @@ function dsModDesenha(){
 }
 const DS={pm:[]};
 // redesenha o dashboard aberto quando as tarefas ou os pedidos de parceiros mudam (sem buscar tudo de novo)
-const dsRefaz=()=>{const c=cliAtual();if(VIEW!=='gfdash'||!DS.cli||DS.cli!==c?.id)return;if(dsFin(c)){if(REL.movs)dsDesenha(c)}else if(DS.mod?.cli.id===c.id)dsModDesenha()};
+const dsRefaz=()=>{const c=cliOuTodas();if(VIEW!=='gfdash'||!DS.cli||DS.cli!==c?.id)return;if(dsFin(c)){if(REL.movs)dsDesenha(c)}else if(DS.mod?.cli.id===c.id)dsModDesenha()};
 // gráfico de barras desenhado na largura real do quadro (o texto fica do mesmo tamanho no celular e no computador)
 function dsGraf(){
   const box=$('dsChart');if(!box||!DS.pm.length)return;const pm=DS.pm,mx=Math.max(1,...pm.flatMap(x=>[x.e,x.s])),W=Math.max(280,box.clientWidth),H=W<500?180:240,top=12,bot=28,ch=H-top-bot,bw=W/12,bar=Math.max(3,Math.min(16,(bw-8)/2));
@@ -6880,12 +6907,12 @@ function dsDesenha(cli){
   const naoConc=REL.movs.filter(m=>!REL.cart.has(m.conta_id)&&!m.ofx_id&&!m.conciliado&&m.data>=addDias(TODAY,-30)&&m.data<=TODAY).length;
   const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length,catRev=REL.movs.filter(m=>m.cat_revisar).length+REL.tits.filter(t=>t.cat_revisar&&relFalta(t)>0.004).length;
   const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
-  const pAlt=PPEND.filter(x=>x.cli===cli.id&&x.t==='alt').length,pNovo=PPEND.filter(x=>x.cli===cli.id&&x.t==='novo').length;
+  const pAlt=PPEND.filter(x=>(cli.id==='*'||x.cli===cli.id)&&x.t==='alt').length,pNovo=PPEND.filter(x=>(cli.id==='*'||x.cli===cli.id)&&x.t==='novo').length;
   const pend=[[pAlt,qt(pAlt,'alteração de conta de parceiro','alterações de conta de parceiro'),'repasse:alerta'],[pNovo,qt(pNovo,'parceiro novo para conferir','parceiros novos para conferir'),'repasse:alerta'],[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
     [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[REL.movs.filter(m=>m.validar).length,qt(REL.movs.filter(m=>m.validar).length,'lançamento do histórico a validar','lançamentos do histórico a validar'),'gfmov:validar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
     [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
   // as tarefas da pessoa nesta empresa (ex.: alteração de conta de parceiro, v76) entram primeiro
-  DS.cli=cli.id;const tars=TPEND.filter(t=>t.cliente_id===cli.id),outras=TPEND.length-tars.length;
+  DS.cli=cli.id;const tars=TPEND.filter(t=>cli.id==='*'||t.cliente_id===cli.id),outras=TPEND.length-tars.length;
   const tarH=tars.slice(0,5).map(t=>`<button type="button" class="dr dpend" data-tar="${t.id}"><span class="pi t">${svgI('tarefas')}</span><span>${esc(t.titulo)}${tpLate(t)?' <span class="chip c-bad">atrasada</span>':TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}</span><span class="go">›</span></button>`).join('')
     +(tars.length>5||outras>0?`<button type="button" class="dr" data-tar="*">${mu(tars.length>5?'Ver todas as suas '+TPEND.length+' tarefas':outras+(outras===1?' tarefa sua em outra empresa':' tarefas suas em outras empresas'))}<span class="go">›</span></button>`:'');
   const pendH=tarH+pend.map(p=>`<button type="button" class="dr dpend" data-go="${p[2]}"><span class="pi${/vencid|alteraç/.test(p[1])?' b':''}">${p[0]>99?'99+':p[0]}</span><span>${esc(p[1].replace(/^\d+ /,''))}</span><span class="go">›</span></button>`).join('')||(tarH?'':vazio('Nenhuma pendência. Tudo em dia!'));
