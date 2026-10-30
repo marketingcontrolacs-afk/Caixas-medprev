@@ -7591,6 +7591,19 @@ async function tEquipe(){
   const {data}=await sb.from('perfis').select('user_id,nome,email').eq('papel','escritorio').order('nome');
   return TEQUIPE=(data||[]).map(u=>({id:u.user_id,nome:u.nome||u.email}));
 }
+// pessoas para responsável/executor: a equipe da Controlacs e, na tarefa de empresa, os usuários dela
+async function tPessoas(cli){
+  if(!ehEsc())return [];
+  const d=await dirUsuarios(),eq=d.equipe.map(u=>({...u,g:'Equipe Controlacs'}));
+  return cli?[...eq,...d.porEmpresa(cli).map(u=>({...u,g:'Usuários da empresa'}))]:eq;
+}
+const nomeDe=(id,salvo)=>(DIRUS?.perfis.find(u=>u.user_id===id)&&DIRUS.nome(id))||salvo||'?';
+function selPessoa(id,pessoas,v,vazio,dis){
+  const gs=[...new Set(pessoas.map(p=>p.g))],opt=p=>`<option value="${p.id}"${p.id===v?' selected':''}>${esc(p.nome)}</option>`;
+  // quem já está na tarefa e não aparece mais na lista continua selecionado
+  const fora=v&&!pessoas.some(p=>p.id===v)?`<option value="${v}" selected>${esc(nomeDe(v))}</option>`:'';
+  return `<select id="${id}"${dis||''}><option value="">${vazio}</option>${fora}${gs.map(g=>`<optgroup label="${g}">${pessoas.filter(p=>p.g===g).map(opt).join('')}</optgroup>`).join('')}</select>`;
+}
 async function renderTarefas(){
   const e=ehEsc(),v=escCli.value,todas=v==='*';
   $('tSub').textContent=e?'Tarefas da equipe e recados com os clientes. Arraste o cartão para mudar de coluna; clique para abrir a conversa.'
@@ -7599,6 +7612,7 @@ async function renderTarefas(){
   $('tRespBox').hidden=!e;
   const vazio=(t,cl)=>{$('tBoard').innerHTML=`<p class="${cl||'muted'}">${t}</p>`;$('tAlerta').hidden=true;$('tNote').textContent=''};
   if(!v){vazio('Nenhuma empresa liberada para tarefas.');return}
+  if(window.V74===undefined){const {error:e74}=await sb.from('tarefas').select('executor').limit(1);window.V74=!e74}
   if(window.V31===undefined){const {error:e31}=await sb.from('tarefa_usuarios').select('tarefa_id').limit(1);window.V31=!e31}
   DIRUS=null;
   let q=sb.from('tarefas').select('*, tarefa_comentarios(count)'+(window.V31?', tarefa_usuarios(user_id)':'')).eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
@@ -7607,20 +7621,21 @@ async function renderTarefas(){
   const conc=$('tConc').value;
   if(conc==='nao')q=q.neq('status','concluida');
   else if(conc==='30')q=q.or(`status.neq.concluida,concluida_em.gte.${new Date(Date.now()-30*864e5).toISOString()}`);
-  const [{data,error}]=await Promise.all([q.order('ordem'),tNovidades(),tEquipe()]);
+  const [{data,error}]=await Promise.all([q.order('ordem'),tNovidades(),tEquipe(),ehEsc()?dirUsuarios():null]);
   if(error){console.error(error);vazio(error.code==='42P01'||error.code==='PGRST205'||/tarefa/.test(error.message||'')?'Este módulo precisa da atualização v26 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
   TAR=data||[];
-  // responsáveis: a equipe do escritório e quem já aparece nas tarefas
-  const rs=$('tResp'),rv=rs.value||'todos',nomes=new Map((TEQUIPE||[]).map(u=>[u.id,u.nome]));
-  TAR.forEach(t=>t.responsavel&&!nomes.has(t.responsavel)&&nomes.set(t.responsavel,t.responsavel_nome||'?'));
-  rs.innerHTML=`<option value="todos">Todos</option><option value="meus">Minhas tarefas</option><option value="sem">Sem responsável</option>`+[...nomes].map(([id,n])=>`<option value="${id}">${esc(n)}</option>`).join('');
+  // filtro por pessoa: a equipe do escritório e quem já é responsável ou executor nas tarefas
+  const rs=$('tResp'),rv=rs.value||'todos',nomes=new Map((TEQUIPE||[]).map(u=>[u.id,nomeDe(u.id,u.nome)]));
+  TAR.forEach(t=>{t.responsavel&&!nomes.has(t.responsavel)&&nomes.set(t.responsavel,nomeDe(t.responsavel,t.responsavel_nome));
+    t.executor&&!nomes.has(t.executor)&&nomes.set(t.executor,nomeDe(t.executor,t.executor_nome))});
+  rs.innerHTML=`<option value="todos">Todos</option><option value="meus">Minhas tarefas</option><option value="sem">Sem executor</option>`+[...nomes].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,n])=>`<option value="${id}">${esc(n)}</option>`).join('');
   rs.value=[...rs.options].some(o=>o.value===rv)?rv:'todos';
   tDesenha();
 }
 function tFiltradas(){
   const busca=$('tBusca').value.trim().toLowerCase(),r=$('tResp').value;
   return TAR.filter(t=>(!busca||(t.titulo+' '+(t.descricao||'')).toLowerCase().includes(busca))
-    &&(!ehEsc()||r==='todos'||(r==='meus'?t.responsavel===ME.user_id:r==='sem'?!t.responsavel:t.responsavel===r)));
+    &&(!ehEsc()||r==='todos'||(r==='meus'?[t.responsavel,t.executor].includes(ME.user_id):r==='sem'?!t.executor:[t.responsavel,t.executor].includes(r))));
 }
 function tCard(t,todas){
   const nome=t.cliente_id?CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'':'Interna',nv=TNOV[t.id],pr=TPRI[t.prioridade];
@@ -7630,7 +7645,8 @@ function tCard(t,todas){
     t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':'',
     ehEsc()&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:''].join('');
   const meta=[t.prazo?`<span class="${late||hoje?'late':''}">📅 ${late?'Atrasada · ':hoje?'Hoje · ':''}${dBR(t.prazo).slice(0,5)}</span>`:'',
-    t.responsavel_nome?`<span>👤 ${esc(t.responsavel_nome)}</span>`:'',n?`<span>💬 ${n}</span>`:'',
+    t.executor?`<span title="Executor">🛠 ${esc(nomeDe(t.executor,t.executor_nome))}</span>`:'',
+    t.responsavel?`<span title="Responsável">👤 ${esc(nomeDe(t.responsavel,t.responsavel_nome))}</span>`:'',n?`<span>💬 ${n}</span>`:'',
     nv?`<span class="new">● ${nv.mensagens?nv.mensagens+(nv.mensagens===1?' mensagem nova':' mensagens novas'):'Nova'}</span>`:''].join('');
   return `<button type="button" class="kcard${nv?' novo':''}" data-id="${t.id}" draggable="${tLanca(t)}">${chips?`<div class="kchips">${chips}</div>`:''}<div class="t">${esc(t.titulo)}</div>${meta?`<div class="m">${meta}</div>`:''}</button>`;
 }
@@ -7674,7 +7690,7 @@ $('tBoard').addEventListener('drop',async e=>{
 });
 const dlgTar=$('dlgTar');
 async function abrirTarefa(t){
-  TARDLG=t;const e=ehEsc(),pode=t?tLanca(t):true,equipe=await tEquipe();
+  TARDLG=t;const e=ehEsc(),pode=t?tLanca(t):true;
   $('tdTitle').textContent=t?t.titulo:'Nova tarefa';
   $('tdChip').innerHTML=t?(t.cliente_id?`<span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:'')+(t.interna&&e?'<span class="chip c-none">🔒 Interna</span>':''):'';
   const d=pode?'':' disabled',sel=(id,ops,v)=>`<select id="${id}"${d}>${ops.map(([k,n])=>`<option value="${k}"${k===v?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
@@ -7686,10 +7702,12 @@ async function abrirTarefa(t){
     <label class="f">Coluna${sel('td_status',TCOLS,t?.status||'afazer')}</label>
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
-    ${e?`<label class="f">Responsável${sel('td_resp',[['','Ninguém'],...equipe.map(u=>[u.id,u.nome])],t?t.responsavel||'':ME.user_id)}</label>`:''}</div>
+    ${e?'<label class="f">Responsável (acompanha)<span id="td_respBox"></span></label><label class="f">Executor (quem faz)<span id="td_execBox"></span></label>'
+      :t&&(t.responsavel||t.executor)?`<p class="note wide" style="margin:0">${t.executor?'Executor: <b>'+esc(t.executor_nome||'')+'</b>':''}${t.responsavel&&t.executor?' · ':''}${t.responsavel?'Responsável: <b>'+esc(t.responsavel_nome||'')+'</b>':''}</p>`:''}
+    <p class="note wide" style="margin:0">Cadastrada por <b>${esc(t?nomeDe(t.criado_por,t.criado_por_nome):nomeDe(ME.user_id,ME.nome||ME.email))}</b>${t?' em '+dtBR(t.criado_em):''}${t?.concluida_em?' · concluída em '+dtBR(t.concluida_em):''}</p></div>
     ${e&&window.V31?'<div id="td_visBox"></div>':''}
     ${e?`<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px" id="td_intBox"><input type="checkbox" id="td_int" style="width:auto"${t?.interna?' checked':''}> Tarefa interna (o cliente não vê)</label>`:''}
-    ${t?`<p class="note" style="margin:0">Aberta por ${esc(t.criado_por_nome||'?')} em ${dtBR(t.criado_em)}${t.concluida_em?' · concluída em '+dtBR(t.concluida_em):''}</p>`:''}`;
+`;
   if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
     ${pode?`<div style="display:grid;gap:8px;margin-top:10px"><textarea id="td_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
       <div class="row" style="gap:10px;align-items:center"><input type="file" id="td_file" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF">
@@ -7701,6 +7719,12 @@ async function abrirTarefa(t){
   $('tdFoot').innerHTML=(e&&t?b('excluir','Excluir','ghost')+b('arquivar','Arquivar','ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+(pode?b('salvar',t?'Salvar':'Criar tarefa','primary'):'');
   const ic=$('td_cli'),ib=$('td_intBox');if(ic&&ib){const f=()=>ib.hidden=!ic.value;ic.onchange=f;f()}
   if(t&&!t.cliente_id&&ib)ib.hidden=true;
+  // responsável e executor: escolhidos pelo nome entre a equipe e os usuários da empresa da tarefa
+  if($('td_respBox')){
+    const pessoas=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,ps=await tPessoas(cli),rv=$('td_resp')?.value??(t?t.responsavel||'':ME.user_id),xv=$('td_exec')?.value??(t?.executor||'');
+      $('td_respBox').innerHTML=selPessoa('td_resp',ps,rv,'Ninguém',d);$('td_execBox').innerHTML=selPessoa('td_exec',ps,xv,'Ninguém ainda',d)};
+    if(ic)ic.addEventListener('change',pessoas);await pessoas();
+  }
   if($('td_visBox')){
     const marc=(t?.tarefa_usuarios||[]).map(x=>x.user_id);
     // a lista vale para a equipe e, nas tarefas de empresa que não são internas, para os usuários do cliente
@@ -7711,7 +7735,7 @@ async function abrirTarefa(t){
       const rest=box.querySelector('input[name="td_vis"]:checked')?.value??(marc.length?'marcados':'todos');
       box.innerHTML=`<div class="f"><span>Quem vê esta tarefa</span><div class="vis"><label><input type="radio" name="td_vis" value="todos"${rest==='todos'?' checked':''}> ${interna?'Toda a equipe':'Todos (a equipe e os usuários da empresa)'}</label><label><input type="radio" name="td_vis" value="marcados"${rest==='marcados'?' checked':''}> Só os usuários marcados</label></div></div>
         <div id="td_pickBox"${rest==='marcados'?'':' hidden'}>${gs.length?pickUsers('td_pick',gs,marc):'<p class="note" style="margin:0">Ainda não há outros usuários para marcar. Cadastre em Configurações › Empresas e usuários.</p>'}
-        <p class="note" style="margin:6px 0 0">${adm?esc(adm)+' (administração), ':''}quem abriu a tarefa e o responsável sempre veem.</p></div>`;
+        <p class="note" style="margin:6px 0 0">${adm?esc(adm)+' (administração), ':''}quem cadastrou, o responsável e o executor sempre veem.</p></div>`;
       box.querySelectorAll('input[name="td_vis"]').forEach(r=>r.onchange=()=>$('td_pickBox').hidden=r.value!=='marcados'||!r.checked)};
     if(ic)ic.addEventListener('change',vis);if($('td_int'))$('td_int').addEventListener('change',vis);vis();
   }
@@ -7742,7 +7766,7 @@ async function tAcao(act,btn){
     if(act==='salvar'){
       const titulo=$('td_titulo').value.trim();if(!titulo)return tdErr('Informe o título da tarefa.');
       const r={titulo,descricao:$('td_desc').value.trim()||null,status:$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
-      if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked}
+      if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked;if(window.V74)r.executor=$('td_exec').value||null}
       const restrito=e&&$('td_visBox')?.querySelector('input[name="td_vis"]:checked')?.value==='marcados',quem=restrito?pickLer('td_pick'):[];
       if(restrito&&!quem.length)return tdErr('Marque pelo menos um usuário que pode ver a tarefa, ou escolha a opção de todos.');
       if(!t){const c=$('td_cli').value||null;if(!c&&!e)return tdErr('Escolha a empresa.');r.cliente_id=c;
