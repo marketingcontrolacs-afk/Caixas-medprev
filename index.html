@@ -319,6 +319,10 @@ dialog::backdrop{background:rgba(6,22,24,.5);backdrop-filter:blur(3px)}
 .nfp.x{background:var(--bad-soft);color:var(--bad)}.nfv{color:var(--line);font-weight:700}
 .nfgrid select.nfsit{padding:3px 8px;font-size:12.5px;height:auto;width:auto;border-radius:999px}
 .nfgrid .nfnome{cursor:pointer}.nfgrid .nfnome:hover b{text-decoration:underline}
+/* repasse com alteração de conta pendente */
+#rnBody tr.rnalt td{background:var(--bad-soft)}#rnBody tr.rnalt td:first-child{box-shadow:inset 4px 0 0 var(--bad)}
+.rnaltbox{margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--bad);color:var(--bad);background:var(--surface);font-size:13px;line-height:1.5}
+.rnaltbox .btn{margin-top:6px}
 #mvBulk b.pos{color:var(--ok)}#mvBulk b.neg{color:var(--bad)}#mvBulk b.tot{font-size:16px}
 .chip{letter-spacing:.01em}
 .toast{border-radius:12px;box-shadow:var(--sh2)}
@@ -704,7 +708,7 @@ body.lg header.top .logo{visibility:hidden}
     <div class="toolbar" id="rnBar" hidden>
       <label class="f">Relatório<select id="rnLote"></select></label>
       <label class="f">Pagamento em<input type="date" id="rnVenc"></label>
-      <label class="f">Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="st:sem">Sem conta a pagar</option><option value="st:aberto">Em aberto</option><option value="st:atrasado">Atrasados</option><option value="st:pago">Pagos</option><option value="st:conciliado">Conciliados</option></select></label>
+      <label class="f">Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="alt">Com alteração de conta</option><option value="st:sem">Sem conta a pagar</option><option value="st:aberto">Em aberto</option><option value="st:atrasado">Atrasados</option><option value="st:pago">Pagos</option><option value="st:conciliado">Conciliados</option></select></label>
       <label class="f">Empresa<select id="rnEmpF"></select></label>
       <input id="rnBusca" placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
     </div>
@@ -8433,6 +8437,8 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-10-30c',data:'2026-10-30',t:'Alteração de conta no Repasse de parceiros',itens:[
+    {x:'Gestão financeira › Repasse de parceiros: o parceiro com alteração de conta pendente aparece em vermelho, com a conta nova e o botão “Aplicar a conta nova”. Também dá para filtrar “Com alteração de conta”.',para:'esc'}]},
   {k:'2026-10-30b',data:'2026-10-30',t:'Parceiros mais rápidos de achar e de atualizar',itens:[
     {x:'Gestão financeira › Repasse de parceiros: o botão “Editar” ao lado da conta e Pix grava os dados no cadastro do parceiro (e nas outras empresas do grupo, se quiser). Quem não tem cadastro ganha o botão “Cadastrar”.',para:'esc'},
     {x:'Comunicação › Parceiros: na alteração de conta e no desconto, é só digitar o nome do parceiro para encontrá-lo, sem procurar na lista.',mods:['repasse']}]},
@@ -8962,6 +8968,9 @@ function rnParc(it,emp){
   return p||(emp?rnParc(it,null):null);
 }
 const rnTemConta=p=>!!(p&&(p.pix_chave||p.conta));
+// alteração de conta pendente do parceiro (nesta empresa ou no mesmo parceiro em outra empresa do grupo)
+function rnAlt(it){const p=rnParc(it,it.empresa_id);if(!p||!RN.alt)return null;if(RN.alt[p.id])return RN.alt[p.id];
+  const o=RN.parc.find(x=>RN.alt[x.id]&&(rnChave(x.nome)===rnChave(p.nome)||rnDig(x.cpf_cnpj)&&rnDig(x.cpf_cnpj)===rnDig(p.cpf_cnpj)));return o?RN.alt[o.id]:null}
 const rnConta=p=>!p?'':[p.titular&&p.titular!==p.nome&&p.titular!==p.nome_global?'Titular: '+esc(p.titular)+(p.cpf_cnpj?' · '+esc(p.cpf_cnpj):''):'',
   p.conta?[p.banco&&esc(p.banco),p.agencia&&'ag. '+esc(p.agencia),'c/c '+esc(p.conta)].filter(Boolean).join(' · '):'',p.pix_chave?'Pix '+(p.pix_tipo?esc(p.pix_tipo)+' ':'')+esc(p.pix_chave):''].filter(Boolean).join('<br>');
 const rnDescPend=p=>p?RN.desc.filter(d=>d.parceiro_id===p.id||RN.parc.some(x=>x.id===d.parceiro_id&&rnChave(x.nome)===rnChave(p.nome))):[];
@@ -8989,6 +8998,9 @@ async function renderRN(recarrega=true){
         todas(()=>sb.from('repasse_descontos').select('*').in('cliente_id',emp).eq('status','Pendente')),
         todas(()=>sb.from('fin_contas').select('id,cliente_id,nome,tipo,ativo').in('cliente_id',emp).eq('ativo',true).order('nome'))]);
       Object.assign(RN,{lotes:l,nf,parc:pa,pes:pe,desc:de,contas:ct});
+      // alterações de conta pedidas e ainda não aplicadas: aparecem em vermelho no repasse (Carol, 30/10)
+      RN.alt={};const ids=pa.map(x=>x.id);
+      for(let i=0;i<ids.length;i+=200){const {data:al}=await sb.from('parceiro_alteracoes').select('*').in('parceiro_id',ids.slice(i,i+200)).eq('status','Pendente');(al||[]).forEach(a=>RN.alt[a.parceiro_id]=a)}
     }catch(e){console.error(e);return rnVazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   }
   const sel=$('rnLote'),cur=sel.value;
@@ -9013,7 +9025,7 @@ function rnFiltrados(){
   const f=$('rnFiltro').value,ef=$('rnEmpF').value,q=rnChave($('rnBusca').value),qd=$('rnBusca').value.trim();
   return RN.itens.filter(it=>{const s=rnSitDe(it);
     if(f.startsWith('st:')&&rnStatus(it)!==f.slice(3))return false;
-    if(f==='emite'&&s!=='emite'||f==='nao'&&rnGrupoSit(s)!=='nao'||f==='sem'&&s!=='sem'||f==='semEmp'&&it.empresa_id||f==='semConta'&&rnTemConta(rnParc(it,it.empresa_id)))return false;
+    if(f==='emite'&&s!=='emite'||f==='nao'&&rnGrupoSit(s)!=='nao'||f==='sem'&&s!=='sem'||f==='semEmp'&&it.empresa_id||f==='semConta'&&rnTemConta(rnParc(it,it.empresa_id))||f==='alt'&&!rnAlt(it))return false;
     if(ef==='-'&&it.empresa_id||ef&&ef!=='-'&&it.empresa_id!==ef)return false;
     return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)});
 }
@@ -9023,10 +9035,11 @@ function rnDesenha(){
   const opSit=it=>{const s=rnSitDe(it);return `<select class="rnsit ${RNSIT[s][1]}" style="min-width:150px;padding:6px 8px;font-weight:600" title="Situação no controle de NF. Ao trocar, o controle guarda para os próximos relatórios.">${(s==='sem'?['sem']:[]).concat(['emite','nao_emitido','nao_emitir']).map(k=>`<option value="${k}"${k===s?' selected':''}>${RNSIT[k][0]}</option>`).join('')}</select>`};
   const linha=it=>{const s=rnSitDe(it),nf=rnNf(it),p=rnParc(it,it.empresa_id),t=it.titulo_id&&RN.tits[it.titulo_id],ds=rnDescPend(p);
     const st=rnStatus(it),ct=it.titulo_id?(t?(st==='pago'||st==='conciliado'?`<span class="chip ${RNST[st][1]}">✓ ${RNST[st][0]}</span>${t.data?`<br><span class="muted">${dBR(t.data)}${t.conta_id?' · '+esc(RN.contas.find(c=>c.id===t.conta_id)?.nome||''):''}</span>`:''}`:`<span class="chip ${RNST[st][1]}">${RNST[st][0]}</span> <span class="muted">venc. ${dBR(t.vencimento)}</span><br><button type="button" class="btn small ghost" data-rn="desfaz">Desfazer</button>`):'<span class="chip c-none">conta excluída</span>'):'';
-    return `<tr data-id="${it.id}"><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
+    const alt=!rnPago(it)&&rnAlt(it);
+    return `<tr data-id="${it.id}"${alt?' class="rnalt"':''}><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
       <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}</td>
       <td>${it.guias??''}</td><td><b>${fm(it.valor)}</b></td><td class="l">${opSit(it)}</td>
-      <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
+      <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${alt?`<div class="rnaltbox">⚠ <b>Alteração de conta pendente</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}<br><button type="button" class="btn small primary" data-rn="altAplica" data-alt="${alt.id}">Aplicar a conta nova</button></div>`:''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
       <td>${opEmp(it)}</td><td class="l">${ct}</td><td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td></tr>`};
   $('rnHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="rnTodas" style="width:auto" title="Selecionar todos do filtro"${rows.length&&rows.filter(i=>!rnPago(i)).every(i=>RN.sel.has(i.id))?' checked':''}></th><th class="l">Parceiro</th><th>Guias</th><th>Valor</th><th class="l">Nota fiscal</th><th class="l">Conta e Pix</th><th>Pagar em</th><th class="l">Situação</th><th class="l">Protocolo</th></tr>`;
   const blocos=[['emite','Emitem nota fiscal'],['nao','Não emitem nota fiscal'],['sem','Não encontrados no controle de NF']];
@@ -9037,8 +9050,9 @@ function rnDesenha(){
   $('rnTiles').innerHTML=[['Repasses',fm(soma(it)),`${it.length} parceiros`],['Emitem NF',fm(soma(por('emite'))),`${por('emite').length} parceiros`],['Não emitem NF',fm(soma(por('nao'))),`${por('nao').length} parceiros`],
     ...(por('sem').length?[['Não encontrados',fm(soma(por('sem'))),`${por('sem').length} parceiros · escolha a situação`]]:[]),
     ...G.empresas.map(id=>{const l=it.filter(i=>i.empresa_id===id);return [esc(rnEmpNome(id)),fm(soma(l)),`${l.length} ${l.length===1?'repasse':'repasses'}${l.length?' · '+l.filter(i=>i.titulo_id).length+' com conta a pagar':''}`]}),
-    ['Sem empresa',fm(soma(semE)),semE.length?`${semE.length} para escolher`:'todos escolhidos']]
-    .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${t[0]==='Sem empresa'&&semE.length||t[0]==='Não encontrados'?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+    ['Sem empresa',fm(soma(semE)),semE.length?`${semE.length} para escolher`:'todos escolhidos'],
+    ...(()=>{const l=it.filter(i=>!rnPago(i)&&rnAlt(i));return l.length?[['Alteração de conta',String(l.length),'conferir antes de pagar']]:[]})()]
+    .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${t[0]==='Sem empresa'&&semE.length||t[0]==='Não encontrados'||t[0]==='Alteração de conta'?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   const ns=RN.sel.size;$('rnBulk').hidden=!ns;
   $('rnBulkTxt').textContent=`${ns} ${ns===1?'repasse selecionado':'repasses selecionados'} · ${fm(soma(it.filter(i=>RN.sel.has(i.id))))}`;
   $('rnBulkBtns').innerHTML=G.empresas.map(id=>`<button type="button" class="btn small primary" data-rb="${id}">Pagar em ${esc(rnEmpNome(id))}</button>`).join('')+'<button type="button" class="btn small primary" data-rb="pago">Marcar como pago</button><button type="button" class="btn small" data-rb="-">Tirar a empresa</button><button type="button" class="btn small ghost" data-rb="limpa">Limpar seleção</button>';
@@ -9067,7 +9081,10 @@ $('rnBody').addEventListener('change',async e=>{const tr=e.target.closest('tr[da
 });
 $('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-rn]');if(!b)return;const it=RN.itens.find(x=>x.id===b.closest('tr').dataset.id);
   if(b.dataset.rn==='desfaz'){b.disabled=true;await rnDesfaz(it);b.disabled=false}
-  if(b.dataset.rn==='conta')rnAbreConta(it)});
+  if(b.dataset.rn==='conta')rnAbreConta(it);
+  if(b.dataset.rn==='altAplica'){const a=Object.values(RN.alt).find(x=>x.id===b.dataset.alt);if(!a||!confirm('Aplicar a conta nova no cadastro do parceiro?'))return;b.disabled=true;
+    const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:a.id,nota:'Aplicada pelo Repasse de parceiros'});b.disabled=false;if(error)return fail(error);
+    const px=RN.parc.find(x=>x.id===a.parceiro_id);if(px)CONTAK.forEach(k=>px[k]=a[k]??null);delete RN.alt[a.parceiro_id];toast('Conta do parceiro atualizada');parcPendentes();rnDesenha()}});
 // editar a conta e o Pix do parceiro aqui mesmo; grava no cadastro (Parceiros) — Carol, 30/10
 function rnAbreConta(it){
   const p=rnParc(it,it.empresa_id),nf=rnNf(it),emps=RN.grupo.empresas||[];
