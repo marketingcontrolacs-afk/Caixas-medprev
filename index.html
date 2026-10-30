@@ -465,7 +465,7 @@ body.lg header.top .logo{visibility:hidden}
         <div class="block">
           <div class="bh"><span class="dot" style="background:var(--amber)"></span><h2>Saídas do caixa</h2><span class="spacer"></span><button type="button" class="btn small" id="addSaida">+ Adicionar saída</button></div>
           <div id="saidas" style="display:grid;gap:10px"></div>
-          <p class="note" id="semSaidas" style="margin:0">Nenhuma saída hoje. Use “Adicionar saída” para devolução (com nº da guia), repasse (com nome do parceiro), água ou outra despesa (com nº do documento ou NF).</p>
+          <p class="note" id="semSaidas" style="margin:0">Nenhuma saída hoje. Use “Adicionar saída” para devolução (com nº da guia), repasse (com nome do parceiro), água ou outra despesa (é importante informar o nº do documento ou NF e anexar o comprovante).</p>
         </div>
         <div class="block">
           <div class="bh"><span class="dot" style="background:var(--deb)"></span><h2>Cartão de débito</h2></div>
@@ -1222,6 +1222,7 @@ const OUTRAS='Outras despesas pagas no caixa';
 const DEV='Devolução em dinheiro';
 const TIPOS_SAIDA=[DEV,'Repasse','Água / voucher','Material de limpeza / higiene',OUTRAS];
 const REF=t=>t===DEV?['guia','Nº da guia','Ex.: 48213']:t==='Repasse'?['parceiro','Nome do parceiro','Ex.: Lab. Parceiro']:['guia','Nº do documento ou NF','Ex.: NF 1520'];
+const AVISO_NF='É importante informar o número da nota fiscal e anexar o comprovante.';
 const refTxt=x=>x.tipo==='Repasse'?(x.parceiro?' · parceiro '+esc(x.parceiro):''):x.guia?(x.tipo===DEV?' · guia ':' · doc ')+esc(x.guia):'';
 const anexoHint=t=>t===DEV?'Ex.: foto da guia ou do recibo de devolução.':t==='Repasse'?'Ex.: recibo assinado pelo parceiro.':'Ex.: nota ou cupom fiscal.';
 const CATS=['Relatório do caixa (sistema)','Relatório da máquina de cartão','Outro comprovante'];
@@ -1686,10 +1687,11 @@ $('opForm').addEventListener('submit',async e=>{
   else if(d.saidas.some(s=>!(s.valor>0)))m='Toda saída precisa de um valor maior que zero.';
   else if(d.saidas.some(s=>s.tipo===DEV&&!(s.guia||'').trim()))m='Informe o nº da guia em cada devolução.';
   else if(d.saidas.some(s=>s.tipo==='Repasse'&&!(s.parceiro||'').trim()))m='Informe o nome do parceiro em cada repasse.';
-  else if(d.saidas.some(s=>s.tipo!==DEV&&s.tipo!=='Repasse'&&!(s.guia||'').trim()))m='Informe o nº do documento ou da NF em cada saída.';
   else if(d.saidas.some(s=>s.tipo===OUTRAS&&!(s.descricao||'').trim()))m='Descreva cada saída do tipo “Outras despesas”.';
   else if(c.alerta&&!d.obs)m='Tem diferença no caixa. Explique nas observações antes de enviar.';
   if(m){err.textContent=m;err.hidden=false;return}
+  // nº da NF e comprovante não impedem o envio (Carol, 30/10): só avisa
+  if(d.saidas.some(s=>s.tipo!==DEV&&s.tipo!=='Repasse'&&(!(s.guia||'').trim()||!s.anexo))&&!confirm(AVISO_NF+'\n\nHá saída sem o nº da nota ou sem o comprovante. Enviar mesmo assim?'))return;
   err.hidden=true;$('btnEnviar').disabled=true;
   try{
     const row={cliente_id:OPCLI.id,data:$('opData').value,obs:d.obs||null,enviado_em:new Date().toISOString()};
@@ -2791,7 +2793,7 @@ $('rForm').addEventListener('submit',async e=>{
   const falta=!m&&cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
   if(falta)m='Preencha: '+falta[1]+'.';
   else if(Number.isNaN(row.valor)||!(row.valor>0))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
-  else if(cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
+  else if(MOD!=='tesouraria'&&cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
   if(MOD==='pagar'){liqLer();const l=(RLIQ||[]).filter(x=>x.nome||x.valor);
     if(!m&&l.some(x=>!x.nome||!(x.valor>0)))m='No relatório de líquidos, preencha o nome e o valor de cada pessoa (ou tire a linha).';
     row.liquidos=l.length?l.map(x=>({nome:x.nome,valor:r2(x.valor)})):null}
@@ -2800,6 +2802,8 @@ $('rForm').addEventListener('submit',async e=>{
     if(rp.length){const t='Este boleto já está lançado em outra conta: '+repetidoTxt(rp)+'.';
       if(!ehEsc())m=t+' Confira se é o boleto certo desta empresa.';else if(!confirm(t+'\n\nSalvar mesmo assim?'))return}}
   if(m){err.textContent=m;err.hidden=false;return}
+  // tesouraria: nº da NF e comprovante não impedem salvar (Carol, 30/10): só avisa
+  if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
   err.hidden=true;$('rSave').disabled=true;
   try{
     row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
@@ -8437,6 +8441,9 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-10-30d',data:'2026-10-30',t:'Nota fiscal não é mais obrigatória para salvar',itens:[
+    {x:'Caixa: a saída pode ser enviada sem o nº do documento ou da NF. O sistema avisa que é importante informar o número da nota e anexar o comprovante.',mods:['caixa']},
+    {x:'Tesouraria: a despesa pode ser salva sem o nº da NF e sem o documento anexado, com o mesmo aviso.',mods:['tesouraria']}]},
   {k:'2026-10-30c',data:'2026-10-30',t:'Alteração de conta no Repasse de parceiros',itens:[
     {x:'Gestão financeira › Repasse de parceiros: o parceiro com alteração de conta pendente aparece em vermelho, com a conta nova e o botão “Aplicar a conta nova”. Também dá para filtrar “Com alteração de conta”.',para:'esc'}]},
   {k:'2026-10-30b',data:'2026-10-30',t:'Parceiros mais rápidos de achar e de atualizar',itens:[
