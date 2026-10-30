@@ -1424,8 +1424,9 @@ const EMPK='portal_empresa';
 let EMP=(()=>{try{return localStorage.getItem(EMPK)||''}catch(e){return ''}})();
 function guardaEmp(){const v=escCli.value;if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
 function fillClientes(){
-  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,v=(cur==='*'||cur==='int')&&escCli.dataset.mod===m?cur:EMP||cur;escCli.dataset.mod=m;
-  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas')&&(doMod.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
+  // "Todas as empresas" continua escolhida ao trocar entre contas a pagar, a receber, agenda e inadimplência
+  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,ant=escCli.dataset.mod,v=(cur==='*'||cur==='int')&&(ant===m||cur==='*'&&GTTODAS.includes(ant)&&GTTODAS.includes(m))?cur:EMP||cur;escCli.dataset.mod=m;
+  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas'||GTTODAS.includes(m)&&ehEsc())&&(doMod.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
@@ -1442,7 +1443,11 @@ function viewDaEmp(){
   const itens=navItens(),alt=itens.find(x=>navGrp(x)===navGrp(n)&&!x.soon)||itens.find(x=>x.k==='gfdash')||itens.find(x=>!x.soon);
   if(!alt)return;VIEW=alt.k;try{localStorage.setItem(SECK,VIEW)}catch(e){}fillClientes();
 }
-const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
+// com "Todas as empresas" nas contas, a conta aberta usa a empresa dela (CLIDLG)
+let CLIDLG=null;
+const cliAtual=()=>CLIDLG||CLIENTES.find(c=>c.id===escCli.value);
+// telas da Gestão financeira que somam todas as empresas, para o pagamento do dia não esquecer nenhuma (Carol, 30/10)
+const GTTODAS=['gfpagar','gfrec','gfagenda','gfinad'];
 function openView(){
   viewDaEmp();renderNav();
   ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
@@ -5981,16 +5986,17 @@ const GTMODOS={
   gfagenda:['Agenda financeira','O que vence em cada dia do mês. Clique num dia para ver as contas.']};
 async function gtCarrega(tipo,cli){
   const key=tipo+'|'+cli.id;if(key===GT.key)return;
-  const tq=()=>{let q=sb.from('fin_titulos').select('*').eq('cliente_id',cli.id);if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
-  const mq=()=>{let q=sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id);if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
-  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),gfContasDe(cli.id,true)]);
+  const tod=cli.id==='*',ids=tod?empresasDe(VIEW).map(c=>c.id):[cli.id],emp=q=>tod?q.in('cliente_id',ids):q.eq('cliente_id',cli.id);
+  const tq=()=>{let q=emp(sb.from('fin_titulos').select('*'));if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
+  const mq=()=>{let q=emp(sb.from('fin_movimentos').select('*'));if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
+  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')):gfContasDe(cli.id,true)]);
   GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;
   movs.filter(m=>m.titulo_id).forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
-  GT.rem=tipo!=='receber'?await rmItensDe(cli.id):{};
+  GT.rem=tipo!=='receber'&&!tod?await rmItensDe(cli.id):{};GT.todasE=tod;
   GT.key=key;
 }
 async function renderGT(){
-  const M=VIEW,cli=cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
+  const M=VIEW,tod=escCli.value==='*'&&GTTODAS.includes(M),cli=tod?{id:'*',nome:'Todas as empresas'}:cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
   if(M==='gfmov'&&GT.modo!=='gfmov'){$('gtIni').value='';$('gtFim').value='';MV.lim=300}   // a movimentação abre com tudo
   GT.modo=M;if(M!=='gfmov')$('mvAviso').hidden=true;
   $('gtTitle').textContent=GTMODOS[M][0];$('gtSub').textContent=GTMODOS[M][1];
@@ -5999,13 +6005,14 @@ async function renderGT(){
   const lista=M!=='gfinad'&&M!=='gfagenda';
   ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtFiltroBox').hidden=!lista||M==='gfmov';
   document.querySelectorAll('.mvf').forEach(x=>x.hidden=M!=='gfmov');(pt=>{if(pt?.classList.contains('per'))pt.firstElementChild.textContent=M==='gfmov'?'Data':'Vencimento'})($('gtIniBox').previousElementSibling);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
-  $('gtNovo').hidden=!cli;$('gtNovoR').hidden=!cli||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||M!=='gfpagar';
+  $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';
+  if(tod)$('gtSub').textContent=GTMODOS[M][1]+' Todas as empresas juntas: escolha o período para ver o resumo.';
   if(!cli)return gtVazio('Escolha uma empresa.');
   if(GT.key!==tipo+'|'+cli.id){gtVazio('Carregando…');
     try{await gtCarrega(tipo,cli)}catch(e){console.error(e);GT.key='';return gtVazio(v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}}
   if(VIEW!==M)return;
   gtDesenha();
-  if(M==='gfpagar')gtBoletos(cli);
+  if(M==='gfpagar'&&!tod)gtBoletos(cli);
 }
 // boletos e notas enviados pelo cliente (Financeiro › Boletos e notas fiscais a pagar) que ainda não viraram conta a pagar
 async function gtBoletos(cli){
@@ -6064,7 +6071,7 @@ function gtDesenha(){
 function gtTabela(rows,vazio){
   const MV=GT.tipo==='mov',P=gtP(),mu=t=>`<span class="muted">${t}</span>`;
   $('gtHead').innerHTML=`<tr><th>Vencimento</th>${MV?'<th class="l">Tipo</th>':''}<th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Descrição</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b>${GT.todasE?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:''}</td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="${MV?10:9}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td></td></tr>`
@@ -6277,7 +6284,8 @@ $('gtMes').onchange=gtDesenha;
 // pagas ou todas: sem período escolhido, mostra o mês atual
 $('gtFiltro').onchange=()=>{const f=$('gtFiltro').value;if((f==='baixadas'||f==='todas')&&!$('gtIni').value&&!$('gtFim').value){$('gtIni').value=TODAY.slice(0,8)+'01';$('gtFim').value=fimMes(TODAY)}gtDesenha()};
 $('gtIni').onchange=gtDesenha;$('gtFim').onchange=gtDesenha;$('gtBusca').oninput=()=>{clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,200)};
-const gtAbre=tr=>tr.dataset.mv?mvAbre(tr):abrirGT(GT.lista.find(t=>t.id===tr.dataset.id));
+const gtAbre=tr=>{if(tr.dataset.mv)return mvAbre(tr);const t=GT.lista.find(x=>x.id===tr.dataset.id);
+  CLIDLG=GT.todasE&&t?CLIENTES.find(c=>c.id===t.cliente_id)||null:null;return abrirGT(t)};
 $('gtBody').addEventListener('change',e=>{const k=e.target.dataset?.mvsel;if(!k)return;e.target.checked?MV.sel.add(k):MV.sel.delete(k);e.target.closest('tr').classList.toggle('sel',e.target.checked);
   const r=GT.mvRows||[],all=r.length&&r.every(x=>MV.sel.has(x.k+':'+x.id));if($('mvTodos'))$('mvTodos').checked=all;mvBulk()});
 $('gtHead').addEventListener('change',e=>{if(e.target.id!=='mvTodos')return;(GT.mvRows||[]).forEach(x=>e.target.checked?MV.sel.add(x.k+':'+x.id):MV.sel.delete(x.k+':'+x.id));gtDesenha()});
@@ -6286,7 +6294,7 @@ $('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
 $('gtRem').onclick=()=>{RM.so=null;go('gfremessa')};
-const dlgGT=$('dlgGT');
+const dlgGT=$('dlgGT');dlgGT.addEventListener('close',()=>{CLIDLG=null});
 async function abrirGT(t,tipo){
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
   let pes=[],contas=GFC.lista;
