@@ -386,6 +386,11 @@ body.lg header.top .logo{visibility:hidden}
 .pli{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;font-size:13.5px;color:inherit;text-align:left;padding:8px 14px;cursor:pointer}
 .pli:last-child{border-bottom:0}.pli:hover{background:var(--sunk)}
 .pli .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}.pli .go{color:var(--muted)}
+.dash>.c12{grid-column:1/-1}
+.dash.mod{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}.dash.mod>.card{grid-column:auto}.dash.mod>.c12{grid-column:1/-1}
+.dlinks{display:flex;flex-wrap:wrap;gap:8px}
+.dlink{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13.5px var(--body);padding:8px 12px;border-radius:10px;cursor:pointer;transition:background .12s,border-color .12s}
+.dlink:hover{background:var(--brand-soft);border-color:transparent;color:var(--brand)}.dlink svg{width:18px;height:18px;color:var(--brand)}
 .dtip{border-radius:10px;box-shadow:var(--sh2);padding:8px 10px;line-height:1.45}
 </style>
 </head>
@@ -1224,7 +1229,7 @@ const ehEsc=()=>ME&&ME.papel==='escritorio';
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos'];
+const SEMPRE=['tarefas','avisos','projetos','gfdash'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
@@ -1294,7 +1299,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('cartao')},
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
-  {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:()=>true},   // todos; cada um vê só o que tem acesso (Carol, 30/10)
   {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
@@ -1363,13 +1368,14 @@ const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
   // atalho do Dashboard no início dos módulos (Carol, 30/10)
-  $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g)).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
+  const noGrp=n=>n.k!=='gfdash'||ehEsc();
+  $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n))).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
     return `<button type="button" class="modbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.c||m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('')
     +(atual?`<span class="crumb">${naDash?'<b>Dashboard</b>':`${navGrp(atual)} › <b>${esc(atual.t)}</b>`}</span>`:'');
   if(MEGA.g)megaDesenha();
 }
 function megaDesenha(){
-  const itens=navItens().filter(n=>navGrp(n)===MEGA.g);
+  const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&(n.k!=='gfdash'||ehEsc()));
   if(!itens.length)return megaFecha();
   const cols=SECOES.map(sc=>[sc,itens.filter(n=>(n.s||'Dia a dia')===sc)]).filter(([,l])=>l.length);
   $('mega').innerHTML=`<span class="mega-tag">${MEGA.g}</span><div class="mega-cols">${cols.map(([sc,l])=>`<div class="mega-col"><h3>${sc}</h3>${l.map(n=>`<button type="button" class="megaitem" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}>${esc(n.t)}${n.soon?'<span class="soon">em breve</span>':''}${navBadge(n)}</button>`).join('')}</div>`).join('')}</div>`;
@@ -1399,6 +1405,8 @@ function empresasDe(m){
   return so?l.filter(c=>so.includes(c.id)):l;
 }
 function empresasMod(m){
+  // dashboard: as empresas em que a pessoa tem algum acesso (o escritório, todas)
+  if(m==='gfdash')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()||ACESSOS.some(a=>a.cliente_id===c.id)));
   if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:temEm(c.id,'colab')));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
@@ -1492,8 +1500,8 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
-  // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, o escritório abre no dashboard da empresa
-  show('app');go(volta?volta.k:ehEsc()&&eqPode('gfdash')?'gfdash':first.k);
+  // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
+  show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);
   const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
@@ -6747,12 +6755,76 @@ async function renderDash(){
   $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?'Resumo da empresa em '+dBR(TODAY)+'.':'';
   if(!cli){g.innerHTML='<p class="muted">Escolha uma empresa.</p>';return}
   g.innerHTML='<p class="muted">Carregando…</p>';
+  if(!dsFin(cli))return dsModulos(cli);
   try{await relCarrega(cli)}catch(e){console.error(e);g.innerHTML=`<p class="neg">${v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
   if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
   dsDesenha(cli);
 }
 $('dsAtual').onclick=renderDash;
+// a parte financeira (saldos, contas a pagar e receber, gráfico) é do escritório, nas empresas com BPO financeiro;
+// quem tem módulos escolhidos pela master vê se o Dashboard financeiro estiver marcado
+const dsFin=cli=>ehEsc()&&cli.bpo_financeiro!==false&&(ehAdm()||!ME.modulos_equipe||ME.modulos_equipe.includes('gfdash'));
+// Dashboard de quem não vê a parte financeira (operadoras do caixa e da tesouraria, RH, cliente): um quadro por
+// módulo que a pessoa tem liberado nesta empresa, as tarefas dela e os atalhos (Carol, 30/10)
+async function dsModulos(cli){
+  const g=$('dsGrid'),pv=m=>podeVer(cli.id,m)&&eqPode(m)&&empresasDe(m).some(c=>c.id===cli.id),tem={caixa:pv('caixa'),tes:pv('tesouraria'),pagar:pv('pagar'),cartao:pv('cartao'),tar:temAcesso('tarefas')};
+  const d14=addDias(TODAY,-14),lista=r=>r.error?[]:r.data||[];
+  let F,T,TS,TC,P,C;
+  try{[F,T,TS,TC,P,C]=await Promise.all([
+    tem.caixa?sb.from('fechamentos').select('*, saidas(valor)').eq('cliente_id',cli.id).gte('data',d14).then(lista):null,
+    tem.tes?sb.from('tesouraria').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).limit(6).then(lista):null,
+    tem.tes?tcSaldo(cli.id,TODAY).catch(()=>null):null,
+    tem.tes?sb.from('tesouraria_conferencias').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).limit(1).then(r=>lista(r)[0]||null):null,
+    tem.pagar?sb.from('contas_pagar').select('*').eq('cliente_id',cli.id).eq('conferido',false).order('vencimento').limit(300).then(lista):null,
+    tem.cartao?sb.from('cartao_notas').select('valor,data').eq('cliente_id',cli.id).gte('data',TODAY.slice(0,8)+'01').then(lista):null])}
+  catch(e){console.error(e);g.innerHTML='<p class="neg">Erro ao carregar. Verifique a internet e tente de novo.</p>';return}
+  if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
+  DS.cli=cli.id;DS.mod={cli,F,T,TS,TC,P,C,tem};dsModDesenha();
+}
+function dsModDesenha(){
+  const {cli,F,T,TS,TC,P,C,tem}=DS.mod,mu=t=>`<span class="muted">${t}</span>`,qt=(n,a,b)=>n+' '+(n===1?a:b),cnt=n=>n?`<span class="cnt">${n}</span>`:'';
+  const vazio=t=>`<div class="dvazio"><span class="ok">✓</span>${t}</div>`,ico=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const kpi=(cl,ic,go,k,v,n)=>`<button type="button" class="dskpi ${cl}" data-go="${go}"><span class="ic">${ic}</span><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n}</span></button>`;
+  const ks=[],cards=[];
+  // tarefas da pessoa
+  const tars=TPEND.filter(t=>t.cliente_id===cli.id),late=tars.filter(tpLate).length,outras=TPEND.length-tars.length;
+  // caixa: últimos 14 dias, cada caixa do dia
+  if(tem.caixa){
+    const n=nCx(cli),por={};F.forEach(f=>por[f.data+'|'+(f.caixa||1)]=f);const dias=[];
+    for(let i=0;i<=14;i++){const s=addDias(TODAY,-i);if(dObj(s).getDay()===0&&!cli.abre_domingo)continue;for(let k=1;k<=n;k++)dias.push([s,k,por[s+'|'+k]])}
+    const hoje=dias.filter(d=>d[0]===TODAY),okHoje=hoje.length&&hoje.every(d=>d[2]),falta=dias.filter(d=>!d[2]&&d[0]<TODAY).length;
+    ks.push(kpi(okHoje?'t-ok':'t-bad',ico(ICO.caixa),'caixa','Caixa de hoje',okHoje?'Enviado':hoje.length?'Pendente':'Sem expediente',falta?`<span class="chip c-bad">${qt(falta,'dia sem fechamento','dias sem fechamento')}</span>`:'nenhum dia em atraso'));
+    cards.push(`<div class="card"><div class="ch"><div><h2>Caixa</h2><p class="sub">Últimos 14 dias${n>1?' · '+n+' caixas':''}</p></div></div><div class="dl">${dias.slice(0,6).map(([s,k,f])=>`<button type="button" class="dr dvenc" data-go="caixa"><span class="dd${!f&&s<TODAY?' late':''}"><b>${s.slice(8,10)}</b><small>${MESES[+s.slice(5,7)-1].slice(0,3)}</small></span><span class="nm"><b>${DOW[dObj(s).getDay()]}${n>1?' · Caixa '+k:''}</b><span>${f?'contado '+fm(f.din_cont):s===TODAY?'ainda não enviado':'sem fechamento'}</span></span>${chip(f?calc(f).status:'none')}</button>`).join('')}</div></div>`);
+  }
+  // tesouraria: saldo, conferência física e últimos lançamentos
+  if(tem.tes){
+    const at=tcAtrasada(TC);
+    ks.push(kpi(at?'t-bad':'t-ok',ico(ICO.tesouraria),'tesouraria','Saldo da tesouraria',TS==null?'—':`<span class="${TS<0?'neg':''}">${fm(TS)}</span>`,TC?`<span class="chip ${at?'c-bad':'c-ok'}">conferida há ${qt(tcDias(TC),'dia','dias')}</span>`:'<span class="chip c-bad">sem conferência física</span>'));
+    cards.push(`<div class="card"><div class="ch"><div><h2>Tesouraria</h2><p class="sub">Últimos lançamentos</p></div></div><div class="dl">${T.map(r=>{const e=r.tipo==='Suprimento';return `<button type="button" class="dr dvenc" data-go="tesouraria"><span class="dd"><b>${r.data.slice(8,10)}</b><small>${MESES[+r.data.slice(5,7)-1].slice(0,3)}</small></span><span class="nm"><b>${esc(r.descricao||r.tipo||'')}</b><span>${esc(r.tipo||'')}</span></span><span class="${e?'pos':'neg'}" style="font-weight:600">${e?'+':'−'} ${fm(r.valor)}</span></button>`}).join('')||vazio('Nenhum lançamento ainda.')}</div></div>`);
+  }
+  // boletos e notas a pagar
+  if(tem.pagar){
+    const v=P.filter(r=>r.vencimento&&r.vencimento<TODAY),tot=r2(P.reduce((x,r)=>x+(+r.valor||0),0));
+    ks.push(kpi(v.length?'t-bad':'t-ok',ico(ICO.pagar),'pagar','Boletos a pagar',fm(tot),v.length?`<span class="chip c-bad">${qt(v.length,'vencido','vencidos')}</span>`:qt(P.length,'conta em aberto','contas em aberto')));
+    cards.push(`<div class="card"><div class="ch"><div><h2>Boletos e notas a pagar ${cnt(P.length)}</h2><p class="sub">Próximos vencimentos</p></div></div><div class="dl">${P.slice(0,6).map(r=>`<button type="button" class="dr dvenc" data-go="pagar"><span class="dd${r.vencimento<TODAY?' late':''}"><b>${(r.vencimento||'').slice(8,10)}</b><small>${r.vencimento?MESES[+r.vencimento.slice(5,7)-1].slice(0,3):''}</small></span><span class="nm"><b>${esc(r.fornecedor||'—')}</b><span>${esc(r.documento?'Doc. '+r.documento:r.sobre||'')}</span></span><span class="neg" style="font-weight:600">${fm(r.valor)}</span></button>`).join('')||vazio('Nenhuma conta em aberto.')}</div></div>`);
+  }
+  if(tem.cartao){const tot=r2(C.reduce((x,r)=>x+(+r.valor||0),0));ks.push(kpi('t-cred',ico(ICO.cartao),'cartao','Cartão no mês',fm(tot),qt(C.length,'nota lançada','notas lançadas')))}
+  if(tem.tar){
+    ks.push(kpi(late?'t-bad':'',ico(ICO.tarefas),'tarefas','Suas tarefas',String(TPEND.length),late?`<span class="chip c-bad">${qt(late,'atrasada','atrasadas')}</span>`:TPEND.length?'nenhuma atrasada':'tudo em dia'));
+    cards.unshift(`<div class="card"><div class="ch"><div><h2>Suas tarefas ${cnt(tars.length)}</h2><p class="sub">Em que você é executor ou responsável</p></div></div><div class="dl">${tars.slice(0,6).map(t=>`<button type="button" class="dr dpend" data-tar="${t.id}"><span class="pi t">${svgI('tarefas')}</span><span>${esc(t.titulo)}${tpLate(t)?' <span class="chip c-bad">atrasada</span>':t.prazo?' '+mu('até '+dBR(t.prazo)):''}</span><span class="go">›</span></button>`).join('')
+      +(tars.length>6||outras>0?`<button type="button" class="dr" data-tar="*">${mu(tars.length>6?'Ver todas as suas '+TPEND.length+' tarefas':outras+(outras===1?' tarefa sua em outra empresa':' tarefas suas em outras empresas'))}<span class="go">›</span></button>`:'')||vazio('Nenhuma tarefa pendente nesta empresa.')}</div></div>`);
+  }
+  if(ks.length)ks[0]=ks[0].replace('class="dskpi ','class="dskpi hero ');
+  $('dsTiles').innerHTML=ks.join('');
+  // atalhos para os módulos que a pessoa tem nesta empresa
+  const at=navItens().filter(n=>n.k!=='gfdash'&&!n.soon&&!telaSemEmp(n.k));
+  cards.push(`<div class="card c12"><div class="ch"><h2>Atalhos</h2></div><div class="dlinks">${at.map(n=>`<button type="button" class="dlink" data-go="${n.k}">${svgI(ICO[n.k]?n.k:'m_fin')}<span>${esc(n.t)}</span></button>`).join('')}</div></div>`);
+  $('dsGrid').classList.add('mod');$('dsGrid').innerHTML=cards.join('');
+  $('dsNote').textContent='O painel mostra só os módulos que você tem liberados nesta empresa. Clique num quadro para abrir a tela.';
+}
 const DS={pm:[]};
+// redesenha o dashboard aberto quando as tarefas ou os pedidos de parceiros mudam (sem buscar tudo de novo)
+const dsRefaz=()=>{const c=cliAtual();if(VIEW!=='gfdash'||!DS.cli||DS.cli!==c?.id)return;if(dsFin(c)){if(REL.movs)dsDesenha(c)}else if(DS.mod?.cli.id===c.id)dsModDesenha()};
 // gráfico de barras desenhado na largura real do quadro (o texto fica do mesmo tamanho no celular e no computador)
 function dsGraf(){
   const box=$('dsChart');if(!box||!DS.pm.length)return;const pm=DS.pm,mx=Math.max(1,...pm.flatMap(x=>[x.e,x.s])),W=Math.max(280,box.clientWidth),H=W<500?180:240,top=12,bot=28,ch=H-top-bot,bw=W/12,bar=Math.max(3,Math.min(16,(bw-8)/2));
@@ -6813,7 +6885,7 @@ function dsDesenha(cli){
     +cts.map(([c,v])=>`<div class="dr dacc"><span class="av" style="background:var(--sunk);color:var(--cred)">${svgI('cartao')}</span><span class="nm"><b>${esc(c.nome)}</b><span>gasto não pago</span></span><span style="font-weight:600">${fm(v)}</span></div>`).join('')
     +(sal.length?`<div class="dtot"><span>Total nas contas</span><span class="${tot<0?'neg':''}">${fm(tot)}</span></div>`:vazio('Nenhuma conta cadastrada.'));
   const tE=r2(pm.reduce((x,m)=>x+m.e,0)),tS=r2(pm.reduce((x,m)=>x+m.s,0)),cnt=n=>n?`<span class="cnt">${n}</span>`:'';
-  $('dsGrid').innerHTML=`<div class="card c8"><div class="ch"><div><h2>Entradas e saídas</h2><p class="sub">Últimos 12 meses, regime de caixa</p></div><div class="dleg"><span><i style="background:var(--s1)"></i>Entradas <b>${fm(tE)}</b></span><span><i style="background:var(--s2)"></i>Saídas <b>${fm(tS)}</b></span></div></div><div class="dchart" id="dsChart"><div class="dtip" hidden></div></div></div>
+  $('dsGrid').classList.remove('mod');$('dsGrid').innerHTML=`<div class="card c8"><div class="ch"><div><h2>Entradas e saídas</h2><p class="sub">Últimos 12 meses, regime de caixa</p></div><div class="dleg"><span><i style="background:var(--s1)"></i>Entradas <b>${fm(tE)}</b></span><span><i style="background:var(--s2)"></i>Saídas <b>${fm(tS)}</b></span></div></div><div class="dchart" id="dsChart"><div class="dtip" hidden></div></div></div>
     <div class="card"><div class="ch"><h2>Pendências ${cnt(pend.length+tars.length)}</h2></div><div class="dl">${pendH}</div></div>
     <div class="card c5"><div class="ch"><div><h2>Próximos 7 dias ${cnt(prox.length)}</h2><p class="sub">Contas a pagar e a receber, com as vencidas</p></div></div><div class="dl">${proxH}</div></div>
     <div class="card"><div class="ch"><div><h2>Despesas por categoria</h2><p class="sub">${MESES[+mes.slice(5)-1]} · total ${fm(sai)}</p></div></div>${catH}</div>
@@ -6824,7 +6896,7 @@ function dsDesenha(cli){
     tip.innerHTML=`<b>${MESES[+x.k.slice(5)-1]}/${x.k.slice(0,4)}</b><br>Entradas ${fm(x.e)}<br>Saídas ${fm(x.s)}<br>Resultado ${fm(r2(x.e-x.s))}`;tip.hidden=false;
     tip.style.left=Math.min(Math.max(e.clientX-r.left,70),r.width-70)+'px';tip.style.top=(e.clientY-r.top-10)+'px'};
   box.onmouseleave=()=>tip.hidden=true;
-  $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas. Por enquanto só o escritório vê este painel.';
+  $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas.';
 }
 ['dsGrid','dsTiles'].forEach(id=>$(id).addEventListener('click',e=>{const tb=e.target.closest('[data-tar]');if(tb){const t=TPEND.find(x=>x.id===tb.dataset.tar);return t?abrirTarefa(t):tpJanela()}
   const b=e.target.closest('[data-go]');if(!b)return;const [v,sit]=b.dataset.go.split(':');if(sit)$(v==='repasse'?'pFiltro':'mvSit').value=sit;go(v)}));
@@ -7967,13 +8039,13 @@ async function tPendentes(){
   const {data,error}=await q.order('prazo',{ascending:true,nullsFirst:false});if(error)return;
   // o executor primeiro (é quem faz), depois atrasadas e prazos mais próximos
   TPEND=(data||[]).sort((a,b)=>(b.executor===me)-(a.executor===me)||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
-  tpBanner();if(VIEW==='gfdash'&&DS.cli&&DS.cli===cliAtual()?.id)dsDesenha(cliAtual());
+  tpBanner();dsRefaz();
   let vista=false;try{vista=sessionStorage.getItem('tpVista')==='1'}catch(e){}
   if(TPEND.length&&!vista&&!document.querySelector('dialog[open]')){try{sessionStorage.setItem('tpVista','1')}catch(e){}tpJanela()}
 }
 const tpLate=t=>t.prazo&&t.prazo<TODAY;
 function tpBanner(){
-  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas';
+  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas'||VIEW==='gfdash';
   if(!el.hidden)el.innerHTML=`<span>📋 <b>Você tem ${n} ${n===1?'tarefa pendente':'tarefas pendentes'}${late?` (${late} ${late===1?'atrasada':'atrasadas'})`:''}.</b></span><button type="button" class="btn small primary" data-act="ver">Ver minhas tarefas</button>`;
 }
 $('tpBanner').addEventListener('click',e=>{if(e.target.closest('[data-act]'))tpJanela()});
@@ -8327,7 +8399,7 @@ async function parcPendentes(){
     ...(b.data||[]).map(x=>({t:'novo',cli:x.cliente_id,nome:x.nome,quando:x.criado_em}))].sort((x,y)=>String(y.quando||'').localeCompare(String(x.quando||'')));
   const n=PPEND.length;if((NAVBADGE.repasse||0)!==n){NAVBADGE.repasse=n;renderNav()}
   parcLista();
-  if(VIEW==='gfdash'&&DS.cli&&DS.cli===cliAtual()?.id)dsDesenha(cliAtual());
+  dsRefaz();
 }
 function parcLista(){
   const box=$('tParc');if(VIEW!=='tarefas'){box.hidden=true;return}
