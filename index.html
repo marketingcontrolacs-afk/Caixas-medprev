@@ -310,6 +310,15 @@ dialog{border-radius:18px;border-color:var(--line);box-shadow:var(--sh2)}
 dialog::backdrop{background:rgba(6,22,24,.5);backdrop-filter:blur(3px)}
 .alerta{border-radius:14px}
 .acm{display:inline-flex;align-items:center;gap:6px}.acm select{padding:3px 8px;font-size:12.5px;height:auto;width:auto}
+/* controle de notas fiscais */
+.nfgrid th.m,.nfgrid td.m{text-align:center;min-width:44px;padding-left:4px;padding-right:4px}
+.nfgrid td.m{cursor:pointer}.nfgrid td.m:hover{background:var(--sunk)}
+.nfgrid td.m.fut{cursor:default;opacity:.35}.nfgrid td.m.fut:hover{background:none}
+.nfgrid th.m.atual{color:var(--brand)}.nfgrid td.m.atual{background:color-mix(in srgb,var(--brand-soft) 45%,transparent)}
+.nfp{display:inline-flex;min-width:26px;height:24px;padding:0 7px;border-radius:12px;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;background:var(--ok-soft);color:var(--ok)}
+.nfp.x{background:var(--bad-soft);color:var(--bad)}.nfv{color:var(--line);font-weight:700}
+.nfgrid select.nfsit{padding:3px 8px;font-size:12.5px;height:auto;width:auto;border-radius:999px}
+.nfgrid .nfnome{cursor:pointer}.nfgrid .nfnome:hover b{text-decoration:underline}
 #mvBulk b.pos{color:var(--ok)}#mvBulk b.neg{color:var(--bad)}#mvBulk b.tot{font-size:16px}
 .chip{letter-spacing:.01em}
 .toast{border-radius:12px;box-shadow:var(--sh2)}
@@ -671,6 +680,22 @@ body.lg header.top .logo{visibility:hidden}
   </section>
 
   <!-- GESTÃO FINANCEIRA › REPASSE DE PARCEIROS (escritório) -->
+  <section id="viewNF" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Controle de notas fiscais</h1><p class="sub" id="nfSub">Notas fiscais emitidas pelos parceiros, mês a mês. Quem tem nota lançada passa a “Emite NF”, e isso vale também no Repasse de parceiros.</p></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="nfNovo" hidden>+ Parceiro</button><span class="btn fotobtn" id="nfImp" hidden>Importar planilha<input type="file" id="nfImpArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF"></span><button class="btn" id="nfXls" hidden>Exportar Excel</button></div>
+    </div>
+    <div class="toolbar" id="nfBar" hidden>
+      <label class="f">Ano<select id="nfAno"></select></label>
+      <label class="f">Mostrar<select id="nfFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="pend">Emite NF, sem nota no mês atual</option><option value="nao_emitido">Não emitido NF</option><option value="nao_emitir">Não emitir NF</option><option value="conflito">Não emitir NF, mas com nota</option></select></label>
+      <label class="f">Empresa<select id="nfEmp"></select></label>
+      <input id="nfBusca" placeholder="Buscar parceiro ou CNPJ" style="max-width:240px">
+    </div>
+    <div class="tiles" id="nfTiles"></div>
+    <div class="card tablebox nfgrid"><table><thead id="nfHead"></thead><tbody id="nfBody"></tbody></table></div>
+    <p class="note" id="nfNote"></p>
+  </section>
+
   <section id="viewRN" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Repasse de parceiros</h1><p class="sub">Importe o relatório de restituições da semana. O sistema separa quem emite nota fiscal e quem não emite e traz a conta e o Pix de cada parceiro. Você escolhe em qual empresa do grupo cada repasse vai ser pago e gera as contas a pagar.</p></div>
@@ -1066,6 +1091,11 @@ body.lg header.top .logo{visibility:hidden}
   <div class="db" id="pmBody"></div>
   <div class="df" id="pmFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
 </dialog>
+<dialog id="dlgNF">
+  <div class="dh"><h2 id="nfdTit"></h2></div>
+  <div class="db" id="nfdBody"></div>
+  <div class="df" id="nfdFoot"><button type="button" class="btn ghost" data-act="excluir" style="color:var(--bad)" hidden>Tirar a nota deste mês</button><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
+</dialog>
 <dialog id="dlgRN">
   <div class="dh"><h2 id="rnDTit"></h2></div>
   <div class="db" id="rnDBody"></div>
@@ -1279,6 +1309,7 @@ const ICO={
   gftes:'<path d="M3 7h18v12H3z"/><path d="M3 11h18M7 15h3"/>',
   gfext:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   gfconc:'<path d="M4 7h11l-3-3M20 17H9l3 3"/><path d="M17 7l3 0M4 17h1"/>',
+  gfnf:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/><path d="M4 7v14h11" opacity=".55"/>',
   gfrepasse:'<circle cx="8" cy="8" r="3"/><path d="M3 19a5 5 0 0 1 10 0M14 9h7M18 6l3 3-3 3M14 16h7"/>',
   gfpes:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
   gfcontas:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
@@ -1325,6 +1356,8 @@ const NAV=[
   {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   // repasses da semana (relatório de restituições): separa quem emite NF e gera as contas a pagar em cada empresa do grupo (Carol, 30/10)
   {k:'gfrepasse',t:'Repasse de parceiros',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
+  {k:'gfnf',t:'Controle de notas fiscais',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
@@ -1475,7 +1508,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfdash','gfresumo','gffluxo','gfdre','gfdc
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -1506,6 +1539,7 @@ function openView(){
   else if(VIEW==='gftes'){$('viewGTe').hidden=false;renderGTes()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
   else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;renderRN()}
+  else if(VIEW==='gfnf'){$('viewNF').hidden=false;renderNF()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
@@ -8393,6 +8427,7 @@ const NOVIDADES=[
     {x:'Tarefas: o campo “Coluna” passou a se chamar “Status”, e “Aguardando cliente” passou a ser “Aguardando terceiros”.',mods:['tarefas']},
     {x:'Movimentação financeira: ao selecionar lançamentos, aparecem as entradas, as saídas e o total.',para:'esc'},
     {x:'Pedidos de alteração de conta e de parceiro novo aparecem numa lista enxuta no topo das Tarefas e nas Pendências do Dashboard.',para:'esc'},
+    {x:'Gestão financeira › Controle de notas fiscais: os parceiros de cada empresa com a situação de NF e as notas de cada mês, no lugar da planilha. Lançar nota passa o parceiro a “Emite NF” também no Repasse de parceiros.',para:'esc'},
     {x:'Configurações › Acessos: cada módulo marcado tem o seu nível (Lançamento ou Consulta), e o nível de um acesso já liberado muda direto na tabela.',para:'esc'}]}
 ];
 const nvItens=n=>n.itens.filter(i=>(i.para!=='esc'||ehEsc())&&(!i.mods||ehEsc()||i.mods.some(m=>NAV.some(x=>x.k===m&&x.ok()&&eqPode(m)))));
@@ -9211,6 +9246,164 @@ $('rnDFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-
   const {error}=await q;b.disabled=false;
   if(error){console.error(error);return err(v75(error)?v75Msg:error.message||'Não foi possível salvar.')}
   toast('Grupo salvo');dlgRN.close();renderRN()});
+// =====================================================================
+// GESTÃO FINANCEIRA › CONTROLE DE NOTAS FISCAIS (Carol, 30/10; v77)
+// A planilha de controle de NF, organizada: cada parceiro do grupo de repasse com a situação (a mesma do
+// Repasse de parceiros, em parceiros_nf) e as notas de cada mês (nf_mensal). Lançar nota em quem estava
+// “Não emitido NF” passa ele a “Emite NF” (gatilho da v77). Empresa sem grupo ganha um grupo só dela.
+// =====================================================================
+const NF={grupos:[],grupo:null,parc:[],nfs:[],ano:+TODAY.slice(0,4),dlg:null};
+const MES3=MESES.map(m=>m.slice(0,3));
+const v77=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/nf_mensal/.test(e.message||''));
+const v77Msg='Esta tela precisa da atualização v77 do banco (Controle de notas fiscais). Rode o SQL no Supabase.';
+function nfVazio(t,cls){['nfBar','nfNovo','nfImp','nfXls'].forEach(id=>$(id).hidden=true);$('nfTiles').innerHTML='';$('nfHead').innerHTML='';$('nfBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('nfNote').innerHTML=''}
+async function renderNF(recarrega=true){
+  const cli=cliAtual();
+  if(!cli)return nfVazio('Escolha uma empresa.');
+  if(recarrega){
+    nfVazio('Carregando…');
+    const {data:g,error}=await sb.from('repasse_grupos').select('*').order('nome');
+    if(error){console.error(error);return nfVazio(v75(error)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+    NF.grupos=g||[];
+  }
+  NF.grupo=NF.grupos.find(x=>(x.empresas||[]).includes(cli.id))||null;
+  if(!NF.grupo){nfVazio(`${esc(cli.nome)} ainda não tem controle de notas fiscais.`);
+    $('nfBody').innerHTML+=`<tr><td class="l"><button type="button" class="btn primary" id="nfComeca">Começar o controle de ${esc(cli.nome)}</button></td></tr>`;return}
+  if(recarrega){
+    try{const [pa,nf]=await Promise.all([todas(()=>sb.from('parceiros_nf').select('*').eq('grupo_id',NF.grupo.id).order('nome')),
+        todas(()=>sb.from('nf_mensal').select('*').eq('grupo_id',NF.grupo.id))]);NF.parc=pa;NF.nfs=nf}
+    catch(e){console.error(e);return nfVazio(v77(e)?v77Msg:v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  }
+  ['nfBar','nfNovo','nfImp','nfXls'].forEach(id=>$(id).hidden=false);
+  const emps=NF.grupo.empresas||[];
+  $('nfSub').textContent=`Grupo ${NF.grupo.nome}${emps.length>1?' ('+emps.map(rnEmpNome).join(', ')+')':''}. Notas fiscais emitidas pelos parceiros, mês a mês. Quem tem nota lançada passa a “Emite NF”, e isso vale também no Repasse de parceiros.`;
+  const anos=[...new Set([+TODAY.slice(0,4),...NF.nfs.map(n=>+n.competencia.slice(0,4))])].sort((a,b)=>b-a);
+  $('nfAno').innerHTML=anos.map(a=>`<option${a===NF.ano?' selected':''}>${a}</option>`).join('');
+  const ef=$('nfEmp'),ec=ef.value;ef.innerHTML='<option value="">Todas do grupo</option>'+emps.map(id=>`<option value="${id}">${esc(rnEmpNome(id))}</option>`).join('');
+  if([...ef.options].some(o=>o.value===ec))ef.value=ec;$('nfEmp').closest('label').hidden=emps.length<2;
+  nfDesenha();
+}
+// parceiros do controle + nomes que só aparecem nas notas
+function nfLinhas(){
+  const ano=String(NF.ano),emp=$('nfEmp').value,ls=NF.parc.map(p=>({p,nome:p.nome,sit:p.situacao,m:{}})),por={};ls.forEach(l=>por[l.nome]=l);
+  NF.nfs.forEach(n=>{if(!n.competencia.startsWith(ano)||emp&&n.empresa_id!==emp)return;
+    const l=por[n.nome]||(por[n.nome]={p:null,nome:n.nome,sit:'sem',m:{}},ls.push(por[n.nome]),por[n.nome]);l.m[+n.competencia.slice(5)]=n});
+  ls.forEach(l=>{l.tot=Object.values(l.m).reduce((s,n)=>s+n.quantidade,0);const ult=Object.keys(l.m).map(Number).sort((a,b)=>b-a)[0];l.ult=ult||0});
+  return ls.sort((a,b)=>a.nome.localeCompare(b.nome));
+}
+const nfMesAtual=()=>+TODAY.slice(0,4)===NF.ano?+TODAY.slice(5,7):12;
+function nfDesenha(){
+  const ls=nfLinhas(),f=$('nfFiltro').value,b=chave($('nfBusca').value),ma=nfMesAtual(),atual=+TODAY.slice(0,4)===NF.ano?ma:0;
+  const filtro=l=>(f==='todos'||f===l.sit||f==='pend'&&l.sit==='emite'&&!l.m[ma]||f==='conflito'&&l.sit==='nao_emitir'&&l.tot)
+    &&(!b||chave(l.nome).includes(b)||chave(l.p?.nome_global).includes(b)||String(l.p?.cpf_cnpj||'').replace(/\D/g,'').includes(b.replace(/\D/g,'')||'#')||(l.p?.nomes||[]).some(n=>chave(n).includes(b)));
+  const vis=ls.filter(filtro),n=k=>ls.filter(l=>l.sit===k).length,notas=ls.reduce((s,l)=>s+l.tot,0);
+  const pend=ls.filter(l=>l.sit==='emite'&&!l.m[ma]).length,conf=ls.filter(l=>l.sit==='nao_emitir'&&l.tot).length;
+  $('nfTiles').innerHTML=[['Emitem NF',n('emite'),'parceiros'],['Notas em '+NF.ano,notas,ls.filter(l=>l.tot).length+' parceiros com nota'],
+    ['Sem nota em '+MESES[ma-1].toLowerCase(),pend,'dos que emitem NF'],['Não emitido NF',n('nao_emitido'),'sem nota até agora'],['Não emitir NF',n('nao_emitir'),conf?conf+' com nota: conferir':'nunca emitem']]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('nfHead').innerHTML=`<tr><th class="l">Situação</th><th class="l">Parceiro</th>${MES3.map((m,i)=>`<th class="m${i+1===atual?' atual':''}">${m}</th>`).join('')}<th>Total</th></tr>`;
+  const sitSel=l=>l.sit==='sem'?`<span class="chip c-bad" title="Tem nota, mas não está no controle. Clique no nome para incluir.">Fora do controle</span>`
+    :`<select class="nfsit chip ${RNSIT[l.sit][1]}" aria-label="Situação">${['emite','nao_emitido','nao_emitir'].map(k=>`<option value="${k}"${k===l.sit?' selected':''}>${RNSIT[k][0]}</option>`).join('')}</select>`;
+  const cel=(l,i)=>{const nf=l.m[i],fut=+TODAY.slice(0,4)===NF.ano&&i>ma||NF.ano>+TODAY.slice(0,4);
+    const tit=nf?[nf.quantidade+(nf.quantidade===1?' nota':' notas'),nf.numeros&&'nº '+nf.numeros,nf.valor!=null&&fm(nf.valor),nf.empresa_id&&rnEmpNome(nf.empresa_id),nf.obs].filter(Boolean).join(' · '):'';
+    return `<td class="m${i===atual?' atual':''}${fut&&!nf?' fut':''}" data-mes="${i}"${tit?` title="${esc(tit)}"`:''}>${nf?`<span class="nfp${l.sit==='nao_emitir'?' x':''}">${nf.quantidade}</span>`:fut?'':'<span class="nfv">·</span>'}</td>`};
+  $('nfBody').innerHTML=vis.map(l=>`<tr data-nome="${esc(l.nome)}"><td class="l">${sitSel(l)}</td><td class="l nfnome"><b>${esc(l.nome)}</b>${l.p&&(l.p.nome_global||l.p.cpf_cnpj)?`<br><span class="muted" style="font-size:12.5px">${[l.p.nome_global&&chave(l.p.nome_global)!==chave(l.nome)?esc(l.p.nome_global):'',esc(l.p.cpf_cnpj||'')].filter(Boolean).join(' · ')}</span>`:''}</td>${Array.from({length:12},(_,i)=>cel(l,i+1)).join('')}<td><b>${l.tot||''}</b></td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="15">${ls.length?'Nenhum parceiro com este filtro.':'Nenhum parceiro no controle ainda. Use “+ Parceiro” ou “Importar planilha”.'}</td></tr>`;
+  $('nfNote').innerHTML=`${vis.length} de ${ls.length} parceiros. Clique num mês para lançar ou corrigir as notas; clique no nome para editar o parceiro. A situação vale também no Repasse de parceiros.`;
+}
+['nfFiltro','nfEmp'].forEach(id=>$(id).onchange=nfDesenha);$('nfBusca').oninput=nfDesenha;
+$('nfAno').onchange=()=>{NF.ano=+$('nfAno').value;nfDesenha()};
+$('nfBody').addEventListener('click',async e=>{
+  if(e.target.id==='nfComeca'){const cli=cliAtual();e.target.disabled=true;
+    const {error}=await sb.from('repasse_grupos').insert({nome:cli.nome,empresas:[cli.id]});e.target.disabled=false;
+    if(error){console.error(error);return alert(v75(error)?v75Msg:error.code==='23505'?'Já existe um grupo com o nome '+cli.nome+'. Ajuste em Repasse de parceiros › Empresas do grupo.':'Não foi possível criar: '+(error.message||''))}
+    toast('Controle criado');return renderNF()}
+  const tr=e.target.closest('tr[data-nome]');if(!tr)return;const l=nfLinhas().find(x=>x.nome===tr.dataset.nome);if(!l)return;
+  const td=e.target.closest('td.m');if(td&&!td.classList.contains('fut'))return nfAbreMes(l,+td.dataset.mes);
+  if(e.target.closest('.nfnome'))return nfAbreParc(l.p,l.p?null:l.nome);
+});
+$('nfBody').addEventListener('change',async e=>{if(!e.target.classList.contains('nfsit'))return;const tr=e.target.closest('tr[data-nome]'),p=NF.parc.find(x=>x.nome===tr.dataset.nome);if(!p)return;
+  const sit=e.target.value,{error}=await sb.from('parceiros_nf').update({situacao:sit,atualizado_em:new Date().toISOString()}).eq('id',p.id);
+  if(error){fail(error);return nfDesenha()}p.situacao=sit;toast(`${p.nome}: ${RNSIT[sit][0]}`);nfDesenha()});
+$('nfNovo').onclick=()=>nfAbreParc(null);
+const dlgNF=$('dlgNF');
+function nfAbreMes(l,mes){
+  const comp=NF.ano+'-'+pad(mes),nf=l.m[mes]||NF.nfs.find(n=>n.nome===l.nome&&n.competencia===comp),emps=NF.grupo.empresas||[];
+  NF.dlg={modo:'mes',l,comp,nf};
+  $('nfdTit').textContent=`${l.nome} · ${MESES[mes-1]} de ${NF.ano}`;
+  $('nfdBody').innerHTML=`<div class="fields"><label class="f">Quantidade de notas<input id="nfdQ" type="number" min="1" step="1" value="${nf?.quantidade||1}"></label>
+    <label class="f">Valor total (opcional)<input id="nfdV" class="money" inputmode="decimal" placeholder="0,00" value="${showMoney(nf?.valor)}"></label>
+    <label class="f wide">Números das notas (opcional)<input id="nfdN" value="${esc(nf?.numeros||'')}" placeholder="Ex.: 1234, 1235"></label>
+    ${emps.length>1?`<label class="f wide">Empresa que recebeu a nota<select id="nfdE"><option value="">Não informada</option>${emps.map(id=>`<option value="${id}"${nf?.empresa_id===id?' selected':''}>${esc(rnEmpNome(id))}</option>`).join('')}</select></label>`:''}
+    <label class="f wide">Observação (opcional)<input id="nfdO" value="${esc(nf?.obs||'')}"></label></div>
+    ${l.sit==='nao_emitir'?'<p class="note" style="margin:0"><span class="chip c-bad">Atenção</span> Este parceiro está como “Não emitir NF”. Confira antes de lançar.</p>':l.sit==='nao_emitido'?'<p class="note" style="margin:0">Ao salvar, o parceiro passa a “Emite NF”.</p>':''}<p class="err" id="nfdErr" hidden></p>`;
+  $('nfdFoot').querySelector('[data-act="excluir"]').hidden=!nf;dlgNF.showModal();
+}
+function nfAbreParc(p,nome){
+  NF.dlg={modo:'parc',p};
+  $('nfdTit').textContent=p?'Parceiro '+p.nome:'Novo parceiro no controle';
+  $('nfdBody').innerHTML=`<div class="fields"><label class="f wide">Nome do parceiro (como aparece nos relatórios) *<input id="nfpN" value="${esc(p?.nome||nome||'')}"${p?' disabled title="O nome liga o parceiro às notas e aos repasses"':''}></label>
+    <label class="f wide">Outros nomes com que aparece (separe com ;)<input id="nfpX" value="${esc((p?.nomes||[]).filter(n=>n!==p?.nome).join('; '))}"></label>
+    <label class="f wide">Nome global (razão social)<input id="nfpG" value="${esc(p?.nome_global||'')}"></label>
+    <label class="f">CPF/CNPJ<input id="nfpD" value="${esc(p?.cpf_cnpj||'')}"></label>
+    <label class="f">Situação<select id="nfpS">${['emite','nao_emitido','nao_emitir'].map(k=>`<option value="${k}"${(p?.situacao||'emite')===k?' selected':''}>${RNSIT[k][0]}</option>`).join('')}</select></label>
+    <label class="f wide">Observação<input id="nfpO" value="${esc(p?.obs||'')}"></label></div><p class="err" id="nfdErr" hidden></p>`;
+  $('nfdFoot').querySelector('[data-act="excluir"]').hidden=true;dlgNF.showModal();
+}
+$('nfdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,d=NF.dlg;if(a==='fechar')return dlgNF.close();
+  const err=t=>{$('nfdErr').textContent=t;$('nfdErr').hidden=false};
+  try{b.disabled=true;
+    if(d.modo==='mes'){
+      if(a==='excluir'){if(!confirm('Tirar as notas de '+d.l.nome+' deste mês?'))return;const {error}=await sb.from('nf_mensal').delete().eq('id',d.nf.id);if(error)throw error;NF.nfs=NF.nfs.filter(n=>n.id!==d.nf.id)}
+      else{const q=parseInt($('nfdQ').value);if(!(q>0))return err('Informe a quantidade de notas.');
+        const reg={grupo_id:NF.grupo.id,nome:d.l.nome,competencia:d.comp,quantidade:q,valor:parseMoney($('nfdV').value),numeros:$('nfdN').value.trim()||null,empresa_id:$('nfdE')?.value||null,obs:$('nfdO').value.trim()||null,atualizado_em:new Date().toISOString()};
+        const {data,error}=await sb.from('nf_mensal').upsert(reg,{onConflict:'grupo_id,nome,competencia'}).select().single();if(error)throw error;
+        NF.nfs=[...NF.nfs.filter(n=>!(n.nome===reg.nome&&n.competencia===reg.competencia)),data];
+        const p=NF.parc.find(x=>x.nome===d.l.nome);if(p&&p.situacao==='nao_emitido')p.situacao='emite'}
+      toast('Notas salvas');
+    }else{
+      const nome=$('nfpN').value.trim();if(!nome)return err('Informe o nome do parceiro.');
+      const r={nome_global:$('nfpG').value.trim()||null,cpf_cnpj:$('nfpD').value.trim()||null,situacao:$('nfpS').value,obs:$('nfpO').value.trim()||null,
+        nomes:[...new Set([nome,...$('nfpX').value.split(';').map(x=>x.trim()).filter(Boolean)])],atualizado_em:new Date().toISOString()};
+      if(d.p){const {error}=await sb.from('parceiros_nf').update(r).eq('id',d.p.id);if(error)throw error;Object.assign(d.p,r)}
+      else{if(NF.parc.some(x=>chave(x.nome)===chave(nome)))return err('Este parceiro já está no controle.');
+        const {data,error}=await sb.from('parceiros_nf').insert({...r,grupo_id:NF.grupo.id,nome}).select().single();if(error)throw error;NF.parc.push(data)}
+      toast('Parceiro salvo');
+    }
+    dlgNF.close();nfDesenha();
+  }catch(x){console.error(x);err(v77(x)?v77Msg:'Não foi possível salvar: '+(x.message||x))}finally{b.disabled=false}
+});
+// importar a planilha “Controle NF parceiros” (aba Controle NF): junta com o controle atual, sem apagar ninguém,
+// e grava as notas dos meses (colunas Jan, Fev, …) no ano escolhido
+$('nfImpArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!NF.grupo)return;
+  let ps=[],ms=[];
+  try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),nm=wb.SheetNames.find(n=>chave(n)==='controle nf')||wb.SheetNames[0];
+    const L=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''}),h=L.findIndex(r=>r.some(c=>chave(c)==='situacao'));
+    if(h<0)throw new Error('Não achei a coluna Situação. Use a planilha “Controle NF parceiros”.');
+    const H=L[h].map(chave),ix=k=>H.findIndex(c=>c.startsWith(k)),cS=ix('situacao'),cN=ix('parceiro'),cG=ix('nome global'),cD=ix('cpf'),cX=ix('nome na planilha'),cO=ix('observ');
+    const cM=MES3.map(m=>H.indexOf(chave(m)));
+    const sit=t=>{const c=chave(t);return c.startsWith('emite')?'emite':c.startsWith('nao emitir')?'nao_emitir':c.startsWith('nao emitido')?'nao_emitido':null};
+    for(const r of L.slice(h+1)){const s=sit(r[cS]),n=String(r[cN]||'').trim();if(!s||!n)continue;
+      ps.push({nome:n,nomes:[...new Set([n,...String(cX>=0?r[cX]:'').split(';').map(x=>x.trim()).filter(Boolean)])],nome_global:String(cG>=0?r[cG]:'').trim()||null,cpf_cnpj:String(cD>=0?r[cD]:'').trim()||null,situacao:s,obs:String(cO>=0?r[cO]:'').trim()||null});
+      cM.forEach((c,i)=>{const q=c>=0?parseInt(r[c]):0;if(q>0)ms.push({grupo_id:NF.grupo.id,nome:n,competencia:NF.ano+'-'+pad(i+1),quantidade:q})})}
+  }catch(err){console.error(err);return alert(err.message||'Não foi possível ler a planilha.')}
+  if(!ps.length)return alert('A planilha não tem parceiros.');
+  const novos=ps.filter(p=>!NF.parc.some(x=>x.nome===p.nome));
+  if(!confirm(`Planilha com ${ps.length} parceiros (${novos.length} novos no controle) e ${ms.reduce((s,m)=>s+m.quantidade,0)} notas em ${NF.ano}.\n\nOs parceiros que já estão no controle são atualizados, ninguém é apagado. As notas dos meses da planilha substituem as lançadas nesses meses. Continuar?`))return;
+  try{
+    for(const p of ps){const x=NF.parc.find(y=>y.nome===p.nome);
+      if(x){const {error}=await sb.from('parceiros_nf').update({...p,atualizado_em:new Date().toISOString()}).eq('id',x.id);if(error)throw error}}
+    for(let i=0;i<novos.length;i+=200){const {error}=await sb.from('parceiros_nf').insert(novos.slice(i,i+200).map(p=>({...p,grupo_id:NF.grupo.id})));if(error)throw error}
+    for(let i=0;i<ms.length;i+=200){const {error}=await sb.from('nf_mensal').upsert(ms.slice(i,i+200),{onConflict:'grupo_id,nome,competencia'});if(error)throw error}
+    toast('Planilha importada');renderNF();
+  }catch(err){console.error(err);alert(v77(err)?v77Msg:'Não foi possível importar: '+(err.message||err))}
+};
+$('nfXls').onclick=()=>{
+  const ls=nfLinhas(),H=['Situação','Parceiro','Nome global','CPF/CNPJ',...MES3,'Total','Última nota'];
+  const rows=ls.map(l=>[l.sit==='sem'?'Fora do controle':RNSIT[l.sit][0],l.nome,l.p?.nome_global||'',l.p?.cpf_cnpj||'',...Array.from({length:12},(_,i)=>l.m[i+1]?.quantidade||null),l.tot||null,l.ult?MES3[l.ult-1]+'/'+NF.ano:'']);
+  const ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map((h,i)=>({wch:i===1||i===2?40:i===0?16:i===3?20:i>=4&&i<16?6:12}));xTabela(ws,{texto:[1,2]});
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Controle NF');XLSX.writeFile(wb,`Controle NF ${NF.grupo.nome} ${NF.ano}.xlsx`);
+};
 // período no modelo do Bom Controle em todas as telas com De/Até
 [['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gteIni','gteFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
