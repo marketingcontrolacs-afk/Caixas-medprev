@@ -309,6 +309,7 @@ tbody tr.click{transition:background .1s}
 dialog{border-radius:18px;border-color:var(--line);box-shadow:var(--sh2)}
 dialog::backdrop{background:rgba(6,22,24,.5);backdrop-filter:blur(3px)}
 .alerta{border-radius:14px}
+.acm{display:inline-flex;align-items:center;gap:6px}.acm select{padding:3px 8px;font-size:12.5px;height:auto;width:auto}
 #mvBulk b.pos{color:var(--ok)}#mvBulk b.neg{color:var(--bad)}#mvBulk b.tot{font-size:16px}
 .chip{letter-spacing:.01em}
 .toast{border-radius:12px;box-shadow:var(--sh2)}
@@ -386,6 +387,11 @@ body.lg header.top .logo{visibility:hidden}
 .pli{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;font-size:13.5px;color:inherit;text-align:left;padding:8px 14px;cursor:pointer}
 .pli:last-child{border-bottom:0}.pli:hover{background:var(--sunk)}
 .pli .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}.pli .go{color:var(--muted)}
+.dash>.c12{grid-column:1/-1}
+.dash.mod{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}.dash.mod>.card{grid-column:auto}.dash.mod>.c12{grid-column:1/-1}
+.dlinks{display:flex;flex-wrap:wrap;gap:8px}
+.dlink{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13.5px var(--body);padding:8px 12px;border-radius:10px;cursor:pointer;transition:background .12s,border-color .12s}
+.dlink:hover{background:var(--brand-soft);border-color:transparent;color:var(--brand)}.dlink svg{width:18px;height:18px;color:var(--brand)}
 .dtip{border-radius:10px;box-shadow:var(--sh2);padding:8px 10px;line-height:1.45}
 </style>
 </head>
@@ -578,6 +584,12 @@ body.lg header.top .logo{visibility:hidden}
     <div class="row" id="grFoot" style="margin-top:12px"></div>
   </section>
 
+  <!-- TODAS AS EMPRESAS numa tela que é de uma empresa só: lista das empresas para abrir -->
+  <section id="viewTodas" hidden>
+    <div><h1 id="tdTitle"></h1><p class="sub">Todas as empresas: esta tela mostra uma empresa por vez. Escolha a empresa para abrir.</p></div>
+    <div class="card" style="margin-top:16px;padding:18px 20px"><div class="dlinks" id="tdLista"></div></div>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › DASHBOARD DA EMPRESA (escritório; tela inicial) -->
   <section id="viewDash" hidden>
     <div class="dshead">
@@ -753,6 +765,7 @@ body.lg header.top .logo{visibility:hidden}
       <div class="row" style="align-items:flex-end"><label class="f" id="avFiltroBox">Mostrar<select id="avFiltro"><option value="ativos">Em vigor</option><option value="todos">Todos, inclusive vencidos</option></select></label><button class="btn primary" id="avNovo">+ Novo aviso</button></div>
     </div>
     <div id="avLista" style="display:grid;gap:12px;margin-top:16px"></div>
+    <details class="card" id="nvHist" style="margin-top:16px"><summary><b>Atualizações do portal</b></summary><div id="nvHistLista" style="display:grid;gap:12px;margin-top:12px"></div></details>
   </section>
 
   <!-- PROJETOS E MELHORIAS (v65) -->
@@ -845,12 +858,12 @@ body.lg header.top .logo{visibility:hidden}
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Acessos</h2>
-        <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar.</p>
+        <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar. Cada módulo marcado tem o seu nível, e na tabela abaixo dá para trocar o nível de um acesso já liberado.</p>
         <form class="row" id="formAc" style="align-items:flex-end">
           <label class="f">Usuário<select id="acUsr"></select></label>
           <div class="f" style="flex:1 1 100%"><span>Empresas que ele representa <button type="button" class="btn small ghost" id="acTodas">Marcar todas</button></span><div class="chk" id="acCli"></div></div>
           <div class="f" style="flex:1 1 100%"><span>Módulos</span><div class="chk" id="acMod"></div></div>
-          <label class="f">Nível<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
+          <label class="f">Nível de todos os marcados<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
           <button class="btn primary" type="submit">Liberar</button>
         </form>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbAc"></table></div>
@@ -1063,6 +1076,11 @@ body.lg header.top .logo{visibility:hidden}
   <div class="db" id="rgBody"></div>
   <div class="df" id="rgFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
 </dialog>
+<dialog id="dlgNov">
+  <div class="dh"><h2>✨ Novidades no portal</h2></div>
+  <div class="db" id="nvBody"></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn primary" id="nvOk">Visualizei</button></div>
+</dialog>
 <dialog id="dlgAv">
   <div class="dh"><h2 id="adTitle"></h2></div>
   <div class="db" id="adBody"></div>
@@ -1224,7 +1242,7 @@ const ehEsc=()=>ME&&ME.papel==='escritorio';
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos'];
+const SEMPRE=['tarefas','avisos','projetos','gfdash'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
@@ -1294,7 +1312,7 @@ const NAV=[
   {k:'cartao',t:'Cartão de crédito',g:'Rotina diária',s:'Dia a dia',ok:()=>temAcesso('cartao')},
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
-  {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:()=>true},   // todos; cada um vê só o que tem acesso (Carol, 30/10)
   {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
@@ -1363,13 +1381,14 @@ const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
   // atalho do Dashboard no início dos módulos (Carol, 30/10)
-  $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g)).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
+  const noGrp=n=>n.k!=='gfdash'||ehEsc();
+  $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n))).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
     return `<button type="button" class="modbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.c||m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('')
     +(atual?`<span class="crumb">${naDash?'<b>Dashboard</b>':`${navGrp(atual)} › <b>${esc(atual.t)}</b>`}</span>`:'');
   if(MEGA.g)megaDesenha();
 }
 function megaDesenha(){
-  const itens=navItens().filter(n=>navGrp(n)===MEGA.g);
+  const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&(n.k!=='gfdash'||ehEsc()));
   if(!itens.length)return megaFecha();
   const cols=SECOES.map(sc=>[sc,itens.filter(n=>(n.s||'Dia a dia')===sc)]).filter(([,l])=>l.length);
   $('mega').innerHTML=`<span class="mega-tag">${MEGA.g}</span><div class="mega-cols">${cols.map(([sc,l])=>`<div class="mega-col"><h3>${sc}</h3>${l.map(n=>`<button type="button" class="megaitem" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}>${esc(n.t)}${n.soon?'<span class="soon">em breve</span>':''}${navBadge(n)}</button>`).join('')}</div>`).join('')}</div>`;
@@ -1399,6 +1418,8 @@ function empresasDe(m){
   return so?l.filter(c=>so.includes(c.id)):l;
 }
 function empresasMod(m){
+  // dashboard: as empresas em que a pessoa tem algum acesso (o escritório, todas)
+  if(m==='gfdash')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()||ACESSOS.some(a=>a.cliente_id===c.id)));
   if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:temEm(c.id,'colab')));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
@@ -1411,13 +1432,16 @@ function empresasMod(m){
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':m==='ponto'?'ponto':mod)));
 }
 const escCli=$('escCli');
+$('tdLista').addEventListener('click',e=>{const b=e.target.closest('[data-emp]');if(!b)return;escCli.value=b.dataset.emp;guardaEmp();openView()});
 // a empresa é escolhida uma vez no topo e vale para todos os módulos, inclusive depois de atualizar a página
 const EMPK='portal_empresa';
 let EMP=(()=>{try{return localStorage.getItem(EMPK)||''}catch(e){return ''}})();
 function guardaEmp(){const v=escCli.value;if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
 function fillClientes(){
-  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,v=(cur==='*'||cur==='int')&&escCli.dataset.mod===m?cur:EMP||cur;escCli.dataset.mod=m;
-  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas')&&(doMod.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
+  // "Todas as empresas" continua escolhida ao trocar de módulo
+  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,ant=escCli.dataset.mod,v=cur==='*'||cur==='int'&&ant===m?cur:EMP||cur;escCli.dataset.mod=m;
+  // "Todas as empresas" em todos os módulos para quem vê mais de uma empresa (Carol, 30/10)
+  const todas=!telaSemEmp(m)&&(doMod.length>1||lista.length>1&&ehEsc()||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
@@ -1434,10 +1458,25 @@ function viewDaEmp(){
   const itens=navItens(),alt=itens.find(x=>navGrp(x)===navGrp(n)&&!x.soon)||itens.find(x=>x.k==='gfdash')||itens.find(x=>!x.soon);
   if(!alt)return;VIEW=alt.k;try{localStorage.setItem(SECK,VIEW)}catch(e){}fillClientes();
 }
-const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
+// com "Todas as empresas" nas contas, a conta aberta usa a empresa dela (CLIDLG)
+let CLIDLG=null;
+const cliAtual=()=>CLIDLG||CLIENTES.find(c=>c.id===escCli.value);
+function renderTodas(){
+  const n=NAV.find(x=>x.k===VIEW);$('tdTitle').textContent=n?n.t:'';
+  $('tdLista').innerHTML=empresasDe(VIEW).map(c=>`<button type="button" class="dlink" data-emp="${c.id}">${svgI(ICO[VIEW]?VIEW:'m_esc')}<span>${esc(c.nome)}</span></button>`).join('')||'<p class="muted" style="margin:0">Nenhuma empresa.</p>';
+}
+// telas da Gestão financeira que somam todas as empresas, para o pagamento do dia não esquecer nenhuma (Carol, 30/10)
+const GTTODAS=['gfpagar','gfrec','gfagenda','gfinad','gfmov'];
+const TODAS={id:'*',nome:'Todas as empresas',bpo_financeiro:true};
+const cliOuTodas=()=>escCli.value==='*'?TODAS:cliAtual();
+// telas que somam todas as empresas; nas outras, "Todas as empresas" mostra a lista das empresas para abrir a tela de cada uma
+const SOMA_TODAS=new Set([...GTTODAS,'gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
+// a conta ou o lançamento aberto com "Todas as empresas" usa a empresa dele; ao fechar a janela, volta
+document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1456,7 +1495,7 @@ function openView(){
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
-  else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos()}
+  else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
@@ -1492,8 +1531,8 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
-  // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, o escritório abre no dashboard da empresa
-  show('app');go(volta?volta.k:ehEsc()&&eqPode('gfdash')?'gfdash':first.k);
+  // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
+  show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);nvMostra();
   const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
@@ -2427,7 +2466,7 @@ async function renderCadastro(){
   if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
-  $('acMod').innerHTML=MODGRUPOS.map(([g,ks])=>`<div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center"><b style="font-size:13px;min-width:130px">${g}</b>${ks.map(k=>`<label><input type="checkbox" value="${k}"> ${MODNOME[k].replace(' (RH)','')}</label>`).join('')}</div>`).join('');
+  $('acMod').innerHTML=MODGRUPOS.map(([g,ks])=>`<div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center"><b style="font-size:13px;min-width:130px">${g}</b>${ks.map(k=>`<span class="acm"><label><input type="checkbox" value="${k}"> ${MODNOME[k].replace(' (RH)','')}</label><select data-niv="${k}" hidden aria-label="Nível de ${esc(MODNOME[k])}"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></span>`).join('')}</div>`).join('');
   renderAcessos();
 }
 async function renderAcessos(){
@@ -2436,7 +2475,7 @@ async function renderAcessos(){
   const nu=id=>{const u=USERS.find(x=>x.user_id===id);return u?esc(u.nome||u.email):'?'},nc=id=>esc(CLIENTES.find(c=>c.id===id)?.nome||'?');
   const rows=(data||[]).sort((a,b)=>nu(a.user_id).localeCompare(nu(b.user_id))||nc(a.cliente_id).localeCompare(nc(b.cliente_id)));
   $('tbAc').innerHTML=`<thead><tr><th class="l">Usuário</th><th class="l">Empresa</th><th class="l">Módulo</th><th class="l">Nível</th><th></th></tr></thead><tbody>${
-    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]}</td><td class="l">${a.nivel==='lancamento'?'Lançamento':'Consulta'}</td><td><button type="button" class="btn small ghost">Tirar acesso</button></td></tr>`).join('')
+    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]}</td><td class="l"><select data-acniv aria-label="Nível">${[['lancamento','Lançamento'],['consulta','Consulta']].map(([v,t])=>`<option value="${v}"${a.nivel===v?' selected':''}>${t}</option>`).join('')}</select></td><td><button type="button" class="btn small ghost">Tirar acesso</button></td></tr>`).join('')
     ||'<tr><td class="l muted" colspan="5">Nenhum acesso liberado ainda.</td></tr>'}</tbody>`;
 }
 $('formAc').addEventListener('submit',async e=>{
@@ -2444,12 +2483,19 @@ $('formAc').addEventListener('submit',async e=>{
   const u=$('acUsr').value;if(!u)return;
   const marc=id=>[...$(id).querySelectorAll('input:checked')].map(x=>x.value),cs=marc('acCli'),ms=marc('acMod');
   if(!cs.length||!ms.length){toast('Marque pelo menos uma empresa e um módulo.');return}
-  const rows=cs.flatMap(c=>ms.map(m=>({user_id:u,cliente_id:c,modulo:m,nivel:$('acNiv').value})));
+  // cada módulo com o seu nível (Carol, 30/10): pode lançar em uns e só consultar outros
+  const niv=m=>$('acMod').querySelector(`[data-niv="${m}"]`)?.value||$('acNiv').value;
+  const rows=cs.flatMap(c=>ms.map(m=>({user_id:u,cliente_id:c,modulo:m,nivel:niv(m)})));
   const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){fail(error);return}
   const usr=USERS.find(x=>x.user_id===u);
   if(usr&&usr.papel==='pendente'){await sb.from('perfis').update({papel:'operador'}).eq('user_id',u);usr.papel='operador'}
   toast('Acesso liberado');renderCadastro();
 });
+// marcar um módulo mostra o nível dele; o "Nível de todos os marcados" muda todos de uma vez
+$('acMod').addEventListener('change',e=>{const i=e.target.closest('input[type=checkbox]');if(!i)return;const sl=$('acMod').querySelector(`[data-niv="${i.value}"]`);if(sl){sl.hidden=!i.checked;if(i.checked)sl.value=$('acNiv').value}});
+$('acNiv').addEventListener('change',()=>$('acMod').querySelectorAll('[data-niv]').forEach(sl=>{if(!sl.hidden)sl.value=$('acNiv').value}));
+$('tbAc').addEventListener('change',async e=>{const sl=e.target.closest('[data-acniv]');if(!sl)return;const tr=sl.closest('tr[data-u]');
+  const {error}=await sb.from('acessos').update({nivel:sl.value}).eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error){fail(error);renderAcessos()}else toast('Nível alterado')});
 $('acTodas').onclick=()=>{const bs=[...$('acCli').querySelectorAll('input')],v=bs.some(b=>!b.checked);bs.forEach(b=>b.checked=v)};
 $('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-u]');if(!tr||!e.target.closest('button'))return;
   const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
@@ -2563,7 +2609,7 @@ const MODCFG={
 let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
 const mFiltro=$('mFiltro');
 function initMod(m){
-  const cfg=MODCFG[m],cli=cliAtual();
+  const cfg=MODCFG[m],cli=cliOuTodas();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
     mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option>':'';
@@ -2573,16 +2619,16 @@ function initMod(m){
   $('mTitle').textContent=cfg.titulo;
   $('mSub').textContent=(cli?cli.nome+(m==='cartao'&&cli.cartao_final?' · cartão final '+cli.cartao_final:'')+' · ':'')+cfg.sub;
   $('mNovo').textContent='+ '+cfg.novo;
-  $('mNovo').hidden=!(cli&&podeLancar(cli.id,m));
+  $('mNovo').hidden=!(cli&&cli.id!=='*'&&podeLancar(cli.id,m));
   renderMod();
 }
 ['mIni','mFim'].forEach(id=>$(id).onchange=()=>renderMod());mFiltro.onchange=$('mTipo').onchange=()=>renderMod();
 async function renderMod(){
-  const cfg=MODCFG[MOD],cli=cliAtual();
+  const cfg=MODCFG[MOD],cli=cliOuTodas(),tod=cli?.id==='*';
   if(!cli||!window.V2)$('mConf').innerHTML='';
   if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
-  let q=sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
+  let q=tod?sb.from(cfg.tabela).select('*').in('cliente_id',empresasDe(MOD).map(c=>c.id)):sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
   const f=MOD==='pagar'?mFiltro.value:'per',per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
   const [pIni,pFim]=[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31'];
   if(f==='aberto')q=q.eq('conferido',false);else q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
@@ -2604,17 +2650,19 @@ async function renderMod(){
   if(REGS.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',REGS.map(r=>r.id));(dd||[]).forEach(d=>(DOCS[d.registro_id]=DOCS[d.registro_id]||[]).push(d))}
   const nd=r=>(DOCS[r.id]||[]).length, clip=r=>nd(r)?`<span class="muted" title="Documentos">📎${nd(r)}</span>`:'<span class="neg">sem documento</span>';
   const sum=a=>r2(a.reduce((x,r)=>x+(+r.valor),0));
+  // "Todas as empresas": cada linha mostra a empresa dela
+  const empC=r=>tod?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===r.cliente_id)?.nome||'')}</span>`:'';
   let head,body,foot='',tiles;
   if(MOD==='pagar'){
     const st=r=>{if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
       return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
   }else if(MOD==='cartao'){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
     tiles=[['Compras do período',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
   }else{
@@ -2629,8 +2677,8 @@ async function renderMod(){
   if(MOD==='tesouraria'&&!REGS.length)body='';
   $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste período'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  if(MOD==='tesouraria')renderTC(cli);else $('mConf').innerHTML='';
-  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':cli&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
+  if(MOD==='tesouraria'&&!tod)renderTC(cli);else $('mConf').innerHTML='';
+  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
 }
 $('mNovo').onclick=()=>openReg(null);
 $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openReg(REGS.find(r=>r.id===tr.dataset.id))});
@@ -2645,6 +2693,7 @@ function ajustaDeposito(){
   const d=$('rFields').querySelector('[data-k="descricao"]');if(d)d.closest('label').hidden=dep;
 }
 async function openReg(r){
+  if(escCli.value==='*')CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null;
   if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
   const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
   const ed=regEditavel(),dis=ed?'':' disabled';
@@ -5973,16 +6022,17 @@ const GTMODOS={
   gfagenda:['Agenda financeira','O que vence em cada dia do mês. Clique num dia para ver as contas.']};
 async function gtCarrega(tipo,cli){
   const key=tipo+'|'+cli.id;if(key===GT.key)return;
-  const tq=()=>{let q=sb.from('fin_titulos').select('*').eq('cliente_id',cli.id);if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
-  const mq=()=>{let q=sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id);if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
-  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),gfContasDe(cli.id,true)]);
+  const tod=cli.id==='*',ids=tod?empresasDe(VIEW).map(c=>c.id):[cli.id],emp=q=>tod?q.in('cliente_id',ids):q.eq('cliente_id',cli.id);
+  const tq=()=>{let q=emp(sb.from('fin_titulos').select('*'));if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
+  const mq=()=>{let q=emp(sb.from('fin_movimentos').select('*'));if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
+  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')):gfContasDe(cli.id,true)]);
   GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;
   movs.filter(m=>m.titulo_id).forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
-  GT.rem=tipo!=='receber'?await rmItensDe(cli.id):{};
+  GT.rem=tipo!=='receber'&&!tod?await rmItensDe(cli.id):{};GT.todasE=tod;
   GT.key=key;
 }
 async function renderGT(){
-  const M=VIEW,cli=cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
+  const M=VIEW,tod=escCli.value==='*'&&GTTODAS.includes(M),cli=tod?{id:'*',nome:'Todas as empresas'}:cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
   if(M==='gfmov'&&GT.modo!=='gfmov'){$('gtIni').value='';$('gtFim').value='';MV.lim=300}   // a movimentação abre com tudo
   GT.modo=M;if(M!=='gfmov')$('mvAviso').hidden=true;
   $('gtTitle').textContent=GTMODOS[M][0];$('gtSub').textContent=GTMODOS[M][1];
@@ -5991,13 +6041,14 @@ async function renderGT(){
   const lista=M!=='gfinad'&&M!=='gfagenda';
   ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtFiltroBox').hidden=!lista||M==='gfmov';
   document.querySelectorAll('.mvf').forEach(x=>x.hidden=M!=='gfmov');(pt=>{if(pt?.classList.contains('per'))pt.firstElementChild.textContent=M==='gfmov'?'Data':'Vencimento'})($('gtIniBox').previousElementSibling);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
-  $('gtNovo').hidden=!cli;$('gtNovoR').hidden=!cli||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||M!=='gfpagar';
+  $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';
+  if(tod)$('gtSub').textContent=GTMODOS[M][1]+' Todas as empresas juntas: escolha o período para ver o resumo.';
   if(!cli)return gtVazio('Escolha uma empresa.');
   if(GT.key!==tipo+'|'+cli.id){gtVazio('Carregando…');
     try{await gtCarrega(tipo,cli)}catch(e){console.error(e);GT.key='';return gtVazio(v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}}
   if(VIEW!==M)return;
   gtDesenha();
-  if(M==='gfpagar')gtBoletos(cli);
+  if(M==='gfpagar'&&!tod)gtBoletos(cli);
 }
 // boletos e notas enviados pelo cliente (Financeiro › Boletos e notas fiscais a pagar) que ainda não viraram conta a pagar
 async function gtBoletos(cli){
@@ -6056,7 +6107,7 @@ function gtDesenha(){
 function gtTabela(rows,vazio){
   const MV=GT.tipo==='mov',P=gtP(),mu=t=>`<span class="muted">${t}</span>`;
   $('gtHead').innerHTML=`<tr><th>Vencimento</th>${MV?'<th class="l">Tipo</th>':''}<th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Descrição</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b></td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b>${GT.todasE?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:''}</td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="${MV?10:9}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td></td></tr>`
@@ -6163,6 +6214,8 @@ function mvBulk(){
   const n=MV.sel.size;$('mvBulk').hidden=!n;if(!n)return;
   const ls=mvSelRows(),e=r2(ls.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+x.valor,0)),sd=r2(ls.filter(x=>x.tipo==='saida').reduce((a,x)=>a+x.valor,0));
   const nv=ls.filter(x=>x.k==='m'&&x.ref.validar).length,bv=$('mvBulk').querySelector('[data-mb="valida"]');bv.hidden=!nv;bv.textContent=nv===n?'Marcar como validado':`Marcar ${nv} como ${nv===1?'validado':'validados'}`;
+  // com "Todas as empresas", conta e categoria são de cada empresa: trocar só abrindo a empresa
+  $('mvBulk').querySelectorAll('[data-mb="cat"],[data-mb="conta"]').forEach(x=>x.hidden=!!GT.todasE);
   $('mvBulkTxt').innerHTML=`<b>${n} ${n===1?'lançamento selecionado':'lançamentos selecionados'}</b> · entradas <b class="pos">${fm(e)}</b> · saídas <b class="neg">${fm(sd)}</b> · total <b class="tot ${e-sd<0?'neg':'pos'}">${fm(r2(e-sd))}</b>`;
 }
 $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
@@ -6214,6 +6267,7 @@ async function mvExcluir(rows){
 }
 function mvAbre(tr){
   const [k,id]=tr.dataset.mv.split(':');
+  if(GT.todasE){const r=(k==='t'?GT.lista:GT.todos).find(x=>x.id===id);CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null}
   if(k==='t')return abrirGT(GT.lista.find(t=>t.id===id));
   const m=GT.todos.find(x=>x.id===id);if(!m)return;
   if(m.titulo_id){const t=GT.lista.find(x=>x.id===m.titulo_id);if(t)return abrirGT(t)}
@@ -6269,7 +6323,8 @@ $('gtMes').onchange=gtDesenha;
 // pagas ou todas: sem período escolhido, mostra o mês atual
 $('gtFiltro').onchange=()=>{const f=$('gtFiltro').value;if((f==='baixadas'||f==='todas')&&!$('gtIni').value&&!$('gtFim').value){$('gtIni').value=TODAY.slice(0,8)+'01';$('gtFim').value=fimMes(TODAY)}gtDesenha()};
 $('gtIni').onchange=gtDesenha;$('gtFim').onchange=gtDesenha;$('gtBusca').oninput=()=>{clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,200)};
-const gtAbre=tr=>tr.dataset.mv?mvAbre(tr):abrirGT(GT.lista.find(t=>t.id===tr.dataset.id));
+const gtAbre=tr=>{if(tr.dataset.mv)return mvAbre(tr);const t=GT.lista.find(x=>x.id===tr.dataset.id);
+  CLIDLG=GT.todasE&&t?CLIENTES.find(c=>c.id===t.cliente_id)||null:null;return abrirGT(t)};
 $('gtBody').addEventListener('change',e=>{const k=e.target.dataset?.mvsel;if(!k)return;e.target.checked?MV.sel.add(k):MV.sel.delete(k);e.target.closest('tr').classList.toggle('sel',e.target.checked);
   const r=GT.mvRows||[],all=r.length&&r.every(x=>MV.sel.has(x.k+':'+x.id));if($('mvTodos'))$('mvTodos').checked=all;mvBulk()});
 $('gtHead').addEventListener('change',e=>{if(e.target.id!=='mvTodos')return;(GT.mvRows||[]).forEach(x=>e.target.checked?MV.sel.add(x.k+':'+x.id):MV.sel.delete(x.k+':'+x.id));gtDesenha()});
@@ -6680,15 +6735,17 @@ const mesCurto=ym=>MESES[+ym.slice(5)-1].slice(0,3)+'/'+ym.slice(2,4);
 const cvl=(v,cl)=>`<td data-v="${r2(v)}" class="${cl||''}">${fm(r2(v))}</td>`;
 // os dados de todos os relatórios e do dashboard: lançamentos, contas a pagar e receber, contas e faturas da empresa
 async function relCarrega(cli){
-  const [movs,tits,contas]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',cli.id).order('data')),todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),gfContasDe(cli.id,true)]);
+  const tod=cli.id==='*',ids=tod?empresasDe(VIEW).filter(c=>c.bpo_financeiro!==false).map(c=>c.id):[cli.id],emp=q=>tod?q.in('cliente_id',ids):q.eq('cliente_id',cli.id);
+  const [movs,tits,contas]=await Promise.all([todas(()=>emp(sb.from('fin_movimentos').select('*')).order('data')),todas(()=>emp(sb.from('fin_titulos').select('*')).order('vencimento')),
+    tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')).then(l=>l.map(c=>({...c,nome:(CLIENTES.find(x=>x.id===c.cliente_id)?.nome||'')+' · '+c.nome}))):gfContasDe(cli.id,true)]);
   REL.plano=await planoDe(cli);REL.nat=Object.fromEntries(REL.plano.filter(c=>c.tipo).map(c=>[c.categoria,c.tipo]));
-  REL.fats=await todas(()=>sb.from('fin_faturas').select('*').eq('cliente_id',cli.id)).catch(()=>[]);   // antes do v52 não existe
+  REL.fats=await todas(()=>emp(sb.from('fin_faturas').select('*'))).catch(()=>[]);   // antes do v52 não existe
   REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
   REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
   movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
 }
 async function renderRel(){
-  const M=VIEW,cli=cliAtual();
+  const M=VIEW,cli=cliOuTodas();
   $('relTitle').textContent=RELMODOS[M][0];$('relSub').textContent=RELMODOS[M][1];
   $('relIniBox').hidden=$('relFimBox').hidden=M==='gfresumo'||M==='gforc';$('relSemBox').hidden=M!=='gforc';
   $('relBaseBox').hidden=!['gfdcat','gfdforn','gfdforma'].includes(M);$('relSalvar').hidden=M!=='gforc';
@@ -6702,7 +6759,7 @@ async function renderRel(){
     await relCarrega(cli);
     if(M==='gforc'){const {data,error}=await sb.from('fin_orcamento').select('*').eq('cliente_id',cli.id);if(error)throw error;REL.orc=data||[]}
   }catch(e){console.error(e);return vazio(e&&/fin_orcamento/.test(e.message||'')||e?.code==='42P01'&&M==='gforc'?'A previsão orçamentária precisa da atualização v50 do banco. Rode o SQL no Supabase.':v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
-  if(VIEW!==M||cliAtual()?.id!==cli.id)return;
+  if(VIEW!==M||cliOuTodas()?.id!==cli.id)return;
   ({gfresumo:relResumo,gffluxo:relFluxo,gforc:relOrc,gfdre:relDre,gfdcat:relDesp,gfdforn:relDesp,gfdforma:relDesp})[M]();
 }
 ['relIni','relFim','relSem','relBase'].forEach(id=>$(id).onchange=renderRel);
@@ -6741,18 +6798,82 @@ function relResumo(){
 // despesas do mês por categoria, próximos vencimentos e pendências (cada uma leva para a tela onde se resolve).
 // Por enquanto só o escritório vê; depois a Carol escolhe o que o cliente vai ver.
 async function renderDash(){
-  const cli=cliAtual(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
+  const cli=cliOuTodas(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
   const hr=new Date().getHours(),nome=(ME?.nome||'').split(' ')[0];
   $('dsHello').textContent=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(nome?', '+nome:'');
-  $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?'Resumo da empresa em '+dBR(TODAY)+'.':'';
+  $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?(cli.id==='*'?'Resumo de todas as empresas em ':'Resumo da empresa em ')+dBR(TODAY)+'.':'';
   if(!cli){g.innerHTML='<p class="muted">Escolha uma empresa.</p>';return}
   g.innerHTML='<p class="muted">Carregando…</p>';
+  if(!dsFin(cli))return dsModulos(cli);
   try{await relCarrega(cli)}catch(e){console.error(e);g.innerHTML=`<p class="neg">${v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
-  if(VIEW!=='gfdash'||cliAtual()?.id!==cli.id)return;
+  if(VIEW!=='gfdash'||cliOuTodas()?.id!==cli.id)return;
   dsDesenha(cli);
 }
 $('dsAtual').onclick=renderDash;
+// a parte financeira (saldos, contas a pagar e receber, gráfico) é do escritório, nas empresas com BPO financeiro;
+// quem tem módulos escolhidos pela master vê se o Dashboard financeiro estiver marcado
+const dsFin=cli=>ehEsc()&&cli.bpo_financeiro!==false&&(ehAdm()||!ME.modulos_equipe||ME.modulos_equipe.includes('gfdash'));
+// Dashboard de quem não vê a parte financeira (operadoras do caixa e da tesouraria, RH, cliente): um quadro por
+// módulo que a pessoa tem liberado nesta empresa, as tarefas dela e os atalhos (Carol, 30/10)
+async function dsModulos(cli){
+  const g=$('dsGrid'),pv=m=>cli.id!=='*'&&podeVer(cli.id,m)&&eqPode(m)&&empresasDe(m).some(c=>c.id===cli.id),tem={caixa:pv('caixa'),tes:pv('tesouraria'),pagar:pv('pagar'),cartao:pv('cartao'),tar:temAcesso('tarefas')};
+  const d14=addDias(TODAY,-14),lista=r=>r.error?[]:r.data||[];
+  let F,T,TS,TC,P,C;
+  try{[F,T,TS,TC,P,C]=await Promise.all([
+    tem.caixa?sb.from('fechamentos').select('*, saidas(valor)').eq('cliente_id',cli.id).gte('data',d14).then(lista):null,
+    tem.tes?sb.from('tesouraria').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).limit(6).then(lista):null,
+    tem.tes?tcSaldo(cli.id,TODAY).catch(()=>null):null,
+    tem.tes?sb.from('tesouraria_conferencias').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).limit(1).then(r=>lista(r)[0]||null):null,
+    tem.pagar?sb.from('contas_pagar').select('*').eq('cliente_id',cli.id).eq('conferido',false).order('vencimento').limit(300).then(lista):null,
+    tem.cartao?sb.from('cartao_notas').select('valor,data').eq('cliente_id',cli.id).gte('data',TODAY.slice(0,8)+'01').then(lista):null])}
+  catch(e){console.error(e);g.innerHTML='<p class="neg">Erro ao carregar. Verifique a internet e tente de novo.</p>';return}
+  if(VIEW!=='gfdash'||cliOuTodas()?.id!==cli.id)return;
+  DS.cli=cli.id;DS.mod={cli,F,T,TS,TC,P,C,tem};dsModDesenha();
+}
+function dsModDesenha(){
+  const {cli,F,T,TS,TC,P,C,tem}=DS.mod,mu=t=>`<span class="muted">${t}</span>`,qt=(n,a,b)=>n+' '+(n===1?a:b),cnt=n=>n?`<span class="cnt">${n}</span>`:'';
+  const vazio=t=>`<div class="dvazio"><span class="ok">✓</span>${t}</div>`,ico=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const kpi=(cl,ic,go,k,v,n)=>`<button type="button" class="dskpi ${cl}" data-go="${go}"><span class="ic">${ic}</span><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n}</span></button>`;
+  const ks=[],cards=[];
+  // tarefas da pessoa
+  const tars=TPEND.filter(t=>cli.id==='*'||t.cliente_id===cli.id),late=tars.filter(tpLate).length,outras=TPEND.length-tars.length;
+  // caixa: últimos 14 dias, cada caixa do dia
+  if(tem.caixa){
+    const n=nCx(cli),por={};F.forEach(f=>por[f.data+'|'+(f.caixa||1)]=f);const dias=[];
+    for(let i=0;i<=14;i++){const s=addDias(TODAY,-i);if(dObj(s).getDay()===0&&!cli.abre_domingo)continue;for(let k=1;k<=n;k++)dias.push([s,k,por[s+'|'+k]])}
+    const hoje=dias.filter(d=>d[0]===TODAY),okHoje=hoje.length&&hoje.every(d=>d[2]),falta=dias.filter(d=>!d[2]&&d[0]<TODAY).length;
+    ks.push(kpi(okHoje?'t-ok':'t-bad',ico(ICO.caixa),'caixa','Caixa de hoje',okHoje?'Enviado':hoje.length?'Pendente':'Sem expediente',falta?`<span class="chip c-bad">${qt(falta,'dia sem fechamento','dias sem fechamento')}</span>`:'nenhum dia em atraso'));
+    cards.push(`<div class="card"><div class="ch"><div><h2>Caixa</h2><p class="sub">Últimos 14 dias${n>1?' · '+n+' caixas':''}</p></div></div><div class="dl">${dias.slice(0,6).map(([s,k,f])=>`<button type="button" class="dr dvenc" data-go="caixa"><span class="dd${!f&&s<TODAY?' late':''}"><b>${s.slice(8,10)}</b><small>${MESES[+s.slice(5,7)-1].slice(0,3)}</small></span><span class="nm"><b>${DOW[dObj(s).getDay()]}${n>1?' · Caixa '+k:''}</b><span>${f?'contado '+fm(f.din_cont):s===TODAY?'ainda não enviado':'sem fechamento'}</span></span>${chip(f?calc(f).status:'none')}</button>`).join('')}</div></div>`);
+  }
+  // tesouraria: saldo, conferência física e últimos lançamentos
+  if(tem.tes){
+    const at=tcAtrasada(TC);
+    ks.push(kpi(at?'t-bad':'t-ok',ico(ICO.tesouraria),'tesouraria','Saldo da tesouraria',TS==null?'—':`<span class="${TS<0?'neg':''}">${fm(TS)}</span>`,TC?`<span class="chip ${at?'c-bad':'c-ok'}">conferida há ${qt(tcDias(TC),'dia','dias')}</span>`:'<span class="chip c-bad">sem conferência física</span>'));
+    cards.push(`<div class="card"><div class="ch"><div><h2>Tesouraria</h2><p class="sub">Últimos lançamentos</p></div></div><div class="dl">${T.map(r=>{const e=r.tipo==='Suprimento';return `<button type="button" class="dr dvenc" data-go="tesouraria"><span class="dd"><b>${r.data.slice(8,10)}</b><small>${MESES[+r.data.slice(5,7)-1].slice(0,3)}</small></span><span class="nm"><b>${esc(r.descricao||r.tipo||'')}</b><span>${esc(r.tipo||'')}</span></span><span class="${e?'pos':'neg'}" style="font-weight:600">${e?'+':'−'} ${fm(r.valor)}</span></button>`}).join('')||vazio('Nenhum lançamento ainda.')}</div></div>`);
+  }
+  // boletos e notas a pagar
+  if(tem.pagar){
+    const v=P.filter(r=>r.vencimento&&r.vencimento<TODAY),tot=r2(P.reduce((x,r)=>x+(+r.valor||0),0));
+    ks.push(kpi(v.length?'t-bad':'t-ok',ico(ICO.pagar),'pagar','Boletos a pagar',fm(tot),v.length?`<span class="chip c-bad">${qt(v.length,'vencido','vencidos')}</span>`:qt(P.length,'conta em aberto','contas em aberto')));
+    cards.push(`<div class="card"><div class="ch"><div><h2>Boletos e notas a pagar ${cnt(P.length)}</h2><p class="sub">Próximos vencimentos</p></div></div><div class="dl">${P.slice(0,6).map(r=>`<button type="button" class="dr dvenc" data-go="pagar"><span class="dd${r.vencimento<TODAY?' late':''}"><b>${(r.vencimento||'').slice(8,10)}</b><small>${r.vencimento?MESES[+r.vencimento.slice(5,7)-1].slice(0,3):''}</small></span><span class="nm"><b>${esc(r.fornecedor||'—')}</b><span>${esc(r.documento?'Doc. '+r.documento:r.sobre||'')}</span></span><span class="neg" style="font-weight:600">${fm(r.valor)}</span></button>`).join('')||vazio('Nenhuma conta em aberto.')}</div></div>`);
+  }
+  if(tem.cartao){const tot=r2(C.reduce((x,r)=>x+(+r.valor||0),0));ks.push(kpi('t-cred',ico(ICO.cartao),'cartao','Cartão no mês',fm(tot),qt(C.length,'nota lançada','notas lançadas')))}
+  if(tem.tar){
+    ks.push(kpi(late?'t-bad':'',ico(ICO.tarefas),'tarefas','Suas tarefas',String(TPEND.length),late?`<span class="chip c-bad">${qt(late,'atrasada','atrasadas')}</span>`:TPEND.length?'nenhuma atrasada':'tudo em dia'));
+    cards.unshift(`<div class="card"><div class="ch"><div><h2>Suas tarefas ${cnt(tars.length)}</h2><p class="sub">Em que você é executor ou responsável</p></div></div><div class="dl">${tars.slice(0,6).map(t=>`<button type="button" class="dr dpend" data-tar="${t.id}"><span class="pi t">${svgI('tarefas')}</span><span>${esc(t.titulo)}${tpLate(t)?' <span class="chip c-bad">atrasada</span>':t.prazo?' '+mu('até '+dBR(t.prazo)):''}</span><span class="go">›</span></button>`).join('')
+      +(tars.length>6||outras>0?`<button type="button" class="dr" data-tar="*">${mu(tars.length>6?'Ver todas as suas '+TPEND.length+' tarefas':outras+(outras===1?' tarefa sua em outra empresa':' tarefas suas em outras empresas'))}<span class="go">›</span></button>`:'')||vazio('Nenhuma tarefa pendente nesta empresa.')}</div></div>`);
+  }
+  if(ks.length)ks[0]=ks[0].replace('class="dskpi ','class="dskpi hero ');
+  $('dsTiles').innerHTML=ks.join('');
+  // atalhos para os módulos que a pessoa tem nesta empresa
+  const at=navItens().filter(n=>n.k!=='gfdash'&&!n.soon&&!telaSemEmp(n.k));
+  cards.push(`<div class="card c12"><div class="ch"><h2>Atalhos</h2></div><div class="dlinks">${at.map(n=>`<button type="button" class="dlink" data-go="${n.k}">${svgI(ICO[n.k]?n.k:'m_fin')}<span>${esc(n.t)}</span></button>`).join('')}</div></div>`);
+  $('dsGrid').classList.add('mod');$('dsGrid').innerHTML=cards.join('');
+  $('dsNote').textContent='O painel mostra só os módulos que você tem liberados nesta empresa. Clique num quadro para abrir a tela.';
+}
 const DS={pm:[]};
+// redesenha o dashboard aberto quando as tarefas ou os pedidos de parceiros mudam (sem buscar tudo de novo)
+const dsRefaz=()=>{const c=cliOuTodas();if(VIEW!=='gfdash'||!DS.cli||DS.cli!==c?.id)return;if(dsFin(c)){if(REL.movs)dsDesenha(c)}else if(DS.mod?.cli.id===c.id)dsModDesenha()};
 // gráfico de barras desenhado na largura real do quadro (o texto fica do mesmo tamanho no celular e no computador)
 function dsGraf(){
   const box=$('dsChart');if(!box||!DS.pm.length)return;const pm=DS.pm,mx=Math.max(1,...pm.flatMap(x=>[x.e,x.s])),W=Math.max(280,box.clientWidth),H=W<500?180:240,top=12,bot=28,ch=H-top-bot,bw=W/12,bar=Math.max(3,Math.min(16,(bw-8)/2));
@@ -6800,12 +6921,12 @@ function dsDesenha(cli){
   const naoConc=REL.movs.filter(m=>!REL.cart.has(m.conta_id)&&!m.ofx_id&&!m.conciliado&&m.data>=addDias(TODAY,-30)&&m.data<=TODAY).length;
   const prevS=ap.filter(t=>t.previsto&&t.vencimento<=d10).length,catRev=REL.movs.filter(m=>m.cat_revisar).length+REL.tits.filter(t=>t.cat_revisar&&relFalta(t)>0.004).length;
   const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
-  const pAlt=PPEND.filter(x=>x.cli===cli.id&&x.t==='alt').length,pNovo=PPEND.filter(x=>x.cli===cli.id&&x.t==='novo').length;
+  const pAlt=PPEND.filter(x=>(cli.id==='*'||x.cli===cli.id)&&x.t==='alt').length,pNovo=PPEND.filter(x=>(cli.id==='*'||x.cli===cli.id)&&x.t==='novo').length;
   const pend=[[pAlt,qt(pAlt,'alteração de conta de parceiro','alterações de conta de parceiro'),'repasse:alerta'],[pNovo,qt(pNovo,'parceiro novo para conferir','parceiros novos para conferir'),'repasse:alerta'],[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
     [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[REL.movs.filter(m=>m.validar).length,qt(REL.movs.filter(m=>m.validar).length,'lançamento do histórico a validar','lançamentos do histórico a validar'),'gfmov:validar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
     [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
   // as tarefas da pessoa nesta empresa (ex.: alteração de conta de parceiro, v76) entram primeiro
-  DS.cli=cli.id;const tars=TPEND.filter(t=>t.cliente_id===cli.id),outras=TPEND.length-tars.length;
+  DS.cli=cli.id;const tars=TPEND.filter(t=>cli.id==='*'||t.cliente_id===cli.id),outras=TPEND.length-tars.length;
   const tarH=tars.slice(0,5).map(t=>`<button type="button" class="dr dpend" data-tar="${t.id}"><span class="pi t">${svgI('tarefas')}</span><span>${esc(t.titulo)}${tpLate(t)?' <span class="chip c-bad">atrasada</span>':TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}</span><span class="go">›</span></button>`).join('')
     +(tars.length>5||outras>0?`<button type="button" class="dr" data-tar="*">${mu(tars.length>5?'Ver todas as suas '+TPEND.length+' tarefas':outras+(outras===1?' tarefa sua em outra empresa':' tarefas suas em outras empresas'))}<span class="go">›</span></button>`:'');
   const pendH=tarH+pend.map(p=>`<button type="button" class="dr dpend" data-go="${p[2]}"><span class="pi${/vencid|alteraç/.test(p[1])?' b':''}">${p[0]>99?'99+':p[0]}</span><span>${esc(p[1].replace(/^\d+ /,''))}</span><span class="go">›</span></button>`).join('')||(tarH?'':vazio('Nenhuma pendência. Tudo em dia!'));
@@ -6813,7 +6934,7 @@ function dsDesenha(cli){
     +cts.map(([c,v])=>`<div class="dr dacc"><span class="av" style="background:var(--sunk);color:var(--cred)">${svgI('cartao')}</span><span class="nm"><b>${esc(c.nome)}</b><span>gasto não pago</span></span><span style="font-weight:600">${fm(v)}</span></div>`).join('')
     +(sal.length?`<div class="dtot"><span>Total nas contas</span><span class="${tot<0?'neg':''}">${fm(tot)}</span></div>`:vazio('Nenhuma conta cadastrada.'));
   const tE=r2(pm.reduce((x,m)=>x+m.e,0)),tS=r2(pm.reduce((x,m)=>x+m.s,0)),cnt=n=>n?`<span class="cnt">${n}</span>`:'';
-  $('dsGrid').innerHTML=`<div class="card c8"><div class="ch"><div><h2>Entradas e saídas</h2><p class="sub">Últimos 12 meses, regime de caixa</p></div><div class="dleg"><span><i style="background:var(--s1)"></i>Entradas <b>${fm(tE)}</b></span><span><i style="background:var(--s2)"></i>Saídas <b>${fm(tS)}</b></span></div></div><div class="dchart" id="dsChart"><div class="dtip" hidden></div></div></div>
+  $('dsGrid').classList.remove('mod');$('dsGrid').innerHTML=`<div class="card c8"><div class="ch"><div><h2>Entradas e saídas</h2><p class="sub">Últimos 12 meses, regime de caixa</p></div><div class="dleg"><span><i style="background:var(--s1)"></i>Entradas <b>${fm(tE)}</b></span><span><i style="background:var(--s2)"></i>Saídas <b>${fm(tS)}</b></span></div></div><div class="dchart" id="dsChart"><div class="dtip" hidden></div></div></div>
     <div class="card"><div class="ch"><h2>Pendências ${cnt(pend.length+tars.length)}</h2></div><div class="dl">${pendH}</div></div>
     <div class="card c5"><div class="ch"><div><h2>Próximos 7 dias ${cnt(prox.length)}</h2><p class="sub">Contas a pagar e a receber, com as vencidas</p></div></div><div class="dl">${proxH}</div></div>
     <div class="card"><div class="ch"><div><h2>Despesas por categoria</h2><p class="sub">${MESES[+mes.slice(5)-1]} · total ${fm(sai)}</p></div></div>${catH}</div>
@@ -6824,7 +6945,7 @@ function dsDesenha(cli){
     tip.innerHTML=`<b>${MESES[+x.k.slice(5)-1]}/${x.k.slice(0,4)}</b><br>Entradas ${fm(x.e)}<br>Saídas ${fm(x.s)}<br>Resultado ${fm(r2(x.e-x.s))}`;tip.hidden=false;
     tip.style.left=Math.min(Math.max(e.clientX-r.left,70),r.width-70)+'px';tip.style.top=(e.clientY-r.top-10)+'px'};
   box.onmouseleave=()=>tip.hidden=true;
-  $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas. Por enquanto só o escritório vê este painel.';
+  $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas.';
 }
 ['dsGrid','dsTiles'].forEach(id=>$(id).addEventListener('click',e=>{const tb=e.target.closest('[data-tar]');if(tb){const t=TPEND.find(x=>x.id===tb.dataset.tar);return t?abrirTarefa(t):tpJanela()}
   const b=e.target.closest('[data-go]');if(!b)return;const [v,sit]=b.dataset.go.split(':');if(sit)$(v==='repasse'?'pFiltro':'mvSit').value=sit;go(v)}));
@@ -7918,7 +8039,7 @@ dlgRep.addEventListener('click',ev=>{const el=ev.target.closest('[data-act]');if
 // =====================================================================
 // TAREFAS E RECADOS (Kanban com conversa em cada tarefa)
 // =====================================================================
-const TCOLS=[['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando cliente'],['concluida','Concluída']];
+const TCOLS=[['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando terceiros'],['concluida','Concluída']];
 const TPRI={baixa:['c-none','Baixa'],normal:['','Normal'],alta:['c-warn','Alta'],urgente:['c-bad','Urgente']};
 const SEMEMP='00000000-0000-0000-0000-000000000000';   // pasta dos anexos das tarefas sem empresa
 let TAR=[], TNOV={}, TARDLG=null, TEQUIPE=null, TDRAG=null;
@@ -7967,20 +8088,20 @@ async function tPendentes(){
   const {data,error}=await q.order('prazo',{ascending:true,nullsFirst:false});if(error)return;
   // o executor primeiro (é quem faz), depois atrasadas e prazos mais próximos
   TPEND=(data||[]).sort((a,b)=>(b.executor===me)-(a.executor===me)||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
-  tpBanner();if(VIEW==='gfdash'&&DS.cli&&DS.cli===cliAtual()?.id)dsDesenha(cliAtual());
+  tpBanner();dsRefaz();
   let vista=false;try{vista=sessionStorage.getItem('tpVista')==='1'}catch(e){}
   if(TPEND.length&&!vista&&!document.querySelector('dialog[open]')){try{sessionStorage.setItem('tpVista','1')}catch(e){}tpJanela()}
 }
 const tpLate=t=>t.prazo&&t.prazo<TODAY;
 function tpBanner(){
-  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas';
+  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas'||VIEW==='gfdash';
   if(!el.hidden)el.innerHTML=`<span>📋 <b>Você tem ${n} ${n===1?'tarefa pendente':'tarefas pendentes'}${late?` (${late} ${late===1?'atrasada':'atrasadas'})`:''}.</b></span><button type="button" class="btn small primary" data-act="ver">Ver minhas tarefas</button>`;
 }
 $('tpBanner').addEventListener('click',e=>{if(e.target.closest('[data-act]'))tpJanela()});
 function tpJanela(){
   const me=ME.user_id,cn=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Interna',col=k=>TCOLS.find(c=>c[0]===k)?.[1]||k;
   $('tpBody').innerHTML=`<p class="note" style="margin:0">Tarefas de todas as empresas em que você é executor ou responsável. Clique numa tarefa para abrir.</p>
-    <div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Tarefa</th><th class="l">Empresa</th><th class="l">Você é</th><th class="l">Prazo</th><th class="l">Coluna</th></tr></thead><tbody>${
+    <div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Tarefa</th><th class="l">Empresa</th><th class="l">Você é</th><th class="l">Prazo</th><th class="l">Status</th></tr></thead><tbody>${
     TPEND.map(t=>`<tr class="click" data-id="${t.id}" tabindex="0"><td class="l"><b>${esc(t.titulo)}</b>${TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}</td><td class="l">${esc(cn(t.cliente_id))}</td>
       <td class="l">${[t.executor===me?'Executor':'',t.responsavel===me?'Responsável':''].filter(Boolean).join(' e ')}</td>
       <td class="l${tpLate(t)?' neg':''}">${t.prazo?(tpLate(t)?'Atrasada · ':t.prazo===TODAY?'Hoje · ':'')+dBR(t.prazo):'<span class="muted">sem prazo</span>'}</td><td class="l">${col(t.status)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -8051,7 +8172,7 @@ function tDesenha(){
     cli&&!ehEsc()?`<b>${cli} ${cli===1?'tarefa aguardando a sua resposta':'tarefas aguardando a sua resposta'}</b>`:''].filter(Boolean);
   $('tAlerta').hidden=!av.length;$('tAlerta').innerHTML=av.length?`<span>${av.join(' · ')}</span>`:'';
   $('tNote').textContent=ehEsc()?'Tarefas internas (sem empresa ou marcadas como internas) e as notas internas da conversa não aparecem para o cliente. As concluídas há mais de 30 dias saem do quadro, mas continuam em “Concluídas: Todas”.'
-    :'Quando a tarefa estiver em “Aguardando cliente”, a Controlacs precisa de uma resposta sua na conversa.';
+    :'Quando a tarefa estiver em “Aguardando terceiros”, pode ser que a Controlacs precise de uma resposta sua na conversa.';
 }
 $('tBusca').oninput=()=>{clearTimeout(tDesenha.t);tDesenha.t=setTimeout(tDesenha,200)};
 $('tResp').onchange=tDesenha;$('tConc').onchange=renderTarefas;
@@ -8087,7 +8208,7 @@ async function abrirTarefa(t){
     h+=`<label class="f">Empresa<select id="td_cli">${e?'<option value="">Interna da Controlacs (sem empresa)</option>':''}${ls.map(c=>`<option value="${c.id}"${c.id===cv?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
   h+=`<div class="fields"><label class="f wide">Título *<input id="td_titulo" value="${esc(t?.titulo||'')}" maxlength="160" placeholder="Ex.: enviar extrato de setembro"${d}></label>
     <label class="f wide">Descrição<textarea id="td_desc" rows="3"${d}>${esc(t?.descricao||'')}</textarea></label>
-    <label class="f">Coluna${sel('td_status',TCOLS,t?.status||'afazer')}</label>
+    <label class="f">Status${sel('td_status',TCOLS,t?.status||'afazer')}</label>
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
     ${e?'<label class="f">Responsável (acompanha)<span id="td_respBox"></span></label><label class="f">Executor (quem faz)<span id="td_execBox"></span></label>'
@@ -8258,7 +8379,62 @@ async function renderAvisos(){
     ||`<div class="card aviso"><p class="note" style="margin:0">${e?'Nenhum aviso publicado. Use “Novo aviso” para começar.':'Nenhum aviso no momento.'}</p></div>`;
   if(novos.length){await sb.from('aviso_leituras').upsert(novos.map(a=>({aviso_id:a.id,user_id:ME.user_id})),{onConflict:'aviso_id,user_id'});avNovidades()}
 }
-$('avFiltro').onchange=renderAvisos;$('avNovo').onclick=()=>abrirAviso(null);
+$('avFiltro').onchange=renderAvisos;
+// =====================================================================
+// NOVIDADES DO PORTAL (Carol, 30/10): cada atualização aparece numa janela quando a pessoa entra,
+// até ela clicar em "Visualizei" (gravado em novidades_vistas, v76; o escritório vê quem já viu, em Avisos).
+// Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
+// =====================================================================
+const NOVIDADES=[
+  {k:'2026-10-30',data:'2026-10-30',t:'Portal com visual novo e Dashboard para todos',itens:[
+    {x:'Visual novo do portal, mais limpo e moderno. Tudo continua no mesmo lugar.'},
+    {x:'O Dashboard (primeiro botão da linha de módulos) agora é a tela inicial de todos, com o resumo do que você tem acesso.'},
+    {x:'Quem vê mais de uma empresa tem “Todas as empresas” no seletor do topo, em qualquer módulo: as telas que dá para somar mostram tudo junto, com a empresa em cada linha; as outras mostram a lista das empresas para abrir.'},
+    {x:'Tarefas: o campo “Coluna” passou a se chamar “Status”, e “Aguardando cliente” passou a ser “Aguardando terceiros”.',mods:['tarefas']},
+    {x:'Movimentação financeira: ao selecionar lançamentos, aparecem as entradas, as saídas e o total.',para:'esc'},
+    {x:'Pedidos de alteração de conta e de parceiro novo aparecem numa lista enxuta no topo das Tarefas e nas Pendências do Dashboard.',para:'esc'},
+    {x:'Configurações › Acessos: cada módulo marcado tem o seu nível (Lançamento ou Consulta), e o nível de um acesso já liberado muda direto na tabela.',para:'esc'}]}
+];
+const nvItens=n=>n.itens.filter(i=>(i.para!=='esc'||ehEsc())&&(!i.mods||ehEsc()||i.mods.some(m=>NAV.some(x=>x.k===m&&x.ok()&&eqPode(m)))));
+const NVK='portal_novidades_vistas';
+let NVVISTAS=null;
+async function nvVistas(){
+  const {data,error}=await sb.from('novidades_vistas').select('chave').eq('user_id',ME.user_id);
+  // sem a v76, guarda neste navegador
+  if(error){let l=[];try{l=JSON.parse(localStorage.getItem(NVK)||'[]')}catch(e){}NVVISTAS={local:true,set:new Set(l)};return NVVISTAS}
+  NVVISTAS={local:false,set:new Set((data||[]).map(r=>r.chave))};return NVVISTAS;
+}
+const nvCard=n=>`<div class="card aviso"><h3>${esc(n.t)}</h3><span class="q">${dBR(n.data)}</span><ul style="margin:8px 0 0;padding-left:20px;display:grid;gap:6px">${nvItens(n).map(i=>`<li>${esc(i.x)}</li>`).join('')}</ul></div>`;
+let NVABERTAS=[];
+async function nvMostra(){
+  if(!ME||ME.papel==='pendente')return;
+  const v=await nvVistas().catch(()=>null);if(!v)return;
+  // só as dos últimos 60 dias, para quem entra pela primeira vez não receber o histórico todo
+  const lim=isoLocal(new Date(dObj(TODAY).getTime()-60*864e5));
+  NVABERTAS=NOVIDADES.filter(n=>n.data>=lim&&!v.set.has(n.k)&&nvItens(n).length);
+  if(!NVABERTAS.length)return;
+  $('nvBody').innerHTML=NVABERTAS.map(nvCard).join('');
+  $('dlgNov').showModal();
+}
+$('nvOk').onclick=async()=>{
+  const ks=NVABERTAS.map(n=>n.k);$('dlgNov').close();if(!ks.length)return;
+  if(NVVISTAS?.local){ks.forEach(k=>NVVISTAS.set.add(k));try{localStorage.setItem(NVK,JSON.stringify([...NVVISTAS.set]))}catch(e){}return}
+  const {error}=await sb.from('novidades_vistas').upsert(ks.map(k=>({chave:k,user_id:ME.user_id})),{onConflict:'chave,user_id'});
+  if(error)fail(error,'Não foi possível registrar');else ks.forEach(k=>NVVISTAS.set.add(k));
+};
+// em Avisos: o histórico das atualizações; o escritório vê quem já visualizou cada uma
+async function nvHistorico(){
+  const box=$('nvHistLista');
+  let vis={},us=[];
+  if(ehEsc()){const [{data:vv},{data:pp}]=await Promise.all([sb.from('novidades_vistas').select('*'),sb.from('perfis').select('user_id,nome,email,papel')]);
+    (vv||[]).forEach(r=>(vis[r.chave]=vis[r.chave]||[]).push(r));us=(pp||[]).filter(u=>u.papel!=='pendente')}
+  const nome=id=>{const u=us.find(x=>x.user_id===id);return u?u.nome||u.email:'—'};
+  box.innerHTML=NOVIDADES.filter(n=>nvItens(n).length).map(n=>{
+    if(!ehEsc())return nvCard(n);
+    const vs=vis[n.k]||[],ja=new Set(vs.map(r=>r.user_id)),falta=us.filter(u=>!ja.has(u.user_id));
+    return nvCard(n).replace(/<\/div>$/,`<p class="q" style="margin:10px 0 0"><b>Visualizada por ${vs.length} de ${us.length}:</b> ${vs.map(r=>esc(nome(r.user_id))+' ('+dtBR(r.visto_em)+')').join(', ')||'ninguém ainda'}${falta.length?`<br><b>Ainda não viram:</b> ${falta.map(u=>esc(u.nome||u.email)).join(', ')}`:''}</p></div>`);
+  }).join('');
+}$('avNovo').onclick=()=>abrirAviso(null);
 $('avLista').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=AVS.find(x=>x.id===b.closest('[data-id]').dataset.id);
   if(b.dataset.act==='editar')return abrirAviso(a);
   if(!confirm('Excluir o aviso “'+a.titulo+'”? Não dá para desfazer.'))return;
@@ -8327,7 +8503,7 @@ async function parcPendentes(){
     ...(b.data||[]).map(x=>({t:'novo',cli:x.cliente_id,nome:x.nome,quando:x.criado_em}))].sort((x,y)=>String(y.quando||'').localeCompare(String(x.quando||'')));
   const n=PPEND.length;if((NAVBADGE.repasse||0)!==n){NAVBADGE.repasse=n;renderNav()}
   parcLista();
-  if(VIEW==='gfdash'&&DS.cli&&DS.cli===cliAtual()?.id)dsDesenha(cliAtual());
+  dsRefaz();
 }
 function parcLista(){
   const box=$('tParc');if(VIEW!=='tarefas'){box.hidden=true;return}
