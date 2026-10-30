@@ -544,7 +544,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
     <div class="tiles" id="rnTiles"></div>
     <div class="alerta" id="rnBulk" hidden><span id="rnBulkTxt"></span><span class="row" style="gap:8px;flex-wrap:wrap" id="rnBulkBtns"></span></div>
     <div class="card tablebox"><table><thead id="rnHead"></thead><tbody id="rnBody"></tbody></table></div>
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn primary" id="rnGerar" hidden></button></div>
+    <div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px;flex-wrap:wrap"><span id="rnRem" class="row" style="gap:8px;flex-wrap:wrap"></span><button class="btn primary" id="rnGerar" hidden></button></div>
     <p class="note" id="rnNote"></p>
   </section>
 
@@ -6144,7 +6144,7 @@ $('gtBody').addEventListener('click',e=>{if(e.target.closest('[data-mvsel]')||e.
 $('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return;const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gtAbre(tr)}});
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
-$('gtRem').onclick=()=>go('gfremessa');
+$('gtRem').onclick=()=>{RM.so=null;go('gfremessa')};
 const dlgGT=$('dlgGT');
 async function abrirGT(t,tipo){
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
@@ -6331,6 +6331,13 @@ function rmForma(t,pes){
   return {erro:'sem linha digitável nem chave Pix'};
 }
 const RMNOME={boleto:'Boleto',consumo:'Conta de consumo ou tributo',pix:'Pix'};
+// bancos da remessa: só o Sicredi tem o layout pronto; os outros esperam o manual de pagamentos do banco
+const RMBANCOS=[{k:'sicredi',n:'Sicredi',cod:'748',ok:true},{k:'santander',n:'Santander',cod:'033'},{k:'inter',n:'Inter',cod:'077'},{k:'bb',n:'Banco do Brasil',cod:'001'},{k:'itau',n:'Itaú',cod:'341'},{k:'bradesco',n:'Bradesco',cod:'237'},{k:'caixa',n:'Caixa',cod:'104'}];
+// banco da conta pelo campo Banco (ou pelo nome da conta): "Sicredi", "748 - Sicredi", "Banco Inter"...
+function bancoDe(c){if(!c)return null;const t=chave((c.banco||'')+' '+(c.nome||'')),d=soDig(c.banco);
+  const b=RMBANCOS.find(b=>d&&+d===+b.cod)||RMBANCOS.find(b=>t.includes(chave(b.n))||b.k==='bb'&&/\bbb\b|brasil/.test(t)||b.k==='caixa'&&/\bcef\b|caixa economica/.test(t));
+  // conta antiga sem banco preenchido, com convênio: era do Sicredi (o único com layout)
+  return b?b.k:c.cnab_convenio?'sicredi':null}
 // monta o arquivo; itens: {forma,seu,valor,dataPag,venc,nome,doc,barra,nominal,banco,tipo,chave}
 function cnabSicredi({conta,empresa,nsa,agora,itens}){
   const a=agConta(conta),cnpj=soDig(empresa.cnpj),ti=cnpj.length===11?'1':'2',conv=conta.cnab_convenio;
@@ -6370,7 +6377,7 @@ function rmBaixar(nome,txt){const a=document.createElement('a');a.href=URL.creat
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 
 // ---- tela da remessa (abre no diálogo das contas a pagar) ----
-const RM={conta:'',lista:[],rems:[]};
+const RM={conta:'',lista:[],rems:[],so:null};   // so: {cli,ids,data,txt} = abre só os repasses de parceiros
 async function rmItensDe(cid){ // situação de cada conta a pagar nas remessas (a mais recente vale)
   const {data,error}=await sb.from('fin_remessa_itens').select('titulo_id,status,ocorrencia,remessa_id,data_pagamento,atualizado_em').eq('cliente_id',cid).order('atualizado_em');
   if(error){if(!v48(error))console.error(error);return {}}
@@ -6389,21 +6396,27 @@ async function renderGR(retHtml){
   let contas=[];
   try{await gtCarrega('pagar',cli);await gfPessoasDe(cli.id,'fornecedor');contas=GFC.lista}catch(e){console.error(e);$('grBody').innerHTML=`<p class="err">${v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
   if(VIEW!==(ENV?'gfremessa':'gfretorno'))return;
-  const comConv=contas.filter(c=>c.ativo!==false&&c.cnab_convenio);
+  // o arquivo muda de banco para banco: escolhe o banco e só aparecem as contas dele (Carol, 30/10)
+  const ativas=contas.filter(c=>c.ativo!==false),bco=RMBANCOS.find(b=>b.k===RM.banco)||RMBANCOS.find(b=>b.ok&&ativas.some(c=>c.cnab_convenio&&bancoDe(c)===b.k))||RMBANCOS[0];RM.banco=bco.k;
+  const comConv=bco.ok?ativas.filter(c=>c.cnab_convenio&&bancoDe(c)===bco.k):[];
   const r=await sb.from('fin_remessas').select('id,conta_id,nsa,arquivo,qtd,valor,gerado_em,retorno_em').eq('cliente_id',cli.id).order('gerado_em',{ascending:false}).limit(15);
   if(r.error){console.error(r.error);$('grBody').innerHTML=`<p class="err">${v48(r.error)?v48Msg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
   const rems=r.data||[];RM.rems=rems;
   const lista=`<h3 style="margin:8px 0 0">Remessas geradas</h3>`+(rems.length?`<div class="tablebox" style="margin:0;overflow-x:auto"><table><thead><tr><th>Nº</th><th class="l">Arquivo</th><th class="l">Conta</th><th>Gerada em</th><th>Pagamentos</th><th>Valor</th><th class="l">Retorno</th><th></th></tr></thead><tbody>${rems.map(x=>`<tr><td>${x.nsa}</td><td class="l">${esc(x.arquivo)}</td><td class="l">${esc(contaNome(x.conta_id))}</td><td>${new Date(x.gerado_em).toLocaleString('pt-BR').slice(0,17)}</td><td>${x.qtd}</td><td>${fm(x.valor)}</td><td class="l">${x.retorno_em?'✓ lido':'<span class="muted">aguardando</span>'}</td><td><button type="button" class="btn small ghost" data-act="rm_baixar" data-id="${x.id}">Baixar</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:0">Nenhuma remessa gerada ainda.</p>');
+  const so=ENV&&RM.so?.cli===cli.id?RM.so:null;
   if(ENV){
-    $('grBody').innerHTML=(comConv.length?`<div class="fields">
+    const selB=`<label class="f" style="max-width:280px">Banco<select id="rm_banco">${RMBANCOS.map(b=>`<option value="${b.k}"${b.k===bco.k?' selected':''}>${b.n}${b.ok?'':' (aguardando o manual)'}</option>`).join('')}</select></label>`;
+    $('grBody').innerHTML=(so?`<div class="alerta" style="margin:0"><span>Mostrando só ${esc(so.txt)}.</span><span><button type="button" class="btn small" data-act="rm_tudo">Mostrar todas as contas a pagar</button></span></div>`:'')+selB+(comConv.length?`<div class="fields">
       <label class="f">Conta que paga<select id="rm_conta">${comConv.map(c=>`<option value="${c.id}"${c.id===RM.conta?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>
-      <label class="f">Data do pagamento<input type="date" id="rm_data" value="${TODAY}" min="${TODAY}"></label>
-      <label class="f">Contas que vencem até<input type="date" id="rm_ate" value="${TODAY}"></label>
+      <label class="f">Data do pagamento<input type="date" id="rm_data" value="${so&&so.data>TODAY?so.data:TODAY}" min="${TODAY}"></label>
+      <label class="f"${so?' hidden':''}>Contas que vencem até<input type="date" id="rm_ate" value="${so&&so.data>TODAY?so.data:TODAY}"></label>
     </div>
     <div class="tablebox" style="margin:0;max-height:52vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="rm_todas" style="width:auto" aria-label="Marcar todas"></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Como paga</th><th>Valor</th></tr></thead><tbody id="rmBody"></tbody></table></div>
     <p class="note" id="rmNote" style="margin:0"></p>`
-      :`<p class="note" style="margin:0">Nenhuma conta com convênio de pagamentos. Em Gestão financeira › Contas bancárias, abra a conta do Sicredi e preencha o “Convênio de pagamentos (CNAB)”, o código que o banco passou.</p>`)
+      :!bco.ok?`<p class="note" style="margin:0">A remessa do ${bco.n} ainda não está pronta: cada banco tem o próprio layout de pagamentos (CNAB 240). Mande o manual de pagamentos do ${bco.n} e o sistema passa a gerar o arquivo dele. Até lá, pague estas contas pelo internet banking.</p>`
+      :`<p class="note" style="margin:0">Nenhuma conta do ${bco.n} com convênio de pagamentos nesta empresa. Em Gestão financeira › Contas bancárias, abra a conta do ${bco.n} (o campo Banco precisa dizer ${bco.n}) e preencha o “Convênio de pagamentos (CNAB)”, o código que o banco passou.</p>`)
       +`<p class="err" id="grErr" hidden></p>`+lista;
+    $('rm_banco').onchange=()=>{RM.banco=$('rm_banco').value;renderGR()};
     if(comConv.length){
       $('grFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn primary" data-act="rm_gerar">Gerar arquivo</button>';
       ['rm_conta','rm_data','rm_ate'].forEach(id=>$(id).onchange=()=>{if(id==='rm_data'&&$('rm_ate').value<$('rm_data').value)$('rm_ate').value=$('rm_data').value;rmDesenha()});
@@ -6421,7 +6434,8 @@ $('viewGR').addEventListener('click',async ev=>{const b=ev.target.closest('[data
 function rmDesenha(){
   RM.conta=$('rm_conta').value;const ate=$('rm_ate').value,mu=t=>`<span class="muted">${t}</span>`;
   const pes=GFP.lista,falta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
-  const ab=GT.lista.filter(t=>falta(t)>0.004&&(!ate||t.vencimento<=ate));
+  const so=RM.so?.cli===cliAtual()?.id?RM.so:null;
+  const ab=GT.lista.filter(t=>falta(t)>0.004&&(so?so.ids.has(t.id):!ate||t.vencimento<=ate));
   RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),f=rmForma(t,p),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
     return {t,p,f,ja,it,valor:falta(t)}});
   $('rmBody').innerHTML=RM.lista.map((x,i)=>{const ok=!x.f.erro&&!x.ja;
@@ -6438,6 +6452,7 @@ function rmTotal(){const sel=[...$('rmBody').querySelectorAll('input[data-id]:ch
 async function rmAcao(a,b){
   const cli=cliAtual();
   if(a==='rm_baixar'){const {data,error}=await sb.from('fin_remessas').select('arquivo,conteudo').eq('id',b.dataset.id).single();if(error)return fail(error,'Não foi possível baixar');return rmBaixar(data.arquivo,data.conteudo)}
+  if(a==='rm_tudo'){RM.so=null;return renderGR()}
   if(a!=='rm_gerar')return;
   const conta=GFC.lista.find(c=>c.id===$('rm_conta').value),dataPag=$('rm_data').value;
   const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
@@ -6457,7 +6472,7 @@ async function rmAcao(a,b){
     const {error:e2}=await sb.from('fin_contas').update({cnab_seq:nsa}).eq('id',conta.id);if(e2)throw e2;
     const {data:rem,error:e3}=await sb.from('fin_remessas').insert({cliente_id:cli.id,conta_id:conta.id,nsa,arquivo,conteudo:txt,qtd:itens.length,valor:r2(itens.reduce((s,i)=>s+i.valor,0))}).select().single();if(e3)throw e3;
     const {error:e4}=await sb.from('fin_remessa_itens').insert(sel.map((x,i)=>({remessa_id:rem.id,cliente_id:cli.id,conta_id:conta.id,titulo_id:x.t.id,seu_numero:seu(i),forma:x.f.forma,favorecido:itens[i].nome,valor:x.valor,data_pagamento:dataPag})));if(e4)throw e4;
-    rmBaixar(arquivo,txt);toast(`Remessa nº ${nsa} gerada: ${arquivo}`);
+    rmBaixar(arquivo,txt);toast(`Remessa nº ${nsa} gerada: ${arquivo}`);RM.so=null;
     GT.key='';renderGR();
   }catch(e){console.error(e);grErr(v48(e)?v48Msg:e.message||'Não foi possível gerar a remessa.')}
 }
@@ -8629,11 +8644,18 @@ function rnDesenha(){
   $('rnBulkBtns').innerHTML=G.empresas.map(id=>`<button type="button" class="btn small primary" data-rb="${id}">Pagar em ${esc(rnEmpNome(id))}</button>`).join('')+'<button type="button" class="btn small" data-rb="-">Tirar a empresa</button><button type="button" class="btn small ghost" data-rb="limpa">Limpar seleção</button>';
   const prontos=it.filter(i=>i.empresa_id&&!i.titulo_id);$('rnGerar').hidden=!prontos.length;
   $('rnGerar').textContent=`Gerar ${prontos.length} ${prontos.length===1?'conta':'contas'} a pagar (${fm(soma(prontos))})`;
+  // remessa de pagamento (CNAB) de cada empresa, com as contas a pagar dos repasses ainda não pagas
+  $('rnRem').innerHTML=G.empresas.map(id=>{const l=it.filter(i=>i.empresa_id===id&&i.titulo_id&&RN.tits[i.titulo_id]&&RN.tits[i.titulo_id].pago<RN.tits[i.titulo_id].valor-0.004);
+    return l.length?`<button type="button" class="btn" data-rem="${id}" title="Abre o Envio de remessa da empresa só com estes repasses">Remessa ${esc(rnEmpNome(id))} (${l.length} · ${fm(soma(l))})</button>`:''}).join('');
   const faltaG=G.empresas.length<4?`<b>O grupo ${esc(G.nome)} tem ${G.empresas.length} ${G.empresas.length===1?'empresa':'empresas'}. Confira em “Empresas do grupo”.</b><br>`:'';
   $('rnNote').innerHTML=faltaG+(RN.nf.length?'':'<b>O controle de NF está vazio: importe a planilha de controle de NF dos parceiros.</b><br>')
-    +'A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
+    +'Depois de gerar as contas a pagar, use “Remessa” de cada empresa para gerar o arquivo de pagamento do banco só com estes repasses (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
 }
 ['rnLote'].forEach(id=>$(id).onchange=()=>renderRN(false));
+$('rnRem').addEventListener('click',e=>{const b=e.target.closest('[data-rem]');if(!b)return;const id=b.dataset.rem;
+  const ids=new Set(RN.itens.filter(i=>i.empresa_id===id&&i.titulo_id).map(i=>i.titulo_id));
+  RM.so={cli:id,ids,data:RN.lote.vencimento||proxQuinta(),txt:`os repasses de parceiros do relatório de ${dBR(RN.lote.data_relatorio)}`};
+  escCli.value=id;guardaEmp();go('gfremessa')});
 $('rnFiltro').onchange=$('rnEmpF').onchange=()=>rnDesenha();
 $('rnBusca').oninput=()=>{clearTimeout(rnDesenha.t);rnDesenha.t=setTimeout(rnDesenha,200)};
 $('rnVenc').onchange=async()=>{const v=$('rnVenc').value||null;const {error}=await sb.from('repasse_lotes').update({vencimento:v}).eq('id',RN.lote.id);if(error)return fail(error);RN.lote.vencimento=v;toast('Data de pagamento salva')};
@@ -8760,6 +8782,8 @@ $('rnGerar').onclick=async()=>{
 async function rnDesfaz(it){
   const t=RN.tits[it.titulo_id];
   if(t&&t.pago>0)return alert('Esta conta a pagar já tem pagamento. Desfaça o pagamento em Contas a pagar antes.');
+  const {data:rem}=await sb.from('fin_remessa_itens').select('status').eq('titulo_id',it.titulo_id).in('status',['enviado','agendado']).limit(1);
+  if(rem?.length)return alert('Esta conta a pagar já está numa remessa enviada ao banco. Cancele o pagamento no banco e leia o retorno antes de desfazer.');
   if(!confirm(`Excluir a conta a pagar de ${it.nome.trim()} em ${rnEmpNome(it.empresa_id)}? O repasse volta para ser separado.`))return;
   try{const {error}=await sb.from('repasse_itens').update({titulo_id:null}).eq('id',it.id);if(error)throw error;
     if(t){const {error:e2}=await sb.from('fin_titulos').delete().eq('id',t.id);if(e2)throw e2}
