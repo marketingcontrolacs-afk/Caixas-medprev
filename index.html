@@ -309,6 +309,7 @@ tbody tr.click{transition:background .1s}
 dialog{border-radius:18px;border-color:var(--line);box-shadow:var(--sh2)}
 dialog::backdrop{background:rgba(6,22,24,.5);backdrop-filter:blur(3px)}
 .alerta{border-radius:14px}
+.acm{display:inline-flex;align-items:center;gap:6px}.acm select{padding:3px 8px;font-size:12.5px;height:auto;width:auto}
 #mvBulk b.pos{color:var(--ok)}#mvBulk b.neg{color:var(--bad)}#mvBulk b.tot{font-size:16px}
 .chip{letter-spacing:.01em}
 .toast{border-radius:12px;box-shadow:var(--sh2)}
@@ -857,12 +858,12 @@ body.lg header.top .logo{visibility:hidden}
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Acessos</h2>
-        <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar.</p>
+        <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar. Cada módulo marcado tem o seu nível, e na tabela abaixo dá para trocar o nível de um acesso já liberado.</p>
         <form class="row" id="formAc" style="align-items:flex-end">
           <label class="f">Usuário<select id="acUsr"></select></label>
           <div class="f" style="flex:1 1 100%"><span>Empresas que ele representa <button type="button" class="btn small ghost" id="acTodas">Marcar todas</button></span><div class="chk" id="acCli"></div></div>
           <div class="f" style="flex:1 1 100%"><span>Módulos</span><div class="chk" id="acMod"></div></div>
-          <label class="f">Nível<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
+          <label class="f">Nível de todos os marcados<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
           <button class="btn primary" type="submit">Liberar</button>
         </form>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbAc"></table></div>
@@ -2465,7 +2466,7 @@ async function renderCadastro(){
   if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
   $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
   $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
-  $('acMod').innerHTML=MODGRUPOS.map(([g,ks])=>`<div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center"><b style="font-size:13px;min-width:130px">${g}</b>${ks.map(k=>`<label><input type="checkbox" value="${k}"> ${MODNOME[k].replace(' (RH)','')}</label>`).join('')}</div>`).join('');
+  $('acMod').innerHTML=MODGRUPOS.map(([g,ks])=>`<div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center"><b style="font-size:13px;min-width:130px">${g}</b>${ks.map(k=>`<span class="acm"><label><input type="checkbox" value="${k}"> ${MODNOME[k].replace(' (RH)','')}</label><select data-niv="${k}" hidden aria-label="Nível de ${esc(MODNOME[k])}"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></span>`).join('')}</div>`).join('');
   renderAcessos();
 }
 async function renderAcessos(){
@@ -2474,7 +2475,7 @@ async function renderAcessos(){
   const nu=id=>{const u=USERS.find(x=>x.user_id===id);return u?esc(u.nome||u.email):'?'},nc=id=>esc(CLIENTES.find(c=>c.id===id)?.nome||'?');
   const rows=(data||[]).sort((a,b)=>nu(a.user_id).localeCompare(nu(b.user_id))||nc(a.cliente_id).localeCompare(nc(b.cliente_id)));
   $('tbAc').innerHTML=`<thead><tr><th class="l">Usuário</th><th class="l">Empresa</th><th class="l">Módulo</th><th class="l">Nível</th><th></th></tr></thead><tbody>${
-    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]}</td><td class="l">${a.nivel==='lancamento'?'Lançamento':'Consulta'}</td><td><button type="button" class="btn small ghost">Tirar acesso</button></td></tr>`).join('')
+    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]}</td><td class="l"><select data-acniv aria-label="Nível">${[['lancamento','Lançamento'],['consulta','Consulta']].map(([v,t])=>`<option value="${v}"${a.nivel===v?' selected':''}>${t}</option>`).join('')}</select></td><td><button type="button" class="btn small ghost">Tirar acesso</button></td></tr>`).join('')
     ||'<tr><td class="l muted" colspan="5">Nenhum acesso liberado ainda.</td></tr>'}</tbody>`;
 }
 $('formAc').addEventListener('submit',async e=>{
@@ -2482,12 +2483,19 @@ $('formAc').addEventListener('submit',async e=>{
   const u=$('acUsr').value;if(!u)return;
   const marc=id=>[...$(id).querySelectorAll('input:checked')].map(x=>x.value),cs=marc('acCli'),ms=marc('acMod');
   if(!cs.length||!ms.length){toast('Marque pelo menos uma empresa e um módulo.');return}
-  const rows=cs.flatMap(c=>ms.map(m=>({user_id:u,cliente_id:c,modulo:m,nivel:$('acNiv').value})));
+  // cada módulo com o seu nível (Carol, 30/10): pode lançar em uns e só consultar outros
+  const niv=m=>$('acMod').querySelector(`[data-niv="${m}"]`)?.value||$('acNiv').value;
+  const rows=cs.flatMap(c=>ms.map(m=>({user_id:u,cliente_id:c,modulo:m,nivel:niv(m)})));
   const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){fail(error);return}
   const usr=USERS.find(x=>x.user_id===u);
   if(usr&&usr.papel==='pendente'){await sb.from('perfis').update({papel:'operador'}).eq('user_id',u);usr.papel='operador'}
   toast('Acesso liberado');renderCadastro();
 });
+// marcar um módulo mostra o nível dele; o "Nível de todos os marcados" muda todos de uma vez
+$('acMod').addEventListener('change',e=>{const i=e.target.closest('input[type=checkbox]');if(!i)return;const sl=$('acMod').querySelector(`[data-niv="${i.value}"]`);if(sl){sl.hidden=!i.checked;if(i.checked)sl.value=$('acNiv').value}});
+$('acNiv').addEventListener('change',()=>$('acMod').querySelectorAll('[data-niv]').forEach(sl=>{if(!sl.hidden)sl.value=$('acNiv').value}));
+$('tbAc').addEventListener('change',async e=>{const sl=e.target.closest('[data-acniv]');if(!sl)return;const tr=sl.closest('tr[data-u]');
+  const {error}=await sb.from('acessos').update({nivel:sl.value}).eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error){fail(error);renderAcessos()}else toast('Nível alterado')});
 $('acTodas').onclick=()=>{const bs=[...$('acCli').querySelectorAll('input')],v=bs.some(b=>!b.checked);bs.forEach(b=>b.checked=v)};
 $('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-u]');if(!tr||!e.target.closest('button'))return;
   const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
@@ -8384,7 +8392,8 @@ const NOVIDADES=[
     {x:'Quem vê mais de uma empresa tem “Todas as empresas” no seletor do topo, em qualquer módulo: as telas que dá para somar mostram tudo junto, com a empresa em cada linha; as outras mostram a lista das empresas para abrir.'},
     {x:'Tarefas: o campo “Coluna” passou a se chamar “Status”, e “Aguardando cliente” passou a ser “Aguardando terceiros”.',mods:['tarefas']},
     {x:'Movimentação financeira: ao selecionar lançamentos, aparecem as entradas, as saídas e o total.',para:'esc'},
-    {x:'Pedidos de alteração de conta e de parceiro novo aparecem numa lista enxuta no topo das Tarefas e nas Pendências do Dashboard.',para:'esc'}]}
+    {x:'Pedidos de alteração de conta e de parceiro novo aparecem numa lista enxuta no topo das Tarefas e nas Pendências do Dashboard.',para:'esc'},
+    {x:'Configurações › Acessos: cada módulo marcado tem o seu nível (Lançamento ou Consulta), e o nível de um acesso já liberado muda direto na tabela.',para:'esc'}]}
 ];
 const nvItens=n=>n.itens.filter(i=>(i.para!=='esc'||ehEsc())&&(!i.mods||ehEsc()||i.mods.some(m=>NAV.some(x=>x.k===m&&x.ok()&&eqPode(m)))));
 const NVK='portal_novidades_vistas';
