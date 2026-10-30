@@ -764,6 +764,7 @@ body.lg header.top .logo{visibility:hidden}
       <div class="row" style="align-items:flex-end"><label class="f" id="avFiltroBox">Mostrar<select id="avFiltro"><option value="ativos">Em vigor</option><option value="todos">Todos, inclusive vencidos</option></select></label><button class="btn primary" id="avNovo">+ Novo aviso</button></div>
     </div>
     <div id="avLista" style="display:grid;gap:12px;margin-top:16px"></div>
+    <details class="card" id="nvHist" style="margin-top:16px"><summary><b>Atualizações do portal</b></summary><div id="nvHistLista" style="display:grid;gap:12px;margin-top:12px"></div></details>
   </section>
 
   <!-- PROJETOS E MELHORIAS (v65) -->
@@ -1073,6 +1074,11 @@ body.lg header.top .logo{visibility:hidden}
   <div class="dh"><h2 id="rgTitle"></h2></div>
   <div class="db" id="rgBody"></div>
   <div class="df" id="rgFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
+</dialog>
+<dialog id="dlgNov">
+  <div class="dh"><h2>✨ Novidades no portal</h2></div>
+  <div class="db" id="nvBody"></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn primary" id="nvOk">Visualizei</button></div>
 </dialog>
 <dialog id="dlgAv">
   <div class="dh"><h2 id="adTitle"></h2></div>
@@ -1488,7 +1494,7 @@ function openView(){
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
-  else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos()}
+  else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
@@ -1525,7 +1531,7 @@ async function boot(){
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
-  show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);
+  show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);nvMostra();
   const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
@@ -8025,7 +8031,7 @@ dlgRep.addEventListener('click',ev=>{const el=ev.target.closest('[data-act]');if
 // =====================================================================
 // TAREFAS E RECADOS (Kanban com conversa em cada tarefa)
 // =====================================================================
-const TCOLS=[['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando cliente'],['concluida','Concluída']];
+const TCOLS=[['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando terceiros'],['concluida','Concluída']];
 const TPRI={baixa:['c-none','Baixa'],normal:['','Normal'],alta:['c-warn','Alta'],urgente:['c-bad','Urgente']};
 const SEMEMP='00000000-0000-0000-0000-000000000000';   // pasta dos anexos das tarefas sem empresa
 let TAR=[], TNOV={}, TARDLG=null, TEQUIPE=null, TDRAG=null;
@@ -8087,7 +8093,7 @@ $('tpBanner').addEventListener('click',e=>{if(e.target.closest('[data-act]'))tpJ
 function tpJanela(){
   const me=ME.user_id,cn=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Interna',col=k=>TCOLS.find(c=>c[0]===k)?.[1]||k;
   $('tpBody').innerHTML=`<p class="note" style="margin:0">Tarefas de todas as empresas em que você é executor ou responsável. Clique numa tarefa para abrir.</p>
-    <div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Tarefa</th><th class="l">Empresa</th><th class="l">Você é</th><th class="l">Prazo</th><th class="l">Coluna</th></tr></thead><tbody>${
+    <div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Tarefa</th><th class="l">Empresa</th><th class="l">Você é</th><th class="l">Prazo</th><th class="l">Status</th></tr></thead><tbody>${
     TPEND.map(t=>`<tr class="click" data-id="${t.id}" tabindex="0"><td class="l"><b>${esc(t.titulo)}</b>${TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}</td><td class="l">${esc(cn(t.cliente_id))}</td>
       <td class="l">${[t.executor===me?'Executor':'',t.responsavel===me?'Responsável':''].filter(Boolean).join(' e ')}</td>
       <td class="l${tpLate(t)?' neg':''}">${t.prazo?(tpLate(t)?'Atrasada · ':t.prazo===TODAY?'Hoje · ':'')+dBR(t.prazo):'<span class="muted">sem prazo</span>'}</td><td class="l">${col(t.status)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -8158,7 +8164,7 @@ function tDesenha(){
     cli&&!ehEsc()?`<b>${cli} ${cli===1?'tarefa aguardando a sua resposta':'tarefas aguardando a sua resposta'}</b>`:''].filter(Boolean);
   $('tAlerta').hidden=!av.length;$('tAlerta').innerHTML=av.length?`<span>${av.join(' · ')}</span>`:'';
   $('tNote').textContent=ehEsc()?'Tarefas internas (sem empresa ou marcadas como internas) e as notas internas da conversa não aparecem para o cliente. As concluídas há mais de 30 dias saem do quadro, mas continuam em “Concluídas: Todas”.'
-    :'Quando a tarefa estiver em “Aguardando cliente”, a Controlacs precisa de uma resposta sua na conversa.';
+    :'Quando a tarefa estiver em “Aguardando terceiros”, pode ser que a Controlacs precise de uma resposta sua na conversa.';
 }
 $('tBusca').oninput=()=>{clearTimeout(tDesenha.t);tDesenha.t=setTimeout(tDesenha,200)};
 $('tResp').onchange=tDesenha;$('tConc').onchange=renderTarefas;
@@ -8194,7 +8200,7 @@ async function abrirTarefa(t){
     h+=`<label class="f">Empresa<select id="td_cli">${e?'<option value="">Interna da Controlacs (sem empresa)</option>':''}${ls.map(c=>`<option value="${c.id}"${c.id===cv?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
   h+=`<div class="fields"><label class="f wide">Título *<input id="td_titulo" value="${esc(t?.titulo||'')}" maxlength="160" placeholder="Ex.: enviar extrato de setembro"${d}></label>
     <label class="f wide">Descrição<textarea id="td_desc" rows="3"${d}>${esc(t?.descricao||'')}</textarea></label>
-    <label class="f">Coluna${sel('td_status',TCOLS,t?.status||'afazer')}</label>
+    <label class="f">Status${sel('td_status',TCOLS,t?.status||'afazer')}</label>
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
     ${e?'<label class="f">Responsável (acompanha)<span id="td_respBox"></span></label><label class="f">Executor (quem faz)<span id="td_execBox"></span></label>'
@@ -8365,7 +8371,61 @@ async function renderAvisos(){
     ||`<div class="card aviso"><p class="note" style="margin:0">${e?'Nenhum aviso publicado. Use “Novo aviso” para começar.':'Nenhum aviso no momento.'}</p></div>`;
   if(novos.length){await sb.from('aviso_leituras').upsert(novos.map(a=>({aviso_id:a.id,user_id:ME.user_id})),{onConflict:'aviso_id,user_id'});avNovidades()}
 }
-$('avFiltro').onchange=renderAvisos;$('avNovo').onclick=()=>abrirAviso(null);
+$('avFiltro').onchange=renderAvisos;
+// =====================================================================
+// NOVIDADES DO PORTAL (Carol, 30/10): cada atualização aparece numa janela quando a pessoa entra,
+// até ela clicar em "Visualizei" (gravado em novidades_vistas, v76; o escritório vê quem já viu, em Avisos).
+// Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
+// =====================================================================
+const NOVIDADES=[
+  {k:'2026-10-30',data:'2026-10-30',t:'Portal com visual novo e Dashboard para todos',itens:[
+    {x:'Visual novo do portal, mais limpo e moderno. Tudo continua no mesmo lugar.'},
+    {x:'O Dashboard (primeiro botão da linha de módulos) agora é a tela inicial de todos, com o resumo do que você tem acesso.'},
+    {x:'Quem vê mais de uma empresa tem “Todas as empresas” no seletor do topo, em qualquer módulo: as telas que dá para somar mostram tudo junto, com a empresa em cada linha; as outras mostram a lista das empresas para abrir.'},
+    {x:'Tarefas: o campo “Coluna” passou a se chamar “Status”, e “Aguardando cliente” passou a ser “Aguardando terceiros”.',mods:['tarefas']},
+    {x:'Movimentação financeira: ao selecionar lançamentos, aparecem as entradas, as saídas e o total.',para:'esc'},
+    {x:'Pedidos de alteração de conta e de parceiro novo aparecem numa lista enxuta no topo das Tarefas e nas Pendências do Dashboard.',para:'esc'}]}
+];
+const nvItens=n=>n.itens.filter(i=>(i.para!=='esc'||ehEsc())&&(!i.mods||ehEsc()||i.mods.some(m=>NAV.some(x=>x.k===m&&x.ok()&&eqPode(m)))));
+const NVK='portal_novidades_vistas';
+let NVVISTAS=null;
+async function nvVistas(){
+  const {data,error}=await sb.from('novidades_vistas').select('chave').eq('user_id',ME.user_id);
+  // sem a v76, guarda neste navegador
+  if(error){let l=[];try{l=JSON.parse(localStorage.getItem(NVK)||'[]')}catch(e){}NVVISTAS={local:true,set:new Set(l)};return NVVISTAS}
+  NVVISTAS={local:false,set:new Set((data||[]).map(r=>r.chave))};return NVVISTAS;
+}
+const nvCard=n=>`<div class="card aviso"><h3>${esc(n.t)}</h3><span class="q">${dBR(n.data)}</span><ul style="margin:8px 0 0;padding-left:20px;display:grid;gap:6px">${nvItens(n).map(i=>`<li>${esc(i.x)}</li>`).join('')}</ul></div>`;
+let NVABERTAS=[];
+async function nvMostra(){
+  if(!ME||ME.papel==='pendente')return;
+  const v=await nvVistas().catch(()=>null);if(!v)return;
+  // só as dos últimos 60 dias, para quem entra pela primeira vez não receber o histórico todo
+  const lim=isoLocal(new Date(dObj(TODAY).getTime()-60*864e5));
+  NVABERTAS=NOVIDADES.filter(n=>n.data>=lim&&!v.set.has(n.k)&&nvItens(n).length);
+  if(!NVABERTAS.length)return;
+  $('nvBody').innerHTML=NVABERTAS.map(nvCard).join('');
+  $('dlgNov').showModal();
+}
+$('nvOk').onclick=async()=>{
+  const ks=NVABERTAS.map(n=>n.k);$('dlgNov').close();if(!ks.length)return;
+  if(NVVISTAS?.local){ks.forEach(k=>NVVISTAS.set.add(k));try{localStorage.setItem(NVK,JSON.stringify([...NVVISTAS.set]))}catch(e){}return}
+  const {error}=await sb.from('novidades_vistas').upsert(ks.map(k=>({chave:k,user_id:ME.user_id})),{onConflict:'chave,user_id'});
+  if(error)fail(error,'Não foi possível registrar');else ks.forEach(k=>NVVISTAS.set.add(k));
+};
+// em Avisos: o histórico das atualizações; o escritório vê quem já visualizou cada uma
+async function nvHistorico(){
+  const box=$('nvHistLista');
+  let vis={},us=[];
+  if(ehEsc()){const [{data:vv},{data:pp}]=await Promise.all([sb.from('novidades_vistas').select('*'),sb.from('perfis').select('user_id,nome,email,papel')]);
+    (vv||[]).forEach(r=>(vis[r.chave]=vis[r.chave]||[]).push(r));us=(pp||[]).filter(u=>u.papel!=='pendente')}
+  const nome=id=>{const u=us.find(x=>x.user_id===id);return u?u.nome||u.email:'—'};
+  box.innerHTML=NOVIDADES.filter(n=>nvItens(n).length).map(n=>{
+    if(!ehEsc())return nvCard(n);
+    const vs=vis[n.k]||[],ja=new Set(vs.map(r=>r.user_id)),falta=us.filter(u=>!ja.has(u.user_id));
+    return nvCard(n).replace(/<\/div>$/,`<p class="q" style="margin:10px 0 0"><b>Visualizada por ${vs.length} de ${us.length}:</b> ${vs.map(r=>esc(nome(r.user_id))+' ('+dtBR(r.visto_em)+')').join(', ')||'ninguém ainda'}${falta.length?`<br><b>Ainda não viram:</b> ${falta.map(u=>esc(u.nome||u.email)).join(', ')}`:''}</p></div>`);
+  }).join('');
+}$('avNovo').onclick=()=>abrirAviso(null);
 $('avLista').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=AVS.find(x=>x.id===b.closest('[data-id]').dataset.id);
   if(b.dataset.act==='editar')return abrirAviso(a);
   if(!confirm('Excluir o aviso “'+a.titulo+'”? Não dá para desfazer.'))return;
