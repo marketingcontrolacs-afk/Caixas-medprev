@@ -244,7 +244,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .msg .q{font-size:12px;color:var(--muted)}.msg .x{white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.mine{background:var(--brand-soft);border-color:transparent}.msg.int{background:var(--warn-soft);border-color:var(--warn)}
 .msg.sys{border:0;padding:0 4px;font-size:12px;color:var(--muted);font-style:italic}
-#dlgTar,#dlgProj{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*,#dlgProj .db>*{min-width:0}
+#dlgTar,#dlgProj,#dlgPend{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*,#dlgProj .db>*,#dlgPend .db>*{min-width:0}
 #pjBody tr{cursor:pointer}#pjBody tr.novo td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
 .pjdec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;background:var(--sunk)}
 .pick{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:10px;max-height:300px;overflow:auto}
@@ -295,6 +295,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 
   <div class="shell" id="app" hidden>
     <div style="min-width:0">
+      <div class="alerta" id="tpBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
@@ -915,6 +916,11 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
   <div class="db" id="pdBody"></div>
   <div class="df" id="pdFoot"></div>
 </dialog>
+<dialog id="dlgPend">
+  <div class="dh"><h2>📋 Você tem tarefas pendentes</h2></div>
+  <div class="db" id="tpBody"></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Ver depois</button><button type="button" class="btn primary" data-act="quadro">Abrir o quadro de tarefas</button></div>
+</dialog>
 <dialog id="dlgTar">
   <div class="dh"><h2 id="tdTitle"></h2><span class="spacer"></span><span id="tdChip" class="chips"></span></div>
   <div class="db" id="tdBody"></div>
@@ -1301,7 +1307,7 @@ function openView(){
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
-  avBanner();
+  avBanner();tpBanner();
 }
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);$('modrow').hidden=view!=='app';if(view!=='app')megaFecha();
@@ -1325,7 +1331,7 @@ async function boot(){
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, o escritório abre no dashboard da empresa
   show('app');go(volta?volta.k:ehEsc()&&eqPode('gfdash')?'gfdash':first.k);
-  const novid=()=>{tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -7754,6 +7760,49 @@ function selPessoa(id,pessoas,v,vazio,dis){
   const fora=v&&!pessoas.some(p=>p.id===v)?`<option value="${v}" selected>${esc(nomeDe(v))}</option>`:'';
   return `<select id="${id}"${dis||''}><option value="">${vazio}</option>${fora}${gs.map(g=>`<optgroup label="${g}">${pessoas.filter(p=>p.g===g).map(opt).join('')}</optgroup>`).join('')}</select>`;
 }
+// quais atualizações do banco já rodaram (v31: quem vê; v74: executor)
+async function tVersoes(){
+  if(window.V74===undefined){const {error:e74}=await sb.from('tarefas').select('executor').limit(1);window.V74=!e74}
+  if(window.V31===undefined){const {error:e31}=await sb.from('tarefa_usuarios').select('tarefa_id').limit(1);window.V31=!e31}
+}
+// Tarefas pendentes de quem está logado (executor ou responsável), de TODAS as empresas, independente da
+// empresa escolhida no topo: faixa no topo sempre e a janela uma vez por sessão, ao abrir o sistema
+let TPEND=[];
+async function tPendentes(){
+  if(!temAcesso('tarefas'))return;
+  await tVersoes();
+  const me=ME.user_id;
+  let q=sb.from('tarefas').select('*').eq('arquivada',false).neq('status','concluida');
+  q=window.V74?q.or(`executor.eq.${me},responsavel.eq.${me}`):q.eq('responsavel',me);
+  const {data,error}=await q.order('prazo',{ascending:true,nullsFirst:false});if(error)return;
+  // o executor primeiro (é quem faz), depois atrasadas e prazos mais próximos
+  TPEND=(data||[]).sort((a,b)=>(b.executor===me)-(a.executor===me)||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
+  tpBanner();
+  let vista=false;try{vista=sessionStorage.getItem('tpVista')==='1'}catch(e){}
+  if(TPEND.length&&!vista&&!document.querySelector('dialog[open]')){try{sessionStorage.setItem('tpVista','1')}catch(e){}tpJanela()}
+}
+const tpLate=t=>t.prazo&&t.prazo<TODAY;
+function tpBanner(){
+  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas';
+  if(!el.hidden)el.innerHTML=`<span>📋 <b>Você tem ${n} ${n===1?'tarefa pendente':'tarefas pendentes'}${late?` (${late} ${late===1?'atrasada':'atrasadas'})`:''}.</b></span><button type="button" class="btn small primary" data-act="ver">Ver minhas tarefas</button>`;
+}
+$('tpBanner').addEventListener('click',e=>{if(e.target.closest('[data-act]'))tpJanela()});
+function tpJanela(){
+  const me=ME.user_id,cn=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Interna',col=k=>TCOLS.find(c=>c[0]===k)?.[1]||k;
+  $('tpBody').innerHTML=`<p class="note" style="margin:0">Tarefas de todas as empresas em que você é executor ou responsável. Clique numa tarefa para abrir.</p>
+    <div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Tarefa</th><th class="l">Empresa</th><th class="l">Você é</th><th class="l">Prazo</th><th class="l">Coluna</th></tr></thead><tbody>${
+    TPEND.map(t=>`<tr class="click" data-id="${t.id}" tabindex="0"><td class="l"><b>${esc(t.titulo)}</b>${TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}</td><td class="l">${esc(cn(t.cliente_id))}</td>
+      <td class="l">${[t.executor===me?'Executor':'',t.responsavel===me?'Responsável':''].filter(Boolean).join(' e ')}</td>
+      <td class="l${tpLate(t)?' neg':''}">${t.prazo?(tpLate(t)?'Atrasada · ':t.prazo===TODAY?'Hoje · ':'')+dBR(t.prazo):'<span class="muted">sem prazo</span>'}</td><td class="l">${col(t.status)}</td></tr>`).join('')}</tbody></table></div>`;
+  if(!$('dlgPend').open)$('dlgPend').showModal();
+}
+$('dlgPend').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]'),tr=e.target.closest('tr[data-id]');
+  if(b?.dataset.act==='fechar')return $('dlgPend').close();
+  if(b?.dataset.act==='quadro'){$('dlgPend').close();if(escCli.querySelector('option[value="*"]'))escCli.value='*';return go('tarefas')}
+  if(tr){const t=TPEND.find(x=>x.id===tr.dataset.id);$('dlgPend').close();if(t)abrirTarefa(t)}
+});
+$('dlgPend').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-id]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tr.click()}});
 async function renderTarefas(){
   const e=ehEsc(),v=escCli.value,todas=v==='*';
   $('tSub').textContent=e?'Tarefas da equipe e recados com os clientes. Arraste o cartão para mudar de coluna; clique para abrir a conversa.'
@@ -7762,8 +7811,7 @@ async function renderTarefas(){
   $('tRespBox').hidden=!e;
   const vazio=(t,cl)=>{$('tBoard').innerHTML=`<p class="${cl||'muted'}">${t}</p>`;$('tAlerta').hidden=true;$('tNote').textContent=''};
   if(!v){vazio('Nenhuma empresa liberada para tarefas.');return}
-  if(window.V74===undefined){const {error:e74}=await sb.from('tarefas').select('executor').limit(1);window.V74=!e74}
-  if(window.V31===undefined){const {error:e31}=await sb.from('tarefa_usuarios').select('tarefa_id').limit(1);window.V31=!e31}
+  await tVersoes();
   DIRUS=null;
   let q=sb.from('tarefas').select('*, tarefa_comentarios(count)'+(window.V31?', tarefa_usuarios(user_id)':'')).eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
   if(v==='int')q=q.eq('interna',true);else if(!todas)q=q.eq('cliente_id',v);
@@ -7780,7 +7828,7 @@ async function renderTarefas(){
     t.executor&&!nomes.has(t.executor)&&nomes.set(t.executor,nomeDe(t.executor,t.executor_nome))});
   rs.innerHTML=`<option value="todos">Todos</option><option value="meus">Minhas tarefas</option><option value="sem">Sem executor</option>`+[...nomes].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,n])=>`<option value="${id}">${esc(n)}</option>`).join('');
   rs.value=[...rs.options].some(o=>o.value===rv)?rv:'todos';
-  tDesenha();
+  tDesenha();tPendentes();
 }
 function tFiltradas(){
   const busca=$('tBusca').value.trim().toLowerCase(),r=$('tResp').value;
