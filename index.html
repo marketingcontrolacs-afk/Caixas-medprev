@@ -1181,7 +1181,14 @@ const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:
 const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado'];
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
-const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k));
+// telas que não dependem da empresa escolhida no topo
+const telaSemEmp=k=>k.startsWith('cfg')||k==='avisos'||k==='projetos';
+// o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
+function serveEmp(n){
+  const e=escCli.value||EMP;
+  return telaSemEmp(n.k)||!e||e==='*'||e==='int'||!CLIENTES.some(c=>c.id===e)||empresasDe(n.k).some(c=>c.id===e);
+}
+const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k)&&serveEmp(n));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
 const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
@@ -1208,7 +1215,14 @@ $('modrow').addEventListener('mouseenter',()=>clearTimeout(MEGA.t));
 $('mega').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b){megaFecha();go(b.dataset.v)}});
 document.addEventListener('pointerdown',e=>{if(MEGA.g&&!$('modrow').contains(e.target))megaFecha()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MEGA.g){const g=MEGA.g;megaFecha();$('nav').querySelector(`[data-mod="${g}"]`)?.focus()}});
-// empresas que aparecem no seletor para o módulo aberto
+// empresas que a pessoa vê em pelo menos um módulo: a lista do topo traz sempre todas,
+// sem filtrar pelo módulo aberto (Carol, 29/10)
+function empresasTopo(){
+  const ids=new Set();
+  NAV.filter(n=>!n.soon&&!telaSemEmp(n.k)&&n.ok()&&eqPode(n.k)).forEach(n=>empresasDe(n.k).forEach(c=>ids.add(c.id)));
+  return CLIENTES.filter(c=>ids.has(c.id));
+}
+// empresas em que o módulo vale
 function empresasDe(m){
   const l=empresasMod(m),so=ehEsc()&&!ehAdm()&&ME.empresas_equipe?.length?ME.empresas_equipe:null;
   return so?l.filter(c=>so.includes(c.id)):l;
@@ -1231,8 +1245,8 @@ const EMPK='portal_empresa';
 let EMP=(()=>{try{return localStorage.getItem(EMPK)||''}catch(e){return ''}})();
 function guardaEmp(){const v=escCli.value;if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
 function fillClientes(){
-  const m=VIEW,lista=empresasDe(m),cur=escCli.value,v=(cur==='*'||cur==='int')&&escCli.dataset.mod===m?cur:EMP||cur;escCli.dataset.mod=m;
-  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas')&&(lista.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
+  const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m),cur=escCli.value,v=(cur==='*'||cur==='int')&&escCli.dataset.mod===m?cur:EMP||cur;escCli.dataset.mod=m;
+  const todas=(m==='rh'||m==='repasse'||m==='colab'||m==='tarefas')&&(doMod.length>1||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
@@ -1242,9 +1256,16 @@ function fillClientes(){
 escCli.onchange=()=>{guardaEmp();openView()};
 // a seção aberta fica guardada: ao atualizar a página, o portal volta para ela (Carol, 27/10)
 const SECK='portal_secao';
-function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}renderNav();fillClientes();openView()}
+function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
+// a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
+function viewDaEmp(){
+  const n=NAV.find(x=>x.k===VIEW);if(!n||serveEmp(n))return;
+  const itens=navItens(),alt=itens.find(x=>navGrp(x)===navGrp(n)&&!x.soon)||itens.find(x=>x.k==='gfdash')||itens.find(x=>!x.soon);
+  if(!alt)return;VIEW=alt.k;try{localStorage.setItem(SECK,VIEW)}catch(e){}fillClientes();
+}
 const cliAtual=()=>CLIENTES.find(c=>c.id===escCli.value);
 function openView(){
+  viewDaEmp();renderNav();
   ['viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -1299,7 +1320,8 @@ async function boot(){
   const first=NAV.find(n=>n.ok()&&!n.soon&&eqPode(n.k));
   if(!first){show('viewPend');return}
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
-  show('app');go(ehEsc()&&eqPode('gfdash')?'gfdash':(volta||first).k);   // o escritório abre no dashboard da empresa
+  // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, o escritório abre no dashboard da empresa
+  show('app');go(volta?volta.k:ehEsc()&&eqPode('gfdash')?'gfdash':first.k);
   const novid=()=>{tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
