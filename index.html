@@ -4134,6 +4134,10 @@ const bancoHoras=cli=>!!cli&&(cli.folha_modelo?.banco_horas??/viva|simon/i.test(
 const HE_NORMAL=['he65','he50','horas_extras','he75'];
 const heNormal=cli=>{const cs=cli?colsDe(cli):[],m=cli?.folha_modelo?.he_normal;if(m&&cs.includes(m))return m;return HE_NORMAL.find(c=>cs.includes(c))||'he65'};
 const faltasModo=cli=>cli?.folha_modelo?.faltas_modo||'auto';
+// horas de um dia de falta (Carol, 03/11): o total de faltas da semana já traz o dia faltado; tira o dia (BJ: 8h; Oliveira: 9h,
+// o dia mais longo da escala) e só o que sobrar vai para Faltas/ Horas. Ex.: Jurema (BJ), 8:37 no total com falta em 24/09 =
+// 1 dia (24/09) em Faltas/ Dias + 0:37 em Faltas/ Horas
+const faltaDiaMin=cli=>+cli?.folha_modelo?.falta_dia_min||9*60;
 const semHE=id=>{const f=FOL.func.find(x=>x.id===id);return !!(f&&ff(f,'sem_he'))};
 const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras|^h\.? ?f$/],
   ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)|^h\.? ?e$/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
@@ -4219,7 +4223,7 @@ function espelhoDiario(pags){
   const fechaBh=()=>{if(nome&&(bh.fo||bh.bt))out.push([nome,'',0,'','','','',bh.fo?hhmm(bh.fo):'',bh.bt]);bh={fo:0,bt:''}};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
     if(sem.sab&&sem.he>SAB_HE&&sem.sab.split('/').reverse().join('-')<=SAB_ATE)out.push([nome,sem.sab,0,'','',1]);
-    const hf=Math.max(0,sem.hf-sem.f.length*(faltasModo(FOL.cli)==='horas'?0:FALTA_DIA));if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
+    const hf=Math.max(0,sem.hf-sem.f.length*(faltasModo(FOL.cli)==='horas'?0:faltaDiaMin(FOL.cli)));if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
   for(const ls of pags)for(const l of ls){
     const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
     if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();fechaBh();nome=v}continue}
@@ -4256,7 +4260,7 @@ function pontoAba(aba){
   const temDia=sel.some(x=>x[0]==='faltas_dias'),temHora=sel.some(x=>x[0]==='faltas_horas');
   $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>
-    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'&&faltasModo(FOL.cli)!=='horas'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="9:00" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
+    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'&&faltasModo(FOL.cli)!=='horas'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="${hhmm(faltaDiaMin(FOL.cli))}" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
   if($('pnAba'))$('pnAba').onchange=()=>pontoAba($('pnAba').value);
   $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH').forEach(s=>s.onchange=pontoPrev);pontoPrev();
 }
@@ -4316,7 +4320,7 @@ const pontoBhCel=(g,i,m)=>{const n=pontoBhNeg(g,m);if(!n)return '<span class="mu
 FOLACAO.pontoLanca=async b=>{
   // Oliveira lança a falta pela data do dia (coluna faltas_data); as demais, em dias com DSR
   const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO},cs=colsDe(FOL.cli),
-    fm_=faltasModo(FOL.cli),emHoras=fm_==='horas',porData=fm_==='data'||fm_==='auto'&&cs.includes('faltas_data')&&!cs.includes('faltas_dias'),noMes=d=>d&&d.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d<=fimMes(FOL.comp);
+    fm_=faltasModo(FOL.cli),emHoras=fm_==='horas',porData=fm_==='data'||fm_==='auto'&&cs.includes('faltas_data')&&!cs.includes('faltas_dias'),noMes=d=>d&&d.slice(0,7)>=addMes(FOL.comp,-2).slice(0,7)&&d<=fimMes(FOL.comp);
   let falta=null;const parcs=[];
   document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
     if(PNT.bh){
@@ -4335,7 +4339,7 @@ FOLACAO.pontoLanca=async b=>{
       if(g.atest)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Atestado: ${g.atest.filter(Boolean).map(x=>dBR(x).slice(0,5)).join(', ')||g.atest.length+' dia(s)'}`});
       return}
     g.dias.forEach(d=>regs.push(porData?{...base,funcionario_id:f,coluna:'faltas_data',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:noMes(d.data)?null:`${d.n} ${d.n===1?'dia':'dias'}`}
-      :{...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:emHoras?null:'dsr'}));
+      :{...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:emHoras||!cs.includes('dsr')?null:'dsr'}));
     // quem não pode fazer HE: as horas extras abatem as horas de falta (Carol, 25/10); o que sobrar vira só alerta
     const heBloq=semHE(f)?Object.entries(g.v).filter(([k])=>HE_COLS.includes(k)).reduce((t,[,mi])=>t+mi,0):0,
       abate=heBloq?Math.min(heBloq,g.v.faltas_horas||0):0,v={...g.v};if(abate){v.faltas_horas-=abate;if(v.faltas_horas<10)delete v.faltas_horas}
@@ -5217,6 +5221,7 @@ function renderFolCfg(){
       <label class="f">Horas extras<select id="fcBH"${dis}><option value="0"${bancoHoras(cli)?'':' selected'}>Pagas na folha</option><option value="1"${bancoHoras(cli)?' selected':''}>Banco de horas (não paga HE; só a falta fora do banco vai para a folha)</option></select></label>
       <label class="f">A hora extra normal do ponto vai para<select id="fcHE"${dis}>${heCs.length?heCs.map(c=>`<option value="${c}"${c===heNormal(cli)?' selected':''}>${esc(colT(c))}</option>`).join(''):'<option value="">(a planilha não tem coluna de HE)</option>'}</select></label>
       <label class="f">Falta do dia inteiro<select id="fcFalta"${dis}>${FALTA_OPC.map(([k,t])=>`<option value="${k}"${k===faltasModo(cli)?' selected':''}>${esc(t)}</option>`).join('')}</select></label>
+      <label class="f">Horas de um dia de falta (tiradas do total de faltas da semana; o que sobrar vai em horas)<input id="fcDiaH" value="${hhmm(faltaDiaMin(cli))}" placeholder="9:00" inputmode="numeric"${dis} style="max-width:90px"></label>
       <label class="f">Dia de corte dos vales e guias (emissão até este dia entra no mês)<input id="fcCorte" type="number" min="1" max="31" value="${M.corte??''}" placeholder="20"${dis} style="max-width:90px"></label>
     </div>
     <h3>Nomes das verbas na contabilidade</h3>
@@ -5240,6 +5245,7 @@ async function folCfgSalvar(ev){
   if($('fcCols')){const t={...(M.titulos||{})};cols=[];$('fcCols').querySelectorAll('tbody tr').forEach(tr=>{const c=tr.dataset.c,v=tr.querySelector('[data-ct]').value.trim();cols.push(c);if(v)t[c]=v;else delete t[c]});put('titulos',t)}
   M.banco_horas=$('fcBH').value==='1';put('he_normal',$('fcHE').value);
   const fa=$('fcFalta').value;if(fa==='auto')delete M.faltas_modo;else M.faltas_modo=fa;
+  const dh=$('fcDiaH').value.trim(),dm=dh?lerHoras(dh):9*60;if(!isFinite(dm)||dm<60||dm>12*60){toast('Horas de um dia de falta: ex. 8:00');return}if(dm===9*60)delete M.falta_dia_min;else M.falta_dia_min=dm;
   const co=$('fcCorte').value.trim();if(co===''){delete M.corte}else{const n=parseInt(co,10);if(!(n>=1&&n<=31)){toast('Dia de corte: de 1 a 31');return}M.corte=n}
   const vb={};let rep=null;$('fcVb').querySelectorAll('tbody tr').forEach(tr=>{const n=espSp(tr.querySelector('[data-cvn]').value.toUpperCase());if(!n)return;if(vb[n]!==undefined)rep=n;vb[n]=tr.querySelector('[data-cvc]').value});
   if(rep){toast(`A verba ${rep} está repetida`);return}put('verbas',vb);
@@ -8527,6 +8533,8 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-03b',data:'2026-11-03',t:'Espelho de ponto: dia de falta separado das horas',itens:[
+    {x:'Espelho de ponto: quando o total de faltas da semana já inclui o dia faltado, o dia vai para Faltas/ Dias com a data e só o que sobrar vai para Faltas/ Horas (ex.: 8:37 com uma falta = 1 dia + 0:37). As horas de um dia ficam na configuração (BJ 8:00, Oliveira 9:00).',mods:['ponto','folha']}]},
   {k:'2026-11-03',data:'2026-11-03',t:'Folha de pagamento: configuração por empresa e horas extras do ponto',itens:[
     {x:'RH › Folha de pagamento: no fim da página, “Configuração da folha desta empresa” guarda as regras do fechamento, o título e o nome de cada coluna como na planilha da empresa, a ordem das colunas, se a empresa paga hora extra ou usa banco de horas, para qual coluna vai a hora extra do ponto, como entra a falta do dia inteiro e os nomes das verbas da contabilidade. As regras aparecem no alto da folha.',para:'esc'},
     {x:'Espelho de ponto: a hora extra (coluna H.E) passa a ser lida também nas empresas cuja planilha usa HE 50% ou Horas Extras, como a BJ. Antes só entravam as faltas.',mods:['ponto','folha']},
