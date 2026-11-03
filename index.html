@@ -1029,6 +1029,7 @@ body.lg header.top .logo{visibility:hidden}
       <div class="row" style="align-items:flex-end"><label class="f">Mês<select id="folMes"></select></label><button class="btn" id="folCheia" title="Abrir a folha na tela inteira (Esc fecha)">⛶ Tela cheia</button><button class="btn" id="folPonto" title="A importação do ponto fica na seção Espelho de ponto">Espelho de ponto ›</button><span class="btn fotobtn" id="folEspBtn" title="Importe os recibos (PDF) que a contabilidade devolveu para comparar com esta folha">Conferir espelho da contabilidade<input type="file" id="folEspFile" accept=".pdf" multiple aria-label="Importar o espelho da folha da contabilidade"></span><button class="btn" id="folRescAdd">+ Rescisão</button><button class="btn primary" id="folAdd">+ Lançamento</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="folBar"></div></div>
+    <div class="card block" id="folRegras" hidden style="margin-top:12px"></div>
     <div class="card tablebox"><table id="folGrid"></table></div>
     <p class="note" id="folQuem"></p>
     <div class="card block" id="folEsp" hidden style="margin-top:12px"></div>
@@ -1050,6 +1051,9 @@ body.lg header.top .logo{visibility:hidden}
     <details class="card fdet" id="folColBox" style="margin-top:12px"><summary><b>Colunas da planilha desta empresa</b> <span class="note">no modelo que vai para a contabilidade</span></summary>
       <div id="folCols" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px"></div>
       <div class="row"><span class="spacer"></span><button class="btn primary" id="folColsSalvar">Salvar colunas</button></div>
+    </details>
+    <details class="card fdet" id="folCfgBox" style="margin-top:12px"><summary><b>Configuração da folha desta empresa</b> <span class="note">regras, nomes das colunas, hora extra ou banco de horas, faltas e nomes das verbas da contabilidade</span></summary>
+      <div id="folCfg"></div>
     </details>
   </section>
     </div>
@@ -3587,7 +3591,7 @@ function folCelula(f,c){
   if(d.k==='dias'){if(!nums.length)return {v:null,txt:''};const n=nums.reduce((s,v)=>s+v,0),ds=ls.filter(l=>l.quantidade!=null&&l.data).map(l=>dBR(l.data).slice(0,5));
     const t=ds.length?`${n} (${ds.join(', ')})`:String(n);return {v:ds.length?t:n,txt:t}}
   // money (com texto, como os dias trabalhados sem registro, a célula vai como texto)
-  if(!nums.length&&fx==null){if(textos.length){const t=textos.join(' + ');return {v:t,txt:t}}return d.nao?{v:'Não',txt:'Não'}:{v:null,txt:''}}
+  if(!nums.length&&fx==null){if(textos.length){const t=textos.join(' + ');return {v:t,txt:t}}return d.nao&&!folModelo().sem_nao?{v:'Não',txt:'Não'}:{v:null,txt:''}}
   const tot=r2((fx||0)+nums.reduce((s,v)=>s+v,0));
   if(textos.length){const t=[...textos,fm(tot)].join(' + ');return {v:t,txt:t}}
   const pend=c==='adiantamento'&&fx!=null;
@@ -3667,6 +3671,7 @@ async function renderFolha(){
   $('folSub').textContent=e?'Lance as informações ao longo do mês. No fechamento, confira, ajuste o que precisar e baixe a planilha para a contabilidade.'
     :'Lance as informações dos colaboradores ao longo do mês. O escritório confere e envia para a contabilidade.';
   ['folCadBox','folColBox','folEspBtn'].forEach(x=>$(x).hidden=!e);
+  $('folCfgBox').hidden=!e||!cli;folRegrasMostra(cli);
   if(!cli){vazio([e?'Nenhuma empresa com BPO de RH. Marque o RH no cadastro da empresa.':'Nenhuma empresa liberada para a folha.']);return}
   const comp=FOL.comp=folMes.value+'-01',fim=fimMes(comp);
   const [rf,rm,rl,ra,rr]=await Promise.all([sb.from('funcionarios').select('*').eq('cliente_id',cli.id).order('nome'),
@@ -3691,7 +3696,7 @@ async function renderFolha(){
   // cada empresa tem a sua planilha de folha: sem o modelo configurado, não usa um modelo genérico
   if(!cli.folha_colunas?.length){
     vazio([e?'Esta empresa ainda não tem o modelo da planilha de folha. Envie a planilha da empresa para configurarmos, ou marque as colunas em “Colunas da planilha desta empresa”, abaixo.':'A folha desta empresa ainda está sendo configurada pelo escritório.']);
-    $('folAdd').hidden=$('folRescAdd').hidden=$('folPonto').hidden=true;$('folRescBaixar').hidden=true;$('folParcBox').hidden=true;if(e){renderFolCad();renderFolCols()}return;
+    $('folAdd').hidden=$('folRescAdd').hidden=$('folPonto').hidden=true;$('folRescBaixar').hidden=true;$('folParcBox').hidden=true;if(e){renderFolCad();renderFolCols();renderFolCfg()}return;
   }
   const cols=colsDe(cli),fs=folDoMes(),st=FOL.mes?.status||'Aberta',edGrid=e&&st!=='Enviada',lanca=podeLancar(cli.id,'folha')&&(e||st==='Aberta');
   const depois=FOL.func.filter(f=>f.situacao!=='Desligado'&&!fs.includes(f));
@@ -3724,7 +3729,7 @@ async function renderFolha(){
     :'<tbody><tr><td class="l muted">Nenhuma rescisão com demissão neste mês.</td></tr></tbody>';
   $('folRescBaixar').hidden=!(e&&FOL.resc.length)||!!M.resc_itens;
   renderFolParc(cols,lanca);
-  if(e){renderFolCad();renderFolCols()}
+  if(e){renderFolCad();renderFolCols();renderFolCfg()}
   renderFolEsp();
 }
 // ---------- Espelho da folha da contabilidade ----------
@@ -3808,7 +3813,13 @@ const ESPMAP=[
 // verbas que nunca vão para a planilha da folha (reflexos, férias, 13º, licenças e afastamentos)
 const ESPFORA=/REFLEXO|FERIAS|\b13\b|DECIMO|AFAST|ESTORNO|PROVISAO/;
 const espN=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-function espColuna(v,cols){const d=espN(v.desc),lado=v.des>0&&!(v.venc>0)?'D':'V';if(ESPFORA.test(d))return null;
+// nomenclatura da contabilidade desta empresa (Configuração da folha): verba do recibo → coluna, ou vazia = só no recibo
+const ESPK={money:'money',pct:'pct',horas:'horas',dias:'dias',simnao:'sim'},espK=c=>(ESPMAP.find(x=>x[0]===c)||[])[2]||ESPK[FCOL[c]?.k]||'money';
+const espSp=s=>s.replace(/\s+/g,' ').trim();
+function espColuna(v,cols){const d=espN(v.desc),lado=v.des>0&&!(v.venc>0)?'D':'V';
+  const vm=folModelo().verbas,dv=vm&&Object.entries(vm).find(([n])=>espSp(espN(n))===espSp(d));
+  if(dv){const c=dv[1];if(!c||!FCOL[c])return null;return cols.includes(c)?{c,k:espK(c)}:{c,k:espK(c),sem:true}}
+  if(ESPFORA.test(d))return null;
   const ok=ESPMAP.filter(([k,re,,g])=>re.test(d)&&(!g||g===lado));if(!ok.length)return null;
   let m=ok.find(x=>cols.includes(x[0]));
   // gratificação: com % na descrição é a coluna de percentual; em reais, a de valor (quando a empresa tem as duas)
@@ -4117,6 +4128,12 @@ const PONTO='Espelho de ponto',SAB_PADRAO=50,HE_COLS=['he65','he100','he50','he7
 // dias, para não descontar duas vezes. Sem a coluna Folha, vale o saldo negativo do banco (Carol, 27/10).
 // O controle do banco de horas fica no sistema de ponto: o saldo volta no espelho do mês seguinte.
 const bancoHoras=cli=>!!cli&&(cli.folha_modelo?.banco_horas??/viva|simon/i.test(cli.nome||''));
+// Configuração da folha (Carol, 03/11): para qual coluna vai a hora extra normal do ponto (BJ: HE 50%; Oliveira: HE 65%)
+// e como entra a falta de dia inteiro (auto = como já era: pela data se a planilha só tem a coluna da data, senão em dias com DSR;
+// horas = o dia faltado fica somado nas horas de falta, sem DSR, como a BJ manda para a contabilidade)
+const HE_NORMAL=['he65','he50','horas_extras','he75'];
+const heNormal=cli=>{const cs=cli?colsDe(cli):[],m=cli?.folha_modelo?.he_normal;if(m&&cs.includes(m))return m;return HE_NORMAL.find(c=>cs.includes(c))||'he65'};
+const faltasModo=cli=>cli?.folha_modelo?.faltas_modo||'auto';
 const semHE=id=>{const f=FOL.func.find(x=>x.id===id);return !!(f&&ff(f,'sem_he'))};
 const PONTO_COLS=[['faltas_dias','Faltas (dias)',/falt.*dia|^faltas?$|aus[eê]ncia/],['faltas_horas','Faltas e atrasos (horas)',/(falt|atras).*h|atras|^h\.? ?f$/],
   ['he65','HE 65% (horas extras normais)',/65|normal|extra(?!.*100)|^h\.? ?e$/],['he100','HE 100%',/100/],['he50','HE 50% até 20H',/50/],['he75','HE 75% acima 20H',/75/],['horas_extras','Horas Extras',/extra/]];
@@ -4143,7 +4160,8 @@ $('folPonto').onclick=()=>{PT_MES=folMes.value;go('ponto')};
 // as faltas em dias sempre entram (o pedido de benefícios usa), mesmo que a planilha da folha não tenha a coluna
 $('ptImp').onclick=()=>{
   const bh=bancoHoras(FOL.cli);
-  PNT={bh,cols:[...(bh?[['folha_h','Falta para a folha (coluna Folha, fora do banco)',/^folha$|faltantes folha/],['saldo','Saldo do banco de horas (só informação)',/saldo|banco.*final|^b\.? ?total/]]:[]),...PONTO_COLS.filter(x=>x[0]==='faltas_dias'||colsDe(FOL.cli).includes(x[0])||bh&&x[0]==='faltas_horas')
+  const hn=heNormal(FOL.cli),pcols=PONTO_COLS.map(x=>x[0]==='he65'?[hn,`${colT(hn)} (horas extras normais)`,x[2]]:x).filter((x,i,a)=>a.findIndex(y=>y[0]===x[0])===i);
+  PNT={bh,cols:[...(bh?[['folha_h','Falta para a folha (coluna Folha, fora do banco)',/^folha$|faltantes folha/],['saldo','Saldo do banco de horas (só informação)',/saldo|banco.*final|^b\.? ?total/]]:[]),...pcols.filter(x=>x[0]==='faltas_dias'||colsDe(FOL.cli).includes(x[0])||bh&&x[0]==='faltas_horas')
     .map(x=>bh&&HE_COLS.includes(x[0])?[x[0],'Horas extras (só informação: banco de horas)',x[2]]:x)]};
   folDlg(`Importar espelho de ponto · ${MESES[+FOL.comp.slice(5,7)-1]} ${FOL.comp.slice(0,4)}`,
     `<p class="note" style="margin-top:0">Envie o resumo do espelho de ponto em PDF (gerado pelo sistema de ponto, não escaneado), Excel ou CSV. Pode ser uma linha por colaborador (totais do mês) ou uma linha por dia. Depois diga qual coluna é o quê.</p>
@@ -4201,7 +4219,7 @@ function espelhoDiario(pags){
   const fechaBh=()=>{if(nome&&(bh.fo||bh.bt))out.push([nome,'',0,'','','','',bh.fo?hhmm(bh.fo):'',bh.bt]);bh={fo:0,bt:''}};
   const fecha=()=>{if(!nome)return;sem.f.forEach(d=>out.push([nome,d,1,'','']));
     if(sem.sab&&sem.he>SAB_HE&&sem.sab.split('/').reverse().join('-')<=SAB_ATE)out.push([nome,sem.sab,0,'','',1]);
-    const hf=Math.max(0,sem.hf-sem.f.length*FALTA_DIA);if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
+    const hf=Math.max(0,sem.hf-sem.f.length*(faltasModo(FOL.cli)==='horas'?0:FALTA_DIA));if(hf||sem.he)out.push([nome,'',0,hf?hhmm(hf):'',sem.he?hhmm(sem.he):'']);sem={f:[],hf:0,he:0,sab:null}};
   for(const ls of pags)for(const l of ls){
     const n=l.its.findIndex(i=>/^Nome:/.test(i.s));
     if(n>=0){const v=l.its[n].s.replace(/^Nome:\s*/,'')||l.its[n+1]?.s||'';if(v!==nome){fecha();fechaBh();nome=v}continue}
@@ -4233,12 +4251,12 @@ function pontoAba(aba){
   const sel=alvo.map(([k,t,re])=>[k,t,chute(re)]);
   // o resumo do sistema de ponto traz "H.E 100%" e "H.E" com as mesmas horas, que na verdade são HE 65% (Carol, 24/10):
   // fica só a HE normal; se um dia houver HE 100% de verdade, escolha a coluna à mão
-  const iHe=sel.find(x=>x[0]==='he65'),iCem=sel.find(x=>x[0]==='he100');
+  const iHe=sel.find(x=>x[0]===heNormal(FOL.cli)),iCem=sel.find(x=>x[0]==='he100');
   if(iHe&&iCem&&iHe[2]>=0&&iCem[2]>=0&&/^h\.? ?e$/i.test(cab[iHe[2]]))iCem[2]=-1;
   const temDia=sel.some(x=>x[0]==='faltas_dias'),temHora=sel.some(x=>x[0]==='faltas_horas');
   $('pnMap').innerHTML=`${PNT.wb.SheetNames.length>1?`<label class="f">Aba<select id="pnAba">${PNT.wb.SheetNames.map(n=>`<option${n===aba?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
     <h3>Qual coluna é o quê</h3><div class="fields">${sel.map(([k,t,i])=>`<label class="f">${esc(t)}<select data-pn="${k}"><option value="-1">${k==='nome'?'Escolha':'Não tem'}</option>${cab.map((c,j)=>`<option value="${j}"${j===i?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('')}</div>
-    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="9:00" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
+    ${temDia&&temHora?`<label style="display:flex;gap:6px;align-items:center;font-size:14px;flex-wrap:wrap"><input type="checkbox" id="pnJor" style="width:auto"${aba==='PDF'&&faltasModo(FOL.cli)!=='horas'?' checked':''}> As horas de falta já contam os dias de falta: tirar <input id="pnJorH" value="9:00" style="width:70px" inputmode="numeric"> por dia de falta</label>`:''}`;
   if($('pnAba'))$('pnAba').onchange=()=>pontoAba($('pnAba').value);
   $('pnMap').querySelectorAll('[data-pn],#pnJor,#pnJorH').forEach(s=>s.onchange=pontoPrev);pontoPrev();
 }
@@ -4270,7 +4288,7 @@ function pontoPrev(){
   // sábado trabalhado (quem tem "Sábado R$" no cadastro) entra na ajuda de custo. O resumo de totais não diz os sábados:
   // quem passou de 4h extras fica marcado para conferir no espelho.
   const vsDe=id=>{const f=fs.find(x=>x.id===id);return f?ffNum(f,'ajuda_sabado')||0:0},temSab=m.sab!==undefined;
-  por.forEach(g=>{g.he=(g.v.he65||0)+(g.v.he100||0)+(g.v.horas_extras||0)});
+  por.forEach(g=>{g.he=HE_COLS.reduce((t,k)=>t+(g.v[k]||0),0)});
   por.forEach(g=>Object.keys(g.v).forEach(k=>{if(g.v[k]<10)delete g.v[k]}));
   PNT.g=[...por.values()].filter(g=>g.dias.length||g.saldo<0||Object.keys(g.v).length||g.atest||(temSab&&g.f&&(g.sab||g.he>SAB_HE)));
   const usa=PNT.cols.filter(([k])=>m[k]>=0);
@@ -4298,7 +4316,7 @@ const pontoBhCel=(g,i,m)=>{const n=pontoBhNeg(g,m);if(!n)return '<span class="mu
 FOLACAO.pontoLanca=async b=>{
   // Oliveira lança a falta pela data do dia (coluna faltas_data); as demais, em dias com DSR
   const regs=[],base={cliente_id:FOL.cli.id,competencia:FOL.comp,descricao:PONTO},cs=colsDe(FOL.cli),
-    porData=cs.includes('faltas_data')&&!cs.includes('faltas_dias'),noMes=d=>d&&d.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d<=fimMes(FOL.comp);
+    fm_=faltasModo(FOL.cli),emHoras=fm_==='horas',porData=fm_==='data'||fm_==='auto'&&cs.includes('faltas_data')&&!cs.includes('faltas_dias'),noMes=d=>d&&d.slice(0,7)>=addMes(FOL.comp,-1).slice(0,7)&&d<=fimMes(FOL.comp);
   let falta=null;const parcs=[];
   document.querySelectorAll('[data-pg]').forEach(s=>{const g=PNT.g[+s.dataset.pg],f=s.value;if(!f)return;
     if(PNT.bh){
@@ -4317,7 +4335,7 @@ FOLACAO.pontoLanca=async b=>{
       if(g.atest)regs.push({...base,funcionario_id:f,coluna:'observacoes',texto:`Atestado: ${g.atest.filter(Boolean).map(x=>dBR(x).slice(0,5)).join(', ')||g.atest.length+' dia(s)'}`});
       return}
     g.dias.forEach(d=>regs.push(porData?{...base,funcionario_id:f,coluna:'faltas_data',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:noMes(d.data)?null:`${d.n} ${d.n===1?'dia':'dias'}`}
-      :{...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:'dsr'}));
+      :{...base,funcionario_id:f,coluna:'faltas_dias',quantidade:d.n,data:noMes(d.data)?d.data:null,texto:emHoras?null:'dsr'}));
     // quem não pode fazer HE: as horas extras abatem as horas de falta (Carol, 25/10); o que sobrar vira só alerta
     const heBloq=semHE(f)?Object.entries(g.v).filter(([k])=>HE_COLS.includes(k)).reduce((t,[,mi])=>t+mi,0):0,
       abate=heBloq?Math.min(heBloq,g.v.faltas_horas||0):0,v={...g.v};if(abate){v.faltas_horas-=abate;if(v.faltas_horas<10)delete v.faltas_horas}
@@ -5163,6 +5181,74 @@ $('folColsSalvar').onclick=async ev=>{
   ev.target.disabled=true;const {error}=await sb.from('clientes').update({folha_colunas:cols}).eq('id',FOL.cli.id);ev.target.disabled=false;
   if(error){fail(error);return}FOL.cli.folha_colunas=cols;toast('Colunas salvas');renderFolha();
 };
+// =====================================================================
+// Configuração da folha desta empresa (Carol, 03/11): cada empresa fecha a folha de um jeito e cada contabilidade
+// chama as verbas por um nome. Fica em clientes.folha_modelo (sem atualização do banco): título e nomes das colunas
+// como na planilha da empresa, ordem das colunas, hora extra paga ou banco de horas, para qual coluna vai a HE normal
+// do ponto, como entra a falta do dia inteiro, o dia de corte dos vales, os nomes das verbas no recibo da contabilidade
+// (para a conferência) e as regras do fechamento, em texto livre, que aparecem no alto da folha para o escritório.
+// Todo o escritório vê; só o master altera.
+const FALTA_OPC=[['auto','Como a planilha da empresa (pela data, se só tiver a coluna Faltas por data; senão em dias com DSR)'],['dias','Em dias, com DSR'],['data','Pela data do dia'],['horas','Somadas nas horas de falta, sem DSR (a contabilidade desconta em horas)']];
+function folRegrasMostra(cli){const r=ehEsc()&&cli?.folha_modelo?.regras;$('folRegras').hidden=!r;
+  $('folRegras').innerHTML=r?`<b>Regras do fechamento desta empresa</b> <span class="note">(Configuração da folha, no fim da página)</span><div style="white-space:pre-wrap;margin-top:6px">${esc(r)}</div>`:''}
+function renderFolCfg(){
+  const cli=FOL.cli;if(!cli){$('folCfg').innerHTML='';return}
+  const M=cli.folha_modelo||{},cs=cli.folha_colunas?.length?colsDe(cli):[],dis=ehAdm()?'':' disabled',G=M.grupos||{};
+  const colOpts=sel=>`<option value="">Ignorar (fica só no recibo)</option>${cs.map(c=>`<option value="${c}"${c===sel?' selected':''}>${esc(colT(c))}</option>`).join('')}${sel&&!cs.includes(sel)&&FCOL[sel]?`<option value="${sel}" selected>${esc(FNOME(sel))} (sem coluna)</option>`:''}`;
+  const vbRow=(n,c)=>`<tr><td class="l"><input data-cvn value="${esc(n||'')}" placeholder="Ex.: DESCONTO DE VALE"${dis} style="min-width:220px"></td><td class="l"><select data-cvc${dis}>${colOpts(c)}</select></td><td>${dis?'':'<button type="button" class="btn small ghost" data-cvx>Tirar</button>'}</td></tr>`;
+  const heCs=HE_NORMAL.filter(c=>cs.includes(c));
+  $('folCfg').innerHTML=`${ehAdm()?'':'<p class="note" style="margin-top:0">Só o master altera a configuração da folha.</p>'}
+    <h3 style="margin-top:4px">Regras do fechamento</h3>
+    <textarea id="fcRegras" rows="4" placeholder="Ex.: Lançar tudo como premiação, não dividir os valores. Verificar convênios, faltas e atestados."${dis} style="width:100%">${esc(M.regras||'')}</textarea>
+    <h3>Planilha que vai para a contabilidade</h3>
+    <div class="fields">
+      <label class="f">Título no alto da planilha<input id="fcTitulo" value="${esc(M.titulo||'')}" placeholder="${esc(cli.nome)}"${dis}></label>
+      <label class="f">Nome da coluna dos colaboradores<input id="fcRotulo" value="${esc(M.rotulo_nome||'')}" placeholder="Colaboradores"${dis}></label>
+      <label class="f">Nome do grupo Proventos<input id="fcGP" value="${esc(G.P??'')}" placeholder="PROVENTOS"${dis}></label>
+      <label class="f">Nome do grupo Descontos<input id="fcGD" value="${esc(G.D??'')}" placeholder="DESCONTOS"${dis}></label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fcCargo" style="width:auto"${M.cargo===false?'':' checked'}${dis}> Mostrar a coluna Cargo</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fcNao" style="width:auto"${M.sem_nao?'':' checked'}${dis}> Ajuda de custo sem valor aparece como “Não”</label>
+    </div>
+    ${cs.length?`<p class="note">Ordem e nome de cada coluna como na planilha da empresa (para incluir ou tirar colunas, use “Colunas da planilha desta empresa”, acima).</p>
+    <div class="tablebox"><table id="fcCols"><thead><tr><th class="l">Coluna do sistema</th><th class="l">Nome na planilha da empresa</th><th>Grupo</th><th></th></tr></thead><tbody>${cs.map(c=>`<tr data-c="${c}"><td class="l">${esc(FNOME(c))}</td><td class="l"><input data-ct value="${esc(M.titulos?.[c]||'')}" placeholder="${esc(FCOL[c].t)}"${dis}></td><td>${{P:'Proventos',D:'Descontos',O:'Observações'}[FCOL[c].g]||''}</td><td style="white-space:nowrap">${dis?'':'<button type="button" class="btn small ghost" data-cup title="Subir">↑</button><button type="button" class="btn small ghost" data-cdn title="Descer">↓</button>'}</td></tr>`).join('')}</tbody></table></div>`
+    :'<p class="note">Marque primeiro as colunas em “Colunas da planilha desta empresa”, acima.</p>'}
+    <h3>Ponto, horas extras e faltas</h3>
+    <div class="fields">
+      <label class="f">Horas extras<select id="fcBH"${dis}><option value="0"${bancoHoras(cli)?'':' selected'}>Pagas na folha</option><option value="1"${bancoHoras(cli)?' selected':''}>Banco de horas (não paga HE; só a falta fora do banco vai para a folha)</option></select></label>
+      <label class="f">A hora extra normal do ponto vai para<select id="fcHE"${dis}>${heCs.length?heCs.map(c=>`<option value="${c}"${c===heNormal(cli)?' selected':''}>${esc(colT(c))}</option>`).join(''):'<option value="">(a planilha não tem coluna de HE)</option>'}</select></label>
+      <label class="f">Falta do dia inteiro<select id="fcFalta"${dis}>${FALTA_OPC.map(([k,t])=>`<option value="${k}"${k===faltasModo(cli)?' selected':''}>${esc(t)}</option>`).join('')}</select></label>
+      <label class="f">Dia de corte dos vales e guias (emissão até este dia entra no mês)<input id="fcCorte" type="number" min="1" max="31" value="${M.corte??''}" placeholder="20"${dis} style="max-width:90px"></label>
+    </div>
+    <h3>Nomes das verbas na contabilidade</h3>
+    <p class="note">Usado em “Conferir espelho da contabilidade”. Escreva a verba como sai no recibo e diga a coluna da planilha. O que não estiver aqui segue os nomes padrão (HORAS FALTAS, PREMIO, AJUDA DE CUSTO...). “Ignorar” deixa a verba só no recibo, sem comparar (ex.: vale transporte, quando a planilha não tem a coluna).</p>
+    <div class="tablebox"><table id="fcVb"><thead><tr><th class="l">Verba no recibo</th><th class="l">Coluna da planilha</th><th></th></tr></thead><tbody>${Object.entries(M.verbas||{}).map(([n,c])=>vbRow(n,c)).join('')}</tbody></table></div>
+    ${dis?'':`<div class="row"><button type="button" class="btn" id="fcVbAdd">+ Verba</button><span class="spacer"></span><button type="button" class="btn primary" id="fcSalvar">Salvar configuração</button></div>`}`;
+  if(dis)return;
+  $('fcVbAdd').onclick=()=>{$('fcVb').querySelector('tbody').insertAdjacentHTML('beforeend',vbRow('',''));$('fcVb').querySelector('tbody tr:last-child input').focus()};
+  $('fcVb').onclick=ev=>{const b=ev.target.closest('[data-cvx]');if(b)b.closest('tr').remove()};
+  if($('fcCols'))$('fcCols').onclick=ev=>{const b=ev.target.closest('[data-cup],[data-cdn]');if(!b)return;const tr=b.closest('tr');
+    if(b.hasAttribute('data-cup')){if(tr.previousElementSibling)tr.parentNode.insertBefore(tr,tr.previousElementSibling)}else if(tr.nextElementSibling)tr.parentNode.insertBefore(tr.nextElementSibling,tr)};
+  $('fcSalvar').onclick=folCfgSalvar;
+}
+async function folCfgSalvar(ev){
+  const cli=FOL.cli,M={...(cli.folha_modelo||{})},put=(k,v)=>{if(v==null||v===''||(typeof v==='object'&&!Object.keys(v).length))delete M[k];else M[k]=v};
+  put('regras',$('fcRegras').value.trim());put('titulo',$('fcTitulo').value.trim());put('rotulo_nome',$('fcRotulo').value.trim());
+  const g={...(M.grupos||{})};[['P','fcGP'],['D','fcGD']].forEach(([k,id])=>{const v=$(id).value.trim();if(v)g[k]=v;else delete g[k]});put('grupos',g);
+  if($('fcCargo').checked)delete M.cargo;else M.cargo=false;
+  if($('fcNao').checked)delete M.sem_nao;else M.sem_nao=true;
+  let cols=null;
+  if($('fcCols')){const t={...(M.titulos||{})};cols=[];$('fcCols').querySelectorAll('tbody tr').forEach(tr=>{const c=tr.dataset.c,v=tr.querySelector('[data-ct]').value.trim();cols.push(c);if(v)t[c]=v;else delete t[c]});put('titulos',t)}
+  M.banco_horas=$('fcBH').value==='1';put('he_normal',$('fcHE').value);
+  const fa=$('fcFalta').value;if(fa==='auto')delete M.faltas_modo;else M.faltas_modo=fa;
+  const co=$('fcCorte').value.trim();if(co===''){delete M.corte}else{const n=parseInt(co,10);if(!(n>=1&&n<=31)){toast('Dia de corte: de 1 a 31');return}M.corte=n}
+  const vb={};let rep=null;$('fcVb').querySelectorAll('tbody tr').forEach(tr=>{const n=espSp(tr.querySelector('[data-cvn]').value.toUpperCase());if(!n)return;if(vb[n]!==undefined)rep=n;vb[n]=tr.querySelector('[data-cvc]').value});
+  if(rep){toast(`A verba ${rep} está repetida`);return}put('verbas',vb);
+  const upd={folha_modelo:M};if(cols&&cols.join()!==(cli.folha_colunas||[]).join())upd.folha_colunas=cols;
+  const b=ev.target;b.disabled=true;const {error}=await sb.from('clientes').update(upd).eq('id',cli.id);b.disabled=false;
+  if(error){fail(error);return}
+  Object.assign(cli,upd);const c2=CLIENTES.find(x=>x.id===cli.id);if(c2&&c2!==cli)Object.assign(c2,upd);
+  toast('Configuração da folha salva');renderFolha();
+}
 
 // Visual das planilhas geradas: cabeçalho na cor da Controlacs, bordas finas e linhas alternadas
 const XC={brand:'025556',soft:'E3F0EF',zebra:'F5F8F8',line:'BFCBCB',ink:'13232B',muted:'5B6B70',neg:'B42318',negSoft:'FBE4E2',negInk:'8A1C12',okSoft:'E3F1E7',okInk:'17603A',cinza:'EEF1F1'};
@@ -8441,6 +8527,10 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-03',data:'2026-11-03',t:'Folha de pagamento: configuração por empresa e horas extras do ponto',itens:[
+    {x:'RH › Folha de pagamento: no fim da página, “Configuração da folha desta empresa” guarda as regras do fechamento, o título e o nome de cada coluna como na planilha da empresa, a ordem das colunas, se a empresa paga hora extra ou usa banco de horas, para qual coluna vai a hora extra do ponto, como entra a falta do dia inteiro e os nomes das verbas da contabilidade. As regras aparecem no alto da folha.',para:'esc'},
+    {x:'Espelho de ponto: a hora extra (coluna H.E) passa a ser lida também nas empresas cuja planilha usa HE 50% ou Horas Extras, como a BJ. Antes só entravam as faltas.',mods:['ponto','folha']},
+    {x:'Conferir espelho da contabilidade: as verbas com nome próprio da contabilidade (ex.: DESCONTO DE VALE) são comparadas com a coluna escolhida na configuração.',para:'esc'}]},
   {k:'2026-10-30d',data:'2026-10-30',t:'Nota fiscal não é mais obrigatória para salvar',itens:[
     {x:'Caixa: a saída pode ser enviada sem o nº do documento ou da NF. O sistema avisa que é importante informar o número da nota e anexar o comprovante.',mods:['caixa']},
     {x:'Tesouraria: a despesa pode ser salva sem o nº da NF e sem o documento anexado, com o mesmo aviso.',mods:['tesouraria']}]},
