@@ -632,22 +632,7 @@ body.lg header.top .logo{visibility:hidden}
   </section>
 
   <!-- GESTÃO FINANCEIRA › EXTRATO DA CONTA (escritório) -->
-  <section id="viewGTe" hidden>
-    <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Tesouraria</h1><p class="sub" id="gteSub"></p></div>
-      <button class="btn" id="gteRevTodos" hidden></button>
-    </div>
-    <div id="gteAlerta"></div>
-    <div class="toolbar">
-      <label class="f">De<input type="date" id="gteIni"></label>
-      <label class="f">Até<input type="date" id="gteFim"></label>
-      <label class="f">Lançamentos<select id="gteTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label>
-      <label class="f">Mostrar<select id="gteFiltro"><option value="todos">Todos</option><option value="rev">A revisar e alterados</option><option value="ok">Revisados</option></select></label>
-    </div>
-    <div class="tiles" id="gteTiles"></div>
-    <div class="card tablebox"><table><thead id="gteHead"></thead><tbody id="gteBody"></tbody></table></div>
-    <p class="note" id="gteNote"></p>
-  </section>
+  <section id="viewGTe" hidden></section>
 
   <section id="viewGX" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -659,9 +644,23 @@ body.lg header.top .logo{visibility:hidden}
       <label class="f">De<input type="date" id="gxIni"></label>
       <label class="f">Até<input type="date" id="gxFim"></label>
     </div>
+    <div id="gxBanco">
     <div class="tiles" id="gxTiles"></div>
     <div class="card tablebox"><table><thead id="gxHead"></thead><tbody id="gxBody"></tbody></table></div>
     <p class="note" id="gxNote"></p>
+    </div>
+    <!-- conta Tesouraria: o extrato traz a revisão do que o cliente lança na Tesouraria (antes Gestão financeira › Tesouraria; Carol, 03/11) -->
+    <div id="gxTes" hidden>
+      <div class="row" style="justify-content:space-between;align-items:flex-end"><p class="sub" id="gteSub" style="margin:0"></p><button class="btn" id="gteRevTodos" hidden></button></div>
+      <div id="gteAlerta"></div>
+      <div class="toolbar">
+        <label class="f">Lançamentos<select id="gteTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label>
+        <label class="f">Mostrar<select id="gteFiltro"><option value="todos">Todos</option><option value="rev">A revisar e alterados</option><option value="ok">Revisados</option></select></label>
+      </div>
+      <div class="tiles" id="gteTiles"></div>
+      <div class="card tablebox"><table><thead id="gteHead"></thead><tbody id="gteBody"></tbody></table></div>
+      <p class="note" id="gteNote"></p>
+    </div>
   </section>
 
   <!-- GESTÃO FINANCEIRA › CONCILIAÇÃO BANCÁRIA (escritório) -->
@@ -1358,7 +1357,7 @@ const NAV=[
   {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfinad',t:'Inadimplência',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfagenda',t:'Agenda financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gftes',t:'Tesouraria',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  // a Tesouraria da Gestão financeira saiu do menu: a revisão fica no Extrato da conta, na conta Tesouraria (Carol, 03/11)
   {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
@@ -1419,18 +1418,18 @@ function serveEmp(n){
 }
 const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k)&&serveEmp(n));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
-const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gftes'?'Lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':n.k==='repasse'?'Alterações de conta e parceiros novos para conferir':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
+const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gfext'?'Tesouraria: lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':n.k==='repasse'?'Alterações de conta e parceiros novos para conferir':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
-  // atalho do Dashboard no início dos módulos (Carol, 30/10)
-  const noGrp=n=>n.k!=='gfdash'||ehEsc();
+  // atalho do Dashboard no início dos módulos (Carol, 30/10); ele não aparece mais dentro da Gestão financeira (Carol, 03/11)
+  const noGrp=n=>n.k!=='gfdash';
   $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n))).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
     return `<button type="button" class="modbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.c||m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('')
     +(atual?`<span class="crumb">${naDash?'<b>Dashboard</b>':`${navGrp(atual)} › <b>${esc(atual.t)}</b>`}</span>`:'');
   if(MEGA.g)megaDesenha();
 }
 function megaDesenha(){
-  const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&(n.k!=='gfdash'||ehEsc()));
+  const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&n.k!=='gfdash');
   if(!itens.length)return megaFecha();
   const cols=SECOES.map(sc=>[sc,itens.filter(n=>(n.s||'Dia a dia')===sc)]).filter(([,l])=>l.length);
   $('mega').innerHTML=`<span class="mega-tag">${MEGA.g}</span><div class="mega-cols">${cols.map(([sc,l])=>`<div class="mega-col"><h3>${sc}</h3>${l.map(n=>`<button type="button" class="megaitem" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}>${esc(n.t)}${n.soon?'<span class="soon">em breve</span>':''}${navBadge(n)}</button>`).join('')}</div>`).join('')}</div>`;
@@ -1545,7 +1544,6 @@ function openView(){
   else if(RELMODOS[VIEW]){$('viewRel').hidden=false;renderRel()}
   else if(VIEW==='gfdash'){$('viewDash').hidden=false;renderDash()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
-  else if(VIEW==='gftes'){$('viewGTe').hidden=false;renderGTes()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
   else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;renderRN()}
   else if(VIEW==='gfnf'){$('viewNF').hidden=false;renderNF()}
@@ -7538,23 +7536,22 @@ async function gteNovidades(){
   if(!ehEsc())return null;
   const {data,error}=await sb.from('fin_movimentos').select('cliente_id,tes_id').not('tes_alteracao','is',null).limit(5000);if(error)return null;
   const por={},vis=new Set();(data||[]).forEach(m=>{if(vis.has(m.tes_id))return;vis.add(m.tes_id);por[m.cliente_id]=(por[m.cliente_id]||0)+1});
-  const n=vis.size;if((NAVBADGE.gftes||0)!==n){NAVBADGE.gftes=n;renderNav()}
+  const n=vis.size;if((NAVBADGE.gfext||0)!==n){NAVBADGE.gfext=n;renderNav()}
   return por;
 }
 async function renderGTes(){
   const cli=cliAtual();
-  if(!$('gteIni').value)[$('gteIni').value,$('gteFim').value]=monthRange(TODAY.slice(0,7));
   if(!cli)return gteVazio('Escolha uma empresa.');
-  $('gteSub').textContent=`${cli.nome} · Lançamentos que o cliente faz em Rotina diária › Tesouraria. Corrija, ponha a categoria e marque como revisado: o lançamento do cliente não muda.`;
+  $('gteSub').textContent=`${cli.nome} · Conta Tesouraria: lançamentos que o cliente faz em Rotina diária › Tesouraria. Corrija, ponha a categoria e marque como revisado: o lançamento do cliente não muda.`;
   let conta,movs,alt;
   try{
     const {data:c,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cli.id).eq('espelho_tes',true).maybeSingle();if(error)throw error;
     if(!c)return gteVazio('Esta empresa ainda não tem lançamentos na Tesouraria do cliente.');
-    conta=c;const ini=$('gteIni').value,fim=$('gteFim').value;
+    conta=c;const ini=$('gxIni').value,fim=$('gxFim').value;
     if(ini>fim)return gteVazio('A data inicial é depois da data final.');
     [movs,alt]=await Promise.all([todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',c.saldo_data||'1900-01-01').lte('data',fim).order('data').order('criado_em')),
       todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).not('tes_alteracao','is',null).order('data'))]);
-    if(cliAtual()?.id!==cli.id||VIEW!=='gftes')return;
+    if(cliAtual()?.id!==cli.id||VIEW!=='gfext')return;
     const sg=m=>(m.tipo==='entrada'?1:-1)*m.valor;
     Object.assign(GTE,{conta,ini,fim,alt,ant:r2(+c.saldo_inicial+movs.filter(m=>m.data<ini).reduce((x,m)=>x+sg(m),0)),per:movs.filter(m=>m.data>=ini)});
   }catch(e){console.error(e);return gteVazio(v57(e)||v45(e)?v57Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
@@ -7585,8 +7582,8 @@ async function gteAlertas(cli){
   let h=ls.length?`<div class="alerta bad"><b>⚠ ${ls.length} ${ls.length===1?'lançamento foi alterado':'lançamentos foram alterados'} pelo cliente depois da sua revisão</b><span class="note">Aplique a alteração (o lançamento volta para “a revisar”) ou mantenha a sua versão.</span>
     <div class="tablebox" style="margin:4px 0 0"><table><tbody>${ls.map(m=>`<tr data-tes="${m.tes_id}"><td>${dBR(m.data)}</td><td class="l" style="white-space:normal"><b>${esc(m.descricao||'')}</b> · ${fm(m.valor)}<br>${gteDif(m.tes_alteracao)}</td><td class="l"><button type="button" class="btn small primary" data-te="aplicar">${m.tes_alteracao.acao==='excluido'?'Excluir do espelho':'Aplicar a alteração'}</button> <button type="button" class="btn small" data-te="manter">Manter a minha versão</button> <button type="button" class="btn small ghost" data-te="abrir" data-id="${m.id}">Abrir</button></td></tr>`).join('')}</tbody></table></div></div>`:'';
   $('gteAlerta').innerHTML=h;
-  const por=await gteNovidades();if(!por||cliAtual()?.id!==cli.id||VIEW!=='gftes')return;
-  const outras=empresasDe('gftes').filter(c=>c.id!==cli.id&&por[c.id]);
+  const por=await gteNovidades();if(!por||cliAtual()?.id!==cli.id||VIEW!=='gfext')return;
+  const outras=empresasDe('gfext').filter(c=>c.id!==cli.id&&por[c.id]);
   if(outras.length)$('gteAlerta').insertAdjacentHTML('beforeend',`<div class="alerta bad" style="margin-top:10px"><b>Outras empresas com lançamentos alterados pelo cliente</b><div class="row" style="gap:8px">${outras.map(c=>`<button type="button" class="btn small" data-tcc="${c.id}">${esc(c.nome)} · ${por[c.id]}</button>`).join('')}</div></div>`);
 }
 function gteDif(a){
@@ -7606,7 +7603,7 @@ $('gteAlerta').addEventListener('click',e=>{const b=e.target.closest('[data-te],
   if(b.dataset.tcc){if(escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;openView()}return}
   if(b.dataset.te==='abrir')return gteAbrir(GTE.alt.find(m=>m.id===b.dataset.id));
   b.disabled=true;gteResolve(b.closest('[data-tes]').dataset.tes,b.dataset.te)});
-['gteFiltro','gteTipo','gteIni','gteFim'].forEach(id=>$(id).onchange=()=>id==='gteFiltro'||id==='gteTipo'?gteDesenha():renderGTes());
+['gteFiltro','gteTipo'].forEach(id=>$(id).onchange=gteDesenha);
 $('gteBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)gteAbrir(GTE.per.find(m=>m.id===tr.dataset.id))});
 $('gteBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gteAbrir(GTE.per.find(m=>m.id===tr.dataset.id))}});
 $('gteRevTodos').onclick=async()=>{
@@ -7690,7 +7687,7 @@ async function gteAcao(a){
 }
 // ---------- Extrato da conta: saldo anterior, entradas e saídas e saldo de cada dia ----------
 const GX={conta:null,ant:0,per:[],ini:'',fim:''};
-function gxVazio(t,cl){$('gxHead').innerHTML='';$('gxTiles').innerHTML='';$('gxBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gxNote').textContent='';$('gxBaixar').hidden=true}
+function gxVazio(t,cl){$('gxBanco').hidden=false;$('gxTes').hidden=true;$('gxHead').innerHTML='';$('gxTiles').innerHTML='';$('gxBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gxNote').textContent='';$('gxBaixar').hidden=true}
 async function renderGX(){
   const cli=cliAtual();$('gxAvulso').hidden=true;
   if(!cli)return gxVazio('Escolha uma empresa.');
@@ -7700,6 +7697,9 @@ async function renderGX(){
   sel.innerHTML=vis.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma conta</option>';
   if(vis.some(c=>c.id===cur))sel.value=cur;
   const c=vis.find(x=>x.id===sel.value);
+  // conta Tesouraria: mostra a revisão dos lançamentos do cliente (o que era Gestão financeira › Tesouraria)
+  const tes=!!c&&!!c.espelho_tes;$('gxBanco').hidden=tes;$('gxTes').hidden=!tes;
+  if(tes){$('gxBaixar').hidden=true;const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini){$('gxBanco').hidden=false;$('gxTes').hidden=true;return gxVazio('Escolha o período.')}return renderGTes()}
   if(!c)return gxVazio('Nenhuma conta bancária cadastrada nesta empresa. Cadastre em Gestão financeira › Contas bancárias.');
   const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini)return gxVazio('Escolha o período.');
   let movs;try{movs=await todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',c.saldo_data||'1900-01-01').lte('data',fim).order('data').order('criado_em'))}
@@ -8538,6 +8538,9 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-03d',data:'2026-11-03',t:'Menu: Dashboard e Tesouraria da Gestão financeira',itens:[
+    {x:'O Dashboard fica só no botão “Dashboard” no início do menu; ele saiu de dentro da Gestão financeira.',para:'esc'},
+    {x:'Gestão financeira › Tesouraria saiu do menu. A revisão da tesouraria (categoria, “revisado” e o aviso quando o cliente altera um lançamento) agora fica em Relatórios › Extrato da conta, escolhendo a conta Tesouraria. O número de alterações do cliente aparece no Extrato.',para:'esc'}]},
   {k:'2026-11-03c',data:'2026-11-03',t:'Folha: DSR em toda falta',itens:[
     {x:'Configuração da folha: nova opção “DSR em toda falta (de dia ou de horas)”. Marcada, a coluna DSR fica “Sim” para quem teve qualquer falta no mês (BJ).',para:'esc'}]},
   {k:'2026-11-03b',data:'2026-11-03',t:'Espelho de ponto: dia de falta separado das horas',itens:[
@@ -9579,7 +9582,7 @@ $('nfXls').onclick=()=>{
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Controle NF');XLSX.writeFile(wb,`Controle NF ${NF.grupo.nome} ${NF.ano}.xlsx`);
 };
 // período no modelo do Bom Controle em todas as telas com De/Até
-[['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gteIni','gteFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
+[['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
 })();
 </script>
