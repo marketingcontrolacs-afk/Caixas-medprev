@@ -5925,8 +5925,13 @@ const pAlertas=p=>{const a=[];if(PALT[p.id])a.push(['c-bad','Alteração de cont
   if(!p.pix_chave&&!(p.banco&&p.conta))a.push(['c-bad','Sem dados bancários']);return a};
 function copiar(t,msg){navigator.clipboard.writeText(t).then(()=>toast(msg||'Copiado'),()=>toast('Não deu para copiar.'))}
 const pIds=()=>{const lista=empresasDe('repasse');return escCli.value==='*'?lista.map(c=>c.id):escCli.value?[escCli.value]:[]};
-const pDescaveis=()=>PARC.filter(p=>p.ativo&&podeLancar(p.cliente_id,'repasse'));
+const pDescaveis=()=>PARC.filter(p=>p.ativo&&pPode(p));
 const pLancaEm=()=>empresasDe('repasse').filter(c=>podeLancar(c.id,'repasse'));
+// parceiro com cadastro único (sem empresa, v88): vale para todas as empresas (Carol, 03/11)
+const pPode=p=>p.cliente_id?podeLancar(p.cliente_id,'repasse'):ehEsc()||pLancaEm().length>0;
+// empresa em que a alteração de conta ou o desconto foi pedido: a do topo, se tiver Parceiros nela
+const pEmp=()=>{const v=escCli.value;return v&&v!=='*'&&v!=='int'&&empresasDe('repasse').some(c=>c.id===v)?v:(pLancaEm()[0]||empresasDe('repasse')[0])?.id||null};
+const pOrNulo=ids=>`cliente_id.in.(${ids.join(',')}),cliente_id.is.null`;
 // ---------- Gestão financeira › Cadastros (contas bancárias, clientes e fornecedores; v44) ----------
 // contas bancárias por empresa; clientes e fornecedores por empresa ou para todas (cliente_id vazio).
 // Os fornecedores começam com a lista do Bom Controle (fornecedor_bc = chave em fornecedores_bc).
@@ -8016,13 +8021,13 @@ async function renderRep(){
     :'Cadastre os parceiros, avise quando um parceiro trocar de conta e informe os descontos a fazer no repasse.';
   $('pNovo').hidden=!pLancaEm().length;
   if(!ids.length){vazio('Nenhuma empresa liberada para repasses.');return}
-  const [r1,r2_,r3]=await Promise.all([sb.from('parceiros').select('*').in('cliente_id',ids).order('nome'),
-    sb.from('parceiro_alteracoes').select('*').in('cliente_id',ids).eq('status','Pendente'),
+  const [r1,r2_,r3]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
+    sb.from('parceiro_alteracoes').select('*').eq('status','Pendente'),
     sb.from('repasse_descontos').select('*').in('cliente_id',ids).eq('status','Pendente').order('criado_em')]);
   const err=r1.error||r2_.error||r3.error;
   if(err){console.error(err);vazio(err.code==='42P01'||/parceir|repasse/.test(err.message||'')?'Este módulo precisa da atualização v7 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
   PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
-  const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  const nomeCli=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Todas as empresas';
   const f=$('pFiltro').value,q=$('pBusca').value.trim().toLowerCase();
   const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||[p.nome,p.nome_global,...(p.nomes_locais||[])].some(n=>(n||'').toLowerCase().includes(q))))
     .sort((a,b)=>(pAlertas(b).length>0)-(pAlertas(a).length>0)||a.nome.localeCompare(b.nome));
@@ -8059,7 +8064,7 @@ const lerCampos=(pre,ks)=>Object.fromEntries(ks.map(k=>[k,($(pre+'_'+k)?.value||
 const temConta=o=>o.pix_chave||(o.banco&&o.agencia&&o.conta);
 async function abrirParceiro(p,modo){
   PARCDLG=p;PMODO=modo||null;const e=ehEsc();
-  const pode=p?podeLancar(p.cliente_id,'repasse'):true,editaCad=!p||e||(pode&&!p.conferido);
+  const pode=p?pPode(p):true,editaCad=!p||e||(pode&&!p.conferido);
   const alt=p&&PALT[p.id],descs=p?PDESC[p.id]||[]:[];
   $('rpTitle').textContent=p?p.nome:modo==='novo'?'Novo cadastro ou alteração':modo==='desc'?'Desconto de valores':modo==='alt'?'Alteração de conta':'Novo parceiro';
   $('rpChip').innerHTML=p?(pAlertas(p).map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'):'';
@@ -8167,7 +8172,7 @@ async function rpAcao(act,el){
       if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta novos.');
       if(!o.motivo)return rpErr('Informe o motivo ou quem pediu a troca.');
       if(CONTAK.every(k=>(o[k]||null)===(p[k]||null)))return rpErr('A conta nova está igual à atual.');
-      o.parceiro_id=p.id;const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
+      o.parceiro_id=p.id;o.cliente_id=p.cliente_id||pEmp();const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
       PMODO=null;PVOLTA=false;return recarregar(e?'Alteração registrada. Aplique para trocar a conta.':'Alteração enviada ao escritório');
     }
     if(act==='salvarDesc'){
@@ -8175,7 +8180,7 @@ async function rpAcao(act,el){
       if(!parc)return rpErr('Escolha o parceiro.');
       if(!(valor>0))return rpErr('Informe o valor do desconto.');if(!guia)return rpErr('Informe o número da guia que corresponde ao desconto.');
       // a guia vai na referência; sem observação, o motivo é a própria guia
-      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
+      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:PARC.find(x=>x.id===parc)?.cliente_id||pEmp(),valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
       PMODO=null;PVOLTA=false;if(!p)PARCDLG=null;return recarregar('Desconto lançado');
     }
     if(act==='aplicar'){const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:PALT[p.id].id,nota:$('pa_nota')?.value.trim()||null});if(error)throw error;return recarregar('Conta do parceiro atualizada')}
@@ -8538,6 +8543,9 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-03p',data:'2026-11-03',t:'Parceiros: um cadastro só para todas as empresas',itens:[
+    {x:'Comunicação › Parceiros: cada parceiro tem agora um cadastro só, que vale para todas as empresas (antes a planilha tinha criado uma cópia em cada empresa). Os nomes locais de cada empresa ficam guardados no mesmo cadastro.',mods:['repasse']},
+    {x:'Alterações de conta, descontos e o fornecedor ligado na Gestão financeira passaram para o cadastro único; uma conta diferente que existia numa cópia ficou na Observação como “Outra conta”. O portal não deixa mais cadastrar o mesmo CPF/CNPJ ou o mesmo nome duas vezes.',para:'esc'}]},
   {k:'2026-11-03d',data:'2026-11-03',t:'Menu: Dashboard e Tesouraria da Gestão financeira',itens:[
     {x:'O Dashboard fica só no botão “Dashboard” no início do menu; ele saiu de dentro da Gestão financeira.',para:'esc'},
     {x:'Gestão financeira › Tesouraria saiu do menu. A revisão da tesouraria (categoria, “revisado” e o aviso quando o cliente altera um lançamento) agora fica em Relatórios › Extrato da conta, escolhendo a conta Tesouraria. O número de alterações do cliente aparece no Extrato.',para:'esc'}]},
@@ -8669,7 +8677,7 @@ async function parcPendentes(){
   if(!ehEsc()||!eqPode('repasse'))return;
   const ids=empresasDe('repasse').map(c=>c.id);if(!ids.length)return;
   const [a,b]=await Promise.all([sb.from('parceiro_alteracoes').select('id,cliente_id,motivo,solicitado_em,parceiros(nome)').in('cliente_id',ids).eq('status','Pendente'),
-    sb.from('parceiros').select('id,cliente_id,nome,criado_em').in('cliente_id',ids).eq('ativo',true).or('conferido.is.null,conferido.eq.false')]);
+    sb.from('parceiros').select('id,cliente_id,nome,criado_em').or(pOrNulo(ids)).eq('ativo',true).not('conferido','is',true)]);
   if(a.error||b.error)return;
   PPEND=[...(a.data||[]).map(x=>({t:'alt',cli:x.cliente_id,nome:x.parceiros?.nome||'',quando:x.solicitado_em,obs:x.motivo})),
     ...(b.data||[]).map(x=>({t:'novo',cli:x.cliente_id,nome:x.nome,quando:x.criado_em}))].sort((x,y)=>String(y.quando||'').localeCompare(String(x.quando||'')));
@@ -8679,7 +8687,7 @@ async function parcPendentes(){
 }
 function parcLista(){
   const box=$('tParc');if(VIEW!=='tarefas'){box.hidden=true;return}
-  const v=escCli.value,l=PPEND.filter(x=>v==='*'||v==='int'||x.cli===v);box.hidden=!l.length;if(!l.length)return;
+  const v=escCli.value,l=PPEND.filter(x=>v==='*'||v==='int'||!x.cli||x.cli===v);box.hidden=!l.length;if(!l.length)return;
   const na=l.filter(x=>x.t==='alt').length,nn=l.length-na,cn=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
   $('tParcSum').innerHTML=`<span class="pi">${svgI('repasse')}</span><b>Parceiros</b><span class="muted">${[na?na+(na===1?' alteração de conta':' alterações de conta'):'',nn?nn+(nn===1?' parceiro novo para conferir':' parceiros novos para conferir'):''].filter(Boolean).join(' · ')}</span>`;
   $('tParcList').innerHTML=l.map(x=>`<button type="button" class="pli" data-pcli="${x.cli}"><span class="chip ${x.t==='alt'?'c-bad':'c-warn'}">${x.t==='alt'?'Alteração de conta':'Parceiro novo'}</span><b>${esc(x.nome)}</b><span class="muted">${esc(cn(x.cli))}${x.quando?' · '+dBR(String(x.quando).slice(0,10)):''}${x.obs?' · '+esc(x.obs):''}</span><span class="go">›</span></button>`).join('');
@@ -9075,7 +9083,7 @@ const rnGrupoSit=s=>s==='emite'?'emite':s==='sem'?'sem':'nao';
 const rnEmpNome=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
 // parceiro cadastrado (conta e Pix): o da empresa escolhida; se não houver empresa, o primeiro do grupo com conta
 function rnParc(it,emp){
-  const nf=rnNf(it),doc=rnDig(nf?.cpf_cnpj),cand=RN.parc.filter(p=>!emp||p.cliente_id===emp);
+  const nf=rnNf(it),doc=rnDig(nf?.cpf_cnpj),cand=RN.parc.filter(p=>!emp||!p.cliente_id||p.cliente_id===emp);
   let p=doc?cand.find(x=>rnDig(x.cpf_cnpj)===doc):null;
   if(!p)p=rnAcha(it.nome,cand,rnParcNomes)[0]||(nf?rnAcha(nf.nome,cand,rnParcNomes)[0]:null);
   if(!p&&!emp)return null;
@@ -9108,8 +9116,8 @@ async function renderRN(recarrega=true){
       const [l,nf,pa,pe,de,ct]=await Promise.all([
         todas(()=>sb.from('repasse_lotes').select('*').eq('grupo_id',G.id).order('data_relatorio',{ascending:false}).order('criado_em',{ascending:false})),
         todas(()=>sb.from('parceiros_nf').select('*').eq('grupo_id',G.id).order('nome')),
-        todas(()=>sb.from('parceiros').select('*').in('cliente_id',emp).eq('ativo',true)),
-        todas(()=>sb.from('fin_pessoas').select('id,cliente_id,nome,fantasia,parceiro_id,pix_chave').in('cliente_id',emp).not('parceiro_id','is',null)),
+        todas(()=>sb.from('parceiros').select('*').or(pOrNulo(emp)).eq('ativo',true)),
+        todas(()=>sb.from('fin_pessoas').select('id,cliente_id,nome,fantasia,parceiro_id,pix_chave').or(pOrNulo(emp)).not('parceiro_id','is',null)),
         todas(()=>sb.from('repasse_descontos').select('*').in('cliente_id',emp).eq('status','Pendente')),
         todas(()=>sb.from('fin_contas').select('id,cliente_id,nome,tipo,ativo').in('cliente_id',emp).eq('ativo',true).order('nome'))]);
       Object.assign(RN,{lotes:l,nf,parc:pa,pes:pe,desc:de,contas:ct});
@@ -9321,7 +9329,7 @@ async function rnCriaTitulos(ls,venc,cont){
   for(const id of RN.grupo.empresas){const l=ls.filter(i=>i.empresa_id===id&&!i.titulo_id);if(!l.length)continue;
     const cli=CLIENTES.find(c=>c.id===id);let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
     const cat=(plano.find(c=>/repasse/.test(chave(c.categoria))&&/parceir/.test(chave(c.categoria)))||plano.find(c=>/repasse/.test(chave(c.categoria))))?.categoria||null;
-    for(const it of l){const p=rnParc(it,id),pe=p&&RN.pes.find(x=>x.parceiro_id===p.id&&x.cliente_id===id);
+    for(const it of l){const p=rnParc(it,id),pe=p&&RN.pes.find(x=>x.parceiro_id===p.id&&(!x.cliente_id||x.cliente_id===id));
       const row={cliente_id:id,tipo:'pagar',pessoa_id:pe?.id||null,pessoa_nome:pe?.nome||p?.nome_global||p?.nome||it.nome.trim(),
         descricao:`Repasse de parceiro (restituição)${it.guias?` · ${it.guias} ${it.guias===1?'guia':'guias'}`:''} · relatório ${dBR(RN.lote.data_relatorio)}`,
         documento:it.protocolo,categoria:cat,competencia:venc.slice(0,8)+'01',vencimento:venc,valor:r2(it.valor),parcela:1,parcelas:1,
