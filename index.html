@@ -3573,6 +3573,9 @@ function folCelula(f,c){
   if(typeof fx==='string'){const n=/^[\d.,\s]+$/.test(fx)?parseMoney(fx):NaN;if(isFinite(n)&&d.k==='money')fx=n;else{textos.unshift(fx);fx=null}}
   if(d.k==='pct'){const t=ff(f,'fixo_'+c);if(t!=null&&t!=='')textos.unshift(typeof t==='number'?showMoney(t):String(t))}
   if(c==='dsr'&&FOL.lanc.some(l=>l.funcionario_id===f.id&&FCOL[l.coluna]?.dsr&&l.texto==='dsr'))textos.unshift('Sim');
+  // DSR em toda falta, de dia ou de horas (Carol, 03/11: BJ); configuração da folha (folha_modelo.dsr_sempre)
+  else if(c==='dsr'&&folModelo().dsr_sempre&&(FOL.lanc.some(l=>l.funcionario_id===f.id&&['faltas_dias','faltas_horas','faltas_data'].includes(l.coluna)&&+l.quantidade>0)
+    ||FOL.parc.some(p=>p.funcionario_id===f.id&&p.coluna==='faltas_horas'&&parcDoMes(p))))textos.unshift('Sim');
   if(c==='observacoes'&&f.situacao==='Afastado'&&f.motivo_afastamento)textos.unshift(f.motivo_afastamento);
   // quem tem ajuda de custo e sábado no mês: lembrete de que o sábado está somado na ajuda (Carol, 25/10)
   if(c==='observacoes'&&colsDe(FOL.cli).includes('ajuda_dia')&&FOL.aj[f.id+'|ajuda_dia']===undefined&&!semSab(f)){
@@ -5211,6 +5214,7 @@ function renderFolCfg(){
       <label class="f">Nome do grupo Proventos<input id="fcGP" value="${esc(G.P??'')}" placeholder="PROVENTOS"${dis}></label>
       <label class="f">Nome do grupo Descontos<input id="fcGD" value="${esc(G.D??'')}" placeholder="DESCONTOS"${dis}></label>
       <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fcCargo" style="width:auto"${M.cargo===false?'':' checked'}${dis}> Mostrar a coluna Cargo</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fcDsr" style="width:auto"${M.dsr_sempre?' checked':''}${dis}> DSR em toda falta (de dia ou de horas)</label>
       <label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fcNao" style="width:auto"${M.sem_nao?'':' checked'}${dis}> Ajuda de custo sem valor aparece como “Não”</label>
     </div>
     ${cs.length?`<p class="note">Ordem e nome de cada coluna como na planilha da empresa (para incluir ou tirar colunas, use “Colunas da planilha desta empresa”, acima).</p>
@@ -5241,6 +5245,7 @@ async function folCfgSalvar(ev){
   const g={...(M.grupos||{})};[['P','fcGP'],['D','fcGD']].forEach(([k,id])=>{const v=$(id).value.trim();if(v)g[k]=v;else delete g[k]});put('grupos',g);
   if($('fcCargo').checked)delete M.cargo;else M.cargo=false;
   if($('fcNao').checked)delete M.sem_nao;else M.sem_nao=true;
+  if($('fcDsr').checked)M.dsr_sempre=true;else delete M.dsr_sempre;
   let cols=null;
   if($('fcCols')){const t={...(M.titulos||{})};cols=[];$('fcCols').querySelectorAll('tbody tr').forEach(tr=>{const c=tr.dataset.c,v=tr.querySelector('[data-ct]').value.trim();cols.push(c);if(v)t[c]=v;else delete t[c]});put('titulos',t)}
   M.banco_horas=$('fcBH').value==='1';put('he_normal',$('fcHE').value);
@@ -8533,6 +8538,8 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-03c',data:'2026-11-03',t:'Folha: DSR em toda falta',itens:[
+    {x:'Configuração da folha: nova opção “DSR em toda falta (de dia ou de horas)”. Marcada, a coluna DSR fica “Sim” para quem teve qualquer falta no mês (BJ).',para:'esc'}]},
   {k:'2026-11-03b',data:'2026-11-03',t:'Espelho de ponto: dia de falta separado das horas',itens:[
     {x:'Espelho de ponto: quando o total de faltas da semana já inclui o dia faltado, o dia vai para Faltas/ Dias com a data e só o que sobrar vai para Faltas/ Horas (ex.: 8:37 com uma falta = 1 dia + 0:37). As horas de um dia ficam na configuração (BJ 8:00, Oliveira 9:00).',mods:['ponto','folha']}]},
   {k:'2026-11-03',data:'2026-11-03',t:'Folha de pagamento: configuração por empresa e horas extras do ponto',itens:[
