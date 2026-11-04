@@ -3025,13 +3025,14 @@ async function renderRDocs(){
   const cfg=MODCFG[MOD],ed=regEditavel();
   const urls=await signed(RDOCS.filter(d=>d.caminho&&!d.preview).map(d=>d.caminho));
   $('rDocs').innerHTML=`<h3>Documentos</h3>`+(RDOCS.map((d,i)=>`<div class="docrow" data-i="${i}">${anexoView(d,d.preview||urls[d.caminho],true)}<span><b>${esc(d.categoria)}</b><br><span class="note">${esc(d.nome_arquivo)}</span></span>${ed?'<button type="button" class="btn small ghost deldoc">Remover</button>':''}</div>`).join('')||'<p class="note" style="margin:0">Nenhum documento anexado.</p>')
-    +(ed?`<div class="row">${cfg.cats.map(c=>`<span class="btn small fotobtn">📎 ${c}<input type="file" accept="${ACCEPT}" data-cat="${c}" aria-label="Anexar ${c}"></span>`).join('')}</div><p class="note" style="margin:0">Foto ou PDF. ${MOD==='pagar'?'Os arquivos vão para a pasta Contas a pagar.':MOD==='tesouraria'?'Os arquivos vão para a pasta Tesouraria.':''}</p>`:'');
+    +(ed?`<div class="row">${cfg.cats.map(c=>`<span class="btn small fotobtn">📎 ${c}<input type="file" accept="${ACCEPT}" data-cat="${c}" multiple aria-label="Anexar ${c}"></span>`).join('')}</div><p class="note" style="margin:0">Foto ou PDF. ${MOD==='pagar'?'Pode anexar mais de um documento no mesmo lançamento (ex.: o boleto e a nota fiscal): clique em cada botão. ':''}${MOD==='pagar'?'Os arquivos vão para a pasta Contas a pagar.':MOD==='tesouraria'?'Os arquivos vão para a pasta Tesouraria.':''}</p>`:'');
 }
 $('rDocs').addEventListener('change',async e=>{if(e.target.type!=='file'||!e.target.files[0])return;const cli=regCli();
   const dt=$('rFields').querySelector('[data-k="'+MODCFG[MOD].dataK+'"]').value||TODAY;
   toast('Enviando arquivo…');
-  const arq=e.target.files[0];
-  try{RDOCS.push({...await uploadAnexo(arq,cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast('Arquivo anexado')}catch(err){toast(err.message);return}
+  // mais de um arquivo de uma vez (ex.: boleto em duas páginas): todos entram no mesmo lançamento (Carol, 04/11)
+  const arqs=[...e.target.files],arq=arqs[0];e.target.value='';
+  try{for(const a of arqs)RDOCS.push({...await uploadAnexo(a,cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast(arqs.length>1?arqs.length+' arquivos anexados':'Arquivo anexado')}catch(err){toast(err.message);await renderRDocs();return}
   // PDF com vários recibos de pagamento (folha, 13º): monta o relatório de líquidos sozinho
   if(MOD==='pagar'&&!RLIQ&&/pdf$/i.test(arq.type||arq.name))try{const l=await lerRecibos(await arq.arrayBuffer(),await nomesCadastro(cli.id));
     if(l.length>=2){RLIQ=l;renderRLiq();toast(`Recibos de pagamento: li ${l.length} pessoas. Confira o relatório de líquidos.`)}
@@ -9451,6 +9452,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04rdoc',data:'2026-11-04',t:'Boletos e notas: mais de um documento no lançamento',itens:[
+    {x:'Rotina diária › Boletos e notas fiscais a pagar: dá para anexar o boleto e a nota fiscal no mesmo lançamento (clique em cada botão) e escolher vários arquivos de uma vez.'}]},
   {k:'2026-11-04anx',data:'2026-11-04',t:'Anexos nos lançamentos da Gestão financeira',itens:[
     {x:'Contas a pagar, Contas a receber, Movimentação financeira e Extrato da conta: ao abrir ou lançar uma conta, tem agora a parte “📎 Anexos”. Escolha o tipo (Boleto ou fatura, Comprovante, Nota fiscal ou Outros) e arraste o arquivo ou clique para procurar. Foto ou PDF.'},
     {x:'Conta parcelada: marque “Adicionar em todas as parcelas” para o mesmo arquivo ir para todas. A janela da conta também mostra a lista de todas as parcelas, com vencimento, valor e situação.'},
