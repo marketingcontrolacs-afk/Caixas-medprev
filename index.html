@@ -1228,6 +1228,11 @@ body.lg header.top .logo{visibility:hidden}
   <div class="db" id="gtdBody"></div>
   <div class="df" id="gtdFoot"></div>
 </dialog>
+<dialog id="dlgBol" style="width:min(1200px,calc(100vw - 32px))">
+  <div class="dh"><h2 id="bolTitle">Boletos e notas enviados pelo cliente</h2></div>
+  <div class="db" id="bolBody"></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="trazer">Trazer os marcados</button></div>
+</dialog>
 <dialog id="dlgGF">
   <form id="gfForm" novalidate>
     <div class="dh"><h2 id="gfTitle"></h2></div>
@@ -6473,27 +6478,73 @@ async function gtBoletos(cli){
   if(error||cliAtual()?.id!==cli.id||VIEW!=='gfpagar')return;
   const ja=new Set(GT.lista.map(t=>t.origem_id).filter(Boolean)),novos=(data||[]).filter(r=>!ja.has(r.id));
   GT.boletos=novos;$('gtImp').hidden=!novos.length;
-  $('gtImp').textContent=`Trazer boletos enviados (${novos.length})`;
+  $('gtImp').textContent=`Boletos e notas do cliente para validar (${novos.length})`;$('gtImp').classList.toggle('primary',!!novos.length);
+}
+// Boletos e notas enviados pelo cliente: o escritório confere cada um e escolhe se vira conta nova ou se vai para uma conta
+// que já está lançada (prevista ou recorrente, sem boleto). O documento do cliente fica ligado à conta escolhida (Carol, 04/11)
+const dlgBol=$('dlgBol');let BOL=null;
+const bolAbertas=()=>GT.lista.filter(t=>t.tipo==='pagar'&&!t.origem_id&&!(GT.movs[t.id]||[]).length&&!(GT.rem?.[t.id]&&GT.rem[t.id].status!=='excluido'&&GT.rem[t.id].status!=='recusado'));
+const bolMesmo=(t,r)=>r.pessoa_id&&t.pessoa_id===r.pessoa_id||pessoaChave(t.pessoa_nome)===pessoaChave(r.pessoa_nome);
+const bolDias=(a,b)=>Math.round(Math.abs(dObj(a)-dObj(b))/864e5);
+// sugestão: mesmo fornecedor, vencimento até 20 dias de diferença; prefere a prevista, depois a de valor igual e a de data mais perto
+function bolSugere(r,livres){
+  const c=livres.filter(t=>bolMesmo(t,r)&&bolDias(t.vencimento,r.vencimento)<=20);
+  c.sort((a,b)=>(b.previsto-a.previsto)||((Math.abs(a.valor-r.valor)>0.004)-(Math.abs(b.valor-r.valor)>0.004))||bolDias(a.vencimento,r.vencimento)-bolDias(b.vencimento,r.vencimento));
+  return c[0]||null;
+}
+const bolOpt=(t,r)=>`<option value="${t.id}">${dBR(t.vencimento)} · ${esc(t.pessoa_nome||'—')} · ${fm(t.valor)}${t.parcelas>1?` · parcela ${t.parcela}/${t.parcelas}`:''}${t.previsto?' · prevista':''}${t.descricao?' · '+esc(t.descricao).slice(0,40):''}</option>`;
+function bolDesenha(){
+  const livres=bolAbertas(),usadas=new Set(BOL.it.map(x=>x.dest).filter(d=>d&&d!=='nova'));
+  $('bolBody').innerHTML=`<p class="note" style="margin:0">Confira cada boleto ou nota que o cliente enviou na Rotina diária. Em “Lançar como”, escolha <b>Conta nova</b> ou a conta que já está lançada (prevista ou recorrente) para o documento ficar anexado nela. Quando o sistema acha a conta do mesmo fornecedor com vencimento perto, ela já vem escolhida. Quando você registrar o pagamento aqui, o boleto também fica como pago na tela do cliente.</p>
+  <div class="tablebox" style="max-height:none"><table><thead><tr><th></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos do cliente</th><th class="l">Lançar como</th></tr></thead><tbody>${BOL.it.map((x,i)=>{const r=x.row,b=x.bol;
+    const mesmo=livres.filter(t=>bolMesmo(t,r)&&(t.id===x.dest||!usadas.has(t.id))),outras=livres.filter(t=>!bolMesmo(t,r)&&bolDias(t.vencimento,r.vencimento)<=30&&(t.id===x.dest||!usadas.has(t.id)));
+    const t=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null,dif=t&&Math.abs(t.valor-r.valor)>0.004;
+    return `<tr><td><input type="checkbox" data-bolok="${i}"${x.ok?' checked':''} aria-label="Trazer este"></td><td>${dBR(r.vencimento)}</td><td class="l"><b>${esc(b.fornecedor||'')}</b></td><td class="l">${esc(b.sobre||'')||'<span class="muted">—</span>'}</td><td class="l">${esc(b.documento||'')||'<span class="muted">—</span>'}</td><td>${fm(r.valor)}</td>
+      <td class="l">${(BOL.docs[b.id]||[]).map(d=>`<a href="${BOL.urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria||'Anexo')}</a>`).join('<br>')||'<span class="neg">sem anexo</span>'}</td>
+      <td class="l"><select data-boldest="${i}" aria-label="Lançar como" style="max-width:340px"><option value="nova">Conta nova</option>${mesmo.length?`<optgroup label="Contas lançadas deste fornecedor">${mesmo.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}${outras.length?`<optgroup label="Outras contas em aberto perto do vencimento">${outras.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}</select>
+      ${t?`<br><span class="chip c-done">Vai para a conta já lançada</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`:''}`:''}</td></tr>`}).join('')}</tbody></table></div>`;
+  BOL.it.forEach((x,i)=>{const s=document.querySelector(`[data-boldest="${i}"]`);if(s)s.value=x.dest||'nova'});
 }
 $('gtImp').onclick=async()=>{
   const cli=cliAtual(),ls=GT.boletos||[];if(!cli||!ls.length)return;
-  if(!confirm(`Trazer ${ls.length} ${ls.length===1?'boleto ou nota enviado':'boletos ou notas enviados'} pelo cliente para o contas a pagar? Quando você registrar o pagamento aqui, o boleto também fica como pago na tela do cliente.`))return;
   $('gtImp').disabled=true;
   try{
     const pes=await gfPessoasDe(cli.id,'fornecedor');
     const acha=r=>pes.find(p=>r.fornecedor_bc&&p.fornecedor_bc===r.fornecedor_bc)||pes.find(p=>chave(p.nome)===chave(r.fornecedor)||chave(p.fantasia)===chave(r.fornecedor));
-    const rows=ls.map(r=>{const p=acha(r);return {cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||r.fornecedor,descricao:r.sobre||null,documento:r.documento||null,
-      categoria:r.categoria_ok?r.categoria:null,vencimento:r.vencimento,valor:r.valor,forma:'Boleto',linha_digitavel:r.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:r.id,obs:r.obs||null}});
-    // o boleto que chega no lugar de uma conta prevista (mesmo fornecedor, vencimento até 20 dias de diferença) atualiza a prevista
-    const prev=GT.lista.filter(t=>t.previsto&&t.tipo==='pagar'&&!(GT.movs[t.id]||[]).length),novos=[];let subst=0;
-    for(const r of rows){const i=prev.findIndex(t=>(r.pessoa_id&&t.pessoa_id===r.pessoa_id||chave(t.pessoa_nome)===chave(r.pessoa_nome))&&Math.abs(dObj(t.vencimento)-dObj(r.vencimento))<=20*864e5);
-      if(i<0){novos.push(r);continue}
-      const t=prev.splice(i,1)[0],{error}=await sb.from('fin_titulos').update({...r,categoria:r.categoria||t.categoria,conta_id:t.conta_id,descricao:r.descricao||t.descricao,previsto:false,obs:r.obs}).eq('id',t.id);if(error)throw error;subst++}
-    if(novos.length){const {error}=await sb.from('fin_titulos').insert(novos);if(error)throw error}
-    toast(`${rows.length} ${rows.length===1?'conta trazida':'contas trazidas'} para o contas a pagar`+(subst?` (${subst} no lugar de ${subst===1?'conta prevista':'contas previstas'})`:''));
-  }catch(e){fail(e,'Não foi possível trazer os boletos')}
-  $('gtImp').disabled=false;GT.key='';renderGT();
+    const docs={};const {data:dd}=await sb.from('documentos').select('*').in('registro_id',ls.map(r=>r.id));(dd||[]).forEach(d=>(docs[d.registro_id]||=[]).push(d));
+    const urls=await signed((dd||[]).map(d=>d.caminho).filter(Boolean)).catch(()=>({}));
+    const livres=bolAbertas(),it=[];
+    for(const b of ls){const p=acha(b),row={cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||b.fornecedor,descricao:b.sobre||null,documento:b.documento||null,
+      categoria:b.categoria_ok?b.categoria:null,vencimento:b.vencimento,valor:b.valor,forma:'Boleto',linha_digitavel:b.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:b.id,obs:b.obs||null};
+      const s=bolSugere(row,livres);if(s)livres.splice(livres.indexOf(s),1);it.push({bol:b,row,dest:s?s.id:'nova',ok:true})}
+    BOL={cli,it,docs,urls:urls||{}};
+    $('bolTitle').textContent=`Boletos e notas enviados pelo cliente (${ls.length})`;bolDesenha();dlgBol.showModal();
+  }catch(e){fail(e,'Não foi possível abrir os boletos enviados')}
+  $('gtImp').disabled=false;
 };
+dlgBol.addEventListener('change',ev=>{const d=ev.target.dataset;
+  if(d.boldest!==undefined){BOL.it[+d.boldest].dest=ev.target.value;bolDesenha()}
+  if(d.bolok!==undefined)BOL.it[+d.bolok].ok=ev.target.checked});
+dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]')?.dataset.act;if(!a)return;
+  if(a==='fechar')return dlgBol.close();
+  if(a!=='trazer'||!BOL)return;
+  const sel=BOL.it.filter(x=>x.ok);if(!sel.length)return toast('Marque pelo menos um boleto ou nota.');
+  const bt=ev.target.closest('button');bt.disabled=true;let novas=0,ligadas=0;
+  try{
+    const ins=[];
+    for(const x of sel){const r=x.row;
+      if(x.dest==='nova'){ins.push(r);continue}
+      const t=GT.lista.find(y=>y.id===x.dest);if(!t){ins.push(r);continue}
+      // vai para a conta já lançada: o boleto manda no vencimento, no valor e no documento; o resto da conta continua como estava
+      const {error}=await sb.from('fin_titulos').update({...r,pessoa_id:r.pessoa_id||t.pessoa_id,pessoa_nome:r.pessoa_id?r.pessoa_nome:t.pessoa_nome||r.pessoa_nome,categoria:r.categoria||t.categoria,conta_id:t.conta_id,
+        descricao:r.descricao||t.descricao,documento:r.documento||t.documento,pix_chave:r.pix_chave||t.pix_chave,previsto:false,obs:[t.obs,r.obs].filter(Boolean).join(' | ')||null}).eq('id',t.id);
+      if(error)throw error;ligadas++}
+    if(ins.length){const {error}=await sb.from('fin_titulos').insert(ins);if(error)throw error;novas=ins.length}
+    toast([novas?`${novas} ${novas===1?'conta nova':'contas novas'}`:'',ligadas?`${ligadas} ${ligadas===1?'boleto anexado em conta já lançada':'boletos anexados em contas já lançadas'}`:''].filter(Boolean).join(' e '));
+    dlgBol.close();
+  }catch(e){fail(e,'Não foi possível trazer os boletos')}
+  bt.disabled=false;GT.key='';renderGT();
+});
 // conta prevista pelo histórico: avisa até chegar o boleto ou a nota
 const prevTxt=t=>t.forma==='Boleto'?'Falta o boleto':t.categoria==='Salário'?'Previsto: confirmar valor':'Falta o boleto ou a nota';
 const gtFalta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
@@ -7157,6 +7208,8 @@ async function relCarrega(cli){
     tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')).then(l=>l.map(c=>({...c,nome:(CLIENTES.find(x=>x.id===c.cliente_id)?.nome||'')+' · '+c.nome}))):gfContasDe(cli.id,true)]);
   REL.plano=await planoDe(cli);REL.nat=Object.fromEntries(REL.plano.filter(c=>c.tipo).map(c=>[c.categoria,c.tipo]));
   REL.fats=await todas(()=>emp(sb.from('fin_faturas').select('*'))).catch(()=>[]);   // antes do v52 não existe
+  // boletos e notas que o cliente enviou na Rotina diária e o escritório ainda não validou (Carol, 04/11)
+  REL.bolEnv=await todas(()=>emp(sb.from('contas_pagar').select('id')).eq('conferido',false)).then(l=>{const ja=new Set(tits.map(t=>t.origem_id).filter(Boolean));return l.filter(r=>!ja.has(r.id)).length}).catch(()=>0);
   REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
   REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
   movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
@@ -7340,6 +7393,7 @@ function dsDesenha(cli){
   const fatAb=new Set(REL.movs.filter(m=>m.fatura&&REL.cart.has(m.conta_id)).filter(m=>{const c=REL.contas.find(x=>x.id===m.conta_id);return ftFech(c,m.fatura)<=TODAY&&!REL.fats.some(f=>f.conta_id===c.id&&f.mes===m.fatura)}).map(m=>m.conta_id+m.fatura)).size;
   const pAlt=PPEND.filter(x=>(cli.id==='*'||x.cli===cli.id)&&x.t==='alt').length,pNovo=PPEND.filter(x=>(cli.id==='*'||x.cli===cli.id)&&x.t==='novo').length;
   const pend=[[pAlt,qt(pAlt,'alteração de conta de parceiro','alterações de conta de parceiro'),'repasse:alerta'],[pNovo,qt(pNovo,'parceiro novo para conferir','parceiros novos para conferir'),'repasse:alerta'],[apV.length,qt(apV.length,'conta a pagar vencida','contas a pagar vencidas'),'gfpagar'],[arV.length,qt(arV.length,'conta a receber vencida','contas a receber vencidas'),'gfinad'],
+    [REL.bolEnv||0,qt(REL.bolEnv||0,'boleto ou nota enviado pelo cliente para validar','boletos ou notas enviados pelo cliente para validar'),'gfpagar'],
     [prevS,qt(prevS,'conta prevista sem boleto ou nota (vence em 10 dias)','contas previstas sem boleto ou nota (vencem em 10 dias)'),'gfpagar'],[catRev,qt(catRev,'lançamento com categoria a revisar (estorno ou devolução)','lançamentos com categoria a revisar (estorno ou devolução)'),'gfmov:revisar'],[REL.movs.filter(m=>m.validar).length,qt(REL.movs.filter(m=>m.validar).length,'lançamento do histórico a validar','lançamentos do histórico a validar'),'gfmov:validar'],[semCat,qt(semCat,'lançamento sem categoria (últimos 90 dias)','lançamentos sem categoria (últimos 90 dias)'),'gfmov'],
     [naoConc,qt(naoConc,'lançamento não conciliado com o banco (últimos 30 dias)','lançamentos não conciliados com o banco (últimos 30 dias)'),'gfconc'],[fatAb,qt(fatAb,'fatura de cartão para fechar','faturas de cartão para fechar'),'gffatura']].filter(p=>p[0]);
   // as tarefas da pessoa nesta empresa (ex.: alteração de conta de parceiro, v76) entram primeiro
@@ -9314,6 +9368,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04bol',data:'2026-11-04',t:'Boletos e notas do cliente: validar e anexar na conta lançada',itens:[
+    {x:'Gestão financeira › Contas a pagar: o botão “Boletos e notas do cliente para validar” abre a lista do que o cliente enviou na Rotina diária, com os anexos para abrir.',para:'esc'},
+    {x:'Em cada um, escolha “Conta nova” ou a conta que já está lançada (prevista ou recorrente). O sistema já sugere a conta do mesmo fornecedor com vencimento perto. O boleto ou a nota fica anexado nessa conta e o aviso “Falta o boleto” sai.',para:'esc'},
+    {x:'O Dashboard da empresa mostra nas pendências quantos boletos e notas do cliente faltam validar.',para:'esc'}]},
   {k:'2026-11-04fs',data:'2026-11-04',t:'Férias: parcela fica marcada como solicitada',itens:[
     {x:'RH › Férias: depois de gerar a “Solicitação para a contabilidade”, a parcela fica marcada “Solicitada” com a data, na janela e na lista de férias. Na próxima vez a caixinha dela já vem desmarcada.'},
     {x:'Se a data da parcela mudar depois, ela volta a ficar sem a marca, para você solicitar de novo.'}]},
