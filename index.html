@@ -157,6 +157,7 @@ tfoot td{font-weight:700;background:var(--sunk)}
 .tablebox td.l{white-space:normal;overflow-wrap:break-word;min-width:60px}
 .tablebox td:has(.btn),.tablebox td:has(.chip){white-space:normal}
 .tablebox td .btn+.btn{margin-top:2px}
+.gxext th,.gxext td{padding:4px 6px}
 }
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
@@ -708,7 +709,7 @@ body.lg header.top .logo{visibility:hidden}
     </div>
     <div id="gxBanco">
     <div class="tiles" id="gxTiles"></div>
-    <div class="card tablebox"><table><thead id="gxHead"></thead><tbody id="gxBody"></tbody></table></div>
+    <div class="card tablebox gxext"><table><thead id="gxHead"></thead><tbody id="gxBody"></tbody></table></div>
     <p class="note" id="gxNote"></p>
     </div>
     <!-- conta Tesouraria: o extrato traz a revisão do que o cliente lança na Tesouraria (antes Gestão financeira › Tesouraria; Carol, 03/11) -->
@@ -8022,11 +8023,11 @@ function gxDesenha(){
   const c=GX.conta,mu=t=>`<span class="muted">${t}</span>`,L=gxLinhas();
   const E=r2(GX.per.filter(m=>m.tipo==='entrada').reduce((x,m)=>x+(+m.valor),0)),S=r2(GX.per.filter(m=>m.tipo==='saida').reduce((x,m)=>x+(+m.valor),0)),F=r2(GX.ant+E-S);
   const antes=isoLocal(new Date(dObj(GX.ini).getTime()-864e5));
-  $('gxHead').innerHTML='<tr><th>Data</th><th class="l">Descrição</th><th class="l">Fornecedor ou cliente</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>';
-  $('gxBody').innerHTML=`<tr><td>${dBR(antes)}</td><td class="l muted" colspan="5">Saldo anterior</td><td class="${GX.ant<0?'neg':''}"><b>${fm(GX.ant)}</b></td></tr>`
-    +L.map(x=>x.m?`<tr${x.m.titulo_id?'':` class="click" data-id="${x.m.id}" tabindex="0"`}><td>${dBR(x.m.data)}</td><td class="l">${esc(x.m.descricao||'')||mu('—')}${x.m.transf_id?` ${mu('· transferência')}`:x.m.titulo_id?'':` ${mu('· avulso')}`}${x.m.ofx_id?` <span class="pos" title="Conciliado com o extrato do banco">✓</span>`:''}${x.m.categoria?`<br>${mu(esc(x.m.categoria))}`:''}</td><td class="l">${esc(x.m.pessoa_nome||'')}</td><td class="l">${esc(x.m.documento||'')}</td><td class="pos">${x.m.tipo==='entrada'?fm(x.m.valor):''}</td><td class="neg">${x.m.tipo==='saida'?fm(x.m.valor):''}</td><td class="muted">${fm(x.saldo)}</td></tr>`
-      :`<tr style="background:var(--sunk)"><td><b>${dBR(x.dia)}</b></td><td class="l" colspan="3"><b>Total do dia</b></td><td><b>${x.ent?fm(x.ent):''}</b></td><td><b>${x.sai?fm(x.sai):''}</b></td><td class="${x.saldo<0?'neg':''}"><b>${fm(x.saldo)}</b></td></tr>`).join('')
-    +(GX.per.length?'':`<tr><td class="l muted" colspan="7">Nenhuma entrada ou saída no período.</td></tr>`);
+  $('gxHead').innerHTML='<tr><th>Data</th><th class="l">Fornecedor ou cliente</th><th class="l">Categoria</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>';
+  $('gxBody').innerHTML=`<tr><td>${dBR(antes)}</td><td class="l muted" colspan="6">Saldo anterior</td><td class="${GX.ant<0?'neg':''}"><b>${fm(GX.ant)}</b></td></tr>`
+    +L.map(x=>x.m?`<tr${x.m.titulo_id?'':` class="click" data-id="${x.m.id}" tabindex="0"`}><td>${dBR(x.m.data)}</td><td class="l">${esc(x.m.pessoa_nome||'')}</td><td class="l">${esc(x.m.categoria||'')||mu('—')}</td><td class="l">${esc(x.m.descricao||'')||mu('—')}${x.m.transf_id?` ${mu('· transferência')}`:x.m.titulo_id?'':` ${mu('· avulso')}`}${x.m.ofx_id?` <span class="pos" title="Conciliado com o extrato do banco">✓</span>`:''}</td><td class="l">${esc(x.m.documento||'')}</td><td class="pos">${x.m.tipo==='entrada'?fm(x.m.valor):''}</td><td class="neg">${x.m.tipo==='saida'?fm(x.m.valor):''}</td><td class="muted">${fm(x.saldo)}</td></tr>`
+      :`<tr style="background:var(--sunk)"><td><b>${dBR(x.dia)}</b></td><td class="l" colspan="4"><b>Total do dia</b></td><td><b>${x.ent?fm(x.ent):''}</b></td><td><b>${x.sai?fm(x.sai):''}</b></td><td class="${x.saldo<0?'neg':''}"><b>${fm(x.saldo)}</b></td></tr>`).join('')
+    +(GX.per.length?'':`<tr><td class="l muted" colspan="8">Nenhuma entrada ou saída no período.</td></tr>`);
   $('gxTiles').innerHTML=[['Saldo anterior',fm(GX.ant),'em '+dBR(antes)],['Entradas',fm(E),GX.per.filter(m=>m.tipo==='entrada').length+' lançamentos'],['Saídas',fm(S),GX.per.filter(m=>m.tipo==='saida').length+' lançamentos'],['Saldo final',fm(F),'em '+dBR(GX.fim)]]
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===3&&F<0?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gxSub').textContent=`${c.nome}${c.banco?' · '+c.banco:''}${c.agencia||c.conta?` · Ag. ${c.agencia||'—'} · ${c.conta||'—'}`:''}. Confira o saldo de cada dia com o extrato do banco.`;
@@ -9325,6 +9326,7 @@ async function agBadge(){
 const NOVIDADES=[
   {k:'2026-11-04tc',data:'2026-11-04',t:'Telas inteiras, sem rolar para o lado',itens:[
     {x:'As listas (contas a pagar e a receber, movimentação financeira, extrato, conciliação e as outras telas) agora cabem na largura da tela: a letra ficou um pouco menor e os textos longos quebram linha dentro da coluna. Não precisa mais puxar a barra para o lado para ver todas as colunas.'},
+    {x:'Extrato da conta no modelo do Bom Controle: a categoria ganhou coluna própria, ao lado do fornecedor ou cliente, e as linhas ficaram mais baixas para caber mais lançamentos na tela.'},
     {x:'Em monitores grandes o portal usa mais a largura da tela. O botão de tela cheia continua onde já existia.'}]},
   {k:'2026-11-04fs',data:'2026-11-04',t:'Férias: parcela fica marcada como solicitada',itens:[
     {x:'RH › Férias: depois de gerar a “Solicitação para a contabilidade”, a parcela fica marcada “Solicitada” com a data, na janela e na lista de férias. Na próxima vez a caixinha dela já vem desmarcada.'},
