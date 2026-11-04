@@ -9085,7 +9085,9 @@ $('avFiltro').onchange=renderAvisos;
 // (as mesmas da janela "Você tem tarefas pendentes"); nada muda nas Tarefas.
 // =====================================================================
 let AGR=[],AGF=new Set(),AGDIA=null,AGDLG=null,AGNT={t:null,dia:null,txt:null};
-const AGREP={nao:'Só neste dia',diario:'Todo dia',uteis:'Dias úteis (segunda a sexta)',semanal:'Dias da semana marcados',mensal:'Todo mês'};
+const AGREP={nao:'Só neste dia',diario:'Todo dia',uteis:'Dias úteis (segunda a sexta)',semanal:'Dias da semana marcados',mensal:'Todo mês',ate_concluir:'Até concluir (aparece todo dia até marcar como feita)'};
+// "Até concluir" (Carol, 04/11): aparece do dia escolhido em diante, todo dia, até ser marcada como feita. AGCONC = id → dia em que foi feita
+let AGCONC={};
 const AGDS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const agV90=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/agenda_/.test(e.message||''));
 const AGV90MSG='A Agenda precisa da atualização v90 do banco. Rode o SQL “v90 - Agenda” no Supabase.';
@@ -9093,7 +9095,8 @@ const agD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const agMais=(s,n)=>{const d=agD(s);d.setDate(d.getDate()+n);return isoLocal(d)};
 const agSeg=s=>{const d=agD(s),w=(d.getDay()+6)%7;return agMais(s,-w)};   // semana de segunda a domingo
 const agK=(id,s)=>id+'|'+s;
-function agNoDia(r,s){
+function agNoDia(r,s,conc){
+  if(r.repete==='ate_concluir'){const f=(conc||AGCONC)[r.id];return s>=r.data_inicio&&(!f||s<=f)}
   if(s<r.data_inicio||(r.data_fim&&s>r.data_fim))return false;
   const d=agD(s),w=d.getDay();
   if(r.repete==='nao')return s===r.data_inicio;
@@ -9104,6 +9107,8 @@ function agNoDia(r,s){
   if(r.repete==='mensal'){const di=+r.data_inicio.slice(8),ult=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return d.getDate()===Math.min(di,ult)}
   return false;
 }
+// dia em que cada "Até concluir" foi feita (o primeiro)
+const agConc=(rs,fs)=>{const ac=new Set(rs.filter(r=>r.repete==='ate_concluir').map(r=>r.id)),m={};fs.forEach(f=>{if(ac.has(f.rotina_id)&&(!m[f.rotina_id]||f.data<m[f.rotina_id]))m[f.rotina_id]=f.data});return m};
 const agDoDia=s=>AGR.filter(r=>agNoDia(r,s)).sort((a,b)=>String(a.hora||'99').localeCompare(String(b.hora||'99'))||a.titulo.localeCompare(b.titulo));
 // compromissos de um dia só que passaram sem marcar
 const agAtras=()=>AGR.filter(r=>r.repete==='nao'&&r.data_inicio<TODAY&&!AGF.has(agK(r.id,r.data_inicio))).sort((a,b)=>a.data_inicio.localeCompare(b.data_inicio));
@@ -9112,11 +9117,12 @@ async function agCarrega(){
   const {data:rs,error}=await sb.from('agenda_rotinas').select('*').order('hora',{ascending:true,nullsFirst:false});
   if(error)return error;
   AGR=rs||[];AGF=new Set();
-  const ids=AGR.filter(r=>r.repete==='nao'&&r.data_inicio<TODAY).map(r=>r.id);
+  const ids=AGR.filter(r=>r.repete==='nao'&&r.data_inicio<TODAY||r.repete==='ate_concluir').map(r=>r.id);
   const [a,b]=await Promise.all([sb.from('agenda_feitos').select('rotina_id,data').gte('data',ini<TODAY?ini:TODAY).lte('data',fim>TODAY?fim:TODAY),
     ids.length?sb.from('agenda_feitos').select('rotina_id,data').in('rotina_id',ids):{data:[]}]);
   if(a.error)return a.error;
   [...(a.data||[]),...(b.data||[])].forEach(f=>AGF.add(agK(f.rotina_id,f.data)));
+  AGCONC=agConc(AGR,b.data||[]);
   return null;
 }
 async function renderAgenda(){
@@ -9139,7 +9145,7 @@ function agDesenha(){
   $('agProg').textContent=l.length?`${feitas} de ${l.length} feitas`:'';
   const item=(r,d,atr)=>{const f=AGF.has(agK(r.id,d));
     return `<div class="agit${f?' feito':''}" data-id="${r.id}" data-d="${d}"><input type="checkbox"${f?' checked':''} aria-label="Marcar “${esc(r.titulo)}” como feita"><span class="h">${r.hora?r.hora.slice(0,5):'—'}</span>
-      <span class="t"><b>${esc(r.titulo)}</b>${r.prioridade==='alta'?' <span class="chip c-warn">Importante</span>':''}${atr?` <span class="chip c-bad">de ${dBR(d)}</span>`:''}${r.repete!=='nao'?` <span class="chip c-none">${r.repete==='semanal'?(r.dias_semana||[]).map(Number).sort().map(w=>AGDS[w]).join(', '):AGREP[r.repete].replace(/ \(.*\)/,'')}</span>`:''}${r.descricao?`<small>${esc(r.descricao)}</small>`:''}</span>
+      <span class="t"><b>${esc(r.titulo)}</b>${r.prioridade==='alta'?' <span class="chip c-warn">Importante</span>':''}${atr?` <span class="chip c-bad">de ${dBR(d)}</span>`:''}${r.repete==='ate_concluir'?` <span class="chip c-warn">Até concluir${r.data_inicio<d?' · desde '+dBR(r.data_inicio):''}</span>`:r.repete!=='nao'?` <span class="chip c-none">${r.repete==='semanal'?(r.dias_semana||[]).map(Number).sort().map(w=>AGDS[w]).join(', '):AGREP[r.repete].replace(/ \(.*\)/,'')}</span>`:''}${r.descricao?`<small>${esc(r.descricao)}</small>`:''}</span>
       <span class="acts">${atr?'<button type="button" class="btn small ghost" data-act="hoje">Passar para hoje</button>':''}<button type="button" class="btn small ghost" data-act="editar" aria-label="Editar “${esc(r.titulo)}”">Editar</button></span></div>`};
   const atr=s===TODAY?agAtras():[];
   $('agRot').innerHTML=(l.length?`<div class="agbar"><i style="width:${Math.round(feitas/l.length*100)}%"></i></div>`:'')
@@ -9202,6 +9208,7 @@ $('agRot').addEventListener('change',async e=>{
   cb.disabled=false;
   if(error){cb.checked=!cb.checked;return fail(error,agV90(error)?AGV90MSG:'Não foi possível marcar')}
   if(cb.checked)AGF.add(k);else AGF.delete(k);
+  const ra=AGR.find(x=>x.id===id);if(ra?.repete==='ate_concluir'){if(cb.checked){if(!AGCONC[id]||d<AGCONC[id])AGCONC[id]=d}else if(AGCONC[id]===d)delete AGCONC[id]}
   agDesenha();agBadge();
 });
 $('agRot').addEventListener('click',async e=>{
@@ -9223,19 +9230,19 @@ function agAbrir(r){
     <label class="f">Repetir<select id="ag_rep">${Object.entries(AGREP).map(([k,t])=>`<option value="${k}"${k===rep?' selected':''}>${t}</option>`).join('')}</select></label>
     <div class="f wide" id="ag_diasBox"${rep==='semanal'?'':' hidden'}><span>Em quais dias</span><div class="agdias">${[1,2,3,4,5,6,0].map(w=>`<label><input type="checkbox" value="${w}"${dias.includes(w)?' checked':''}>${AGDS[w]}</label>`).join('')}</div></div>
     <label class="f"><span id="ag_iniL">${rep==='nao'?'Dia':'A partir de'}</span><input type="date" id="ag_ini" value="${r?.data_inicio||AGDIA}"></label>
-    <label class="f" id="ag_fimBox"${rep==='nao'?' hidden':''}>Repetir até (opcional)<input type="date" id="ag_fim" value="${r?.data_fim||''}"></label>
+    <label class="f" id="ag_fimBox"${rep==='nao'||rep==='ate_concluir'?' hidden':''}>Repetir até (opcional)<input type="date" id="ag_fim" value="${r?.data_fim||''}"></label>
     <label class="f"><span>Prioridade</span><select id="ag_pri"><option value="normal">Normal</option><option value="alta"${r?.prioridade==='alta'?' selected':''}>Importante</option></select></label>
     <label class="f wide">Detalhes (opcional)<textarea id="ag_desc" rows="3">${esc(r?.descricao||'')}</textarea></label></div>
     <p class="note" style="margin:0">Só você vê a sua agenda.</p><p class="err" id="agdErr" hidden></p>`;
   const b=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-act="${act}">${txt}</button>`;
   // rotina que repete e já começou: dá para encerrar e manter o que foi marcado nos dias anteriores
-  const encerra=r&&r.repete!=='nao'&&r.data_inicio<AGDIA&&(!r.data_fim||r.data_fim>=AGDIA);
+  const encerra=r&&r.repete!=='nao'&&r.repete!=='ate_concluir'&&r.data_inicio<AGDIA&&(!r.data_fim||r.data_fim>=AGDIA);
   $('agdFoot').innerHTML=(r?b('excluir','Excluir','ghost'):'')+(encerra?b('encerrar','Parar a partir de '+dBR(AGDIA),'ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+b('salvar','Salvar','primary');
   if(!dlgAg.open)dlgAg.showModal();
   $('ag_tit').focus();
 }
 $('agdBody').addEventListener('change',e=>{if(e.target.id!=='ag_rep')return;const v=e.target.value;
-  $('ag_diasBox').hidden=v!=='semanal';$('ag_fimBox').hidden=v==='nao';$('ag_iniL').textContent=v==='nao'?'Dia':'A partir de'});
+  $('ag_diasBox').hidden=v!=='semanal';$('ag_fimBox').hidden=v==='nao'||v==='ate_concluir';$('ag_iniL').textContent=v==='nao'?'Dia':'A partir de'});
 const agdErr=x=>{$('agdErr').textContent=x;$('agdErr').hidden=false};
 $('agdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const r=AGDLG,act=b.dataset.act;
   if(act==='fechar')return dlgAg.close();
@@ -9246,7 +9253,7 @@ $('agdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-
   if(act==='encerrar'){
     const {error}=await sb.from('agenda_rotinas').update({data_fim:agMais(AGDIA,-1)}).eq('id',r.id);if(error)return fail(error);
     toast('A rotina não aparece mais a partir de '+dBR(AGDIA));dlgAg.close();renderAgenda();agBadge();return}
-  const titulo=$('ag_tit').value.trim(),repete=$('ag_rep').value,ini=$('ag_ini').value,fim=repete==='nao'?null:$('ag_fim').value||null;
+  const titulo=$('ag_tit').value.trim(),repete=$('ag_rep').value,ini=$('ag_ini').value,fim=repete==='nao'||repete==='ate_concluir'?null:$('ag_fim').value||null;
   const dias=[...document.querySelectorAll('#ag_diasBox input:checked')].map(x=>+x.value);
   if(!titulo)return agdErr('Diga o que precisa ser feito.');
   if(!ini)return agdErr('Escolha o dia.');
@@ -9258,7 +9265,7 @@ $('agdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-
     if(error)throw error;
     toast(r?'Rotina salva':'Rotina lançada na agenda');dlgAg.close();
     if(!r&&repete==='nao'&&ini!==AGDIA)AGDIA=ini;renderAgenda();agBadge()}
-  catch(x){console.error(x);agdErr(agV90(x)?AGV90MSG:'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
+  catch(x){console.error(x);agdErr(agV90(x)?AGV90MSG:x.code==='23514'&&repete==='ate_concluir'?'A opção “Até concluir” precisa da atualização v91 do banco. Rode o SQL “v91” no Supabase.':'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
   finally{b.disabled=false}
 });
 // número no menu: rotinas de hoje ainda não feitas e compromissos que ficaram para trás
@@ -9267,11 +9274,13 @@ async function agBadge(){
   if(!ME||!AGBOK)return;
   const {data:rs,error}=await sb.from('agenda_rotinas').select('id,repete,dias_semana,data_inicio,data_fim').or(`data_fim.is.null,data_fim.gte.${TODAY}`);
   if(error){if(agV90(error))AGBOK=false;return}
-  const hoje=(rs||[]).filter(r=>agNoDia(r,TODAY)),atr=(rs||[]).filter(r=>r.repete==='nao'&&r.data_inicio<TODAY),ids=[...new Set([...hoje,...atr].map(r=>r.id))];
+  const acIds=(rs||[]).filter(r=>r.repete==='ate_concluir').map(r=>r.id);
+  const fac=acIds.length?((await sb.from('agenda_feitos').select('rotina_id,data').in('rotina_id',acIds)).data||[]):[],conc=agConc(rs||[],fac);
+  const hoje=(rs||[]).filter(r=>agNoDia(r,TODAY,conc)),atr=(rs||[]).filter(r=>r.repete==='nao'&&r.data_inicio<TODAY),ids=[...new Set([...hoje,...atr].map(r=>r.id))];
   let feitos=new Set();
   const desde=atr.reduce((m,r)=>r.data_inicio<m?r.data_inicio:m,TODAY);
   if(ids.length){const {data:fs}=await sb.from('agenda_feitos').select('rotina_id,data').in('rotina_id',ids).gte('data',desde).lte('data',TODAY);(fs||[]).forEach(f=>feitos.add(agK(f.rotina_id,f.data)))}
-  const n=hoje.filter(r=>!feitos.has(agK(r.id,TODAY))).length+atr.filter(r=>!feitos.has(agK(r.id,r.data_inicio))).length;
+  const n=hoje.filter(r=>r.repete==='ate_concluir'?!conc[r.id]:!feitos.has(agK(r.id,TODAY))).length+atr.filter(r=>!feitos.has(agK(r.id,r.data_inicio))).length;
   if((NAVBADGE.agenda||0)!==n){NAVBADGE.agenda=n;renderNav()}
 }
 // =====================================================================
@@ -9280,6 +9289,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04ag2',data:'2026-11-04',t:'Agenda: rotina “Até concluir”',itens:[
+    {x:'Comunicação › Agenda: em “Repetir” agora tem “Até concluir”. A rotina aparece no dia escolhido e continua aparecendo nos dias seguintes até você marcar como feita.'}]},
   {k:'2026-11-04h',data:'2026-11-04',t:'Cadastro de usuários: marcar a coluna inteira',itens:[
     {x:'Privilégios de acesso: clique no olho, no lápis ou no cadeado do alto de cada coluna para marcar todas as telas daquela coluna de uma vez. Clicar de novo desmarca. Depois dá para ajustar tela por tela.',para:'esc'}]},
   {k:'2026-11-04g',data:'2026-11-04',t:'Gestão financeira liberável para o operador cliente',itens:[
