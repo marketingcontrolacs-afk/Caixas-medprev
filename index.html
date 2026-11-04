@@ -749,6 +749,19 @@ body.lg header.top .logo{visibility:hidden}
       <input id="nfBusca" placeholder="Buscar parceiro ou CNPJ" style="max-width:240px">
     </div>
     <div class="tiles" id="nfTiles"></div>
+    <div class="card" id="nfPg" hidden style="padding:14px 16px;margin-bottom:14px">
+      <div class="row" style="justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap">
+        <div><h2 style="margin:0">Repasses pagos: notas a emitir</h2><p class="sub" id="nfPgSub" style="margin:4px 0 0"></p></div>
+        <div class="row" style="align-items:flex-end;flex-wrap:wrap">
+          <label class="f">Empresa que pagou<select id="nfPgEmp"></select></label>
+          <label class="f">Mês do pagamento<select id="nfPgMes"></select></label>
+          <label class="f">Mostrar<select id="nfPgF"><option value="pend">Falta emitir a NF</option><option value="feita">NF emitida</option><option value="nao">Não emitir NF</option><option value="todos">Todos os pagos</option></select></label>
+          <button class="btn primary" id="nfPgMarca" disabled>Marcar NF emitida</button>
+        </div>
+      </div>
+      <div class="tablebox" style="margin-top:10px;max-height:420px;overflow:auto"><table><thead id="nfPgHead"></thead><tbody id="nfPgBody"></tbody></table></div>
+      <p class="note" id="nfPgNote" style="margin:8px 0 0"></p>
+    </div>
     <div class="card tablebox nfgrid"><table><thead id="nfHead"></thead><tbody id="nfBody"></tbody></table></div>
     <p class="note" id="nfNote"></p>
   </section>
@@ -9314,6 +9327,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04nfr',data:'2026-11-04',t:'Notas fiscais: repasses pagos aparecem para emitir',itens:[
+    {x:'Gestão financeira › Parceiros › Notas fiscais: no alto aparece “Repasses pagos: notas a emitir”, com os repasses que a empresa escolhida pagou (ex.: os pagos na MP Chopinzinho aparecem nas notas da MP Chopinzinho).',mods:['gfnf']},
+    {x:'Para cada repasse aparecem a data do pagamento, o parceiro, o CNPJ, o valor e o protocolo. Clique em “NF emitida” (ou marque vários e use “Marcar NF emitida”) quando a nota for feita. A nota entra sozinha no mês da emissão na tabela de baixo, e “Desfazer” tira.',mods:['gfnf']}]},
   {k:'2026-11-04fs',data:'2026-11-04',t:'Férias: parcela fica marcada como solicitada',itens:[
     {x:'RH › Férias: depois de gerar a “Solicitação para a contabilidade”, a parcela fica marcada “Solicitada” com a data, na janela e na lista de férias. Na próxima vez a caixinha dela já vem desmarcada.'},
     {x:'Se a data da parcela mudar depois, ela volta a ficar sem a marca, para você solicitar de novo.'}]},
@@ -10290,7 +10306,7 @@ const NF={grupos:[],grupo:null,parc:[],nfs:[],ano:+TODAY.slice(0,4),dlg:null};
 const MES3=MESES.map(m=>m.slice(0,3));
 const v77=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/nf_mensal/.test(e.message||''));
 const v77Msg='Esta tela precisa da atualização v77 do banco (Controle de notas fiscais). Rode o SQL no Supabase.';
-function nfVazio(t,cls){['nfBar','nfNovo','nfImp','nfXls'].forEach(id=>$(id).hidden=true);$('nfTiles').innerHTML='';$('nfHead').innerHTML='';$('nfBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('nfNote').innerHTML=''}
+function nfVazio(t,cls){['nfBar','nfNovo','nfImp','nfXls','nfPg'].forEach(id=>$(id).hidden=true);$('nfTiles').innerHTML='';$('nfHead').innerHTML='';$('nfBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('nfNote').innerHTML=''}
 async function renderNF(recarrega=true){
   const cli=cliAtual();
   if(!cli)return nfVazio('Escolha uma empresa.');
@@ -10316,6 +10332,7 @@ async function renderNF(recarrega=true){
   const ef=$('nfEmp'),ec=ef.value;ef.innerHTML='<option value="">Todas do grupo</option>'+emps.map(id=>`<option value="${id}">${esc(rnEmpNome(id))}</option>`).join('');
   if([...ef.options].some(o=>o.value===ec))ef.value=ec;$('nfEmp').closest('label').hidden=emps.length<2;
   nfDesenha();
+  nfPgCarrega(recarrega);
 }
 // parceiros do controle + nomes que só aparecem nas notas
 function nfLinhas(){
@@ -10438,6 +10455,113 @@ $('nfXls').onclick=()=>{
   const ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map((h,i)=>({wch:i===1||i===2?40:i===0?16:i===3?20:i>=4&&i<16?6:12}));xTabela(ws,{texto:[1,2]});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Controle NF');XLSX.writeFile(wb,`Controle NF ${NF.grupo.nome} ${NF.ano}.xlsx`);
 };
+// Repasses pagos → notas a emitir (Carol, 04/11; v93): os repasses pagos por uma empresa do grupo aparecem no
+// Controle de notas fiscais dessa empresa (ex.: pagos na MP Chopinzinho → NF de Chopinzinho), para o operador
+// saber quais notas emitir. “NF emitida” marca o repasse (repasse_itens.nf_emitida_em) e soma a nota no mês da emissão.
+const NFP={key:'',cli:'',itens:[],sel:new Set()};
+const v93=e=>e&&(e.code==='PGRST204'||e.code==='42703'||/nf_emitida|nf_numero|nf_marcada/.test(e.message||''));
+const v93Msg='Para marcar a nota como emitida, rode antes a atualização v93 do banco (Repasses pagos no Controle de notas fiscais) no Supabase.';
+const nfPgParc=it=>NF.parc.find(p=>p.id===it.parceiro_nf_id)||NF.parc.find(p=>chave(p.nome)===chave(it.nome)||(p.nomes||[]).some(n=>chave(n)===chave(it.nome)))||null;
+const nfPgSit=it=>nfPgParc(it)?.situacao||'sem';
+const nfPgCls=it=>it.nf_emitida_em?'feita':nfPgSit(it)==='nao_emitir'?'nao':'pend';
+async function nfPgCarrega(recarrega){
+  const G=NF.grupo,cli=cliAtual();if(!G||!cli)return;$('nfPg').hidden=false;
+  const emps=G.empresas||[],sel=$('nfPgEmp'),cur=sel.value;
+  sel.innerHTML=(emps.length>1?'<option value="">Todas do grupo</option>':'')+emps.map(id=>`<option value="${id}">${esc(rnEmpNome(id))}</option>`).join('');
+  // ao trocar a empresa no alto, mostra os pagamentos dela; depois respeita o que a pessoa escolher aqui
+  if(NFP.cli===cli.id&&[...sel.options].some(o=>o.value===cur))sel.value=cur;else sel.value=emps.includes(cli.id)?cli.id:(sel.options[0]?.value||'');
+  NFP.cli=cli.id;
+  const ms=$('nfPgMes'),mc=ms.value;ms.innerHTML='<option value="">Todos</option>'+MESES.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');ms.value=mc;
+  const key=G.id+'|'+NF.ano;
+  if(recarrega||NFP.key!==key){
+    NFP.key='';$('nfPgHead').innerHTML='';$('nfPgBody').innerHTML='<tr><td class="l muted">Carregando os repasses pagos…</td></tr>';$('nfPgSub').textContent='';$('nfPgNote').textContent='';
+    try{
+      const its=await todas(()=>sb.from('repasse_itens').select('*').eq('grupo_id',G.id).not('titulo_id','is',null).gte('criado_em',(NF.ano-1)+'-12-01').lt('criado_em',(NF.ano+1)+'-01-01').order('nome'));
+      const ids=[...new Set(its.map(i=>i.titulo_id))],tits={};
+      for(let i=0;i<ids.length;i+=200){const c=ids.slice(i,i+200);
+        const [t,m]=await Promise.all([sb.from('fin_titulos').select('id,valor').in('id',c),sb.from('fin_movimentos').select('titulo_id,valor,juros,desconto,data').in('titulo_id',c)]);
+        if(t.error)throw t.error;if(m.error)throw m.error;
+        t.data.forEach(x=>tits[x.id]={valor:+x.valor,pago:0,data:null});
+        m.data.forEach(x=>{const tt=tits[x.titulo_id];if(tt){tt.pago=r2(tt.pago+abat(x));if(!tt.data||x.data>tt.data)tt.data=x.data}})}
+      if(key!==G.id+'|'+NF.ano||NF.grupo!==G)return;   // trocou de empresa/ano enquanto carregava
+      NFP.itens=its.filter(i=>{const t=tits[i.titulo_id];return t&&t.data&&t.pago>=t.valor-0.004&&+t.data.slice(0,4)===NF.ano}).map(i=>({...i,pago_em:tits[i.titulo_id].data}));
+      NFP.key=key;NFP.sel.clear();
+    }catch(e){console.error(e);$('nfPgBody').innerHTML=`<tr><td class="l neg">${v75(e)?v75Msg:'Erro ao carregar os repasses pagos. Verifique a internet e tente de novo.'}</td></tr>`;return}
+  }
+  nfPgDesenha();
+}
+function nfPgFiltrados(){const emp=$('nfPgEmp').value,mes=$('nfPgMes').value;
+  return NFP.itens.filter(i=>(!emp||i.empresa_id===emp)&&(!mes||+i.pago_em.slice(5,7)===+mes))}
+function nfPgDesenha(){
+  if(!NFP.key)return;
+  const base=nfPgFiltrados(),f=$('nfPgF').value,emp=$('nfPgEmp').value,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+(+i.valor||0),0));
+  const rows=base.filter(i=>f==='todos'||nfPgCls(i)===f).sort((a,b)=>b.pago_em.localeCompare(a.pago_em)||a.nome.localeCompare(b.nome));
+  [...NFP.sel].forEach(id=>{if(!rows.some(r=>r.id===id&&!r.nf_emitida_em))NFP.sel.delete(id)});
+  const pend=base.filter(i=>nfPgCls(i)==='pend'),feita=base.filter(i=>i.nf_emitida_em);
+  $('nfPgSub').innerHTML=`${emp?'Pagos pela '+esc(rnEmpNome(emp)):'Pagos pelas empresas do grupo'} em ${$('nfPgMes').value?MESES[$('nfPgMes').value-1].toLowerCase()+' de ':''}${NF.ano}: <b>${pend.length} ${pend.length===1?'nota a emitir':'notas a emitir'}</b> (${fm(soma(pend))}) · ${feita.length} já ${feita.length===1?'emitida':'emitidas'}.`;
+  const sitChip=it=>{const s=nfPgSit(it);return `<span class="chip ${RNSIT[s][1]}">${RNSIT[s][0]}</span>`};
+  const nota=it=>it.nf_emitida_em?`<span class="chip c-ok">✓ Emitida ${dBR(it.nf_emitida_em)}</span>${it.nf_numero?' '+mu('nº '+esc(it.nf_numero)):''} <button type="button" class="btn small ghost" data-pg="desfaz">Desfazer</button>`
+    :`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button>`;
+  const todasSel=rows.filter(i=>!i.nf_emitida_em);
+  $('nfPgHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="nfPgTodas" style="width:auto" title="Selecionar todos do filtro"${todasSel.length&&todasSel.every(i=>NFP.sel.has(i.id))?' checked':''}></th><th class="l">Pago em</th><th class="l">Parceiro</th><th>Valor</th>${emp?'':'<th class="l">Pago pela</th>'}<th class="l">Protocolo</th><th class="l">Situação</th><th class="l">Nota fiscal</th></tr>`;
+  $('nfPgBody').innerHTML=rows.map(it=>{const p=nfPgParc(it);
+    return `<tr data-id="${it.id}"><td>${it.nf_emitida_em?'':`<input type="checkbox" class="nfpgck" style="width:auto"${NFP.sel.has(it.id)?' checked':''}>`}</td><td class="l" style="white-space:nowrap">${dBR(it.pago_em)}</td>
+      <td class="l" style="white-space:normal;min-width:200px"><b>${esc(it.nome)}</b>${p&&(p.nome_global||p.cpf_cnpj)?'<br>'+mu([p.nome_global&&chave(p.nome_global)!==chave(it.nome)?esc(p.nome_global):'',esc(p.cpf_cnpj||'')].filter(Boolean).join(' · ')):''}</td>
+      <td><b>${fm(it.valor)}</b></td>${emp?'':`<td class="l" style="white-space:nowrap">${esc(rnEmpNome(it.empresa_id))}</td>`}<td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td><td class="l">${sitChip(it)}</td><td class="l" style="white-space:nowrap">${nota(it)}</td></tr>`}).join('')
+    ||`<tr><td></td><td class="l muted" colspan="${emp?6:7}">${NFP.itens.length?'Nenhum repasse pago neste filtro.':'Nenhum repasse pago em '+NF.ano+' ainda. Os repasses aparecem aqui quando são marcados como pagos no Repasse de parceiros.'}</td></tr>`;
+  const n=NFP.sel.size;$('nfPgMarca').disabled=!n;$('nfPgMarca').textContent=n?`Marcar NF emitida (${n})`:'Marcar NF emitida';
+  $('nfPgNote').textContent=`${rows.length} de ${base.length} repasses pagos. Ao marcar “NF emitida”, a nota entra sozinha no mês da emissão na tabela de baixo.`;
+}
+['nfPgEmp','nfPgMes','nfPgF'].forEach(id=>$(id).addEventListener('change',()=>{NFP.sel.clear();nfPgDesenha()}));
+$('nfAno').addEventListener('change',()=>nfPgCarrega(false));
+$('nfPg').addEventListener('change',e=>{
+  if(e.target.id==='nfPgTodas'){const l=nfPgFiltrados().filter(i=>!i.nf_emitida_em&&($('nfPgF').value==='todos'||nfPgCls(i)===$('nfPgF').value));l.forEach(i=>e.target.checked?NFP.sel.add(i.id):NFP.sel.delete(i.id));return nfPgDesenha()}
+  if(e.target.classList.contains('nfpgck')){const id=e.target.closest('tr').dataset.id;e.target.checked?NFP.sel.add(id):NFP.sel.delete(id);nfPgDesenha()}});
+$('nfPgBody').addEventListener('click',async e=>{const b=e.target.closest('[data-pg]');if(!b)return;const it=NFP.itens.find(i=>i.id===b.closest('tr').dataset.id);if(!it)return;
+  if(b.dataset.pg==='marca')return nfPgAbre([it]);
+  if(!confirm(`Desfazer a nota de ${it.nome}? O repasse volta para “Falta emitir a NF” e a nota sai do mês da emissão.`))return;
+  b.disabled=true;
+  try{const {error}=await sb.from('repasse_itens').update({nf_emitida_em:null,nf_numero:null,nf_marcada_por:null,nf_marcada_em:null}).eq('id',it.id);if(error)throw error;
+    await nfPgMensal(it,-1,it.nf_emitida_em,it.nf_numero);Object.assign(it,{nf_emitida_em:null,nf_numero:null});toast('Nota desfeita');nfDesenha();nfPgDesenha()}
+  catch(x){console.error(x);alert(v93(x)?v93Msg:'Não foi possível desfazer: '+(x.message||x));b.disabled=false}});
+$('nfPgMarca').onclick=()=>{const l=NFP.itens.filter(i=>NFP.sel.has(i.id)&&!i.nf_emitida_em);if(l.length)nfPgAbre(l)};
+function nfPgAbre(l){
+  NF.dlg={modo:'pg',l};
+  $('nfdTit').textContent=l.length===1?'Nota fiscal de '+l[0].nome:`Notas fiscais de ${l.length} repasses`;
+  const nao=l.filter(i=>nfPgCls(i)==='nao').length;
+  $('nfdBody').innerHTML=`<p class="note" style="margin:0 0 10px">${l.length===1?`Repasse de ${fm(l[0].valor)} pago em ${dBR(l[0].pago_em)} pela ${esc(rnEmpNome(l[0].empresa_id))}.`:`${l.length} repasses · ${fm(r2(l.reduce((x,i)=>x+(+i.valor||0),0)))}.`}</p>
+    <div class="fields"><label class="f">Data da emissão<input id="nfgD" type="date" value="${TODAY}"></label>
+    ${l.length===1?'<label class="f">Número da nota (opcional)<input id="nfgN" placeholder="Ex.: 1234"></label>':''}</div>
+    ${nao?`<p class="note" style="margin:8px 0 0"><span class="chip c-bad">Atenção</span> ${nao===1&&l.length===1?'Este parceiro está':nao+' parceiros estão'} como “Não emitir NF”. Confira antes de marcar.</p>`:''}
+    <p class="note" style="margin:8px 0 0">A nota entra também na tabela de notas do mês da emissão.</p><p class="err" id="nfdErr" hidden></p>`;
+  $('nfdFoot').querySelector('[data-act="excluir"]').hidden=true;dlgNF.showModal();
+}
+// soma (+1) ou tira (-1) a nota do repasse no controle do mês da emissão (nf_mensal)
+async function nfPgMensal(it,delta,data,numero){
+  if(!data)return;const p=nfPgParc(it),nome=p?.nome||it.nome,comp=data.slice(0,7),ex=NF.nfs.find(n=>n.nome===nome&&n.competencia===comp);
+  const nums=s=>String(s||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(delta<0){if(!ex)return;
+    if(ex.quantidade<=1){const {error}=await sb.from('nf_mensal').delete().eq('id',ex.id);if(error)throw error;NF.nfs=NF.nfs.filter(n=>n.id!==ex.id);return}
+    const r={quantidade:ex.quantidade-1,valor:ex.valor!=null?Math.max(0,r2(+ex.valor-(+it.valor||0))):null,numeros:nums(ex.numeros).filter(x=>x!==String(numero||'').trim()).join(', ')||null,atualizado_em:new Date().toISOString()};
+    const {error}=await sb.from('nf_mensal').update(r).eq('id',ex.id);if(error)throw error;Object.assign(ex,r);return}
+  const reg={grupo_id:NF.grupo.id,nome,competencia:comp,quantidade:(ex?.quantidade||0)+1,valor:ex?(ex.valor!=null?r2(+ex.valor+(+it.valor||0)):null):(+it.valor||null),
+    numeros:[...nums(ex?.numeros),...(numero?[String(numero).trim()]:[])].join(', ')||null,empresa_id:ex?.empresa_id||it.empresa_id||null,obs:ex?.obs||null,atualizado_em:new Date().toISOString()};
+  const {data:d,error}=await sb.from('nf_mensal').upsert(reg,{onConflict:'grupo_id,nome,competencia'}).select().single();if(error)throw error;
+  NF.nfs=[...NF.nfs.filter(n=>!(n.nome===nome&&n.competencia===comp)),d];if(p&&p.situacao==='nao_emitido')p.situacao='emite';
+}
+// o botão Salvar da janela de notas trata também o modo 'pg' (antes do tratamento das notas do mês e do parceiro)
+$('nfdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act="salvar"]'),d=NF.dlg;if(!b||d?.modo!=='pg')return;e.stopImmediatePropagation();
+  const err=t=>{$('nfdErr').textContent=t;$('nfdErr').hidden=false};
+  const data=$('nfgD').value,num=$('nfgN')?.value.trim()||null;if(!data)return err('Informe a data da emissão.');
+  b.disabled=true;let feitos=0;
+  try{for(const it of d.l){
+      const {error}=await sb.from('repasse_itens').update({nf_emitida_em:data,nf_numero:num,nf_marcada_por:ME?.user_id||null,nf_marcada_em:new Date().toISOString()}).eq('id',it.id);if(error)throw error;
+      Object.assign(it,{nf_emitida_em:data,nf_numero:num});NFP.sel.delete(it.id);feitos++;
+      await nfPgMensal(it,1,data,num)}
+    toast(feitos===1?'Nota marcada como emitida':feitos+' notas marcadas como emitidas');dlgNF.close();
+  }catch(x){console.error(x);err((v93(x)?v93Msg:'Não foi possível salvar: '+(x.message||x))+(feitos?` (${feitos} já ${feitos===1?'foi marcada':'foram marcadas'})`:''))}
+  finally{b.disabled=false;nfDesenha();nfPgDesenha()}
+},true);
 // período no modelo do Bom Controle em todas as telas com De/Até
 [['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
