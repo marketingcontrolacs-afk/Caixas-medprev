@@ -764,7 +764,7 @@ body.lg header.top .logo{visibility:hidden}
       <button class="btn" id="pcXls" hidden>Baixar Excel</button>
     </div>
     <div class="card" id="pcModo" hidden style="padding:16px 18px;margin-top:16px;display:grid;gap:10px">
-      <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="padrao" style="width:auto;margin-top:4px"><span><b>Usar o plano padrão</b><br><span class="muted">O mesmo para todas as empresas. Ele é editado em Configurações › Categorias.</span></span></label>
+      <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="padrao" style="width:auto;margin-top:4px"><span><b>Usar o plano padrão</b><br><span class="muted">O mesmo para todas as empresas. Ele é editado aqui mesmo: o que mudar vale para todas as empresas que usam o padrão.</span></span></label>
       <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="radio" name="pcModo" value="proprio" style="width:auto;margin-top:4px"><span><b>Usar um plano próprio desta empresa</b><br><span class="muted">Começa como uma cópia do padrão. Depois pode incluir, renomear e desativar categorias só para esta empresa.</span></span></label>
     </div>
     <form class="card row" id="pcForm" hidden style="padding:16px 18px;margin-top:16px;align-items:flex-end">
@@ -773,6 +773,9 @@ body.lg header.top .logo{visibility:hidden}
       <label class="f">Código<input id="pcCod" readonly placeholder="automático" style="max-width:110px" title="O código é o próximo da sequência do grupo"></label>
       <label class="f">Tipo<select id="pcTipo" disabled><option>Despesa</option><option>Receita</option></select></label>
       <button class="btn primary" type="submit">Adicionar categoria</button>
+      <details style="flex:1 1 100%"><summary class="note" style="cursor:pointer">Colar várias categorias de uma vez (uma por linha; pode copiar a coluna do Excel)</summary>
+        <div style="display:grid;gap:8px;margin-top:8px"><textarea id="pcCola" rows="4" placeholder="Energia elétrica&#10;Aluguel&#10;Material de escritório"></textarea>
+        <div class="row"><button class="btn small" type="button" id="pcColaBtn">Adicionar as coladas</button><span class="note">As que já existem são mantidas.</span></div></div></details>
     </form>
     <div class="toolbar"><input id="pcBusca" placeholder="Buscar categoria ou código" style="max-width:260px"><label class="f">Mostrar<select id="pcFiltro"><option value="ativos">Ativas</option><option value="inativos">Inativas</option><option value="todos">Todas</option></select></label></div>
     <div class="card tablebox"><table><thead id="pcHead"></thead><tbody id="pcBody"></tbody></table></div>
@@ -783,7 +786,7 @@ body.lg header.top .logo{visibility:hidden}
   <section id="viewGF" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="gfH1">Cadastros</h1><p class="sub" id="gfSub"></p></div>
-      <button class="btn primary" id="gfNovo"></button>
+      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gfFbc" hidden title="Planilha de fornecedores exportada do Bom Controle. Os que faltarem entram aqui, valendo para todas as empresas, e a exportação para o Bom Controle usa o nome e o CNPJ/CPF como estão lá.">Importar fornecedores do Bom Controle<input type="file" id="fbcFile" accept=".xls,.xlsx,.csv" aria-label="Importar fornecedores do Bom Controle"></span><button class="btn primary" id="gfNovo"></button></div>
     </div>
     <div class="toolbar"><input id="gfBusca" placeholder="Buscar por nome, CNPJ/CPF ou cidade" style="max-width:300px"><label class="f" id="gfPapelBox">É<select id="gfPapel"><option value="">Clientes e fornecedores</option><option value="cliente">Clientes</option><option value="fornecedor">Fornecedores</option></select></label><label class="f">Mostrar<select id="gfFiltro"><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></label></div>
     <div class="card tablebox"><table><thead id="gfHead"></thead><tbody id="gfBody"></tbody></table></div>
@@ -866,7 +869,7 @@ body.lg header.top .logo{visibility:hidden}
       <button role="tab" aria-selected="true" data-tab="cadastro">Empresas e usuários</button>
       <button role="tab" aria-selected="false" data-tab="mapa">Mapeamento Bom Controle</button>
       <button role="tab" aria-selected="false" data-tab="cats">Categorias</button>
-      <button role="tab" aria-selected="false" data-tab="fbc">Fornecedores</button>
+      <button role="tab" aria-selected="false" data-tab="fbc" hidden>Fornecedores</button>
     </div>
     <div id="tabCadastro">
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
@@ -912,7 +915,7 @@ body.lg header.top .logo{visibility:hidden}
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Fornecedores do Bom Controle</h2>
         <p class="note" style="margin:0">Importe a planilha de fornecedores exportada do Bom Controle. Na conferência, cada lançamento é ligado a um fornecedor daqui, e a exportação usa o nome e o CNPJ/CPF exatamente como estão no Bom Controle. Importar de novo atualiza a lista.</p>
-        <div class="row"><span class="btn small primary fotobtn">Importar planilha de fornecedores<input type="file" id="fbcFile" accept=".xls,.xlsx,.csv" aria-label="Importar planilha de fornecedores"></span><span class="note" id="fbcTotal"></span></div>
+        <div class="row"><span class="note" id="fbcTotal"></span></div>
         <input id="fbcBusca" placeholder="Buscar por nome ou CNPJ/CPF" style="max-width:360px">
         <div class="tablebox" style="margin:0;max-height:420px;overflow:auto"><table class="cfg" id="tbFbc"></table></div>
       </div>
@@ -921,10 +924,8 @@ body.lg header.top .logo{visibility:hidden}
       <p class="note" id="catAviso" style="margin:16px 0 0"></p>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Plano de contas</h2>
-        <p class="note" style="margin:0">Plano de contas padrão, que vale para todas as empresas sem plano próprio. Use “+ Nova categoria” para cadastrar uma, ou cole várias, uma por linha (pode copiar a coluna do Excel); as que já existem são mantidas. O grupo e o plano de cada empresa ficam em Gestão financeira › Plano de contas.</p>
-        <textarea id="catCola" rows="4" placeholder="Energia elétrica&#10;Aluguel&#10;Material de escritório"></textarea>
-        <div class="row"><button class="btn small primary" id="catNovaBtn">+ Nova categoria</button><button class="btn small" id="catImport">Adicionar as coladas</button><span class="note" id="catTotal"></span></div>
-        <div class="tablebox" style="margin:0;max-height:260px;overflow:auto"><table class="cfg" id="tbPlano"></table></div>
+        <p class="note" style="margin:0">O plano de contas (o padrão e o de cada empresa) fica num lugar só: Gestão financeira › Plano de contas. Lá dá para incluir, colar várias, mudar código, grupo e tipo, desativar e tirar categorias. Aqui ficam as regras que sugerem a categoria.</p>
+        <div class="row"><button class="btn small primary" type="button" id="catAbrePlano">Abrir o Plano de contas</button><span class="note" id="catTotal"></span></div>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <h2>Regras por palavra</h2>
@@ -1410,7 +1411,7 @@ const NAV=[
   {k:'cfg',t:'Empresas e usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
-  {k:'cfgfbc',t:'Fornecedores',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  // Configurações › Fornecedores (Bom Controle) foi unificado em Gestão financeira › Clientes e fornecedores (Carol, 04/11)
 ];
 const NAVBADGE={};
 // módulos no topo (um ícone cada); as seções e as telas abrem num painel, como no Bom Controle
@@ -1470,7 +1471,9 @@ function empresasDe(m){
 function empresasMod(m){
   // dashboard: as empresas em que a pessoa tem algum acesso (o escritório, todas)
   if(m==='gfdash')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()||ACESSOS.some(a=>a.cliente_id===c.id)));
-  if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh:temEm(c.id,'colab')));
+  if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh||m==='colab'&&c.bpo_beneficios:temEm(c.id,'colab')));
+  // empresa com "RH só benefícios" (MP/MPA, Carol 04/11): o escritório vê o Pedido de benefícios e os colaboradores dela
+  if(m==='ben'&&ehEsc())return CLIENTES.filter(c=>c.ativo!==false&&(c.bpo_rh||c.bpo_beneficios));
   // premiação: o próprio cliente informa, nas empresas cujo modelo da folha tem a seção
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
@@ -2194,9 +2197,9 @@ $('fbcFile').onchange=async e=>{
       const k=soNum(doc)||'nome:'+chave(razao);if(out[k])return;
       out[k]={chave:k,documento:doc||null,razao_social:razao,fantasia:col(o,'Nome Fantasia')||null,tipo:col(o,'Tipo Pessoa (PJ/PF)','Tipo Pessoa')||null,bloqueado:/^sim$/i.test(col(o,'Bloqueado')),atualizado_em:new Date().toISOString()}});
     const lista=Object.values(out);if(!lista.length){toast('Não achei a coluna Razão Social na planilha.');return}
-    $('fbcTotal').textContent=`Importando ${lista.length} fornecedores...`;
+    $('fbcTotal').textContent=`Importando ${lista.length} fornecedores...`;toast(`Importando ${lista.length} fornecedores...`);
     for(let i=0;i<lista.length;i+=500){const {error}=await sb.from('fornecedores_bc').upsert(lista.slice(i,i+500));if(error)throw error}
-    toast(lista.length+' fornecedores importados');renderFbc();
+    toast(lista.length+' fornecedores importados');renderFbc();if(VIEW==='gfpes'){GFKEY=null;GFP.key='';renderGF()}
   }catch(ex){fail(ex,'Não foi possível importar')}
 };
 
@@ -2464,19 +2467,20 @@ async function renderCats(){
   $('catAviso').innerHTML=PCAT.ok?'':'<span class="neg">Rode a atualização v8 do banco no Supabase para usar as categorias.</span>';
   $('catTotal').textContent=PCAT.plano.length+(PCAT.plano.length===1?' categoria':' categorias');
   $('catsList').innerHTML=catOpts();
-  $('tbPlano').innerHTML=`<thead><tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Tipo</th><th></th></tr></thead><tbody>${PCAT.plano.map(c=>`<tr data-cat="${esc(c.categoria)}"><td><input data-k="codigo" value="${esc(c.codigo)}" placeholder="Código" style="max-width:110px"></td><td class="l">${esc(c.categoria)}</td><td><select data-k="tipo"><option${c.tipo==='Despesa'?' selected':''}>Despesa</option><option${c.tipo==='Receita'?' selected':''}>Receita</option></select></td><td><button type="button" class="btn small ghost" data-del="plano">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="4">Nenhuma categoria ainda.</td></tr>'}</tbody>`;
+  if($('tbPlano'))$('tbPlano').innerHTML=`<thead><tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Tipo</th><th></th></tr></thead><tbody>${PCAT.plano.map(c=>`<tr data-cat="${esc(c.categoria)}"><td><input data-k="codigo" value="${esc(c.codigo)}" placeholder="Código" style="max-width:110px"></td><td class="l">${esc(c.categoria)}</td><td><select data-k="tipo"><option${c.tipo==='Despesa'?' selected':''}>Despesa</option><option${c.tipo==='Receita'?' selected':''}>Receita</option></select></td><td><button type="button" class="btn small ghost" data-del="plano">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="4">Nenhuma categoria ainda.</td></tr>'}</tbody>`;
   $('tbRegras').innerHTML=`<thead><tr><th class="l">Palavra</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${PCAT.regras.map(r=>`<tr data-id="${r.id}"><td class="l">${esc(r.palavra)}</td><td class="l">${esc(r.categoria)}</td><td><button type="button" class="btn small ghost" data-del="regra">Tirar</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">Nenhuma regra ainda.</td></tr>'}</tbody>`;
   const fs=Object.values(PCAT.forn);
   $('tbForn').innerHTML=`<thead><tr><th class="l">Fornecedor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${fs.map(f=>`<tr data-k="${esc(f.fornecedor_chave)}"><td class="l">${esc(f.fornecedor)}</td><td><input data-k="categoria" list="catsList" value="${esc(f.categoria)}"></td><td><button type="button" class="btn small ghost" data-del="forn">Esquecer</button></td></tr>`).join('')||'<tr><td class="l muted" colspan="3">O sistema ainda não aprendeu nenhum fornecedor.</td></tr>'}</tbody>`;
 }
-$('catImport').onclick=async()=>{
+$('catAbrePlano').onclick=()=>go('gfplano');
+if($('catImport'))$('catImport').onclick=async()=>{
   const linhas=[...new Set($('catCola').value.split(/\r?\n/).map(l=>l.split('\t')[0].trim()).filter(Boolean))];
   if(!linhas.length)return $('catNovaBtn').click();
   const {error}=await sb.from('plano_contas').upsert(linhas.map(c=>({categoria:c})),{onConflict:'categoria',ignoreDuplicates:true});
   if(error){fail(error);return}
   $('catCola').value='';toast(linhas.length+' categorias adicionadas');renderCats();
 };
-$('catNovaBtn').onclick=async()=>{if(await catNova(null,'Despesa'))renderCats()};
+if($('catNovaBtn'))$('catNovaBtn').onclick=async()=>{if(await catNova(null,'Despesa'))renderCats()};
 $('formRegra').addEventListener('submit',async e=>{e.preventDefault();
   const palavra=$('rgPalavra').value.trim(),categoria=$('rgCat').value.trim();
   if(!palavra||!categoria){toast('Informe a palavra e a categoria.');return}
@@ -2497,8 +2501,8 @@ const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a 
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th><th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td><td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   // permissões de cada usuário do cliente: empresa › módulos (nível)
   const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Master: tudo, inclusive Configurações, Plano de contas, regras e tarefas restritas';
@@ -5956,7 +5960,7 @@ async function renderGF(){
   $('gfNovo').textContent=contas?'+ Nova conta':'+ Novo cadastro';
   $('gfSub').textContent=contas?'Contas bancárias da empresa, usadas nas contas a pagar e a receber, na conciliação do extrato (OFX) e na remessa ao banco. Se a empresa tem cartão de crédito, cadastre-o aqui com o tipo “Cartão de crédito”.'
     :'Quem paga e quem recebe da empresa. Os fornecedores do Bom Controle valem para todas as empresas. Ao digitar o CNPJ, os dados vêm da Receita; ao digitar o CEP, o endereço vem dos Correios.';
-  $('gfNovo').hidden=!cli;
+  $('gfNovo').hidden=!cli;$('gfFbc').hidden=contas||!ehAdm();
   if(!cli){gfVazio('Escolha uma empresa.');return}
   const key=gfTab+'|'+cli.id;
   if(key!==GFKEY){
@@ -7484,11 +7488,11 @@ async function renderPC(){
   const rows=ordPlano(ls).filter(p=>(f==='todos'||(f==='ativos')===(p.ativo!==false))&&(!q||chave((p.codigo||'')+' '+p.categoria+' '+(p.grupo||'')).includes(q)));
   // o padrão vale para todas as empresas que não têm plano próprio; o próprio só para esta
   const grupos=[...new Set(ls.map(p=>p.grupo).filter(Boolean))].sort();
-  $('pcHead').innerHTML=`<tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Grupo na DRE</th><th class="l">Tipo</th><th class="l">Ativa</th>${pr?'<th></th>':''}</tr>`;
-  $('pcBody').innerHTML=`<datalist id="pcGrupos">${grupos.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>`+rows.map(p=>`<tr data-id="${esc(pr?p.id:p.categoria)}"><td class="l"><input data-k="codigo" value="${esc(p.codigo||'')}" style="max-width:100px"></td><td class="l">${pr?`<input data-k="categoria" value="${esc(p.categoria)}" style="min-width:220px">`:esc(p.categoria)}</td><td class="l"><input data-k="grupo" list="pcGrupos" value="${esc(p.grupo||'')}" style="min-width:170px"></td><td class="l"><select data-k="tipo"><option${p.tipo!=='Receita'?' selected':''}>Despesa</option><option${p.tipo==='Receita'?' selected':''}>Receita</option></select></td><td class="l"><input type="checkbox" data-k="ativo" style="width:auto"${p.ativo!==false?' checked':''}></td>${pr?`<td><button type="button" class="btn small ghost" data-del="${p.id}">Apagar</button></td>`:''}</tr>`).join('')
+  $('pcHead').innerHTML=`<tr><th class="l">Código</th><th class="l">Categoria</th><th class="l">Grupo na DRE</th><th class="l">Tipo</th><th class="l">Ativa</th><th></th></tr>`;
+  $('pcBody').innerHTML=`<datalist id="pcGrupos">${grupos.map(g=>`<option value="${esc(g)}">`).join('')}</datalist>`+rows.map(p=>`<tr data-id="${esc(pr?p.id:p.categoria)}"><td class="l"><input data-k="codigo" value="${esc(p.codigo||'')}" style="max-width:100px"></td><td class="l">${pr?`<input data-k="categoria" value="${esc(p.categoria)}" style="min-width:220px">`:esc(p.categoria)}</td><td class="l"><input data-k="grupo" list="pcGrupos" value="${esc(p.grupo||'')}" style="min-width:170px"></td><td class="l"><select data-k="tipo"><option${p.tipo!=='Receita'?' selected':''}>Despesa</option><option${p.tipo==='Receita'?' selected':''}>Receita</option></select></td><td class="l"><input type="checkbox" data-k="ativo" style="width:auto"${p.ativo!==false?' checked':''}></td><td><button type="button" class="btn small ghost" data-del="${esc(pr?p.id:p.categoria)}">${pr?'Apagar':'Tirar'}</button></td></tr>`).join('')
     ||`<tr><td class="l muted" colspan="6">${ls.length?'Nenhuma categoria neste filtro.':'Nenhuma categoria. Adicione acima.'}</td></tr>`;
   $('pcNote').textContent=pr?`Plano próprio de ${cli.nome}: ${ls.length} categorias. Cada alteração é salva sozinha. Ao renomear, os lançamentos desta empresa com o nome antigo passam para o novo. Categoria já usada não pode ser apagada: desmarque “Ativa”.`
-    :`Plano padrão: ${ls.length} categorias, o mesmo para todas as empresas que não têm plano próprio. Mudanças aqui valem para todas elas. Para renomear ou tirar uma categoria do padrão, use Configurações › Categorias.`;
+    :`Plano padrão: ${ls.length} categorias, o mesmo para todas as empresas que não têm plano próprio. Mudanças aqui valem para todas elas.`;
 }
 $('pcFiltro').onchange=renderPC;$('pcBusca').oninput=()=>{clearTimeout(renderPC.t);renderPC.t=setTimeout(renderPC,250)};
 $('pcModo').addEventListener('change',async e=>{
@@ -7526,12 +7530,26 @@ $('pcBody').addEventListener('change',async e=>{
   p[k]=v;toast('Plano salvo');
 });
 $('pcBody').addEventListener('click',async e=>{
-  const b=e.target.closest('[data-del]'),cli=cliAtual();if(!b||!cli)return;const p=(PLANOS[cli.id]||[]).find(x=>x.id===b.dataset.del);if(!p)return;
+  const b=e.target.closest('[data-del]'),cli=cliAtual();if(!b||!cli)return;
+  // plano padrão (o que era Configurações › Categorias): tira do padrão; os lançamentos continuam com o nome
+  if(!cli.plano_proprio){const cat=b.dataset.del;
+    const [a,m]=await Promise.all(['fin_titulos','fin_movimentos'].map(tb=>sb.from(tb).select('id',{count:'exact',head:true}).eq('categoria',cat)));const n=(a.count||0)+(m.count||0);
+    if(!confirm(n?`“${cat}” já foi usada em ${n} lançamentos. Tirar do plano padrão mesmo assim? Os lançamentos continuam com o nome. (Para só esconder, desmarque “Ativa”.)`:`Tirar “${cat}” do plano padrão? Vale para todas as empresas que usam o padrão.`))return;
+    const {error}=await sb.from('plano_contas').delete().eq('categoria',cat);if(error)return fail(error,'Não foi possível tirar');PCAT.ok=false;toast('Categoria tirada do plano padrão');return renderPC()}
+  const p=(PLANOS[cli.id]||[]).find(x=>x.id===b.dataset.del);if(!p)return;
   const [a,m]=await Promise.all(['fin_titulos','fin_movimentos'].map(tb=>sb.from(tb).select('id',{count:'exact',head:true}).eq('cliente_id',cli.id).eq('categoria',p.categoria)));
   if((a.count||0)+(m.count||0))return toast(`“${p.categoria}” já foi usada em ${(a.count||0)+(m.count||0)} lançamentos. Desmarque “Ativa” em vez de apagar.`);
   if(!confirm(`Apagar a categoria “${p.categoria}”?`))return;
   const {error}=await sb.from('fin_plano').delete().eq('id',p.id);if(error)return fail(error,'Não foi possível apagar');toast('Categoria apagada');renderPC();
 });
+$('pcColaBtn').onclick=async()=>{
+  const cli=cliAtual();if(!cli)return;const pr=!!cli.plano_proprio,pl=await planoDe(cli),tem=new Set(pl.map(p=>chave(p.categoria)));
+  const linhas=[...new Set($('pcCola').value.split(/\r?\n/).map(l=>l.split('\t')[0].trim().replace(/\s+/g,' ')).filter(Boolean))].filter(c=>!tem.has(chave(c)));
+  if(!linhas.length)return toast('Nenhuma categoria nova para adicionar.');
+  const {error}=pr?await sb.from('fin_plano').insert(linhas.map(c=>({cliente_id:cli.id,categoria:c,tipo:'Despesa',ativo:true})))
+    :await sb.from('plano_contas').upsert(linhas.map(c=>({categoria:c})),{onConflict:'categoria',ignoreDuplicates:true});
+  if(error)return fail(error,'Não foi possível adicionar');if(!pr)PCAT.ok=false;$('pcCola').value='';toast(linhas.length+(linhas.length===1?' categoria adicionada':' categorias adicionadas'));renderPC();
+};
 $('pcXls').onclick=async()=>{
   const cli=cliAtual();if(!cli)return;const ls=ordPlano(await planoDe(cli));
   const ws=XLSX.utils.aoa_to_sheet([['Código','Categoria','Tipo','Ativa'],...ls.map(p=>[p.codigo||'',p.categoria,p.tipo||'Despesa',p.ativo===false?'Não':'Sim'])]);ws['!cols']=[{wch:12},{wch:44},{wch:10},{wch:6}];
@@ -8786,6 +8804,11 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04u',data:'2026-11-04',t:'Plano de contas, fornecedores, cartão, benefícios e tarefas',itens:[
+    {x:'Plano de contas num lugar só: Gestão financeira › Plano de contas agora também cola várias categorias e tira categorias do plano padrão. Configurações › Categorias ficou só com as regras que sugerem a categoria.',para:'esc'},
+    {x:'Fornecedores do Bom Controle dentro de Gestão financeira › Clientes e fornecedores: o botão “Importar fornecedores do Bom Controle” fica lá, e os que faltarem entram sozinhos. Saiu do menu Configurações › Fornecedores.',para:'esc'},
+    {x:'Cartão de crédito ligado em todas as empresas com gestão financeira (desmarque em Configurações › Empresas as que não têm). Nas MP/MPA, do RH aparecem só o Pedido de benefícios e os colaboradores.',para:'esc'},
+    {x:'Tarefas e recados liberadas para todos os usuários, em todas as empresas em que cada um tem acesso.',mods:['tarefas']}]},
   {k:'2026-11-03d',data:'2026-11-03',t:'Importar do Bom Controle',itens:[
     {x:'Gestão financeira › Movimentação financeira: botão “Importar do Bom Controle”. Envie o arquivo de movimentações exportado do BC (pode ser mais de um, um por conta) e os lançamentos entram na empresa escolhida no topo. O que já existe (mesma conta, data, tipo e valor) fica de fora, então pode importar o mesmo arquivo de novo. Categoria do BC que não existe no plano aparece num aviso com a sugestão, para escolher outra ou cadastrar. Transferências com as duas contas no arquivo viram uma só; “Ordem de Pagamento de Terceiros” entra como Restituições; contas em aberto vão para as contas a pagar e a receber. A conta Tesouraria fica de fora por padrão.',para:'esc'}]},
   {k:'2026-11-03r',data:'2026-11-03',t:'Repasse de parceiros: separar, pagar e avisos',itens:[
