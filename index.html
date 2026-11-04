@@ -8367,7 +8367,7 @@ $('gtBCArq').addEventListener('change',async e=>{
     if(!linhas.length)return toast('Nenhum lançamento encontrado no arquivo.');
     if(!PCAT.ok)await loadCats();
     const [contas,plano,pes]=await Promise.all([gfContasDe(cli.id,true),planoDe(cli),gfPessoasDe(cli.id,'fornecedor')]);
-    Object.assign(BCI,{cli,linhas,contas,plano:plano.filter(p=>p.ativo!==false),pesLista:pes,arqs:fs.map(f=>f.name),mapa:{},cats:{},criarPes:true});
+    Object.assign(BCI,{cli,linhas,contas,plano:plano.filter(p=>p.ativo!==false),pesLista:pes,arqs:fs.map(f=>f.name),mapa:{},cats:{},criarPes:true,baixar:true,dbKeyOk:''});
     // contas do arquivo × contas da empresa (pelo nome no Bom Controle ou pelo nome da conta)
     const tes=chave(cli.conta_tesouraria_bc);
     [...new Set(linhas.map(l=>l.contaBC))].forEach(n=>{
@@ -8396,6 +8396,13 @@ async function bcMonta(){
     const [movs,tits]=await Promise.all([ids.length&&ds.length?todas(()=>sb.from('fin_movimentos').select('id,conta_id,data,tipo,valor,transf_id').in('conta_id',ids).gte('data',ds[0]).lte('data',ds.at(-1))):[],
       vs.length?todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor').eq('cliente_id',cli.id).gte('vencimento',vs[0]).lte('vencimento',vs.at(-1))):[]]);
     BCI.movs=movs;BCI.tits=tits;BCI.dbKeyOk=key;
+    // contas a pagar e a receber em aberto (inclusive as previstas pelo histórico) perto das datas do arquivo:
+    // o pagamento importado baixa a conta, em vez de ficar duplicado (Carol, 04/11)
+    BCI.abertos=[];
+    if(ds.length){const sd=(d,n)=>isoLocal(new Date(dObj(d).getTime()+n*864e5));
+      const ab=await todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor,pessoa_id,pessoa_nome,previsto,categoria').eq('cliente_id',cli.id).gte('vencimento',sd(ds[0],-BCJAN)).lte('vencimento',sd(ds.at(-1),BCJAN)));
+      const pg=new Set();for(let i=0;i<ab.length;i+=150){const {data,error}=await sb.from('fin_movimentos').select('titulo_id').in('titulo_id',ab.slice(i,i+150).map(t=>t.id));if(error)throw error;(data||[]).forEach(x=>pg.add(x.titulo_id))}
+      BCI.abertos=ab.filter(t=>!pg.has(t.id))}
   }
   const ja={},jt={};BCI.movs.forEach(m=>(ja[m.conta_id+'|'+m.data+'|'+m.tipo+'|'+Math.round(m.valor*100)]||=[]).push(m));
   BCI.tits.forEach(t=>(jt[t.tipo+'|'+t.vencimento+'|'+Math.round(t.valor*100)]||=[]).push(t));
@@ -8451,7 +8458,25 @@ async function bcMonta(){
     if(l.parc&&l.vreal<l.valor)R.movs.push({...base,tipo,data:l.data,valor:l.vreal,titulo_id:id,conciliado:l.conc,_l:l,_p:pessoa.novo});
     c.novos++;
   });
+  R.baixas=BCI.baixar===false?[]:bcBaixas(R.movs);
   R.novosP=novosP;return R;
+}
+// pagamento do arquivo × conta em aberto: mesmo tipo, mesmo fornecedor ou cliente e data até BCJAN dias do vencimento.
+// A conta prevista (recorrente do histórico) aceita valor diferente e mais de um pagamento (ex.: dois boletos da
+// Maxcore); a conta normal só com o mesmo valor. A conta prevista passa a ter o valor pago e deixa de ser prevista.
+const BCJAN=10;
+function bcBaixas(movs){
+  const ab=[...(BCI.abertos||[])],out=new Map(),dd=(a,b)=>Math.abs(dObj(a)-dObj(b))/864e5;
+  movs.filter(m=>!m.transf_id&&!m.titulo_id&&m.pessoa_nome).sort((a,b)=>a.data.localeCompare(b.data)).forEach(m=>{
+    const tp=m.tipo==='saida'?'pagar':'receber',pk=pessoaChave(m.pessoa_nome);
+    const cs=ab.filter(t=>t.tipo===tp&&pessoaChave(t.pessoa_nome)===pk&&dd(t.vencimento,m.data)<=BCJAN&&(t.previsto||Math.round(t.valor*100)===Math.round(m.valor*100)))
+      .sort((a,b)=>(Math.round(b.valor*100)===Math.round(m.valor*100))-(Math.round(a.valor*100)===Math.round(m.valor*100))||dd(a.vencimento,m.data)-dd(b.vencimento,m.data));
+    const t=cs[0];if(!t)return;
+    m.titulo_id=t.id;if(!m.categoria&&t.categoria)m.categoria=t.categoria;
+    const b=out.get(t.id)||{t,movs:[]};b.movs.push(m);out.set(t.id,b);
+    if(!t.previsto)ab.splice(ab.indexOf(t),1);
+  });
+  return [...out.values()];
 }
 async function bcPrevia(){
   const cli=BCI.cli,R=await bcMonta();BCI.R=R;
@@ -8472,6 +8497,7 @@ async function bcPrevia(){
     ${nP?`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bciPes" style="width:auto"${BCI.criarPes?' checked':''}> Cadastrar ${nP===1?'o cliente ou fornecedor novo':`os ${nP} clientes e fornecedores novos`} (${esc(Object.values(R.novosP).slice(0,4).map(p=>p.nome).join(', '))}${nP>4?'…':''})</label>`:''}
     <ul class="note" style="margin:0;padding-left:18px">
       <li><b>${R.movs.length}</b> ${R.movs.length===1?'lançamento novo':'lançamentos novos'} na Movimentação (entradas ${fm(totE)}, saídas ${fm(totS)}, fora as transferências)${R.ja?` · ${R.ja} já ${R.ja===1?'existia':'existiam'} e ${R.ja===1?'fica':'ficam'} de fora`:''}.</li>
+      ${R.baixas.length?`<li><b>${R.baixas.length}</b> ${R.baixas.length===1?'conta a pagar ou a receber que já estava lançada é baixada':'contas a pagar ou a receber que já estavam lançadas são baixadas'} pelo pagamento do arquivo, sem duplicar${R.baixas.some(b=>b.t.previsto)?` (${R.baixas.filter(b=>b.t.previsto).length} ${R.baixas.filter(b=>b.t.previsto).length===1?'prevista fica':'previstas ficam'} com o valor pago)`:''}. <a href="#" id="bciVerBx">Ver</a></li>`:''}
       ${R.tits.length||R.jaT?`<li><b>${R.tits.length}</b> ${R.tits.length===1?'conta em aberto vai':'contas em aberto vão'} para as contas a pagar e a receber${R.jaT?` · ${R.jaT} já ${R.jaT===1?'existia':'existiam'}`:''}.</li>`:''}
       ${R.trPar||R.trSem?`<li>Transferências: ${R.trPar} com as duas contas no arquivo${R.trSem?`; <b>${R.trSem}</b> só com uma ponta (o Bom Controle não diz a outra conta) ${R.trSem===1?'fica':'ficam'} “a validar”. Para ligar as duas pontas, importe junto o arquivo da outra conta.`:'.'}</li>`:''}
       ${R.ordem?`<li>${R.ordem} ${R.ordem===1?'transferência':'transferências'} para Ordem de Pagamento de Terceiros ${R.ordem===1?'entra':'entram'} como repasse às clínicas (Restituições).</li>`:''}
@@ -8479,6 +8505,8 @@ async function bcPrevia(){
       ${R.semCat?`<li>${R.semCat} ${R.semCat===1?'lançamento fica':'lançamentos ficam'} sem categoria.</li>`:''}
       ${R.pulo?`<li>${R.pulo} ${R.pulo===1?'linha de conta':'linhas de contas'} marcada${R.pulo===1?'':'s'} “Não importar”.</li>`:''}
     </ul>`;
+  if(R.baixas.length||BCI.baixar===false)$('bciBody').insertAdjacentHTML('beforeend',`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bciBaixa" style="width:auto"${BCI.baixar===false?'':' checked'}> Baixar as contas a pagar e a receber em aberto (inclusive as recorrentes previstas) com os pagamentos do arquivo</label>
+    <div id="bciBx" hidden class="tablebox" style="margin:0"><table class="cfg"><thead><tr><th class="l">Conta em aberto</th><th>Vencimento</th><th>Valor</th><th class="l">Pago no arquivo</th></tr></thead><tbody>${R.baixas.map(b=>`<tr><td class="l">${esc(b.t.pessoa_nome||'')}${b.t.previsto?' <span class="chip c-warn">prevista</span>':''}</td><td>${dBR(b.t.vencimento)}</td><td>${fm(b.t.valor)}</td><td class="l">${b.movs.map(m=>`${dBR(m.data)} · ${fm(m.valor)}`).join('<br>')}</td></tr>`).join('')}</tbody></table></div>`);
   const n=R.movs.length+R.tits.length;
   $('bciOk').disabled=!!falta.length||!n;$('bciOk').textContent=n?`Importar ${n} ${n===1?'lançamento':'lançamentos'}`:'Nada novo para importar';
   $('bciInfo').textContent=falta.length?'Escolha a conta de cada linha da tabela de contas.':'';
@@ -8491,8 +8519,10 @@ $('bciBody').addEventListener('change',async e=>{
     if(s.value&&!BCI.plano.some(p=>p.categoria===s.value)){delete PLANOS[BCI.cli.id];BCI.plano=(await planoDe(BCI.cli)).filter(p=>p.ativo!==false)}
     c.escolha=s.value||null;c.lembrada=false;return bcPrevia()}
   if(s.id==='bciPes')BCI.criarPes=s.checked;
+  if(s.id==='bciBaixa'){BCI.baixar=s.checked;return bcPrevia()}
 });
 $('bciBody').addEventListener('click',async e=>{
+  if(e.target.id==='bciVerBx'){e.preventDefault();const x=$('bciBx');if(x)x.hidden=!x.hidden;return}
   const b=e.target.closest('[data-bcnova]');if(!b)return;
   const c=Object.values(BCI.cats).sort((a,b)=>b.n-a.n)[+b.dataset.bcnova],nova=await catNova(BCI.cli,c.tipo,c.nome);if(!nova)return;
   delete PLANOS[BCI.cli.id];if(!BCI.cli.plano_proprio)await loadCats();BCI.plano=(await planoDe(BCI.cli)).filter(p=>p.ativo!==false);
@@ -8516,6 +8546,8 @@ $('bciOk').onclick=async()=>{
     }
     const tits=R.tits.map(({_p,...t})=>({...t,pessoa_id:t.pessoa_id||(_p&&pid[_p])||null}));
     for(let i=0;i<tits.length;i+=500){const {error}=await sb.from('fin_titulos').insert(tits.slice(i,i+500));if(error)throw error}
+    for(const b of R.baixas){if(!b.t.previsto)continue;
+      const {error}=await sb.from('fin_titulos').update({valor:r2(b.movs.reduce((x,m)=>x+m.valor,0)),previsto:false}).eq('id',b.t.id);if(error)throw error}
     const movs=R.movs.map(({_l,_p,...m})=>m);
     for(let i=0;i<movs.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(movs.slice(i,i+500));if(error)throw error}
     toast(`Importado: ${movs.length} ${movs.length===1?'lançamento':'lançamentos'}${tits.length?` e ${tits.length} ${tits.length===1?'conta em aberto':'contas em aberto'}`:''}`);
@@ -9631,6 +9663,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04bx',data:'2026-11-04',t:'Importar do Bom Controle: baixa das contas em aberto',itens:[
+    {x:'Importar do Bom Controle: o pagamento do arquivo agora baixa a conta a pagar ou a receber que já estava lançada (mesmo fornecedor ou cliente, até 10 dias do vencimento), em vez de ficar duplicado. A conta recorrente prevista pelo histórico aceita valor diferente (fica com o valor pago) e mais de um pagamento; a conta normal só com o mesmo valor. A prévia mostra quais contas serão baixadas.',para:'esc'}]},
   {k:'2026-11-04rcat',data:'2026-11-04',t:'Repasse de parceiros na categoria Restituições',itens:[
     {x:'Gestão financeira › Parceiros › Repasse da semana: as contas a pagar e os pagamentos gerados pelo repasse agora entram sempre na categoria “Restituições” (antes iam para “Repasse de Cartões”). Os repasses já lançados na semana passada também foram corrigidos.',para:'esc'}]},
   {k:'2026-11-04man',data:'2026-11-04',t:'Manual do sistema',itens:[
