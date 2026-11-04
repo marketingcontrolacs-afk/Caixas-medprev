@@ -1392,6 +1392,8 @@ const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao']],['Re
 const MODEQ={folha:['folha','ponto','premio','beneficios','colab'],ferias:['ferias','colab']};
 const temEm=(cli,m)=>ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
+// Gestão financeira: o escritório e o operador cliente com o acesso 'gestao' (gerado pelo cadastro do usuário, Carol 04/11)
+const okGestao=()=>temAcesso('gestao');
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo));
 const podeLancar=(cli,m)=>(ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo)&&a.nivel==='lancamento'))&&(!VIEW||podeExec(VIEW));
 const ICO={
@@ -1453,33 +1455,33 @@ const NAV=[
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
   {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:()=>true},   // todos; cada um vê só o que tem acesso (Carol, 30/10)
-  {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gfinad',t:'Inadimplência',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gfagenda',t:'Agenda financeira',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfinad',t:'Inadimplência',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfagenda',t:'Agenda financeira',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
   // a Tesouraria da Gestão financeira saiu do menu: a revisão fica no Extrato da conta, na conta Tesouraria (Carol, 03/11)
-  {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
   // repasses da semana (relatório de restituições): separa quem emite NF e gera as contas a pagar em cada empresa do grupo (Carol, 30/10)
   // Parceiros saiu da Comunicação: é a tela única de parceiros na Gestão financeira, com as abas Cadastro, Repasse e Notas fiscais (Carol, 04/11)
   {k:'repasse',t:'Parceiros',g:'Gestão financeira',s:'Dia a dia',ok:()=>temAcesso('repasse')},
   // Repasse e Notas fiscais viraram abas da tela Parceiros (aba:'repasse'): saem do menu, a tela continua igual (Carol, 04/11)
-  {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc,aba:'repasse'},
+  {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Dia a dia',ok:okGestao,aba:'repasse'},
   // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
-  {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc,aba:'repasse'},
-  {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gforc',t:'Previsão orçamentária',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gfdre',t:'DRE gerencial',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gfdcat',t:'Despesas por categoria',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gfdforn',t:'Despesas por fornecedor',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gfdforma',t:'Despesas por forma de pagamento',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
-  {k:'gfpes',t:'Clientes e fornecedores',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
-  {k:'gfcontas',t:'Contas bancárias e cartões',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
+  {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Dia a dia',ok:okGestao,aba:'repasse'},
+  {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gforc',t:'Previsão orçamentária',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gfdre',t:'DRE gerencial',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gfdcat',t:'Despesas por categoria',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gfdforn',t:'Despesas por fornecedor',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gfdforma',t:'Despesas por forma de pagamento',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
+  {k:'gfpes',t:'Clientes e fornecedores',g:'Gestão financeira',s:'Cadastros',ok:okGestao},
+  {k:'gfcontas',t:'Contas bancárias e cartões',g:'Gestão financeira',s:'Cadastros',ok:okGestao},
   {k:'gfplano',t:'Plano de contas',g:'Gestão financeira',s:'Cadastros',ok:ehEsc},
   // Portal da contabilidade: escritório e contador (acesso Contabilidade)
   {k:'ctbexp',t:'Fechamento e exportação',g:'Contabilidade',s:'Dia a dia',ok:()=>temAcesso('contabil')},
@@ -1575,6 +1577,8 @@ function empresasMod(m){
   if(m==='premio')return (ehEsc()?empresasDe('folha'):CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'premio'))).filter(c=>c.folha_modelo?.premiacao?.length);
   // tarefas: todas as empresas (inclusive as só de RH)
   if(m==='tarefas')return CLIENTES.filter(c=>c.ativo!==false&&podeVer(c.id,'tarefas'));
+  // operador cliente com a Gestão financeira liberada: as empresas em que ele tem o acesso 'gestao' (Carol, 04/11)
+  if(!ehEsc()&&TOOLMOD[m]==='gestao')return CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'gestao'));
   if(m.startsWith('ctb'))return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_financeiro!==false:temEm(c.id,'contabil')));
   const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
@@ -2646,7 +2650,9 @@ const msgBanco=(e,v)=>/criar_usuario|trocar_senha|function/i.test(e.message||'')
 const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origin+location.pathname}\nE-mail: ${email}\nSenha: ${senha}`;
 // ---------- cadastro do usuário com permissões por ferramenta (Carol, 03/11) ----------
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
-const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil'};
+const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
+  // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -7193,7 +7199,7 @@ async function renderDash(){
 $('dsAtual').onclick=renderDash;
 // a parte financeira (saldos, contas a pagar e receber, gráfico) é do escritório, nas empresas com BPO financeiro;
 // quem tem módulos escolhidos pela master vê se o Dashboard financeiro estiver marcado
-const dsFin=cli=>ehEsc()&&cli.bpo_financeiro!==false&&(ehAdm()||!ME.modulos_equipe||ME.modulos_equipe.includes('gfdash'));
+const dsFin=cli=>ehEsc()?cli.bpo_financeiro!==false&&(ehAdm()||!ME.modulos_equipe||ME.modulos_equipe.includes('gfdash')):cli.id!=='*'&&temEm(cli.id,'gestao');
 // Dashboard de quem não vê a parte financeira (operadoras do caixa e da tesouraria, RH, cliente): um quadro por
 // módulo que a pessoa tem liberado nesta empresa, as tarefas dela e os atalhos (Carol, 30/10)
 async function dsModulos(cli){
@@ -9269,6 +9275,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04g',data:'2026-11-04',t:'Gestão financeira liberável para o operador cliente',itens:[
+    {x:'Cadastro de usuários › Privilégios de acesso: o operador cliente agora tem todas as telas da Gestão financeira (Movimentação, Contas a pagar e a receber, Conciliação, Remessa, Fatura do cartão, relatórios, Clientes e fornecedores, Contas bancárias…). Marque Ver ou Executar em cada uma. O Plano de contas continua só da master.',para:'esc'}]},
   {k:'2026-11-04ag',data:'2026-11-04',t:'Agenda: seu planner do dia',itens:[
     {x:'Comunicação › Agenda: um planner diário só seu (ninguém mais vê). Lance as suas rotinas e compromissos, com horário, e escolha se repetem todo dia, nos dias úteis, em dias da semana ou todo mês. Marque cada uma como feita.'},
     {x:'A Agenda também mostra as tarefas e recados destinados a você (atrasadas, do dia e as que esperam o seu ciente) e tem um espaço para as anotações do dia.'}]},
