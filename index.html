@@ -9631,6 +9631,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04rcat',data:'2026-11-04',t:'Repasse de parceiros na categoria Restituições',itens:[
+    {x:'Gestão financeira › Parceiros › Repasse da semana: as contas a pagar e os pagamentos gerados pelo repasse agora entram sempre na categoria “Restituições” (antes iam para “Repasse de Cartões”). Os repasses já lançados na semana passada também foram corrigidos.',para:'esc'}]},
   {k:'2026-11-04man',data:'2026-11-04',t:'Manual do sistema',itens:[
     {x:'Novo: Configurações › Manual do sistema, para todos os usuários. Ele explica como usar cada tela, com imagens de exemplo, e mostra só as telas que você tem liberadas.'},
     {x:'Nesta primeira parte estão os primeiros passos, o Dashboard, a Rotina diária (Caixa, Boletos e notas fiscais a pagar, Tesouraria e Cartão de crédito) e a Comunicação. As outras telas entram nas próximas atualizações.'}]},
@@ -10519,7 +10521,8 @@ $('rnCtrlArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if
 async function rnCriaTitulos(ls,venc,cont){
   for(const id of RN.grupo.empresas){const l=ls.filter(i=>i.empresa_id===id&&!i.titulo_id);if(!l.length)continue;
     const cli=CLIENTES.find(c=>c.id===id);let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
-    const cat=(plano.find(c=>/repasse/.test(chave(c.categoria))&&/parceir/.test(chave(c.categoria)))||plano.find(c=>/repasse/.test(chave(c.categoria))))?.categoria||null;
+    // repasse de parceiro é sempre na categoria Restituições (Carol, 04/11): antes caía em "Repasse de Cartões"
+    const cat=plano.find(c=>chave(c.categoria)===chave('Restituições'))?.categoria||'Restituições';
     for(const it of l){const p=rnParc(it,id),pe=p&&RN.pes.find(x=>x.parceiro_id===p.id&&(!x.cliente_id||x.cliente_id===id));
       const row={cliente_id:id,tipo:'pagar',pessoa_id:pe?.id||null,pessoa_nome:pe?.nome||p?.nome_global||p?.nome||it.nome.trim(),
         descricao:`Repasse de parceiro (restituição)${it.guias?` · ${it.guias} ${it.guias===1?'guia':'guias'}`:''} · relatório ${dBR(RN.lote.data_relatorio)}`,
