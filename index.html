@@ -884,7 +884,8 @@ body.lg header.top .logo{visibility:hidden}
   <section id="viewCfg" hidden>
     <h1>Configurações</h1>
     <div class="tabs" role="tablist" id="tabsCfg">
-      <button role="tab" aria-selected="true" data-tab="cadastro">Empresas e usuários</button>
+      <button role="tab" aria-selected="true" data-tab="cadastro">Cadastro de empresas</button>
+      <button role="tab" aria-selected="false" data-tab="usuarios">Cadastro de usuários</button>
       <button role="tab" aria-selected="false" data-tab="mapa">Mapeamento Bom Controle</button>
       <button role="tab" aria-selected="false" data-tab="cats">Categorias</button>
       <button role="tab" aria-selected="false" data-tab="fbc" hidden>Fornecedores</button>
@@ -895,16 +896,13 @@ body.lg header.top .logo{visibility:hidden}
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCli"></table></div>
         <form class="row" id="formCli"><input id="novoCli" placeholder="Nome da nova empresa" style="max-width:280px"><button class="btn small primary" type="submit">Adicionar empresa</button></form>
       </div>
+    </div>
+    <div id="tabUsuarios" hidden>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
         <div class="row" style="align-items:center;gap:10px"><h2 style="margin:0">Cadastro de usuários</h2><span class="spacer"></span><input id="usBusca" type="search" placeholder="Pesquise por nome ou login" style="max-width:280px" aria-label="Pesquisar usuário"><button type="button" class="btn primary" id="nuAbrir">Cadastrar novo</button></div>
         <div class="alerta" id="nuOk" hidden style="margin:0"></div>
         <div class="tablebox" style="margin:0"><table class="cfg uslist" id="tbUsr"></table></div>
         <p class="note" style="margin:0"><span class="lk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></span> liberado (lança e altera) · <span class="lk ver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></span> só visualiza · <span class="lk no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span> bloqueado. Clique no lápis para abrir o cadastro: <b>Dados básicos</b>, <b>Empresas</b> e <b>Privilégios de acesso</b>. <b>Master</b>: só você, vê e executa tudo. <b>Operador Controlacs</b>: a equipe, sempre com Tarefas, Avisos, Projetos e o Dashboard. <b>Operador cliente</b>: só as empresas e as ferramentas liberadas.</p>
-      </div>
-      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
-        <h2>Acessos dos operadores cliente por empresa</h2>
-        <p class="note" style="margin:0">Resumo do que está liberado no banco para cada operador cliente, por empresa e módulo. É montado sozinho a partir das permissões do cadastro: <b>Lançamento</b> quando alguma ferramenta do módulo tem Executar, <b>Consulta</b> quando só tem Visualizar. Para mudar, abra <b>Cadastro e permissões</b> do usuário, acima.</p>
-        <div class="tablebox" style="margin:0"><table class="cfg" id="tbAc"></table></div>
       </div>
     </div>
     <div id="tabMapa" hidden>
@@ -1316,7 +1314,7 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 const SEMPRE=['tarefas','avisos','projetos','gfdash'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
-const SO_MASTER=['cfg','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
+const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
 const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 // permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
@@ -1440,7 +1438,9 @@ const NAV=[
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
   {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'bc',t:'Exportação Bom Controle',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'cfg',t:'Empresas e usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
+  // cadastro de empresas e de usuários em telas separadas (Carol, 04/11)
+  {k:'cfg',t:'Cadastro de empresas',g:'Configurações',s:'Cadastros',ok:ehEsc},
+  {k:'cfgusr',t:'Cadastro de usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   // Configurações › Fornecedores (Bom Controle) foi unificado em Gestão financeira › Clientes e fornecedores (Carol, 04/11)
@@ -1578,7 +1578,7 @@ function openView(){
     if(cli&&podeLancar(cli.id,'caixa')){$('viewOp').hidden=false;initOp(cli)}
     else{$('viewEsc').hidden=false;initEsc()}
   }else if(VIEW==='confcaixa'){$('viewEsc').hidden=false;initEsc()}else if(MODCFG[VIEW]){$('viewMod').hidden=false;initMod(VIEW)}
-  else if(VIEW.startsWith('cfg')){$('viewCfg').hidden=false;tabCfg={cfg:'cadastro',cfgmapa:'mapa',cfgcats:'cats',cfgfbc:'fbc'}[VIEW];document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===tabCfg));renderCfg()}
+  else if(VIEW.startsWith('cfg')){$('viewCfg').hidden=false;tabCfg={cfg:'cadastro',cfgusr:'usuarios',cfgmapa:'mapa',cfgcats:'cats',cfgfbc:'fbc'}[VIEW];document.querySelectorAll('#tabsCfg button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===tabCfg));renderCfg()}
   else if(VIEW==='rh'){$('viewRH').hidden=false;renderRH()}
   else if(VIEW==='folha'){$('viewFolha').hidden=false;initFolha()}
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
@@ -1804,10 +1804,10 @@ function initEsc(){
   renderPainel();
 }
 escFim.onchange=escIni.onchange=()=>renderPainel();
-document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>go({cadastro:'cfg',mapa:'cfgmapa',cats:'cfgcats',fbc:'cfgfbc'}[b.dataset.tab]));
+document.querySelectorAll('#tabsCfg button').forEach(b=>b.onclick=()=>go({cadastro:'cfg',usuarios:'cfgusr',mapa:'cfgmapa',cats:'cfgcats',fbc:'cfgfbc'}[b.dataset.tab]));
 function renderCfg(){
-  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';$('tabFbc').hidden=tabCfg!=='fbc';
-  if(tabCfg==='cadastro')renderCadastro();else if(tabCfg==='cats')renderCats();else if(tabCfg==='fbc')renderFbc();else renderMapa();
+  $('tabCadastro').hidden=tabCfg!=='cadastro';$('tabUsuarios').hidden=tabCfg!=='usuarios';$('tabMapa').hidden=tabCfg!=='mapa';$('tabCats').hidden=tabCfg!=='cats';$('tabFbc').hidden=tabCfg!=='fbc';
+  if(tabCfg==='cadastro'||tabCfg==='usuarios')renderCadastro();else if(tabCfg==='cats')renderCats();else if(tabCfg==='fbc')renderFbc();else renderMapa();
 }
 // correções do escritório (v42); sem a v42 rodada, a conferência continua funcionando sem o histórico
 let TEM_AJ=true;
@@ -2560,9 +2560,9 @@ async function renderCadastro(){
     return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Abra Cadastro e permissões.</span>'};
   const adm=ehAdm();USR_PERM=perm;usLista();
   $('nuAbrir').hidden=!adm;
-  renderAcessos();
+  // o quadro de acessos por empresa saiu (Carol, 04/11): as permissões aparecem ao abrir o cadastro do usuário
 }
-async function renderAcessos(){
+async function renderAcessos(){if(!$('tbAc'))return;
   if(!window.V2){$('tbAc').innerHTML='<tbody><tr><td class="l neg">Rode a atualização v2 do banco no Supabase para liberar acessos por módulo.</td></tr></tbody>';return}
   const {data,error}=await sb.from('acessos').select('*');if(error){fail(error,'Erro ao carregar os acessos');return}
   const nu=id=>{const u=USERS.find(x=>x.user_id===id);return u?esc(u.nome||u.email):'?'},nc=id=>esc(CLIENTES.find(c=>c.id===id)?.nome||'?');
@@ -8857,7 +8857,7 @@ async function abrirTarefa(t){
       const gs=grupos.filter(g=>g.users.length),adm=d.equipe.filter(u=>u.admin).map(u=>u.nome).join(', ');
       const rest=box.querySelector('input[name="td_vis"]:checked')?.value??(marc.length?'marcados':'todos');
       box.innerHTML=`<div class="f"><span>Quem vê esta tarefa</span><div class="vis"><label><input type="radio" name="td_vis" value="todos"${rest==='todos'?' checked':''}> ${interna?'Toda a equipe':'Todos (a equipe e os usuários da empresa)'}</label><label><input type="radio" name="td_vis" value="marcados"${rest==='marcados'?' checked':''}> Só os usuários marcados</label></div></div>
-        <div id="td_pickBox"${rest==='marcados'?'':' hidden'}>${gs.length?pickUsers('td_pick',gs,marc):'<p class="note" style="margin:0">Ainda não há outros usuários para marcar. Cadastre em Configurações › Empresas e usuários.</p>'}
+        <div id="td_pickBox"${rest==='marcados'?'':' hidden'}>${gs.length?pickUsers('td_pick',gs,marc):'<p class="note" style="margin:0">Ainda não há outros usuários para marcar. Cadastre em Configurações › Cadastro de usuários.</p>'}
         <p class="note" style="margin:6px 0 0">${adm?esc(adm)+' (administração), ':''}quem cadastrou, o responsável e o executor sempre veem.</p></div>`;
       box.querySelectorAll('input[name="td_vis"]').forEach(r=>r.onchange=()=>$('td_pickBox').hidden=r.value!=='marcados'||!r.checked)};
     if(ic)ic.addEventListener('change',vis);if($('td_int'))$('td_int').addEventListener('change',vis);vis();
@@ -9008,6 +9008,8 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04e',data:'2026-11-04',t:'Configurações: empresas e usuários separados',itens:[
+    {x:'Configurações agora tem “Cadastro de empresas” e “Cadastro de usuários” em telas separadas. O quadro de acessos por empresa saiu: as permissões de cada usuário aparecem ao abrir o cadastro dele (lápis).',para:'esc'}]},
   {k:'2026-11-04c',data:'2026-11-04',t:'Cadastro de usuários no estilo do Bom Controle e tarefas com ciente de todos',itens:[
     {x:'Configurações › Empresas e usuários: cadastro de usuários no estilo do Bom Controle. A lista mostra um cadeado por módulo (verde liberado, amarelo só visualiza, vermelho bloqueado). O lápis abre o cadastro em abas: Dados básicos (e-mail, nome, WhatsApp, tipo), Empresas e Privilégios de acesso, com Acesso personalizado, Total ou Bloqueado por módulo e Ver, Executar ou Bloqueado em cada tela. Quem só vê uma tela não consegue lançar nem alterar nela.',para:'esc'},
     {x:'Tarefas e recados: além do executor, dá para marcar mais executores e validadores (quem precisa da informação). Quando a tarefa é concluída, todos os envolvidos dão ciente; o cartão mostra “Ciente 1/3” e quem falta recebe o aviso de tarefas pendentes.',mods:['tarefas']}]},
@@ -9333,7 +9335,7 @@ function ctbFaltas(){
   const f=[],orig=ctbOrigens(),sem=orig.filter(o=>!CTB.depara[o.k]?.confirmado||!CTB.depara[o.k]?.conta_codigo).length;
   if(!CTB.plano.length)f.push(['ctbplano','Importar o plano de contas da contabilidade']);
   if(!CTB.layout?.colunas?.length)f.push(['ctblayout','Importar e configurar o layout de exportação do sistema contábil']);
-  if(ehEsc()&&CTB.status&&!CTB.status[CTB.cli.id]?.contador)f.push(['cfg','Cadastrar o login do contador (Configurações › Empresas e usuários, acesso Contabilidade)']);
+  if(ehEsc()&&CTB.status&&!CTB.status[CTB.cli.id]?.contador)f.push(['cfgusr','Cadastrar o login do contador (Configurações › Cadastro de usuários, acesso Contabilidade)']);
   if(sem)f.push(['ctbdepara',`Conferir o de-para: ${sem} de ${orig.length} ${orig.length===1?'item':'itens'} sem conta contábil confirmada`]);
   return f;
 }
