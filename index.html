@@ -1606,7 +1606,16 @@ function fillClientes(){
 escCli.onchange=()=>{guardaEmp();openView()};
 // a seção aberta fica guardada: ao atualizar a página, o portal volta para ela (Carol, 27/10)
 const SECK='portal_secao';
-function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
+// filtros e buscas das telas voltam ao padrão ao trocar de tela: o nome de fornecedor digitado não fica lá esquecido (Carol, 04/11)
+// o F5 continua na mesma tela; trocar só a empresa mantém os filtros; o período das outras telas (extrato, conciliação, relatórios) não muda
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro']
+  .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
+function limpaFiltros(){
+  FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
+  MOD=null;MV.lim=300;   // Contas a pagar e Tesouraria do cliente reabrem como na primeira vez
+}
+// ajusta: filtro que o link já quer aplicar (ex.: "a validar" do Dashboard), depois da limpeza
+function go(v,ajusta){if(!eqPode(v))return;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
 // a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
 // tela única de Parceiros: Cadastro e contas, Repasse da semana e Notas fiscais em abas (Carol, 04/11)
 // cada aba é a tela de antes; quem só tem o cadastro (o cliente) não vê a barra de abas
@@ -7365,7 +7374,7 @@ function dsDesenha(cli){
   $('dsNote').textContent='Regime de caixa: o que entrou e saiu das contas. As transferências entre contas e os aportes de sócios não entram nas entradas e saídas.';
 }
 ['dsGrid','dsTiles'].forEach(id=>$(id).addEventListener('click',e=>{const tb=e.target.closest('[data-tar]');if(tb){const t=TPEND.find(x=>x.id===tb.dataset.tar);return t?abrirTarefa(t):tpJanela()}
-  const b=e.target.closest('[data-go]');if(!b)return;const [v,sit]=b.dataset.go.split(':');if(sit)$(v==='repasse'?'pFiltro':'mvSit').value=sit;go(v)}));
+  const b=e.target.closest('[data-go]');if(!b)return;const [v,sit]=b.dataset.go.split(':');go(v,sit?()=>{$(v==='repasse'?'pFiltro':'mvSit').value=sit}:null)}));
 function relFluxo(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return $('relBody').innerHTML='<tr><td class="l muted">Escolha o período.</td></tr>';
   const dia=dObj(fim)-dObj(ini)<=62*864e5,bk=d=>dia?d:d.slice(0,7);
@@ -9314,6 +9323,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04lf',data:'2026-11-04',t:'Filtros limpos ao trocar de tela',itens:[
+    {x:'Ao sair de uma tela e voltar (ex.: Movimentação financeira, Contas a pagar, Contas a receber), os filtros e a busca voltam ao padrão. O nome de fornecedor digitado não fica mais lá esquecido.'},
+    {x:'Atualizar a página (F5) continua na mesma tela, e trocar só a empresa no alto mantém os filtros.'}]},
   {k:'2026-11-04fs',data:'2026-11-04',t:'Férias: parcela fica marcada como solicitada',itens:[
     {x:'RH › Férias: depois de gerar a “Solicitação para a contabilidade”, a parcela fica marcada “Solicitada” com a data, na janela e na lista de férias. Na próxima vez a caixinha dela já vem desmarcada.'},
     {x:'Se a data da parcela mudar depois, ela volta a ficar sem a marca, para você solicitar de novo.'}]},
@@ -9498,7 +9510,7 @@ function parcLista(){
   $('tParcList').innerHTML=l.map(x=>`<button type="button" class="pli" data-pcli="${x.cli}"><span class="chip ${x.t==='alt'?'c-bad':'c-warn'}">${x.t==='alt'?'Alteração de conta':'Parceiro novo'}</span><b>${esc(x.nome)}</b><span class="muted">${esc(cn(x.cli))}${x.quando?' · '+dBR(String(x.quando).slice(0,10)):''}${x.obs?' · '+esc(x.obs):''}</span><span class="go">›</span></button>`).join('');
 }
 // abre Gestão financeira › Parceiros na empresa do pedido, só com os parceiros com alerta
-function parcAbre(cli){if(cli&&[...escCli.options].some(o=>o.value===cli)){escCli.value=cli;guardaEmp()}else if(cli){EMP=cli;try{localStorage.setItem(EMPK,cli)}catch(e){}}$('pFiltro').value='alerta';go('repasse')}
+function parcAbre(cli){if(cli&&[...escCli.options].some(o=>o.value===cli)){escCli.value=cli;guardaEmp()}else if(cli){EMP=cli;try{localStorage.setItem(EMPK,cli)}catch(e){}}go('repasse',()=>{$('pFiltro').value='alerta'})}
 $('tParcList').addEventListener('click',e=>{const b=e.target.closest('[data-pcli]');if(b)parcAbre(b.dataset.pcli)});
 async function pjNovidades(){
   if(!ehEsc())return;
