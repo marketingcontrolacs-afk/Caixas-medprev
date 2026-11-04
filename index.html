@@ -259,6 +259,19 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .aviso{padding:14px 18px;display:grid;gap:6px}.aviso.imp{border-left:4px solid var(--amber)}.aviso.novo{box-shadow:0 0 0 2px var(--brand)}
 .aviso h3{margin:0;font-size:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.aviso .x{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .aviso .q{font-size:12px;color:var(--muted)}
+.pmtab{width:100%;border-collapse:collapse;font-size:13.5px}.pmtab th,.pmtab td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.pmtab td.c,.pmtab th.c{text-align:center;width:96px}.pmtab input{width:auto;margin:0}.pmtab tr.pmg td{background:var(--brand-soft);font-weight:700}.pmtab .sec{color:var(--muted);font-size:12px;margin-left:6px}
+.uslist th.m,.uslist td.m{text-align:center;width:74px}.uslist th.m svg{width:22px;height:22px;display:block;margin:0 auto 2px;color:var(--brand)}.uslist th.m span{font-size:11px;font-weight:600}
+.lk{display:inline-flex;vertical-align:middle}.lk svg{width:18px;height:18px}.lk.ok{color:var(--ok)}.lk.ver{color:var(--warn)}.lk.no{color:var(--bad)}
+.uslist .unome b{display:block}.uslist .unome small{color:var(--muted)}.uslist .uact{white-space:nowrap;text-align:right}
+.iconbtn{border:0;background:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:6px;display:inline-flex}.iconbtn:hover{color:var(--brand);background:var(--brand-soft)}.iconbtn svg{width:18px;height:18px}
+.usmods{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}.usmod{position:relative;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px 8px;min-width:118px;cursor:pointer;display:grid;justify-items:center;gap:4px;font:600 12.5px var(--body);color:var(--muted)}
+.usmod svg{width:26px;height:26px;color:var(--brand)}.usmod[aria-pressed="true"]{border-color:var(--brand);box-shadow:inset 0 -3px 0 var(--brand);color:var(--ink)}.usmod .ck{position:absolute;top:4px;right:8px;color:var(--ok);font-size:14px}.usmod .ck.no{color:var(--bad)}
+.usmodo{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;margin-bottom:10px}.usmodo label{display:flex;gap:6px;align-items:center}.usmodo input{width:auto;margin:0}
+.uscols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.uscol table{width:100%;border-collapse:collapse;font-size:13.5px}.uscol th{text-align:left;font-size:15px;padding:6px 6px 8px;border-bottom:1px solid var(--line)}.uscol th.r{width:42px;text-align:center;color:var(--muted)}.uscol th.r svg{width:16px;height:16px}
+.uscol td{padding:6px;border-bottom:1px solid var(--line)}.uscol td.r{text-align:center}.uscol td.r input{width:auto;margin:0;cursor:pointer}
+.uslinha{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line);font-size:13.5px;font-weight:600}
+.usgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .chk{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:400;color:var(--ink)}.chk label{display:flex;gap:6px;align-items:center}.chk input{width:auto;margin:0}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 #dcCampos h3{margin:14px 0 6px}#dcSalvaL[hidden]{display:none!important}#dcEpi{border-collapse:collapse;width:100%;margin-top:4px}#dcEpi th,#dcEpi td{padding:3px 4px;text-align:left;font-size:13px}#dcEpi input,#dcEpi select{width:100%;box-sizing:border-box}
@@ -451,6 +464,7 @@ body.lg header.top .logo{visibility:hidden}
     <div style="min-width:0">
       <div class="alerta" id="tpBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
+      <div class="alerta" id="soVerBanner" hidden style="margin:0 0 14px"><b>Somente visualização</b><span>Você pode ver e baixar o que está nesta tela, mas não lançar, alterar ou excluir. Para isso, peça ao master para marcar “Executar” nesta ferramenta.</span></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -882,29 +896,14 @@ body.lg header.top .logo{visibility:hidden}
         <form class="row" id="formCli"><input id="novoCli" placeholder="Nome da nova empresa" style="max-width:280px"><button class="btn small primary" type="submit">Adicionar empresa</button></form>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
-        <h2>Usuários</h2>
-        <p class="note" style="margin:0">Cadastre aqui o login de cada pessoa. Ela já pode entrar com o e-mail e a senha informados. Para clientes e colaboradores, depois libere as empresas e os módulos no quadro Acessos.</p>
-        <form class="row" id="formUsr" style="align-items:flex-end">
-          <label class="f">E-mail<input type="email" id="nuEmail" required autocomplete="off" placeholder="pessoa@empresa.com"></label>
-          <label class="f">Nome<input id="nuNome" placeholder="Nome e sobrenome"></label>
-          <label class="f">Senha provisória<input id="nuSenha" required minlength="6" autocomplete="new-password"></label>
-          <label class="f">Tipo<select id="nuTipo"></select></label>
-          <button class="btn primary" type="submit">Cadastrar usuário</button>
-        </form>
+        <div class="row" style="align-items:center;gap:10px"><h2 style="margin:0">Cadastro de usuários</h2><span class="spacer"></span><input id="usBusca" type="search" placeholder="Pesquise por nome ou login" style="max-width:280px" aria-label="Pesquisar usuário"><button type="button" class="btn primary" id="nuAbrir">Cadastrar novo</button></div>
         <div class="alerta" id="nuOk" hidden style="margin:0"></div>
-        <p class="note" style="margin:0"><b>Master</b>: só você; vê tudo, é o único que entra em Configurações, Plano de contas e regras das categorias, e muda o tipo e as permissões dos usuários. <b>Operador Controlacs</b>: equipe; vê os módulos e as empresas que você escolher em “Escolher módulos e empresas”, mais Tarefas e Avisos. <b>Cliente</b> (gestor da empresa) e <b>Colaborador do cliente</b>: veem só as empresas e módulos liberados em Acessos, com o nível Lançamento ou Consulta.</p>
-        <div class="tablebox" style="margin:0"><table class="cfg" id="tbUsr"></table></div>
+        <div class="tablebox" style="margin:0"><table class="cfg uslist" id="tbUsr"></table></div>
+        <p class="note" style="margin:0"><span class="lk ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></span> liberado (lança e altera) · <span class="lk ver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></span> só visualiza · <span class="lk no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span> bloqueado. Clique no lápis para abrir o cadastro: <b>Dados básicos</b>, <b>Empresas</b> e <b>Privilégios de acesso</b>. <b>Master</b>: só você, vê e executa tudo. <b>Operador Controlacs</b>: a equipe, sempre com Tarefas, Avisos, Projetos e o Dashboard. <b>Operador cliente</b>: só as empresas e as ferramentas liberadas.</p>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
-        <h2>Acessos</h2>
-        <p class="note" style="margin:0"><b>Lançamento</b>: lança, anexa e corrige até o escritório conferir. <b>Consulta</b>: só vê os lançamentos e os documentos, sem alterar. Cada módulo marcado tem o seu nível, e na tabela abaixo dá para trocar o nível de um acesso já liberado.</p>
-        <form class="row" id="formAc" style="align-items:flex-end">
-          <label class="f">Usuário<select id="acUsr"></select></label>
-          <div class="f" style="flex:1 1 100%"><span>Empresas que ele representa <button type="button" class="btn small ghost" id="acTodas">Marcar todas</button></span><div class="chk" id="acCli"></div></div>
-          <div class="f" style="flex:1 1 100%"><span>Módulos</span><div class="chk" id="acMod"></div></div>
-          <label class="f">Nível de todos os marcados<select id="acNiv"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></label>
-          <button class="btn primary" type="submit">Liberar</button>
-        </form>
+        <h2>Acessos dos operadores cliente por empresa</h2>
+        <p class="note" style="margin:0">Resumo do que está liberado no banco para cada operador cliente, por empresa e módulo. É montado sozinho a partir das permissões do cadastro: <b>Lançamento</b> quando alguma ferramenta do módulo tem Executar, <b>Consulta</b> quando só tem Visualizar. Para mudar, abra <b>Cadastro e permissões</b> do usuário, acima.</p>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbAc"></table></div>
       </div>
     </div>
@@ -1102,6 +1101,12 @@ body.lg header.top .logo{visibility:hidden}
   <div class="db" id="rpBody"></div>
   <div class="df" id="rpFoot"></div>
 </dialog>
+<dialog id="dlgUsr" style="width:min(1100px,calc(100vw - 32px))">
+  <div class="dh"><h2 id="usTitle"></h2></div>
+  <div class="tabs" role="tablist" id="usTabs" style="margin:0 18px"><button type="button" role="tab" data-ust="dados" aria-selected="true">Dados básicos</button><button type="button" role="tab" data-ust="emps" aria-selected="false">Empresas</button><button type="button" role="tab" data-ust="priv" aria-selected="false">Privilégios de acesso</button></div>
+  <div class="db" id="usBody"></div>
+  <div class="df" id="usFoot"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Cancelar</button><button type="button" class="btn primary" data-act="salvar">Salvar</button></div>
+</dialog>
 <dialog id="dlgPerm">
   <div class="dh"><h2 id="pmTitle"></h2></div>
   <div class="db" id="pmBody"></div>
@@ -1194,6 +1199,20 @@ body.lg header.top .logo{visibility:hidden}
 const SUPABASE_URL='https://qlopcclhswtbgrupfhyy.supabase.co';
 const SUPABASE_KEY='sb_publishable_7Vz9OIY5grg3eqixTtxOWQ_yGxC1XRL';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+// quem só tem "Visualizar" na tela aberta não grava nada nela (permissões por ferramenta, Carol 03/11).
+// Leituras passam sempre; marcar novidade/aviso/tarefa como lida também.
+const SEMPRE_GRAVA=new Set(['novidades_vistas','aviso_leituras','tarefa_leituras','tarefa_cientes']);
+const RPC_GRAVA=new Set(['aplicar_alteracao_conta','ferias_gerar_periodos','gerar_contas_beneficios','tes_espelho_aplicar','tes_transferir','ctb_exportado']);
+const SOVER_MSG='Você tem só permissão para visualizar esta tela. Para lançar ou alterar, peça ao master para marcar “Executar”.';
+const soVerBloq=()=>{try{return typeof VIEW==='string'&&!podeExec(VIEW)}catch(e){return false}};
+const soVerResp=()=>{const r={data:null,error:{message:SOVER_MSG,code:'so_visualizar'}};toast(SOVER_MSG);
+  const p=new Proxy(function(){},{get:(t,k)=>k==='then'?(ok,ko)=>Promise.resolve(r).then(ok,ko):()=>p,apply:()=>p});return p};
+{const _from=sb.from.bind(sb),_rpc=sb.rpc.bind(sb),_stGet=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(sb),'storage')?.get;
+  const guarda=(q,ms)=>new Proxy(q,{get(o,k){if(ms.includes(k)&&soVerBloq())return ()=>soVerResp();const v=o[k];return typeof v==='function'?v.bind(o):v}});
+  sb.from=t=>SEMPRE_GRAVA.has(t)?_from(t):guarda(_from(t),['insert','upsert','update','delete']);
+  sb.rpc=(f,...a)=>RPC_GRAVA.has(f)&&soVerBloq()?soVerResp():_rpc(f,...a);
+  // o storage do supabase-js é criado a cada acesso (getter): embrulha o from de cada um
+  if(_stGet)Object.defineProperty(sb,'storage',{get(){const st=_stGet.call(sb),f=st.from.bind(st);st.from=b=>guarda(f(b),['upload','remove','update','move']);return st}});}
 const $=id=>document.getElementById(id);
 
 // ---------- utilidades ----------
@@ -1298,7 +1317,14 @@ const SEMPRE=['tarefas','avisos','projetos','gfdash'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
-const eqPode=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
+const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
+// permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
+// perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
+const PERM=()=>ME&&!ehAdm()&&ME.permissoes&&typeof ME.permissoes==='object'&&!Array.isArray(ME.permissoes)?ME.permissoes:null;
+const permTela=k=>{if(!ME||ehAdm())return 'exec';const p=PERM();if(!p||SEMPRE.includes(k)||k==='avisos')return 'exec';return p[k]==='exec'?'exec':p[k]==='ver'?'ver':''};
+const eqPode=k=>{if(!ME)return false;if(ehAdm())return true;const p=PERM();if(!p)return eqPodeAnt(k);if(ehEsc()&&SO_MASTER.includes(k))return false;return !!permTela(k)};
+// Executar: lança, altera, exclui e anexa na tela; só Visualizar: vê e baixa, sem gravar nada
+const podeExec=k=>permTela(k)==='exec';
 const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Parceiros: cadastro e alterações',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas','repasse']],['Contabilidade',['contabil']]];
@@ -1307,7 +1333,7 @@ const MODEQ={folha:['folha','ponto','premio','beneficios','colab'],ferias:['feri
 const temEm=(cli,m)=>ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo));
-const podeLancar=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo)&&a.nivel==='lancamento');
+const podeLancar=(cli,m)=>(ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo)&&a.nivel==='lancamento'))&&(!VIEW||podeExec(VIEW));
 const ICO={
   caixa:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 11h18M8 4h8v3H8z"/>',
   pagar:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
@@ -1544,7 +1570,7 @@ document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.
 function openView(){
   viewDaEmp();renderNav();
   ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
-  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();return}
+  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -1577,8 +1603,10 @@ function openView(){
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
-  avBanner();tpBanner();
+  avBanner();tpBanner();soVerBanner();
 }
+// aviso no alto da tela de quem só tem "Visualizar" nela
+function soVerBanner(){$('soVerBanner').hidden=!VIEW||podeExec(VIEW)||telaSemEmp(VIEW)&&VIEW.startsWith('cfg')}
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);document.body.classList.toggle('lg',view==='loginForm'||view==='viewPend');$('modrow').hidden=view!=='app';if(view!=='app')megaFecha();
   const logged=view!=='loginForm'&&view!=='loading';$('btnSair').hidden=!logged;$('who').hidden=!logged;
@@ -2509,8 +2537,8 @@ $('tabCats').addEventListener('change',async e=>{const tr=e.target.closest('tr')
   if(!q)return;const {error}=await q;if(error)fail(error);else toast('Salvo')});
 
 // ---------- cadastros ----------
-let USERS=[];
-const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a tudo)'],['equipe','Operador Controlacs'],['cliente','Cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
+let USERS=[],ACS_TODOS=[],USR_PERM=null;
+const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a tudo)'],['equipe','Operador Controlacs'],['cliente','Operador cliente (gestor da empresa)'],['colaborador','Colaborador do cliente']];
 // tipo do usuário; antes da v33 vem do papel
 // só existe um master; o tipo não aparece como opção para os outros usuários
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
@@ -2519,56 +2547,30 @@ async function renderCadastro(){
   $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th><th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
     CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td><td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
+  ACS_TODOS=acs||[];
   // permissões de cada usuário do cliente: empresa › módulos (nível)
   const perm=u=>{if(u.papel==='escritorio'){if(u.tipo==='admin'||u.admin)return 'Master: tudo, inclusive Configurações, Plano de contas, regras e tarefas restritas';
-      const ms=u.modulos_equipe?NAV.filter(n=>u.modulos_equipe.includes(n.k)).map(n=>n.t):null,es=u.empresas_equipe?.length?u.empresas_equipe.map(id=>CLIENTES.find(c=>c.id===id)?.nome).filter(Boolean):null;
-      return `${ms?(ms.length?esc(ms.join(', ')):'Só Tarefas e Avisos'):'Todos os módulos'}${ms&&ms.length?' + Tarefas e Avisos':''}<br><span class="muted">${es?'Empresas: '+esc(es.join(', ')):'Todas as empresas'}</span>${ehAdm()?' <button type="button" class="btn small ghost" data-perm="1">Escolher módulos e empresas</button>':''}`}
+      const es=u.empresas_equipe?.length?u.empresas_equipe.map(id=>CLIENTES.find(c=>c.id===id)?.nome).filter(Boolean):null;
+      if(temPermNova(u))return permResumo(u)+`<br><span class="muted">${es?'Empresas: '+esc(es.join(', ')):'Todas as empresas'}</span>`;
+      const ms=u.modulos_equipe?NAV.filter(n=>u.modulos_equipe.includes(n.k)).map(n=>n.t):null;
+      return `${ms?(ms.length?esc(ms.join(', ')):'Só Tarefas e Avisos'):'Todos os módulos'}${ms&&ms.length?' + Tarefas e Avisos':''}<br><span class="muted">${es?'Empresas: '+esc(es.join(', ')):'Todas as empresas'}</span>`}
     const g={};(acs||[]).filter(a=>a.user_id===u.user_id).forEach(a=>(g[a.cliente_id]||=[]).push(`${MODNOME[a.modulo]||a.modulo} (${a.nivel==='lancamento'?'Lançamento':'Consulta'})`));
-    return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Libere no quadro Acessos.</span>'};
-  $('tbUsr').innerHTML=`<thead><tr><th class="l">E-mail</th><th class="l">Nome</th><th class="l">Tipo</th><th class="l">Permissões</th><th></th></tr></thead><tbody>${
-    USERS.map(u=>`<tr data-id="${u.user_id}"><td class="l">${esc(u.email)}</td><td><input data-k="nome" value="${esc(u.nome)}"></td>
-      <td><select data-k="tipo" ${u.user_id===ME.user_id?'disabled':''}>${TIPOSUSR.filter(([v])=>v!=='admin'||tipoUsr(u)==='admin').map(([v,t])=>`<option value="${v}"${tipoUsr(u)===v?' selected':''}>${t}</option>`).join('')}</select></td>
-      <td class="l" style="white-space:normal;font-size:13px;min-width:260px">${u.papel==='pendente'?'<span class="muted">Sem acesso</span>':perm(u)+regTxt(u)}</td>
-      <td>${u.user_id===ME.user_id?'':'<button type="button" class="btn small ghost" data-senha="1">Trocar senha</button>'}</td></tr>`).join('')}</tbody>`;
-  // novo usuário: a equipe só cadastra clientes e colaboradores
-  const adm=ME.tipo==='admin'||ME.admin;
-  $('nuTipo').innerHTML=TIPOSUSR.filter(([v])=>v!=='pendente'&&v!=='admin'&&(adm||v==='cliente'||v==='colaborador')).map(([v,t])=>`<option value="${v}"${v==='cliente'?' selected':''}>${t}</option>`).join('');
-  if(!$('nuSenha').value)$('nuSenha').value=senhaNova();
-  $('acUsr').innerHTML=USERS.filter(u=>u.papel!=='escritorio').map(u=>`<option value="${u.user_id}">${esc(u.nome||u.email)} (${esc(u.email)}) · ${TIPOSUSR.find(t=>t[0]===tipoUsr(u))[1]}</option>`).join('');
-  $('acCli').innerHTML=CLIENTES.filter(c=>c.ativo).map(c=>`<label><input type="checkbox" value="${c.id}"> ${esc(c.nome)}</label>`).join('');
-  $('acMod').innerHTML=MODGRUPOS.map(([g,ks])=>`<div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center"><b style="font-size:13px;min-width:130px">${g}</b>${ks.map(k=>`<span class="acm"><label><input type="checkbox" value="${k}"> ${MODNOME[k].replace(' (RH)','')}</label><select data-niv="${k}" hidden aria-label="Nível de ${esc(MODNOME[k])}"><option value="lancamento">Lançamento</option><option value="consulta">Consulta</option></select></span>`).join('')}</div>`).join('');
+    const emps=Object.keys(g).map(c=>CLIENTES.find(x=>x.id===c)?.nome||'?');
+    if(temPermNova(u))return permResumo(u)+(emps.length?`<br><span class="muted">Empresas: ${esc(emps.join(', '))}</span>`:'<br><span class="muted">Nenhuma empresa marcada.</span>');
+    return Object.entries(g).map(([c,ms])=>`<b>${esc(CLIENTES.find(x=>x.id===c)?.nome||'?')}</b>: ${ms.join(', ')}`).join('<br>')||'<span class="muted">Nenhum acesso. Abra Cadastro e permissões.</span>'};
+  const adm=ehAdm();USR_PERM=perm;usLista();
+  $('nuAbrir').hidden=!adm;
   renderAcessos();
 }
 async function renderAcessos(){
   if(!window.V2){$('tbAc').innerHTML='<tbody><tr><td class="l neg">Rode a atualização v2 do banco no Supabase para liberar acessos por módulo.</td></tr></tbody>';return}
   const {data,error}=await sb.from('acessos').select('*');if(error){fail(error,'Erro ao carregar os acessos');return}
   const nu=id=>{const u=USERS.find(x=>x.user_id===id);return u?esc(u.nome||u.email):'?'},nc=id=>esc(CLIENTES.find(c=>c.id===id)?.nome||'?');
-  const rows=(data||[]).sort((a,b)=>nu(a.user_id).localeCompare(nu(b.user_id))||nc(a.cliente_id).localeCompare(nc(b.cliente_id)));
-  $('tbAc').innerHTML=`<thead><tr><th class="l">Usuário</th><th class="l">Empresa</th><th class="l">Módulo</th><th class="l">Nível</th><th></th></tr></thead><tbody>${
-    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]}</td><td class="l"><select data-acniv aria-label="Nível">${[['lancamento','Lançamento'],['consulta','Consulta']].map(([v,t])=>`<option value="${v}"${a.nivel===v?' selected':''}>${t}</option>`).join('')}</select></td><td><button type="button" class="btn small ghost">Tirar acesso</button></td></tr>`).join('')
-    ||'<tr><td class="l muted" colspan="5">Nenhum acesso liberado ainda.</td></tr>'}</tbody>`;
+  const rows=(data||[]).filter(a=>USERS.find(x=>x.user_id===a.user_id)?.papel!=='escritorio').sort((a,b)=>nu(a.user_id).localeCompare(nu(b.user_id))||nc(a.cliente_id).localeCompare(nc(b.cliente_id)));
+  $('tbAc').innerHTML=`<thead><tr><th class="l">Usuário</th><th class="l">Empresa</th><th class="l">Módulo</th><th class="l">Nível</th></tr></thead><tbody>${
+    rows.map(a=>`<tr data-u="${a.user_id}" data-c="${a.cliente_id}" data-m="${a.modulo}"><td class="l">${nu(a.user_id)}</td><td class="l">${nc(a.cliente_id)}</td><td class="l">${MODNOME[a.modulo]||esc(a.modulo)}</td><td class="l">${a.nivel==='lancamento'?'Lançamento':'Consulta'}</td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="4">Nenhum acesso liberado ainda.</td></tr>'}</tbody>`;
 }
-$('formAc').addEventListener('submit',async e=>{
-  e.preventDefault();if(!window.V2){toast('Rode primeiro a atualização v2 do banco.');return}
-  const u=$('acUsr').value;if(!u)return;
-  const marc=id=>[...$(id).querySelectorAll('input:checked')].map(x=>x.value),cs=marc('acCli'),ms=marc('acMod');
-  if(!cs.length||!ms.length){toast('Marque pelo menos uma empresa e um módulo.');return}
-  // cada módulo com o seu nível (Carol, 30/10): pode lançar em uns e só consultar outros
-  const niv=m=>$('acMod').querySelector(`[data-niv="${m}"]`)?.value||$('acNiv').value;
-  const rows=cs.flatMap(c=>ms.map(m=>({user_id:u,cliente_id:c,modulo:m,nivel:niv(m)})));
-  const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){fail(error);return}
-  const usr=USERS.find(x=>x.user_id===u);
-  if(usr&&usr.papel==='pendente'){await sb.from('perfis').update({papel:'operador'}).eq('user_id',u);usr.papel='operador'}
-  toast('Acesso liberado');renderCadastro();
-});
-// marcar um módulo mostra o nível dele; o "Nível de todos os marcados" muda todos de uma vez
-$('acMod').addEventListener('change',e=>{const i=e.target.closest('input[type=checkbox]');if(!i)return;const sl=$('acMod').querySelector(`[data-niv="${i.value}"]`);if(sl){sl.hidden=!i.checked;if(i.checked)sl.value=$('acNiv').value}});
-$('acNiv').addEventListener('change',()=>$('acMod').querySelectorAll('[data-niv]').forEach(sl=>{if(!sl.hidden)sl.value=$('acNiv').value}));
-$('tbAc').addEventListener('change',async e=>{const sl=e.target.closest('[data-acniv]');if(!sl)return;const tr=sl.closest('tr[data-u]');
-  const {error}=await sb.from('acessos').update({nivel:sl.value}).eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error){fail(error);renderAcessos()}else toast('Nível alterado')});
-$('acTodas').onclick=()=>{const bs=[...$('acCli').querySelectorAll('input')],v=bs.some(b=>!b.checked);bs.forEach(b=>b.checked=v)};
-$('tbAc').addEventListener('click',async e=>{const tr=e.target.closest('tr[data-u]');if(!tr||!e.target.closest('button'))return;
-  const {error}=await sb.from('acessos').delete().eq('user_id',tr.dataset.u).eq('cliente_id',tr.dataset.c).eq('modulo',tr.dataset.m);if(error)fail(error);else{toast('Acesso retirado');renderAcessos()}});
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;let v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
   if(k==='caixas')e.target.value=v=Math.max(1,Math.min(9,parseInt(v)||1));
   const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);c[k]=v}});
@@ -2576,18 +2578,160 @@ $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').d
 const senhaNova=()=>{const L='abcdefghjkmnpqrstuvwxyz',a=new Uint32Array(8);crypto.getRandomValues(a);return [...a].map((x,i)=>i<4?L[x%L.length]:String(x%10)).join('')};
 const msgBanco=(e,v)=>/criar_usuario|trocar_senha|function/i.test(e.message||'')&&/not find|does not exist|schema cache/i.test(e.message||'')?`Rode a atualização ${v} do banco no Supabase.`:(e.message||'Verifique a internet e tente de novo.');
 const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origin+location.pathname}\nE-mail: ${email}\nSenha: ${senha}`;
-$('formUsr').addEventListener('submit',async e=>{
-  e.preventDefault();const b=e.submitter||e.target.querySelector('button');b.disabled=true;
-  const email=$('nuEmail').value.trim().toLowerCase(),senha=$('nuSenha').value,tipo=$('nuTipo').value;
-  const {error}=await sb.rpc('criar_usuario',{p_email:email,p_senha:senha,p_nome:$('nuNome').value.trim(),p_tipo:tipo});
-  b.disabled=false;
-  if(error){console.error(error);toast('Não foi possível cadastrar: '+msgBanco(error,'v36'));return}
-  const txt=dadosAcesso(email,senha);
-  $('nuOk').innerHTML=`<b>Usuário cadastrado: ${esc(email)}</b><span>${tipo==='cliente'||tipo==='colaborador'?'Agora libere as empresas e os módulos dele no quadro Acessos, abaixo. ':''}Mande para a pessoa o endereço do portal, o e-mail e a senha.</span><div><button type="button" class="btn small primary" id="nuCopiar">Copiar dados de acesso</button></div>`;
-  $('nuOk').hidden=false;$('nuCopiar').onclick=()=>copiar(txt,'Dados de acesso copiados');
-  $('formUsr').reset();$('nuSenha').value=senhaNova();DIRUS=null;await renderCadastro();
-  if(tipo==='cliente'||tipo==='colaborador'){const u=USERS.find(x=>x.email===email);if(u)$('acUsr').value=u.user_id}
-});
+// ---------- cadastro do usuário com permissões por ferramenta (Carol, 03/11) ----------
+// cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
+const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil'};
+const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
+const ehTipoEquipe=t=>t==='equipe';
+// ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
+const ferramentas=tipo=>NAV.filter(n=>!n.soon&&(ehTipoEquipe(tipo)?!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k)&&n.k!=='avisos':n.k in TOOLMOD));
+const temPermNova=u=>!!u.permissoes&&typeof u.permissoes==='object'&&!Array.isArray(u.permissoes);
+// permissões atuais do usuário; quem ainda não foi salvo na tela nova tem as permissões montadas pela regra antiga (nada muda para ele)
+function permsDe(u,tipo){
+  tipo=tipo||tipoUsr(u);const r={};
+  if(temPermNova(u)){ferramentas(tipo).forEach(n=>{const v=u.permissoes[n.k];if(v==='ver'||v==='exec')r[n.k]=v});return r}
+  if(ehTipoEquipe(tipo)){ferramentas(tipo).forEach(n=>{const k=n.k==='docs'?'colab':n.k;if(!u.modulos_equipe||u.modulos_equipe.includes(k))r[n.k]='exec'});return r}
+  ferramentas(tipo).forEach(n=>{const l=ACS_TODOS.filter(a=>a.user_id===u.user_id&&a.modulo===TOOLMOD[n.k]);if(l.length)r[n.k]=l.some(a=>a.nivel==='lancamento')?'exec':'ver'});
+  return r;
+}
+function permResumo(u){
+  const t=tipoUsr(u),p=permsDe(u,t),fs=ferramentas(t),ex=fs.filter(n=>p[n.k]==='exec').map(n=>n.t),ve=fs.filter(n=>p[n.k]==='ver').map(n=>n.t);
+  if(!ex.length&&!ve.length)return '<span class="muted">Nenhuma ferramenta marcada</span>';
+  return (ex.length?`<b>Executar:</b> ${esc(ex.join(', '))}`:'')+(ex.length&&ve.length?'<br>':'')+(ve.length?`<b>Só visualizar:</b> ${esc(ve.join(', '))}`:'');
+}
+const dlgUsr=$('dlgUsr');let USRED=null;
+const TIPOSCAD=[['equipe','Operador Controlacs'],['cliente','Operador cliente']];
+const LKSVG=a=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="${a?'M8 11V7a4 4 0 0 1 7.6-1.8':'M8 11V7a4 4 0 0 1 8 0v4'}"/></svg>`;
+const ICOS={olho:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',lapis:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',chave:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/>',mapa:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'};
+const icoSvg=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICOS[k]}</svg>`;
+// situação de um módulo para o usuário: 'exec' (alguma ferramenta liberada para executar), 'ver' (só visualiza) ou '' (bloqueado)
+function modSit(u,g){
+  const t=tipoUsr(u);if(t==='admin')return 'exec';if(t==='pendente')return '';
+  if(ehTipoEquipe(t)&&NAV.some(n=>navGrp(n)===g&&SEMPRE.includes(n.k)))return 'exec';
+  const p=permsDe(u,t),vs=ferramentas(t).filter(n=>navGrp(n)===g).map(n=>p[n.k]).filter(Boolean);
+  return vs.includes('exec')?'exec':vs.length?'ver':'';
+}
+// lista no estilo do Bom Controle: nome, login e um cadeado por módulo
+function usLista(){
+  const busca=($('usBusca').value||'').trim().toLowerCase(),adm=ehAdm();
+  const lista=USERS.filter(u=>!busca||((u.nome||'')+' '+u.email+' '+(u.whatsapp||'')).toLowerCase().includes(busca));
+  const tnome=u=>({admin:'Master',equipe:'Operador Controlacs',cliente:'Operador cliente',colaborador:'Colaborador do cliente',pendente:'Pendente'})[tipoUsr(u)]||'';
+  $('tbUsr').innerHTML=`<thead><tr><th class="l">Nome</th><th class="l">Login</th>${MODS.map(m=>`<th class="m" title="${m.g}">${svgI(m.i)}<span>${m.c||m.g}</span></th>`).join('')}<th></th></tr></thead><tbody>${
+    lista.map(u=>`<tr data-id="${u.user_id}"><td class="l unome"><b>${esc(u.nome||u.email)}</b><small>${esc(tnome(u))}${u.whatsapp?' · '+esc(u.whatsapp):''}</small></td><td class="l">${esc(u.email)}</td>
+      ${MODS.map(m=>{const x=modSit(u,m.g);return `<td class="m"><span class="lk ${x==='exec'?'ok':x==='ver'?'ver':'no'}" title="${m.g}: ${x==='exec'?'liberado':x==='ver'?'só visualiza':'bloqueado'}">${LKSVG(!!x)}</span></td>`}).join('')}
+      <td class="uact">${tipoUsr(u)==='admin'?'<span class="chip c-done">Master</span> ':''}${adm?`<button type="button" class="iconbtn" data-usr="1" title="Editar cadastro e privilégios" aria-label="Editar ${esc(u.nome||u.email)}">${icoSvg('lapis')}</button>`:''}${adm&&tipoUsr(u)!=='admin'?`<button type="button" class="iconbtn" data-reg="1" title="Regiões dos parceiros" aria-label="Regiões dos parceiros">${icoSvg('mapa')}</button>`:''}${u.user_id===ME.user_id?'':`<button type="button" class="iconbtn" data-senha="1" title="Trocar senha" aria-label="Trocar senha">${icoSvg('chave')}</button>`}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="${MODS.length+3}">Nenhum usuário encontrado.</td></tr>`}</tbody>`;
+}
+$('usBusca').addEventListener('input',()=>usLista());
+// edição em abas: Dados básicos, Empresas e Privilégios de acesso (como no Bom Controle)
+let US=null;
+function abrirUsuario(u){
+  USRED=u||null;const novo=!u,t0=u?tipoUsr(u):'cliente',master=u&&t0==='admin';
+  US={tipo:t0,p:u&&!master?permsDe(u,t0):{},emps:u&&!master?usEmpresas(u,t0):[],mod:null,aba:'dados',master};
+  $('usTitle').textContent=novo?'Cadastro de usuário':'Cadastro de usuário · '+(u.nome||u.email);
+  const tipos=TIPOSCAD.concat(t0==='colaborador'?[['colaborador','Colaborador do cliente']]:[]).concat(t0==='pendente'&&!novo?[['pendente','Pendente (sem acesso)']]:[]);
+  $('usBody').innerHTML=`<section data-usp="dados"><h3 style="margin:0 0 10px">Dados básicos</h3><div class="usgrid">
+      <label class="f">E-mail (login)<input type="email" id="usEmail" value="${esc(u?.email)}" ${novo?'':'readonly'} autocomplete="off" placeholder="pessoa@empresa.com"></label>
+      <label class="f">Nome<input id="usNome" value="${esc(u?.nome)}" placeholder="Nome e sobrenome"></label>
+      <label class="f">WhatsApp<input id="usWhats" value="${esc(u?.whatsapp)}" inputmode="tel" placeholder="(00) 00000-0000"></label>
+      ${master?'<div class="f"><span>Tipo</span><b>Master (administrador geral)</b></div>':`<label class="f">Tipo<select id="usTipo"${u&&u.user_id===ME.user_id?' disabled':''}>${tipos.map(([v,x])=>`<option value="${v}"${t0===v?' selected':''}>${x}</option>`).join('')}</select></label>`}
+      ${novo?`<label class="f">Senha provisória<input id="usSenha" minlength="6" value="${senhaNova()}" autocomplete="new-password"></label>`:''}
+    </div></section>
+    <section data-usp="emps" hidden></section>
+    <section data-usp="priv" hidden></section>
+    <p class="err" id="usErr" hidden></p>`;
+  if($('usTipo'))$('usTipo').onchange=()=>{const t=$('usTipo').value;US.tipo=t;
+    // a lista de ferramentas muda com o tipo: mantém o que continua valendo
+    const ks=new Set(ferramentas(t).map(n=>n.k));US.p=Object.fromEntries(Object.entries(US.p).filter(([k])=>ks.has(k)));
+    if(ehTipoEquipe(t)&&Array.isArray(US.emps)&&!US.emps.length)US.emps=null;if(!ehTipoEquipe(t)&&US.emps===null)US.emps=[];US.mod=null;usEmpsDesenha();usPrivDesenha()};
+  usEmpsDesenha();usPrivDesenha();usAba('dados');
+  dlgUsr.showModal();
+}
+function usAba(a){US.aba=a;$('usTabs').querySelectorAll('[data-ust]').forEach(b=>b.setAttribute('aria-selected',b.dataset.ust===a));$('usBody').querySelectorAll('[data-usp]').forEach(x=>x.hidden=x.dataset.usp!==a)}
+$('usTabs').addEventListener('click',e=>{const b=e.target.closest('[data-ust]');if(b)usAba(b.dataset.ust)});
+// empresas marcadas: operador Controlacs = null (todas) ou a lista; operador cliente = as empresas dos acessos dele
+function usEmpresas(u,t){
+  if(!u)return ehTipoEquipe(t)?null:[];
+  if(ehTipoEquipe(t))return u.empresas_equipe?.length?[...u.empresas_equipe]:null;
+  return [...new Set(ACS_TODOS.filter(a=>a.user_id===u.user_id&&MODS_CLIENTE.includes(a.modulo)).map(a=>a.cliente_id))];
+}
+function usEmpsDesenha(){
+  const box=$('usBody').querySelector('[data-usp="emps"]');
+  if(US.master){box.innerHTML='<h3 style="margin:0 0 10px">Empresas</h3><p class="note" style="margin:0">O master tem acesso a todas as empresas.</p>';return}
+  const eq=ehTipoEquipe(US.tipo),todas=eq&&US.emps===null,lista=todas?[]:US.emps||[],ativas=CLIENTES.filter(c=>c.ativo!==false),fora=ativas.filter(c=>!lista.includes(c.id));
+  box.innerHTML=`<h3 style="margin:0 0 4px">Empresas</h3><p class="note" style="margin:0 0 10px">Empresas que este usuário terá acesso. Os privilégios valem para todas as empresas da lista.</p>
+    ${eq?`<label style="display:flex;gap:8px;align-items:center;font-weight:600;margin-bottom:10px"><input type="checkbox" id="usTodas" style="width:auto;margin:0"${todas?' checked':''}> Todas as empresas (inclusive as que forem cadastradas depois)</label>`:''}
+    ${todas?'':`<div class="row" style="gap:8px;align-items:flex-end"><label class="f" style="flex:1 1 260px">Empresa<select id="usEmpSel"><option value="">Selecione</option>${fora.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></label><button type="button" class="btn primary" data-use="add" title="Adicionar empresa">+ Adicionar</button>${fora.length>1?'<button type="button" class="btn ghost" data-use="todas">Adicionar todas</button>':''}</div>
+      <div style="margin-top:10px">${lista.map(id=>`<div class="uslinha" data-emp="${id}"><span>${esc(CLIENTES.find(c=>c.id===id)?.nome||'Empresa inativa')}</span><button type="button" class="btn small ghost" data-use="del">Remover</button></div>`).join('')||'<p class="note" style="margin:0">Nenhuma empresa adicionada ainda.</p>'}</div>`}`;
+  if($('usTodas'))$('usTodas').onchange=e=>{US.emps=e.target.checked?null:[];usEmpsDesenha()};
+}
+$('usBody').addEventListener('click',e=>{const b=e.target.closest('[data-use]');if(!b)return;
+  if(b.dataset.use==='add'){const v=$('usEmpSel').value;if(!v)return toast('Selecione a empresa.');US.emps=[...(US.emps||[]),v]}
+  else if(b.dataset.use==='todas')US.emps=CLIENTES.filter(c=>c.ativo!==false).map(c=>c.id);
+  else if(b.dataset.use==='del'){const id=b.closest('[data-emp]').dataset.emp;US.emps=(US.emps||[]).filter(x=>x!==id)}
+  usEmpsDesenha()});
+// privilégios: um ícone por módulo; no módulo, Acesso personalizado / Total / Bloqueado e, por tela, Ver / Executar / Bloqueado
+function usPrivDesenha(){
+  const box=$('usBody').querySelector('[data-usp="priv"]');
+  if(US.master){box.innerHTML='<h3 style="margin:0 0 10px">Privilégios de acesso</h3><p class="note" style="margin:0">O master é o administrador geral: vê e executa tudo, inclusive Configurações.</p>';return}
+  const t=US.tipo,fs=ferramentas(t),mods=MODS.filter(m=>fs.some(n=>navGrp(n)===m.g));
+  if(!mods.length){box.innerHTML='<h3 style="margin:0 0 10px">Privilégios de acesso</h3><p class="note" style="margin:0">Escolha o tipo do usuário em Dados básicos.</p>';return}
+  if(!mods.some(m=>m.g===US.mod))US.mod=mods[0].g;
+  const doMod=g=>fs.filter(n=>navGrp(n)===g),sit=g=>{const vs=doMod(g).map(n=>US.p[n.k]);return vs.every(v=>v==='exec')?'total':vs.every(v=>!v)?'bloq':'pers'};
+  const itens=doMod(US.mod),modo=sit(US.mod),secs=SECOES.map(sc=>[sc==='Relatórios'?'Visões e relatórios':sc,itens.filter(n=>(n.s||'Dia a dia')===sc)]).filter(([,l])=>l.length);
+  const radio=(n,v,tit)=>`<td class="r"><input type="radio" name="usr_${n.k}" value="${v}" title="${tit}" aria-label="${esc(n.t)}: ${tit}"${(US.p[n.k]||'')===v?' checked':''}></td>`;
+  box.innerHTML=`<div class="row" style="align-items:center"><h3 style="margin:0">Privilégios de acesso</h3><span class="spacer"></span><span class="note">${ehTipoEquipe(t)?'Tarefas, Avisos, Projetos e o Dashboard ficam sempre liberados para a equipe.':'Avisos e o Dashboard ficam sempre liberados.'}</span></div>
+    <div class="usmods">${mods.map(m=>{const x=sit(m.g);return `<button type="button" class="usmod" data-usm="${esc(m.g)}" aria-pressed="${m.g===US.mod}">${svgI(m.i)}<span>${m.c||m.g}</span><span class="ck${x==='bloq'?' no':''}" title="${x==='total'?'Acesso total':x==='bloq'?'Bloqueado':'Personalizado'}">${x==='bloq'?'✕':'✔'}</span></button>`}).join('')}</div>
+    <div class="usmodo"><label><input type="radio" name="usmodo" value="pers"${modo==='pers'?' checked':''}> Acesso personalizado</label><label><input type="radio" name="usmodo" value="total"${modo==='total'?' checked':''}> Acesso <b style="color:var(--ok)">Total</b> ao módulo ${esc(US.mod)}</label><label><input type="radio" name="usmodo" value="bloq"${modo==='bloq'?' checked':''}> Acesso <b style="color:var(--bad)">BLOQUEADO</b> ao módulo ${esc(US.mod)}</label></div>
+    <div class="uscols">${secs.map(([sc,l])=>`<div class="uscol"><table><thead><tr><th>${sc}</th><th class="r" title="Ver (visualiza e baixa)">${icoSvg('olho')}</th><th class="r" title="Executar (lança, altera, exclui e anexa)">${icoSvg('lapis')}</th><th class="r" title="Bloqueado">${LKSVG(false)}</th></tr></thead>
+      <tbody>${l.map(n=>`<tr><td>${esc(n.t)}</td>${radio(n,'ver','Ver')}${radio(n,'exec','Executar')}${radio(n,'','Bloqueado')}</tr>`).join('')}</tbody></table></div>`).join('')}</div>
+    <p class="note" style="margin:10px 0 0">${icoSvg('olho').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} <b>Ver</b>: vê a tela e baixa relatórios e documentos. ${icoSvg('lapis').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} <b>Executar</b>: também lança, altera, exclui e anexa. 🔒 <b>Bloqueado</b>: a tela não aparece.</p>`;
+}
+$('usBody').addEventListener('click',e=>{const b=e.target.closest('[data-usm]');if(b){US.mod=b.dataset.usm;usPrivDesenha()}});
+$('usBody').addEventListener('change',e=>{const x=e.target;
+  if(x.name==='usmodo'){if(x.value==='pers')return;ferramentas(US.tipo).filter(n=>navGrp(n)===US.mod).forEach(n=>{if(x.value==='total')US.p[n.k]='exec';else delete US.p[n.k]});usPrivDesenha();return}
+  if(x.name?.startsWith('usr_')){const k=x.name.slice(4);if(x.value)US.p[k]=x.value;else delete US.p[k];usPrivDesenha()}});
+// lido na hora de salvar
+function usLePerm(){return {p:{...US.p},emps:US.emps===null?null:[...(US.emps||[])]}}
+$('nuAbrir').onclick=()=>{$('nuOk').hidden=true;abrirUsuario(null)};
+$('tbUsr').addEventListener('click',e=>{const b=e.target.closest('[data-usr]');if(b)abrirUsuario(USERS.find(x=>x.user_id===b.closest('tr').dataset.id))});
+const msgV85=e=>/whatsapp|permissoes/.test(e?.message||'')&&/column|schema cache|does not exist/i.test(e?.message||'')?'Rode a atualização v85 do banco no Supabase (cadastro com WhatsApp e permissões por ferramenta).':(e?.message||'Não foi possível salvar. Verifique a internet e tente de novo.');
+$('usFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgUsr.close();
+  const er=m=>{$('usErr').textContent=m;$('usErr').hidden=false;b.disabled=false};$('usErr').hidden=true;
+  const u=USRED,novo=!u,master=u&&tipoUsr(u)==='admin',nome=$('usNome').value.trim(),email=$('usEmail').value.trim().toLowerCase(),whats=$('usWhats').value.trim()||null;
+  const tipo=master?'admin':$('usTipo').value,{p,emps}=master?{p:{},emps:null}:usLePerm(),eq=ehTipoEquipe(tipo),cli=tipo==='cliente'||tipo==='colaborador';
+  if(novo&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return er('Informe um e-mail válido.');
+  if(!master&&Array.isArray(emps)&&!emps.length&&(eq||Object.keys(p).length))return er(eq?'Marque pelo menos uma empresa, ou escolha “Todas as empresas”.':'Marque pelo menos uma empresa.');
+  b.disabled=true;let uid=u?.user_id,senha=null;
+  if(novo){senha=$('usSenha').value;if((senha||'').length<6)return er('A senha provisória precisa ter pelo menos 6 caracteres.');
+    const {data,error}=await sb.rpc('criar_usuario',{p_email:email,p_senha:senha,p_nome:nome,p_tipo:tipo});
+    if(error){console.error(error);return er('Não foi possível cadastrar: '+msgBanco(error,'v36'))}
+    uid=data;if(!uid){const {data:pu}=await sb.from('perfis').select('user_id').eq('email',email).maybeSingle();uid=pu?.user_id}
+    if(!uid)return er('Usuário criado, mas não foi possível ler o cadastro. Atualize a página e abra Cadastro e permissões dele.');
+  }else if(!master&&tipo!==tipoUsr(u)){
+    const {error}=await sb.from('perfis').update(tipo==='pendente'?{tipo:null,papel:'pendente'}:{tipo}).eq('user_id',uid);
+    if(error){console.error(error);return er(/master|administradora/.test(error.message||'')?'Só o master muda o tipo de usuário.':error.message||'Não foi possível mudar o tipo.')}
+  }
+  // dados e permissões no perfil; para a equipe, a lista antiga (modulos_equipe) acompanha, por segurança
+  const r={nome:nome||null,whatsapp:whats};
+  if(!master&&tipo!=='pendente'){r.permissoes=p;
+    if(eq){const todos=ferramentas('equipe').map(n=>n.k),ks=Object.keys(p);r.modulos_equipe=todos.every(k=>ks.includes(k))?null:ks;r.empresas_equipe=emps}}
+  const {error:e1}=await sb.from('perfis').update(r).eq('user_id',uid);
+  if(e1){console.error(e1);return er(msgV85(e1))}
+  // operador cliente: os acessos do banco (empresa × módulo × nível) saem das ferramentas marcadas
+  if(cli&&window.V2){
+    const niv={};Object.entries(p).forEach(([k,v])=>{const m=TOOLMOD[k];if(m)niv[m]=v==='exec'||niv[m]==='lancamento'?'lancamento':'consulta'});
+    const rows=(emps||[]).flatMap(c=>Object.entries(niv).map(([modulo,nivel])=>({user_id:uid,cliente_id:c,modulo,nivel})));
+    if(rows.length){const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){console.error(error);return er('Cadastro salvo, mas os acessos não: '+(error.message||'tente de novo.'))}}
+    const {data:atu}=await sb.from('acessos').select('cliente_id,modulo').eq('user_id',uid);
+    const sai=(atu||[]).filter(a=>MODS_CLIENTE.includes(a.modulo)&&!rows.some(x=>x.cliente_id===a.cliente_id&&x.modulo===a.modulo));
+    for(const a of sai){const {error}=await sb.from('acessos').delete().eq('user_id',uid).eq('cliente_id',a.cliente_id).eq('modulo',a.modulo);if(error){console.error(error);return er('Cadastro salvo, mas não deu para tirar um acesso antigo: '+(error.message||''))}}
+  }
+  b.disabled=false;dlgUsr.close();DIRUS=null;
+  if(novo){const txt=dadosAcesso(email,senha);
+    $('nuOk').innerHTML=`<b>Usuário cadastrado: ${esc(email)}</b><span>Mande para a pessoa o endereço do portal, o e-mail e a senha${whats?' (pelo WhatsApp '+esc(whats)+')':''}.</span><div><button type="button" class="btn small primary" id="nuCopiar">Copiar dados de acesso</button></div>`;
+    $('nuOk').hidden=false;$('nuCopiar').onclick=()=>copiar(txt,'Dados de acesso copiados')}
+  toast(novo?'Usuário cadastrado':'Cadastro e permissões salvos');renderCadastro()});
 $('tbUsr').addEventListener('click',e=>{const b=e.target.closest('[data-perm]');if(b)abrirPermissoes(USERS.find(x=>x.user_id===b.closest('tr').dataset.id))});
 // regiões dos parceiros (abas da planilha de parceiros): o usuário só vê os parceiros das regiões marcadas
 const REGPARC=[['sj','São José'],['fpolis','Florianópolis'],['lages','Lages'],['palmas','Palmas'],['pb','Pato Branco']];
@@ -8508,7 +8652,16 @@ function selPessoa(id,pessoas,v,vazio,dis){
 async function tVersoes(){
   if(window.V74===undefined){const {error:e74}=await sb.from('tarefas').select('executor').limit(1);window.V74=!e74}
   if(window.V31===undefined){const {error:e31}=await sb.from('tarefa_usuarios').select('tarefa_id').limit(1);window.V31=!e31}
+  if(window.V85T===undefined){const {error:e85}=await sb.from('tarefa_participantes').select('tarefa_id').limit(1);window.V85T=!e85}
 }
+// v85: mais executores e validadores; na conclusão, todos os envolvidos dão ciente (Carol, 30/10 e 03/11)
+// envolvidos = executor principal, responsável, executores a mais e validadores. Vale para as tarefas concluídas a partir de 03/11/2026.
+const CIENTE_DESDE='2026-11-03';
+const tEnvolvidos=t=>{const m=new Map();const add=(id,nome,papel)=>{if(!id)return;const x=m.get(id);if(x){if(!x.papeis.includes(papel))x.papeis.push(papel)}else m.set(id,{id,nome:nomeDe(id,nome),papeis:[papel]})};
+  add(t.executor,t.executor_nome,'Executor');(t.tarefa_participantes||[]).forEach(p=>add(p.user_id,p.nome,p.papel==='validador'?'Validador':'Executor'));add(t.responsavel,t.responsavel_nome,'Responsável');return [...m.values()]};
+const tPedeCiente=t=>t.status==='concluida'&&!!t.concluida_em&&t.concluida_em.slice(0,10)>=CIENTE_DESDE&&tEnvolvidos(t).length>0;
+const tCienteDe=(t,id)=>(t.tarefa_cientes||[]).find(c=>c.user_id===id);
+const T_SEL_EXTRA=()=>window.V85T?', tarefa_participantes(user_id,papel,nome), tarefa_cientes(user_id,nome,ciente_em)':'';
 // Tarefas pendentes de quem está logado (executor ou responsável), de TODAS as empresas, independente da
 // empresa escolhida no topo: faixa no topo sempre e a janela uma vez por sessão, ao abrir o sistema
 let TPEND=[];
@@ -8518,14 +8671,23 @@ async function tPendentes(){
   const me=ME.user_id;
   let q=sb.from('tarefas').select('*').eq('arquivada',false).neq('status','concluida');
   q=window.V74?q.or(`executor.eq.${me},responsavel.eq.${me}`):q.eq('responsavel',me);
-  const {data,error}=await q.order('prazo',{ascending:true,nullsFirst:false});if(error)return;
+  const {data:d0,error}=await q.order('prazo',{ascending:true,nullsFirst:false});if(error)return;
+  let data=d0||[];
+  // v85: tarefas em que a pessoa é executor a mais ou validador, e as concluídas que esperam o ciente dela
+  if(window.V85T){
+    const {data:pp}=await sb.from('tarefa_participantes').select('tarefa_id').eq('user_id',me),ids=(pp||[]).map(x=>x.tarefa_id);
+    if(ids.length){const {data:d1}=await sb.from('tarefas').select('*').eq('arquivada',false).neq('status','concluida').in('id',ids);(d1||[]).forEach(t=>{if(!data.some(x=>x.id===t.id))data.push(t)})}
+    let qc=sb.from('tarefas').select('*'+T_SEL_EXTRA()).eq('arquivada',false).eq('status','concluida').gte('concluida_em',CIENTE_DESDE);
+    qc=qc.or(`executor.eq.${me},responsavel.eq.${me}`+(ids.length?`,id.in.(${ids.join(',')})`:''));
+    const {data:d2}=await qc;(d2||[]).filter(t=>tPedeCiente(t)&&tEnvolvidos(t).some(x=>x.id===me)&&!tCienteDe(t,me)).forEach(t=>{t._ciente=true;data.push(t)});
+  }
   // o executor primeiro (é quem faz), depois atrasadas e prazos mais próximos
-  TPEND=(data||[]).sort((a,b)=>(b.executor===me)-(a.executor===me)||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
+  TPEND=data.sort((a,b)=>(b.executor===me)-(a.executor===me)||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
   tpBanner();dsRefaz();
   let vista=false;try{vista=sessionStorage.getItem('tpVista')==='1'}catch(e){}
   if(TPEND.length&&!vista&&!document.querySelector('dialog[open]')){try{sessionStorage.setItem('tpVista','1')}catch(e){}tpJanela()}
 }
-const tpLate=t=>t.prazo&&t.prazo<TODAY;
+const tpLate=t=>!t._ciente&&t.prazo&&t.prazo<TODAY;
 function tpBanner(){
   const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas'||VIEW==='gfdash';
   if(!el.hidden)el.innerHTML=`<span>📋 <b>Você tem ${n} ${n===1?'tarefa pendente':'tarefas pendentes'}${late?` (${late} ${late===1?'atrasada':'atrasadas'})`:''}.</b></span><button type="button" class="btn small primary" data-act="ver">Ver minhas tarefas</button>`;
@@ -8536,8 +8698,8 @@ function tpJanela(){
   $('tpBody').innerHTML=`<p class="note" style="margin:0">Tarefas de todas as empresas em que você é executor ou responsável. Clique numa tarefa para abrir.</p>
     <div class="tablebox" style="margin:0"><table><thead><tr><th class="l">Tarefa</th><th class="l">Empresa</th><th class="l">Você é</th><th class="l">Prazo</th><th class="l">Status</th></tr></thead><tbody>${
     TPEND.map(t=>`<tr class="click" data-id="${t.id}" tabindex="0"><td class="l"><b>${esc(t.titulo)}</b>${TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}</td><td class="l">${esc(cn(t.cliente_id))}</td>
-      <td class="l">${[t.executor===me?'Executor':'',t.responsavel===me?'Responsável':''].filter(Boolean).join(' e ')}</td>
-      <td class="l${tpLate(t)?' neg':''}">${t.prazo?(tpLate(t)?'Atrasada · ':t.prazo===TODAY?'Hoje · ':'')+dBR(t.prazo):'<span class="muted">sem prazo</span>'}</td><td class="l">${col(t.status)}</td></tr>`).join('')}</tbody></table></div>`;
+      <td class="l">${[t.executor===me?'Executor':'',t.responsavel===me?'Responsável':''].filter(Boolean).join(' e ')||(tEnvolvidos(t).find(x=>x.id===me)?.papeis.join(' e ')||'Executor')}</td>
+      <td class="l${tpLate(t)?' neg':''}">${t.prazo?(tpLate(t)?'Atrasada · ':t.prazo===TODAY?'Hoje · ':'')+dBR(t.prazo):'<span class="muted">sem prazo</span>'}</td><td class="l">${t._ciente?'<b>Concluída: falta o seu ciente</b>':col(t.status)}</td></tr>`).join('')}</tbody></table></div>`;
   if(!$('dlgPend').open)$('dlgPend').showModal();
 }
 $('dlgPend').addEventListener('click',async e=>{
@@ -8557,7 +8719,7 @@ async function renderTarefas(){
   if(!v){vazio('Nenhuma empresa liberada para tarefas.');return}
   await tVersoes();
   DIRUS=null;
-  let q=sb.from('tarefas').select('*, tarefa_comentarios(count)'+(window.V31?', tarefa_usuarios(user_id)':'')).eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
+  let q=sb.from('tarefas').select('*, tarefa_comentarios(count)'+(window.V31?', tarefa_usuarios(user_id)':'')+T_SEL_EXTRA()).eq('arquivada',false).eq('tarefa_comentarios.sistema',false);
   if(v==='int')q=q.eq('interna',true);else if(!todas)q=q.eq('cliente_id',v);
   else if(ehEsc()&&!ehAdm()&&ME.empresas_equipe?.length)q=q.or(`cliente_id.is.null,cliente_id.in.(${ME.empresas_equipe.join(',')})`);
   const conc=$('tConc').value;
@@ -8569,7 +8731,8 @@ async function renderTarefas(){
   // filtro por pessoa: a equipe do escritório e quem já é responsável ou executor nas tarefas
   const rs=$('tResp'),rv=rs.value||'todos',nomes=new Map((TEQUIPE||[]).map(u=>[u.id,nomeDe(u.id,u.nome)]));
   TAR.forEach(t=>{t.responsavel&&!nomes.has(t.responsavel)&&nomes.set(t.responsavel,nomeDe(t.responsavel,t.responsavel_nome));
-    t.executor&&!nomes.has(t.executor)&&nomes.set(t.executor,nomeDe(t.executor,t.executor_nome))});
+    t.executor&&!nomes.has(t.executor)&&nomes.set(t.executor,nomeDe(t.executor,t.executor_nome));
+    (t.tarefa_participantes||[]).forEach(p=>!nomes.has(p.user_id)&&nomes.set(p.user_id,nomeDe(p.user_id,p.nome)))});
   rs.innerHTML=`<option value="todos">Todos</option><option value="meus">Minhas tarefas</option><option value="sem">Sem executor</option>`+[...nomes].sort((a,b)=>a[1].localeCompare(b[1])).map(([id,n])=>`<option value="${id}">${esc(n)}</option>`).join('');
   rs.value=[...rs.options].some(o=>o.value===rv)?rv:'todos';
   tDesenha();tPendentes();parcPendentes();parcLista();
@@ -8577,7 +8740,7 @@ async function renderTarefas(){
 function tFiltradas(){
   const busca=$('tBusca').value.trim().toLowerCase(),r=$('tResp').value;
   return TAR.filter(t=>(!busca||(t.titulo+' '+(t.descricao||'')).toLowerCase().includes(busca))
-    &&(!ehEsc()||r==='todos'||(r==='meus'?[t.responsavel,t.executor].includes(ME.user_id):r==='sem'?!t.executor:[t.responsavel,t.executor].includes(r))));
+    &&(!ehEsc()||r==='todos'||(r==='meus'?tEnvolvidos(t).some(x=>x.id===ME.user_id):r==='sem'?!t.executor&&!(t.tarefa_participantes||[]).some(p=>p.papel==='executor'):tEnvolvidos(t).some(x=>x.id===r))));
 }
 function tCard(t,todas){
   const nome=t.cliente_id?CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'':'Interna',nv=TNOV[t.id],pr=TPRI[t.prioridade];
@@ -8585,9 +8748,11 @@ function tCard(t,todas){
   const n=t.tarefa_comentarios?.[0]?.count||0;
   const chips=[pr[0]?`<span class="chip ${pr[0]}">${pr[1]}</span>`:'',todas&&t.cliente_id?`<span class="chip c-done">${esc(nome)}</span>`:'',
     t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':'',
-    ehEsc()&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:''].join('');
+    ehEsc()&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:'',
+    tPedeCiente(t)?(()=>{const ev=tEnvolvidos(t),n=ev.filter(x=>tCienteDe(t,x.id)).length;return `<span class="chip ${n===ev.length?'c-done':'c-warn'}" title="Ciente da conclusão">✔ Ciente ${n}/${ev.length}</span>`})():''].join('');
   const meta=[t.prazo?`<span class="${late||hoje?'late':''}">📅 ${late?'Atrasada · ':hoje?'Hoje · ':''}${dBR(t.prazo).slice(0,5)}</span>`:'',
     t.executor?`<span title="Executor">🛠 ${esc(nomeDe(t.executor,t.executor_nome))}</span>`:'',
+    ...(t.tarefa_participantes||[]).map(p=>`<span title="${p.papel==='validador'?'Validador':'Executor'}">${p.papel==='validador'?'🔎':'🛠'} ${esc(nomeDe(p.user_id,p.nome))}</span>`),
     t.responsavel?`<span title="Responsável">👤 ${esc(nomeDe(t.responsavel,t.responsavel_nome))}</span>`:'',n?`<span>💬 ${n}</span>`:'',
     nv?`<span class="new">● ${nv.mensagens?nv.mensagens+(nv.mensagens===1?' mensagem nova':' mensagens novas'):'Nova'}</span>`:''].join('');
   return `<button type="button" class="kcard${nv?' novo':''}" data-id="${t.id}" draggable="${tLanca(t)}">${chips?`<div class="kchips">${chips}</div>`:''}<div class="t">${esc(t.titulo)}</div>${meta?`<div class="m">${meta}</div>`:''}</button>`;
@@ -8632,6 +8797,9 @@ $('tBoard').addEventListener('drop',async e=>{
 });
 const dlgTar=$('dlgTar');
 async function abrirTarefa(t){
+  await tVersoes();
+  // participantes e cientes sempre atualizados (a tarefa pode vir da janela de pendentes, sem eles)
+  if(t&&window.V85T){const [{data:pp},{data:cc}]=await Promise.all([sb.from('tarefa_participantes').select('user_id,papel,nome').eq('tarefa_id',t.id),sb.from('tarefa_cientes').select('user_id,nome,ciente_em').eq('tarefa_id',t.id)]);t.tarefa_participantes=pp||[];t.tarefa_cientes=cc||[]}
   TARDLG=t;const e=ehEsc(),pode=t?tLanca(t):true;
   $('tdTitle').textContent=t?t.titulo:'Nova tarefa';
   $('tdChip').innerHTML=t?(t.cliente_id?`<span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:'')+(t.interna&&e?'<span class="chip c-none">🔒 Interna</span>':''):'';
@@ -8644,12 +8812,17 @@ async function abrirTarefa(t){
     <label class="f">Status${sel('td_status',TCOLS,t?.status||'afazer')}</label>
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
-    ${e?'<label class="f">Responsável (acompanha)<span id="td_respBox"></span></label><label class="f">Executor (quem faz)<span id="td_execBox"></span></label>'
+    ${e?'<label class="f">Responsável (acompanha)<span id="td_respBox"></span></label><label class="f">Executor (quem faz)<span id="td_execBox"></span></label>'+(window.V85T?'<div class="wide" id="td_partBox"></div>':'')
       :t&&(t.responsavel||t.executor)?`<p class="note wide" style="margin:0">${t.executor?'Executor: <b>'+esc(t.executor_nome||'')+'</b>':''}${t.responsavel&&t.executor?' · ':''}${t.responsavel?'Responsável: <b>'+esc(t.responsavel_nome||'')+'</b>':''}</p>`:''}
+    ${!e&&t?.tarefa_participantes?.length?`<p class="note wide" style="margin:0">${['executor','validador'].map(pp=>{const l=t.tarefa_participantes.filter(x=>x.papel===pp);return l.length?(pp==='executor'?'Mais executores: ':'Validadores: ')+'<b>'+l.map(x=>esc(x.nome||'')).join(', ')+'</b>':''}).filter(Boolean).join(' · ')}</p>`:''}
     <p class="note wide" style="margin:0">Cadastrada por <b>${esc(t?nomeDe(t.criado_por,t.criado_por_nome):nomeDe(ME.user_id,ME.nome||ME.email))}</b>${t?' em '+dtBR(t.criado_em):''}${t?.concluida_em?' · concluída em '+dtBR(t.concluida_em):''}</p></div>
     ${e&&window.V31?'<div id="td_visBox"></div>':''}
     ${e?`<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px" id="td_intBox"><input type="checkbox" id="td_int" style="width:auto"${t?.interna?' checked':''}> Tarefa interna (o cliente não vê)</label>`:''}
 `;
+  if(t&&tPedeCiente(t)){const ev=tEnvolvidos(t),me=ev.find(x=>x.id===ME.user_id),eu=tCienteDe(t,ME.user_id),n=ev.filter(x=>tCienteDe(t,x.id)).length;
+    h+=`<div class="alerta" style="margin:0"><b>Ciente da conclusão: ${n} de ${ev.length}</b><span class="note">Todos os envolvidos confirmam que viram a tarefa concluída.</span>
+      <div class="chk">${ev.map(x=>{const c=tCienteDe(t,x.id);return `<span>${c?'✅':'⏳'} ${esc(x.nome)} <span class="muted">(${x.papeis.join(', ')})${c?' · '+dtBR(c.ciente_em):''}</span></span>`}).join('')}</div>
+      ${me&&!eu?'<div><button type="button" class="btn small primary" data-act="ciente">Dar ciente</button></div>':''}</div>`}
   if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
     ${pode?`<div style="display:grid;gap:8px;margin-top:10px"><textarea id="td_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
       <div class="row" style="gap:10px;align-items:center"><input type="file" id="td_file" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF">
@@ -8664,7 +8837,15 @@ async function abrirTarefa(t){
   // responsável e executor: escolhidos pelo nome entre a equipe e os usuários da empresa da tarefa
   if($('td_respBox')){
     const pessoas=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,ps=await tPessoas(cli),rv=$('td_resp')?.value??(t?t.responsavel||'':ME.user_id),xv=$('td_exec')?.value??(t?.executor||'');
-      $('td_respBox').innerHTML=selPessoa('td_resp',ps,rv,'Ninguém',d);$('td_execBox').innerHTML=selPessoa('td_exec',ps,xv,'Ninguém ainda',d)};
+      $('td_respBox').innerHTML=selPessoa('td_resp',ps,rv,'Ninguém',d);$('td_execBox').innerHTML=selPessoa('td_exec',ps,xv,'Ninguém ainda',d);
+      // mais executores e validadores (quem precisa da informação, ex.: para uma conciliação)
+      if($('td_partBox')){const marc=pp=>$('td_partBox').dataset.ok?pickLer('td_'+pp):(t?.tarefa_participantes||[]).filter(x=>x.papel===pp).map(x=>x.user_id);
+        const gs=[...new Set(ps.map(x=>x.g))].map(g=>({nome:g,users:ps.filter(x=>x.g===g)})),mx=marc('executor'),mv=marc('validador');
+        $('td_partBox').dataset.ok='1';
+        $('td_partBox').innerHTML=`<details${mx.length||mv.length?' open':''}><summary style="cursor:pointer;font-weight:600;font-size:14px">Mais executores e validadores${mx.length||mv.length?` (${mx.length+mv.length})`:''}</summary>
+          <div style="display:grid;gap:10px;margin-top:8px"><div class="f"><span>Mais executores (também fazem)</span>${pickUsers('td_executor',gs,mx)}</div>
+          <div class="f"><span>Validadores (precisam da informação, ex.: para uma conciliação)</span>${pickUsers('td_validador',gs,mv)}</div>
+          <p class="note" style="margin:0">Quando a tarefa for concluída, o executor, o responsável, os executores a mais e os validadores dão ciente. Eles sempre veem a tarefa.</p></div></details>`}};
     if(ic)ic.addEventListener('change',pessoas);await pessoas();
   }
   if($('td_visBox')){
@@ -8716,6 +8897,10 @@ async function tAcao(act,btn){
       const {data,error}=t?await sb.from('tarefas').update(r).eq('id',t.id).select().single():await sb.from('tarefas').insert(r).select().single();
       if(error)throw error;
       if(!t)await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:data.id},{onConflict:'user_id,tarefa_id'});
+      if(e&&window.V85T&&$('td_partBox')?.dataset.ok){const ex=$('td_exec').value,vs=pickLer('td_validador'),xs=pickLer('td_executor').filter(u=>u!==ex&&!vs.includes(u)),vv=vs.filter(u=>u!==ex);
+        const {error:e3}=await sb.from('tarefa_participantes').delete().eq('tarefa_id',data.id);if(e3)throw e3;
+        const rows=[...xs.map(u=>({tarefa_id:data.id,user_id:u,papel:'executor'})),...vv.map(u=>({tarefa_id:data.id,user_id:u,papel:'validador'}))];
+        if(rows.length){const {error:e4}=await sb.from('tarefa_participantes').insert(rows);if(e4)throw e4}}
       if(e&&window.V31){const {error:e1}=await sb.from('tarefa_usuarios').delete().eq('tarefa_id',data.id);if(e1)throw e1;
         if(quem.length){const {error:e2}=await sb.from('tarefa_usuarios').insert(quem.map(u=>({tarefa_id:data.id,user_id:u})));if(e2)throw e2}}
       toast(t?'Tarefa salva':'Tarefa criada');dlgTar.close();renderTarefas();
@@ -8727,6 +8912,10 @@ async function tAcao(act,btn){
       $('td_msg').value='';$('td_file').value='';$('tdErr').hidden=true;
       const x=TAR.find(y=>y.id===t.id);if(x&&x.tarefa_comentarios?.[0])x.tarefa_comentarios[0].count++;
       await tConversa(t);if(VIEW==='tarefas')tDesenha();
+    }else if(act==='ciente'){
+      const {error}=await sb.from('tarefa_cientes').insert({tarefa_id:t.id,user_id:ME.user_id});if(error)throw error;
+      toast('Ciente registrado');TPEND=TPEND.filter(x=>!(x.id===t.id&&x._ciente));tpBanner();
+      await abrirTarefa(t);if(VIEW==='tarefas')renderTarefas();
     }else if(act==='arquivar'){
       if(!confirm('Arquivar esta tarefa? Ela sai do quadro.'))return;
       const {error}=await sb.from('tarefas').update({arquivada:true}).eq('id',t.id);if(error)throw error;
@@ -8819,6 +9008,9 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04c',data:'2026-11-04',t:'Cadastro de usuários no estilo do Bom Controle e tarefas com ciente de todos',itens:[
+    {x:'Configurações › Empresas e usuários: cadastro de usuários no estilo do Bom Controle. A lista mostra um cadeado por módulo (verde liberado, amarelo só visualiza, vermelho bloqueado). O lápis abre o cadastro em abas: Dados básicos (e-mail, nome, WhatsApp, tipo), Empresas e Privilégios de acesso, com Acesso personalizado, Total ou Bloqueado por módulo e Ver, Executar ou Bloqueado em cada tela. Quem só vê uma tela não consegue lançar nem alterar nela.',para:'esc'},
+    {x:'Tarefas e recados: além do executor, dá para marcar mais executores e validadores (quem precisa da informação). Quando a tarefa é concluída, todos os envolvidos dão ciente; o cartão mostra “Ciente 1/3” e quem falta recebe o aviso de tarefas pendentes.',mods:['tarefas']}]},
   {k:'2026-11-04p',data:'2026-11-04',t:'Parceiros em uma tela só',itens:[
     {x:'Parceiros agora fica em Gestão financeira › Parceiros (antes em Comunicação). O cadastro, as alterações de conta e os descontos continuam iguais.',mods:['repasse']},
     {x:'Repasse de parceiros e Controle de notas fiscais viraram as abas “Repasse da semana” e “Notas fiscais” da tela Parceiros, e saíram do menu. Tudo o que cada tela fazia continua igual.',para:'esc'}]},
