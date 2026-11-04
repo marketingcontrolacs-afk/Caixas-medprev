@@ -8248,10 +8248,17 @@ async function abrirAvulso(m){
   GXR=m;const cli=cliAtual();let plano=[],outras=[],pes=[];try{[plano,outras,pes]=await Promise.all([planoDe(cli),contasGrupo(cli),gfPessoasTodas(cli.id).catch(()=>[])])}catch(e){console.error(e)}
   const c=GX.conta,v=k=>esc(m?.[k]??'');outras=outras.filter(x=>x.id!==c.id);
   const tipo=m?(m.transf_id?'transf':m.tipo):'saida';
+  // transferência: mostra de qual conta saiu e em qual entrou (Carol, 04/11)
+  let deParaTxt='';
+  if(m?.transf_id){const {data:op}=await sb.from('fin_movimentos').select('conta_id').eq('transf_id',m.transf_id).neq('id',m.id).limit(1);
+    const cn=id=>{const k=CGRUPO.find(x=>x.id===id);if(!k)return '—';const e=k.cliente_id!==cli?.id?CLIENTES.find(x=>x.id===k.cliente_id)?.nome:'';return esc(k.nome)+(e?' · '+esc(e):'')};
+    const o=op?.[0]?.conta_id;
+    deParaTxt=o?`<p class="note wide" style="margin:0">Transferência: saiu de <b>${cn(m.tipo==='saida'?c.id:o)}</b> e entrou em <b>${cn(m.tipo==='saida'?o:c.id)}</b>.</p>`
+      :`<p class="note wide neg" style="margin:0">Transferência com uma ponta só: falta a outra conta (${m.tipo==='saida'?'para onde foi':'de onde veio'}).</p>`}
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
   $('gtdTitle').textContent=(m?'Lançamento avulso':'Novo lançamento avulso')+' · '+c.nome;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<div class="fields">
-    <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída: pagamento (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>Saída: transferência para outra conta (desta ou de outra empresa do grupo)</option>`:''}</select></label>
+    <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída: pagamento (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>${m?.transf_id&&m.tipo==='entrada'?'Entrada: transferência recebida de outra conta':'Saída: transferência para outra conta (desta ou de outra empresa do grupo)'}</option>`:''}</select></label>
     <label class="f" id="ga_destBox"${tipo==='transf'&&!m?'':' hidden'}>Conta de destino<select id="ga_dest">${optContas(outras,cli)}</select></label>
     <label class="f">Data *<input type="date" id="ga_data" value="${m?m.data:TODAY}"></label>
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
@@ -8259,7 +8266,7 @@ async function abrirAvulso(m){
     <label class="f">Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}"><datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
-  </div>${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
+  </div>${deParaTxt}${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
   $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf'};
   $('gtdFoot').innerHTML=`${m?'<button type="button" class="btn ghost" data-act="av_apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="av_salvar">Salvar</button>`;
   dlgGT.showModal();
@@ -8550,6 +8557,12 @@ $('bciOk').onclick=async()=>{
       const {error}=await sb.from('fin_titulos').update({valor:r2(b.movs.reduce((x,m)=>x+m.valor,0)),previsto:false}).eq('id',b.t.id);if(error)throw error}
     const movs=R.movs.map(({_l,_p,...m})=>m);
     for(let i=0;i<movs.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(movs.slice(i,i+500));if(error)throw error}
+    // a ponta de transferência que o banco ligou sozinho à outra conta (ex.: depósito do dinheiro ligado à saída da
+    // tesouraria) deixa de ficar "a validar" (Carol, 04/11)
+    try{const tids=[...new Set(movs.filter(m=>m.transf_id&&m.validar).map(m=>m.transf_id))];
+      for(let i=0;i<tids.length;i+=150){const {data}=await sb.from('fin_movimentos').select('transf_id').in('transf_id',tids.slice(i,i+150));
+        const n={};(data||[]).forEach(x=>n[x.transf_id]=(n[x.transf_id]||0)+1);const ok=Object.keys(n).filter(k=>n[k]>1);
+        if(ok.length)await sb.from('fin_movimentos').update({validar:null}).in('transf_id',ok).like('validar','Transferência:%')}}catch(e){console.warn(e)}
     toast(`Importado: ${movs.length} ${movs.length===1?'lançamento':'lançamentos'}${tits.length?` e ${tits.length} ${tits.length===1?'conta em aberto':'contas em aberto'}`:''}`);
     $('dlgBCI').close();BCI.dbKeyOk='';GT.key='';renderGT();
   }catch(err){console.error(err);toast((v45(err)?v45Msg:'Não foi possível importar: '+(err.message||'verifique a internet'))+(err.message&&/validar|conciliado/.test(err.message)?' (rode a atualização v66 do banco)':''));bcPrevia()}
@@ -9663,6 +9676,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04tr',data:'2026-11-04',t:'Transferências: de qual conta saiu e em qual entrou',itens:[
+    {x:'Ao abrir uma transferência na Movimentação ou no extrato, aparece de qual conta saiu e em qual entrou. A ponta de entrada aparece como “Entrada: transferência recebida de outra conta”.',para:'esc'},
+    {x:'Importar do Bom Controle: o depósito do dinheiro que o sistema liga sozinho à saída da tesouraria (mesmo dia e valor) deixa de ficar “a validar”.',para:'esc'}]},
   {k:'2026-11-04bx',data:'2026-11-04',t:'Importar do Bom Controle: baixa das contas em aberto',itens:[
     {x:'Importar do Bom Controle: o pagamento do arquivo agora baixa a conta a pagar ou a receber que já estava lançada (mesmo fornecedor ou cliente, até 10 dias do vencimento), em vez de ficar duplicado. A conta recorrente prevista pelo histórico aceita valor diferente (fica com o valor pago) e mais de um pagamento; a conta normal só com o mesmo valor. A prévia mostra quais contas serão baixadas.',para:'esc'}]},
   {k:'2026-11-04rcat',data:'2026-11-04',t:'Repasse de parceiros na categoria Restituições',itens:[
