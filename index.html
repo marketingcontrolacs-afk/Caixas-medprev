@@ -423,6 +423,39 @@ body.lg header.top .logo{visibility:hidden}
 .dlink{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13.5px var(--body);padding:8px 12px;border-radius:10px;cursor:pointer;transition:background .12s,border-color .12s}
 .dlink:hover{background:var(--brand-soft);border-color:transparent;color:var(--brand)}.dlink svg{width:18px;height:18px;color:var(--brand)}
 .dtip{border-radius:10px;box-shadow:var(--sh2);padding:8px 10px;line-height:1.45}
+/* AGENDA (planner diário, v90) */
+.agnav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0 10px}
+.agnav input{max-width:170px}
+.agnav .agt{font-size:15px;font-weight:700}
+.agsem{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-bottom:16px}
+.agsem button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 2px;display:grid;gap:2px;justify-items:center;cursor:pointer;font:inherit;color:var(--ink);min-width:0}
+.agsem button:hover{border-color:var(--brand)}
+.agsem .dw{font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700}
+.agsem .dn{font-size:18px;font-weight:700;line-height:1.1}
+.agsem .dc{font-size:11px;color:var(--muted);min-height:14px;white-space:nowrap}
+.agsem .dc.tudo{color:var(--ok);font-weight:700}
+.agsem button[aria-selected="true"]{border-color:var(--brand);background:var(--brand-soft)}
+.agsem button.hoje .dn{color:var(--brand)}
+.aggrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.agcol{display:grid;gap:16px;min-width:0}
+.agcard{padding:14px 16px;min-width:0}
+.agch{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.agch h2{font-size:16px;margin:0}
+.agbar{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;margin:0 0 6px}.agbar i{display:block;height:100%;background:var(--ok);transition:width .2s}
+.agit{display:grid;grid-template-columns:auto 48px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--line)}
+.agit input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--ok);cursor:pointer}
+.agit .h{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+.agit .t{min-width:0;overflow-wrap:anywhere}.agit .t b{font-weight:600}.agit .t small{display:block;color:var(--muted);font-size:12.5px;white-space:pre-wrap}
+.agit.feito .t b{text-decoration:line-through;color:var(--muted)}
+.agit .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.agsub{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 2px}
+.agtk{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:9px 2px;font:inherit;color:var(--ink);cursor:pointer}
+.agtk:hover{background:var(--sunk)}.agtk .t{flex:1;min-width:0;overflow-wrap:anywhere}.agtk .t small{display:block;color:var(--muted);font-size:12.5px}.agtk .go{color:var(--muted)}
+.agvz{color:var(--muted);font-size:14px;padding:10px 2px;margin:0}
+#agNota{width:100%;resize:vertical;box-sizing:border-box}
+.agdias{display:flex;gap:6px;flex-wrap:wrap}.agdias label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;cursor:pointer;font-size:13px}
+@media (max-width:880px){.aggrid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.agsem{gap:3px}.agsem .dw{font-size:10px}.agsem .dn{font-size:15px}.agsem .dc{font-size:10px}.agit{grid-template-columns:auto 40px minmax(0,1fr);}.agit .acts{grid-column:2/-1}}
 </style>
 </head>
 <body>
@@ -838,6 +871,30 @@ body.lg header.top .logo{visibility:hidden}
     <p class="note" id="pjNote"></p>
   </section>
 
+  <!-- AGENDA (planner diário, v90): cada usuário vê só a sua (Carol, 04/11) -->
+  <section id="viewAgenda" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Agenda</h1><p class="sub">Seu planner do dia: rotinas, compromissos e as tarefas e recados destinados a você. Só você vê o que está aqui.</p></div>
+      <button class="btn primary" id="agNova">+ Nova rotina</button>
+    </div>
+    <div class="alerta" id="agAlerta" hidden></div>
+    <div class="agnav">
+      <button type="button" class="btn ghost small" id="agAnt" aria-label="Dia anterior">‹</button>
+      <input type="date" id="agData" aria-label="Dia da agenda">
+      <button type="button" class="btn ghost small" id="agProx" aria-label="Próximo dia">›</button>
+      <button type="button" class="btn ghost small" id="agHoje">Hoje</button>
+      <span class="agt" id="agTitulo"></span>
+    </div>
+    <div class="agsem" id="agSem" role="tablist" aria-label="Dias da semana"></div>
+    <div class="aggrid">
+      <div class="card agcard"><div class="agch"><h2>Rotinas e compromissos</h2><span class="muted" id="agProg"></span></div><div id="agRot"></div></div>
+      <div class="agcol">
+        <div class="card agcard"><div class="agch"><h2>Tarefas e recados para você</h2></div><div id="agTar"></div></div>
+        <div class="card agcard"><div class="agch"><h2>Anotações do dia</h2><span class="muted" id="agNotaSt"></span></div><textarea id="agNota" rows="6" placeholder="Lembretes, ligações, o que ficou para amanhã…"></textarea></div>
+      </div>
+    </div>
+  </section>
+
   <!-- TAREFAS E RECADOS (Kanban) -->
   <section id="viewTar" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -1140,6 +1197,11 @@ body.lg header.top .logo{visibility:hidden}
   <div class="db" id="pdBody"></div>
   <div class="df" id="pdFoot"></div>
 </dialog>
+<dialog id="dlgAg">
+  <div class="dh"><h2 id="agdTitle"></h2></div>
+  <div class="db" id="agdBody"></div>
+  <div class="df" id="agdFoot"></div>
+</dialog>
 <dialog id="dlgPend">
   <div class="dh"><h2>📋 Você tem tarefas pendentes</h2></div>
   <div class="db" id="tpBody"></div>
@@ -1311,7 +1373,7 @@ const ehEsc=()=>ME&&ME.papel==='escritorio';
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos','gfdash'];
+const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
@@ -1349,6 +1411,7 @@ const ICO={
   bc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15l3 3 3-3"/>',
   avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   projetos:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  agenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15.5l2 2 4-4"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   gfpagar:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 13v4M10 15l2 2 2-2"/>',
   gfrec:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 17v-4M10 15l2-2 2 2"/>',
@@ -1433,6 +1496,8 @@ const NAV=[
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
+  // planner diário de cada usuário; ninguém vê a agenda de outra pessoa (Carol, 04/11)
+  {k:'agenda',t:'Agenda',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
   {k:'projetos',t:'Projetos e melhorias',g:'Comunicação',s:'Mensagens',ok:ehEsc},
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
@@ -1452,7 +1517,7 @@ const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k.startsWith('cfg')||k==='avisos'||k==='projetos';
+const telaSemEmp=k=>k.startsWith('cfg')||k==='avisos'||k==='projetos'||k==='agenda';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -1530,7 +1595,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos';
+  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos'||m==='agenda';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
@@ -1569,7 +1634,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfdash','gfresumo','gffluxo','gfdre','gfdc
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -1591,6 +1656,7 @@ function openView(){
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
+  else if(VIEW==='agenda'){$('viewAgenda').hidden=false;renderAgenda()}
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfremessa'||VIEW==='gfretorno'){$('viewGR').hidden=false;renderGR()}
@@ -1629,7 +1695,7 @@ async function boot(){
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
   show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);nvMostra();
-  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -8683,13 +8749,13 @@ async function tPendentes(){
   }
   // o executor primeiro (é quem faz), depois atrasadas e prazos mais próximos
   TPEND=data.sort((a,b)=>(b.executor===me)-(a.executor===me)||String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
-  tpBanner();dsRefaz();
+  tpBanner();dsRefaz();if(VIEW==='agenda')agDesenha();
   let vista=false;try{vista=sessionStorage.getItem('tpVista')==='1'}catch(e){}
   if(TPEND.length&&!vista&&!document.querySelector('dialog[open]')){try{sessionStorage.setItem('tpVista','1')}catch(e){}tpJanela()}
 }
 const tpLate=t=>!t._ciente&&t.prazo&&t.prazo<TODAY;
 function tpBanner(){
-  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas'||VIEW==='gfdash';
+  const n=TPEND.length,late=TPEND.filter(tpLate).length,el=$('tpBanner');el.hidden=!n||VIEW==='tarefas'||VIEW==='gfdash'||VIEW==='agenda';
   if(!el.hidden)el.innerHTML=`<span>📋 <b>Você tem ${n} ${n===1?'tarefa pendente':'tarefas pendentes'}${late?` (${late} ${late===1?'atrasada':'atrasadas'})`:''}.</b></span><button type="button" class="btn small primary" data-act="ver">Ver minhas tarefas</button>`;
 }
 $('tpBanner').addEventListener('click',e=>{if(e.target.closest('[data-act]'))tpJanela()});
@@ -9003,11 +9069,209 @@ async function renderAvisos(){
 }
 $('avFiltro').onchange=renderAvisos;
 // =====================================================================
+// AGENDA (Carol, 04/11): planner diário em Comunicação. Cada usuário vê só a sua (RLS da v90: user_id = auth.uid()).
+// Rotinas: só no dia, todo dia, dias úteis, dias da semana marcados ou todo mês. Tarefas e recados vêm de TPEND
+// (as mesmas da janela "Você tem tarefas pendentes"); nada muda nas Tarefas.
+// =====================================================================
+let AGR=[],AGF=new Set(),AGDIA=null,AGDLG=null,AGNT={t:null,dia:null,txt:null};
+const AGREP={nao:'Só neste dia',diario:'Todo dia',uteis:'Dias úteis (segunda a sexta)',semanal:'Dias da semana marcados',mensal:'Todo mês'};
+const AGDS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const agV90=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/agenda_/.test(e.message||''));
+const AGV90MSG='A Agenda precisa da atualização v90 do banco. Rode o SQL “v90 - Agenda” no Supabase.';
+const agD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const agMais=(s,n)=>{const d=agD(s);d.setDate(d.getDate()+n);return isoLocal(d)};
+const agSeg=s=>{const d=agD(s),w=(d.getDay()+6)%7;return agMais(s,-w)};   // semana de segunda a domingo
+const agK=(id,s)=>id+'|'+s;
+function agNoDia(r,s){
+  if(s<r.data_inicio||(r.data_fim&&s>r.data_fim))return false;
+  const d=agD(s),w=d.getDay();
+  if(r.repete==='nao')return s===r.data_inicio;
+  if(r.repete==='diario')return true;
+  if(r.repete==='uteis')return w>0&&w<6;
+  if(r.repete==='semanal')return (r.dias_semana||[]).map(Number).includes(w);
+  // todo mês no mesmo dia; dia 31 em mês de 30 cai no último dia
+  if(r.repete==='mensal'){const di=+r.data_inicio.slice(8),ult=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return d.getDate()===Math.min(di,ult)}
+  return false;
+}
+const agDoDia=s=>AGR.filter(r=>agNoDia(r,s)).sort((a,b)=>String(a.hora||'99').localeCompare(String(b.hora||'99'))||a.titulo.localeCompare(b.titulo));
+// compromissos de um dia só que passaram sem marcar
+const agAtras=()=>AGR.filter(r=>r.repete==='nao'&&r.data_inicio<TODAY&&!AGF.has(agK(r.id,r.data_inicio))).sort((a,b)=>a.data_inicio.localeCompare(b.data_inicio));
+async function agCarrega(){
+  const ini=agSeg(AGDIA),fim=agMais(ini,6);
+  const {data:rs,error}=await sb.from('agenda_rotinas').select('*').order('hora',{ascending:true,nullsFirst:false});
+  if(error)return error;
+  AGR=rs||[];AGF=new Set();
+  const ids=AGR.filter(r=>r.repete==='nao'&&r.data_inicio<TODAY).map(r=>r.id);
+  const [a,b]=await Promise.all([sb.from('agenda_feitos').select('rotina_id,data').gte('data',ini<TODAY?ini:TODAY).lte('data',fim>TODAY?fim:TODAY),
+    ids.length?sb.from('agenda_feitos').select('rotina_id,data').in('rotina_id',ids):{data:[]}]);
+  if(a.error)return a.error;
+  [...(a.data||[]),...(b.data||[])].forEach(f=>AGF.add(agK(f.rotina_id,f.data)));
+  return null;
+}
+async function renderAgenda(){
+  if(!AGDIA)AGDIA=TODAY;
+  $('agData').value=AGDIA;
+  const err=await agCarrega();
+  $('agAlerta').hidden=!err;
+  if(err){console.error(err);$('agAlerta').innerHTML=`<b>${agV90(err)?AGV90MSG:'Erro ao carregar a agenda.'}</b><span>${agV90(err)?'Enquanto isso, as tarefas e recados aparecem abaixo.':'Verifique a internet e tente de novo.'}</span>`;AGR=[];AGF=new Set()}
+  agDesenha();agNotaCarrega();
+}
+function agDesenha(){
+  const s=AGDIA,ini=agSeg(s);
+  $('agTitulo').textContent=(s===TODAY?'Hoje, ':s===agMais(TODAY,1)?'Amanhã, ':s===agMais(TODAY,-1)?'Ontem, ':'')+agD(s).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:agD(s).getFullYear()!==agD(TODAY).getFullYear()?'numeric':undefined});
+  // semana
+  $('agSem').innerHTML=[0,1,2,3,4,5,6].map(i=>{const d=agMais(ini,i),l=agDoDia(d),f=l.filter(r=>AGF.has(agK(r.id,d))).length,nt=temAcesso('tarefas')?TPEND.filter(t=>!t._ciente&&t.prazo===d).length:0;
+    const dc=l.length?(f===l.length?'<span class="dc tudo">✓ '+f+'/'+l.length+'</span>':`<span class="dc">${f}/${l.length}</span>`):`<span class="dc">${nt?'':'&nbsp;'}</span>`;
+    return `<button type="button" role="tab" data-dia="${d}" aria-selected="${d===s}"${d===TODAY?' class="hoje"':''} title="${agD(d).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}${l.length?' · '+f+' de '+l.length+' feitas':''}${nt?' · '+nt+(nt===1?' tarefa com prazo':' tarefas com prazo'):''}"><span class="dw">${AGDS[agD(d).getDay()]}</span><span class="dn">${agD(d).getDate()}</span>${dc}${nt&&!l.length?`<span class="dc">📋 ${nt}</span>`:''}</button>`}).join('');
+  // rotinas do dia
+  const l=agDoDia(s),feitas=l.filter(r=>AGF.has(agK(r.id,s))).length;
+  $('agProg').textContent=l.length?`${feitas} de ${l.length} feitas`:'';
+  const item=(r,d,atr)=>{const f=AGF.has(agK(r.id,d));
+    return `<div class="agit${f?' feito':''}" data-id="${r.id}" data-d="${d}"><input type="checkbox"${f?' checked':''} aria-label="Marcar “${esc(r.titulo)}” como feita"><span class="h">${r.hora?r.hora.slice(0,5):'—'}</span>
+      <span class="t"><b>${esc(r.titulo)}</b>${r.prioridade==='alta'?' <span class="chip c-warn">Importante</span>':''}${atr?` <span class="chip c-bad">de ${dBR(d)}</span>`:''}${r.repete!=='nao'?` <span class="chip c-none">${r.repete==='semanal'?(r.dias_semana||[]).map(Number).sort().map(w=>AGDS[w]).join(', '):AGREP[r.repete].replace(/ \(.*\)/,'')}</span>`:''}${r.descricao?`<small>${esc(r.descricao)}</small>`:''}</span>
+      <span class="acts">${atr?'<button type="button" class="btn small ghost" data-act="hoje">Passar para hoje</button>':''}<button type="button" class="btn small ghost" data-act="editar" aria-label="Editar “${esc(r.titulo)}”">Editar</button></span></div>`};
+  const atr=s===TODAY?agAtras():[];
+  $('agRot').innerHTML=(l.length?`<div class="agbar"><i style="width:${Math.round(feitas/l.length*100)}%"></i></div>`:'')
+    +(l.map(r=>item(r,s)).join('')||`<p class="agvz">${AGR.length?'Nada marcado para este dia.':'Nenhuma rotina ainda. Use “Nova rotina” para lançar o que você faz todo dia (ex.: conferir o caixa às 9h, mandar o relatório na sexta).'}</p>`)
+    +(atr.length?`<div class="agsub">Ficou para trás</div>${atr.map(r=>item(r,r.data_inicio,true)).join('')}`:'');
+  agTarefas();
+}
+function agTarefas(){
+  const box=$('agTar'),s=AGDIA;
+  if(!temAcesso('tarefas')){box.innerHTML='<p class="agvz">Você ainda não tem acesso às Tarefas e recados.</p>';return}
+  const cn=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Interna da Controlacs',col=k=>TCOLS.find(c=>c[0]===k)?.[1]||k,me=ME.user_id;
+  const papel=t=>[t.executor===me?'Executor':'',t.responsavel===me?'Responsável':''].filter(Boolean).join(' e ')||(tEnvolvidos(t).find(x=>x.id===me)?.papeis.join(' e ')||'Envolvido');
+  const lin=t=>`<button type="button" class="agtk" data-tar="${t.id}"><span class="t"><b>${esc(t.titulo)}</b>${TNOV[t.id]?' <span class="chip c-bad">Novo</span>':''}${TPRI[t.prioridade]?.[0]?` <span class="chip ${TPRI[t.prioridade][0]}">${TPRI[t.prioridade][1]}</span>`:''}
+    <small>${esc(cn(t.cliente_id))} · você é ${papel(t).toLowerCase()} · ${t._ciente?'concluída, falta o seu ciente':esc(col(t.status))}${t.prazo&&t.prazo!==s?' · prazo '+dBR(t.prazo):''}</small></span><span class="go">›</span></button>`;
+  const pend=TPEND.filter(t=>!t._ciente),grp=(tit,l)=>l.length?`<div class="agsub">${tit} (${l.length})</div>${l.map(lin).join('')}`:'';
+  let h;
+  if(s===TODAY){
+    h=grp('Atrasadas',pend.filter(tpLate))+grp('Prazo hoje',pend.filter(t=>t.prazo===TODAY))+grp('Esperam o seu ciente',TPEND.filter(t=>t._ciente));
+    const sem=pend.filter(t=>!t.prazo),prox=pend.filter(t=>t.prazo>TODAY&&t.prazo<=agMais(TODAY,7));
+    h+=grp('Próximos 7 dias',prox);
+    if(sem.length)h+=`<details><summary class="agsub" style="cursor:pointer">Sem prazo (${sem.length})</summary>${sem.map(lin).join('')}</details>`;
+  }else h=grp(s<TODAY?'Prazo neste dia (ainda pendentes)':'Prazo neste dia',pend.filter(t=>t.prazo===s));
+  box.innerHTML=h||`<p class="agvz">${s===TODAY?'Nenhuma tarefa ou recado pendente para você. 🎉':'Nenhuma tarefa com prazo neste dia.'}</p>`;
+}
+// anotações do dia: salvam sozinhas
+async function agNotaCarrega(){
+  await agNotaSalva();
+  const d=AGDIA,ta=$('agNota');ta.value='';ta.disabled=true;$('agNotaSt').textContent='';
+  const {data,error}=await sb.from('agenda_notas').select('texto').eq('user_id',ME.user_id).eq('data',d).maybeSingle();
+  if(d!==AGDIA)return;
+  if(error){ta.placeholder=agV90(error)?'As anotações precisam da atualização v90 do banco.':'Erro ao carregar as anotações.';return}
+  ta.disabled=false;ta.placeholder='Lembretes, ligações, o que ficou para amanhã…';ta.value=data?.texto||'';
+}
+async function agNotaSalva(){
+  clearTimeout(AGNT.t);if(AGNT.dia===null)return;
+  const r={user_id:ME.user_id,data:AGNT.dia,texto:AGNT.txt};AGNT.dia=null;
+  const {error}=await sb.from('agenda_notas').upsert(r,{onConflict:'user_id,data'});
+  if(r.data===AGDIA)$('agNotaSt').textContent=error?'não salvou':'salvo';
+  if(error)fail(error,'Não foi possível salvar a anotação');
+}
+$('agNota').oninput=()=>{AGNT.dia=AGDIA;AGNT.txt=$('agNota').value;$('agNotaSt').textContent='salvando…';clearTimeout(AGNT.t);AGNT.t=setTimeout(agNotaSalva,900)};
+$('agNota').onblur=()=>agNotaSalva();
+window.addEventListener('beforeunload',()=>{if(AGNT.dia!==null)agNotaSalva()});
+// navegação
+const agVai=d=>{if(!d)return;const mesma=agSeg(d)===agSeg(AGDIA);AGDIA=d;$('agData').value=d;if(mesma){agDesenha();agNotaCarrega()}else renderAgenda()};
+$('agAnt').onclick=()=>agVai(agMais(AGDIA,-1));
+$('agProx').onclick=()=>agVai(agMais(AGDIA,1));
+$('agHoje').onclick=()=>agVai(TODAY);
+$('agData').onchange=()=>agVai($('agData').value);
+$('agSem').addEventListener('click',e=>{const b=e.target.closest('[data-dia]');if(b)agVai(b.dataset.dia)});
+$('agTar').addEventListener('click',e=>{const b=e.target.closest('[data-tar]');if(!b)return;const t=TPEND.find(x=>x.id===b.dataset.tar);if(t)abrirTarefa(t)});
+// ao fechar a tarefa, a agenda atualiza
+$('dlgTar').addEventListener('close',()=>{if(VIEW==='agenda')tPendentes().then(()=>{if(VIEW==='agenda')agTarefas()})});
+// marcar feita
+$('agRot').addEventListener('change',async e=>{
+  const cb=e.target.closest('input[type=checkbox]'),it=e.target.closest('.agit');if(!cb||!it)return;
+  const id=it.dataset.id,d=it.dataset.d,k=agK(id,d);cb.disabled=true;
+  const {error}=cb.checked?await sb.from('agenda_feitos').upsert({rotina_id:id,data:d,user_id:ME.user_id},{onConflict:'rotina_id,data'})
+    :await sb.from('agenda_feitos').delete().eq('rotina_id',id).eq('data',d);
+  cb.disabled=false;
+  if(error){cb.checked=!cb.checked;return fail(error,agV90(error)?AGV90MSG:'Não foi possível marcar')}
+  if(cb.checked)AGF.add(k);else AGF.delete(k);
+  agDesenha();agBadge();
+});
+$('agRot').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]'),it=e.target.closest('.agit');if(!b||!it)return;
+  const r=AGR.find(x=>x.id===it.dataset.id);if(!r)return;
+  if(b.dataset.act==='editar')return agAbrir(r);
+  if(b.dataset.act==='hoje'){b.disabled=true;const {error}=await sb.from('agenda_rotinas').update({data_inicio:TODAY}).eq('id',r.id);b.disabled=false;
+    if(error)return fail(error);r.data_inicio=TODAY;toast('Passou para hoje');agDesenha();agBadge()}
+});
+$('agNova').onclick=()=>agAbrir(null);
+// janela da rotina
+const dlgAg=$('dlgAg');
+function agAbrir(r){
+  AGDLG=r;const rep=r?.repete||'nao',dias=(r?.dias_semana||[agD(AGDIA).getDay()]).map(Number);
+  $('agdTitle').textContent=r?'Editar rotina':'Nova rotina';
+  $('agdBody').innerHTML=`<div class="fields">
+    <label class="f wide">O que fazer *<input id="ag_tit" maxlength="160" value="${esc(r?.titulo||'')}" placeholder="Ex.: conferir o caixa da Oliveira SJ"></label>
+    <label class="f">Horário (opcional)<input type="time" id="ag_hora" value="${r?.hora?r.hora.slice(0,5):''}"></label>
+    <label class="f">Repetir<select id="ag_rep">${Object.entries(AGREP).map(([k,t])=>`<option value="${k}"${k===rep?' selected':''}>${t}</option>`).join('')}</select></label>
+    <div class="f wide" id="ag_diasBox"${rep==='semanal'?'':' hidden'}><span>Em quais dias</span><div class="agdias">${[1,2,3,4,5,6,0].map(w=>`<label><input type="checkbox" value="${w}"${dias.includes(w)?' checked':''}>${AGDS[w]}</label>`).join('')}</div></div>
+    <label class="f"><span id="ag_iniL">${rep==='nao'?'Dia':'A partir de'}</span><input type="date" id="ag_ini" value="${r?.data_inicio||AGDIA}"></label>
+    <label class="f" id="ag_fimBox"${rep==='nao'?' hidden':''}>Repetir até (opcional)<input type="date" id="ag_fim" value="${r?.data_fim||''}"></label>
+    <label class="f"><span>Prioridade</span><select id="ag_pri"><option value="normal">Normal</option><option value="alta"${r?.prioridade==='alta'?' selected':''}>Importante</option></select></label>
+    <label class="f wide">Detalhes (opcional)<textarea id="ag_desc" rows="3">${esc(r?.descricao||'')}</textarea></label></div>
+    <p class="note" style="margin:0">Só você vê a sua agenda.</p><p class="err" id="agdErr" hidden></p>`;
+  const b=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-act="${act}">${txt}</button>`;
+  // rotina que repete e já começou: dá para encerrar e manter o que foi marcado nos dias anteriores
+  const encerra=r&&r.repete!=='nao'&&r.data_inicio<AGDIA&&(!r.data_fim||r.data_fim>=AGDIA);
+  $('agdFoot').innerHTML=(r?b('excluir','Excluir','ghost'):'')+(encerra?b('encerrar','Parar a partir de '+dBR(AGDIA),'ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+b('salvar','Salvar','primary');
+  if(!dlgAg.open)dlgAg.showModal();
+  $('ag_tit').focus();
+}
+$('agdBody').addEventListener('change',e=>{if(e.target.id!=='ag_rep')return;const v=e.target.value;
+  $('ag_diasBox').hidden=v!=='semanal';$('ag_fimBox').hidden=v==='nao';$('ag_iniL').textContent=v==='nao'?'Dia':'A partir de'});
+const agdErr=x=>{$('agdErr').textContent=x;$('agdErr').hidden=false};
+$('agdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const r=AGDLG,act=b.dataset.act;
+  if(act==='fechar')return dlgAg.close();
+  if(act==='excluir'){
+    if(!confirm(r.repete==='nao'?'Excluir “'+r.titulo+'”?':'Excluir a rotina “'+r.titulo+'” de todos os dias? Para manter os dias já marcados, use “Parar a partir de…”.'))return;
+    const {error}=await sb.from('agenda_rotinas').delete().eq('id',r.id);if(error)return fail(error,'Não foi possível excluir');
+    toast('Rotina excluída');dlgAg.close();renderAgenda();agBadge();return}
+  if(act==='encerrar'){
+    const {error}=await sb.from('agenda_rotinas').update({data_fim:agMais(AGDIA,-1)}).eq('id',r.id);if(error)return fail(error);
+    toast('A rotina não aparece mais a partir de '+dBR(AGDIA));dlgAg.close();renderAgenda();agBadge();return}
+  const titulo=$('ag_tit').value.trim(),repete=$('ag_rep').value,ini=$('ag_ini').value,fim=repete==='nao'?null:$('ag_fim').value||null;
+  const dias=[...document.querySelectorAll('#ag_diasBox input:checked')].map(x=>+x.value);
+  if(!titulo)return agdErr('Diga o que precisa ser feito.');
+  if(!ini)return agdErr('Escolha o dia.');
+  if(repete==='semanal'&&!dias.length)return agdErr('Marque pelo menos um dia da semana.');
+  if(fim&&fim<ini)return agdErr('“Repetir até” não pode ser antes do início.');
+  const reg={titulo,repete,data_inicio:ini,data_fim:fim,hora:$('ag_hora').value||null,dias_semana:repete==='semanal'?dias:null,prioridade:$('ag_pri').value,descricao:$('ag_desc').value.trim()||null};
+  b.disabled=true;
+  try{const {error}=r?await sb.from('agenda_rotinas').update(reg).eq('id',r.id):await sb.from('agenda_rotinas').insert({...reg,user_id:ME.user_id});
+    if(error)throw error;
+    toast(r?'Rotina salva':'Rotina lançada na agenda');dlgAg.close();
+    if(!r&&repete==='nao'&&ini!==AGDIA)AGDIA=ini;renderAgenda();agBadge()}
+  catch(x){console.error(x);agdErr(agV90(x)?AGV90MSG:'Não foi possível salvar.'+(x.message?' Motivo: '+x.message:' Verifique a internet e tente de novo.'))}
+  finally{b.disabled=false}
+});
+// número no menu: rotinas de hoje ainda não feitas e compromissos que ficaram para trás
+let AGBOK=true;
+async function agBadge(){
+  if(!ME||!AGBOK)return;
+  const {data:rs,error}=await sb.from('agenda_rotinas').select('id,repete,dias_semana,data_inicio,data_fim').or(`data_fim.is.null,data_fim.gte.${TODAY}`);
+  if(error){if(agV90(error))AGBOK=false;return}
+  const hoje=(rs||[]).filter(r=>agNoDia(r,TODAY)),atr=(rs||[]).filter(r=>r.repete==='nao'&&r.data_inicio<TODAY),ids=[...new Set([...hoje,...atr].map(r=>r.id))];
+  let feitos=new Set();
+  const desde=atr.reduce((m,r)=>r.data_inicio<m?r.data_inicio:m,TODAY);
+  if(ids.length){const {data:fs}=await sb.from('agenda_feitos').select('rotina_id,data').in('rotina_id',ids).gte('data',desde).lte('data',TODAY);(fs||[]).forEach(f=>feitos.add(agK(f.rotina_id,f.data)))}
+  const n=hoje.filter(r=>!feitos.has(agK(r.id,TODAY))).length+atr.filter(r=>!feitos.has(agK(r.id,r.data_inicio))).length;
+  if((NAVBADGE.agenda||0)!==n){NAVBADGE.agenda=n;renderNav()}
+}
+// =====================================================================
 // NOVIDADES DO PORTAL (Carol, 30/10): cada atualização aparece numa janela quando a pessoa entra,
 // até ela clicar em "Visualizei" (gravado em novidades_vistas, v76; o escritório vê quem já viu, em Avisos).
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04ag',data:'2026-11-04',t:'Agenda: seu planner do dia',itens:[
+    {x:'Comunicação › Agenda: um planner diário só seu (ninguém mais vê). Lance as suas rotinas e compromissos, com horário, e escolha se repetem todo dia, nos dias úteis, em dias da semana ou todo mês. Marque cada uma como feita.'},
+    {x:'A Agenda também mostra as tarefas e recados destinados a você (atrasadas, do dia e as que esperam o seu ciente) e tem um espaço para as anotações do dia.'}]},
   {k:'2026-11-04e',data:'2026-11-04',t:'Configurações: empresas e usuários separados',itens:[
     {x:'Configurações agora tem “Cadastro de empresas” e “Cadastro de usuários” em telas separadas. O quadro de acessos por empresa saiu: as permissões de cada usuário aparecem ao abrir o cadastro dele (lápis).',para:'esc'}]},
   {k:'2026-11-04c',data:'2026-11-04',t:'Cadastro de usuários no estilo do Bom Controle e tarefas com ciente de todos',itens:[
