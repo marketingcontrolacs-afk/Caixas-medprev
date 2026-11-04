@@ -485,6 +485,29 @@ body.lg header.top .logo{visibility:hidden}
 .mndica{background:var(--brand-soft);border-radius:10px;padding:10px 14px;margin:10px 0;max-width:80ch}
 .mnquem{font-size:13px;color:var(--muted);margin:0 0 6px}
 @media (max-width:820px){.mnwrap{grid-template-columns:minmax(0,1fr)}.mnidx{position:static;max-height:none}.mnsec{padding:16px}}
+/* ===== Celular (Carol, 04/11): janela de novidades com o botão "Visualizei" sempre à vista e topo/menu compactos. No computador nada muda. ===== */
+dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto;min-height:0}#dlgNov .dh,#dlgNov .df{flex:none}
+@media (max-width:700px){
+  /* janelas: cabem na tela visível do celular (barra do Safari incluída); o conteúdo rola e os botões ficam fixos embaixo */
+  dialog{width:calc(100vw - 16px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px)}
+  dialog[open]:has(>.db),dialog[open]:has(>form>.db){display:flex;flex-direction:column}
+  dialog>form:has(>.db){display:flex;flex-direction:column;min-height:0;flex:1 1 auto}
+  dialog>.db,dialog>form>.db{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch}
+  dialog>.dh,dialog>.df,dialog>form>.dh,dialog>form>.df{flex:none}
+  .dh{padding:12px 14px}.db{padding:12px 14px}.df{padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+  #nvOk{flex:1;padding-block:12px;font-size:16px}
+  /* topo: logo menor, empresa e usuário na mesma faixa, sem ficar preso no alto da tela */
+  header.top{position:relative}
+  header.top .topin{gap:8px 10px;padding-block:8px}
+  .logo img{height:28px}.logo .chip-logo{padding:3px 7px;border-radius:8px}.logo small{display:none}
+  .who{font-size:11px;line-height:1.2}.who b{font-size:12.5px}
+  header.top #btnSair{padding:4px 10px}
+  .ctxbar{order:9;flex:1 1 100%;max-width:none}.ctxbar>span{display:none}.ctxbar select{padding:6px 10px;font-size:14px}
+  /* módulos: pílulas menores numa linha que corre para o lado */
+  .mods{gap:2px;padding-block:4px}
+  .modbtn{gap:6px;padding:6px 9px;font-size:13px}.modbtn svg{width:17px;height:17px}
+  .megapop{max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px)}
+}
 </style>
 </head>
 <body>
@@ -9413,6 +9436,7 @@ const MANUAL=[
 <li><b>Módulos:</b> Dashboard, Rotina diária, Gestão financeira, Contabilidade, RH, Comunicação e Configurações. Passe o mouse (ou clique) num módulo para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
+<li><b>No celular:</b> o alto da tela fica mais compacto (logo, nome e Sair numa linha e a empresa logo abaixo). Os módulos ficam numa faixa que corre para o lado com o dedo. Nas janelas, o texto rola e os botões (como <b>Visualizei</b>, Salvar e Cancelar) ficam sempre fixos embaixo.</li>
 </ol>
 <div class="mndica"><b>Dicas:</b> atualizar a página (F5) mantém a tela aberta. Ao trocar de tela, os filtros e as buscas voltam ao padrão. Quando houver uma atualização do portal, aparece uma janela com as novidades ao entrar: leia e clique em <b>Visualizei</b>. Se aparecer a faixa <b>Somente visualização</b>, você pode ver e baixar, mas não lançar nem alterar nada naquela tela.</div>`}]},
   {g:'Dashboard',itens:[
@@ -9676,6 +9700,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04cel',data:'2026-11-04',t:'Portal ajustado para o celular',itens:[
+    {x:'No celular, a janela de novidades e as outras janelas cabem na tela: o texto rola e o botão “Visualizei” (e os botões Salvar e Cancelar) ficam sempre à vista embaixo.'},
+    {x:'No celular, o alto da tela ficou menor: logo, nome e Sair numa linha, a empresa logo abaixo e os módulos numa faixa mais fina. No computador nada mudou.'}]},
   {k:'2026-11-04tr',data:'2026-11-04',t:'Transferências: de qual conta saiu e em qual entrou',itens:[
     {x:'Ao abrir uma transferência na Movimentação ou no extrato, aparece de qual conta saiu e em qual entrou. A ponta de entrada aparece como “Entrada: transferência recebida de outra conta”.',para:'esc'},
     {x:'Importar do Bom Controle: o depósito do dinheiro que o sistema liga sozinho à saída da tesouraria (mesmo dia e valor) deixa de ficar “a validar”.',para:'esc'}]},
