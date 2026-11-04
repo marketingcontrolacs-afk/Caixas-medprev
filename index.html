@@ -62,7 +62,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15p
 .per-mg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .per-foot{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:12px}
 @media (max-width:760px){.per-main{grid-template-columns:1fr}.per-cals{grid-template-columns:1fr}.per-cal[data-k="1"]{display:none}.per-ch .per-mob{visibility:visible}.per-meses{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px}.per-mg{grid-template-columns:repeat(4,1fr)}.perbox .per-btn{min-width:0;flex:1}}
-.wrap{max-width:1600px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1920px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topin{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
 .logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:20px;color:var(--ink)}
@@ -149,6 +149,15 @@ tbody tr.click{cursor:pointer}
 tbody tr.click:hover{background:var(--sunk)}
 tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
 tfoot td{font-weight:700;background:var(--sunk)}
+/* 04/11/2026 (Carol): as tabelas cabem na largura da tela, sem barra para ir para o lado. Letra um pouco menor e o texto quebra linha dentro da coluna; datas e valores continuam numa linha só */
+@media (min-width:901px){
+.tablebox>table{font-size:12.5px}
+.tablebox th,.tablebox td{padding:6px 6px}
+.tablebox th{white-space:normal;font-size:10.5px;letter-spacing:.02em}
+.tablebox td.l{white-space:normal;overflow-wrap:break-word;min-width:60px}
+.tablebox td:has(.btn),.tablebox td:has(.chip){white-space:normal}
+.tablebox td .btn+.btn{margin-top:2px}
+}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
 .fin{display:flex;align-items:center;gap:2px}.fin input{min-width:90px;width:100%;padding:4px 6px;font-size:13px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.ffixo{border:0;background:none;cursor:pointer;font-size:12px;padding:2px;opacity:.3;filter:grayscale(1)}.ffixo:hover{opacity:.8}.ffixo.on{opacity:1;filter:none}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}td.fpend{background:var(--bad-soft)}td.fpend input,td.fpend{color:var(--bad);font-weight:600}.fadto{display:inline-flex;gap:2px;margin-left:2px}.fadto button{border:1px solid var(--line);background:var(--surface);border-radius:4px;cursor:pointer;font-size:12px;padding:1px 5px;line-height:1.4}.fadto button[data-adto=ok]{color:var(--ok)}.fadto button[data-adto=x]{color:var(--bad)}td.fpend{white-space:nowrap}#folGrid td.fpend .fin{display:inline-flex;width:auto;vertical-align:middle}#folGrid td.fpend .fin input{width:90px}.fadto{vertical-align:middle}
@@ -9314,6 +9323,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04tc',data:'2026-11-04',t:'Telas inteiras, sem rolar para o lado',itens:[
+    {x:'As listas (contas a pagar e a receber, movimentação financeira, extrato, conciliação e as outras telas) agora cabem na largura da tela: a letra ficou um pouco menor e os textos longos quebram linha dentro da coluna. Não precisa mais puxar a barra para o lado para ver todas as colunas.'},
+    {x:'Em monitores grandes o portal usa mais a largura da tela. O botão de tela cheia continua onde já existia.'}]},
   {k:'2026-11-04fs',data:'2026-11-04',t:'Férias: parcela fica marcada como solicitada',itens:[
     {x:'RH › Férias: depois de gerar a “Solicitação para a contabilidade”, a parcela fica marcada “Solicitada” com a data, na janela e na lista de férias. Na próxima vez a caixinha dela já vem desmarcada.'},
     {x:'Se a data da parcela mudar depois, ela volta a ficar sem a marca, para você solicitar de novo.'}]},
