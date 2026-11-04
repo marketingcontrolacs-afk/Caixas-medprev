@@ -122,6 +122,7 @@ textarea{min-height:64px;resize:vertical}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:16px;overflow-x:auto}
 .tabs button{border:0;background:none;font:600 14px var(--body);color:var(--muted);padding:10px 14px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand)}
+.ptabs{margin:0 0 14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:16px}
 .tile{padding:14px 16px}
 .tile .k{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
@@ -550,6 +551,7 @@ body.lg header.top .logo{visibility:hidden}
 
   <!-- REPASSES DE PARCEIROS -->
   <section id="viewRep" hidden>
+    <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Parceiros: cadastro e alterações</h1><p class="sub" id="pSub"></p></div>
       <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="pFiltro"><option value="ativos">Parceiros ativos</option><option value="alerta">Só com alerta</option><option value="inativos">Inativos</option></select></label><button class="btn primary" id="pNovo">+ Novo cadastro ou alteração</button></div>
@@ -687,6 +689,7 @@ body.lg header.top .logo{visibility:hidden}
 
   <!-- GESTÃO FINANCEIRA › REPASSE DE PARCEIROS (escritório) -->
   <section id="viewNF" hidden>
+    <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Controle de notas fiscais</h1><p class="sub" id="nfSub">Notas fiscais emitidas pelos parceiros, mês a mês. Quem tem nota lançada passa a “Emite NF”, e isso vale também no Repasse de parceiros.</p></div>
       <div class="row" style="align-items:flex-end"><button class="btn" id="nfNovo" hidden>+ Parceiro</button><span class="btn fotobtn" id="nfImp" hidden>Importar planilha<input type="file" id="nfImpArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF"></span><button class="btn" id="nfXls" hidden>Exportar Excel</button></div>
@@ -703,6 +706,7 @@ body.lg header.top .logo{visibility:hidden}
   </section>
 
   <section id="viewRN" hidden>
+    <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Repasse de parceiros</h1><p class="sub">Importe o relatório de restituições da semana. O sistema separa quem emite nota fiscal e quem não emite e traz a conta e o Pix de cada parceiro. Você escolhe em qual empresa do grupo cada repasse vai ser pago e gera as contas a pagar.</p></div>
       <div class="row" style="align-items:flex-end"><button class="btn" id="rnCfg" hidden>Empresas do grupo</button><span class="btn fotobtn" id="rnCtrl" hidden>Importar controle de NF<input type="file" id="rnCtrlArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF dos parceiros"></span><button class="btn" id="rnXls" hidden>Baixar Excel</button><span class="btn primary fotobtn" id="rnImp" hidden>Importar relatório de repasses<input type="file" id="rnArq" accept=".xls,.xlsx" aria-label="Importar o relatório de restituições"></span></div>
@@ -1373,9 +1377,12 @@ const NAV=[
   {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   // repasses da semana (relatório de restituições): separa quem emite NF e gera as contas a pagar em cada empresa do grupo (Carol, 30/10)
-  {k:'gfrepasse',t:'Repasse de parceiros',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  // Parceiros saiu da Comunicação: é a tela única de parceiros na Gestão financeira, com as abas Cadastro, Repasse e Notas fiscais (Carol, 04/11)
+  {k:'repasse',t:'Parceiros',g:'Gestão financeira',s:'Dia a dia',ok:()=>temAcesso('repasse')},
+  // Repasse e Notas fiscais viraram abas da tela Parceiros (aba:'repasse'): saem do menu, a tela continua igual (Carol, 04/11)
+  {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc,aba:'repasse'},
   // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
-  {k:'gfnf',t:'Controle de notas fiscais',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc,aba:'repasse'},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
@@ -1406,7 +1413,6 @@ const NAV=[
   {k:'projetos',t:'Projetos e melhorias',g:'Comunicação',s:'Mensagens',ok:ehEsc},
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
   {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'repasse',t:'Parceiros: cadastro e alterações',g:'Comunicação',s:'Dia a dia',ok:()=>temAcesso('repasse')},
   {k:'bc',t:'Exportação Bom Controle',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
   {k:'cfg',t:'Empresas e usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
@@ -1432,14 +1438,14 @@ const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
   // atalho do Dashboard no início dos módulos (Carol, 30/10); ele não aparece mais dentro da Gestão financeira (Carol, 03/11)
-  const noGrp=n=>n.k!=='gfdash';
+  const noGrp=n=>n.k!=='gfdash'&&!n.aba;
   $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n))).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
     return `<button type="button" class="modbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.c||m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('')
     +(atual?`<span class="crumb">${naDash?'<b>Dashboard</b>':`${navGrp(atual)} › <b>${esc(atual.t)}</b>`}</span>`:'');
   if(MEGA.g)megaDesenha();
 }
 function megaDesenha(){
-  const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&n.k!=='gfdash');
+  const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&n.k!=='gfdash'&&!n.aba);
   if(!itens.length)return megaFecha();
   const cols=SECOES.map(sc=>[sc,itens.filter(n=>(n.s||'Dia a dia')===sc)]).filter(([,l])=>l.length);
   $('mega').innerHTML=`<span class="mega-tag">${MEGA.g}</span><div class="mega-cols">${cols.map(([sc,l])=>`<div class="mega-col"><h3>${sc}</h3>${l.map(n=>`<button type="button" class="megaitem" data-v="${n.k}"${VIEW===n.k?' aria-current="page"':''}>${esc(n.t)}${n.soon?'<span class="soon">em breve</span>':''}${navBadge(n)}</button>`).join('')}</div>`).join('')}</div>`;
@@ -1506,6 +1512,15 @@ escCli.onchange=()=>{guardaEmp();openView()};
 const SECK='portal_secao';
 function go(v){if(!eqPode(v))return;VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
 // a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
+// tela única de Parceiros: Cadastro e contas, Repasse da semana e Notas fiscais em abas (Carol, 04/11)
+// cada aba é a tela de antes; quem só tem o cadastro (o cliente) não vê a barra de abas
+const PABAS=[['repasse','Cadastro e contas'],['gfrepasse','Repasse da semana'],['gfnf','Notas fiscais']];
+function parcAbas(){
+  const ok=PABAS.filter(([k])=>{const n=NAV.find(x=>x.k===k);return n&&n.ok()&&eqPode(k)});
+  document.querySelectorAll('.ptabs').forEach(d=>{d.hidden=ok.length<2;
+    d.innerHTML=ok.map(([k,t])=>`<button type="button" role="tab" data-pt="${k}" aria-selected="${VIEW===k}">${t}</button>`).join('')});
+}
+document.addEventListener('click',e=>{const b=e.target.closest('.ptabs [data-pt]');if(b&&b.dataset.pt!==VIEW)go(b.dataset.pt)});
 function viewDaEmp(){
   const n=NAV.find(x=>x.k===VIEW);if(!n||serveEmp(n))return;
   const itens=navItens(),alt=itens.find(x=>navGrp(x)===navGrp(n)&&!x.soon)||itens.find(x=>x.k==='gfdash')||itens.find(x=>!x.soon);
@@ -1546,7 +1561,7 @@ function openView(){
   else if(VIEW==='ponto'){$('viewPonto').hidden=false;initPonto()}
   else if(VIEW==='ben'){$('viewBen').hidden=false;initBen()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
-  else if(VIEW==='repasse'){$('viewRep').hidden=false;renderRep()}
+  else if(VIEW==='repasse'){$('viewRep').hidden=false;parcAbas();renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
@@ -1557,8 +1572,8 @@ function openView(){
   else if(VIEW==='gfdash'){$('viewDash').hidden=false;renderDash()}
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
-  else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;renderRN()}
-  else if(VIEW==='gfnf'){$('viewNF').hidden=false;renderNF()}
+  else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;parcAbas();renderRN()}
+  else if(VIEW==='gfnf'){$('viewNF').hidden=false;parcAbas();renderNF()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
@@ -8804,6 +8819,9 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04p',data:'2026-11-04',t:'Parceiros em uma tela só',itens:[
+    {x:'Parceiros agora fica em Gestão financeira › Parceiros (antes em Comunicação). O cadastro, as alterações de conta e os descontos continuam iguais.',mods:['repasse']},
+    {x:'Repasse de parceiros e Controle de notas fiscais viraram as abas “Repasse da semana” e “Notas fiscais” da tela Parceiros, e saíram do menu. Tudo o que cada tela fazia continua igual.',para:'esc'}]},
   {k:'2026-11-04u',data:'2026-11-04',t:'Plano de contas, fornecedores, cartão, benefícios e tarefas',itens:[
     {x:'Plano de contas num lugar só: Gestão financeira › Plano de contas agora também cola várias categorias e tira categorias do plano padrão. Configurações › Categorias ficou só com as regras que sugerem a categoria.',para:'esc'},
     {x:'Fornecedores do Bom Controle dentro de Gestão financeira › Clientes e fornecedores: o botão “Importar fornecedores do Bom Controle” fica lá, e os que faltarem entram sozinhos. Saiu do menu Configurações › Fornecedores.',para:'esc'},
@@ -8964,7 +8982,7 @@ function parcLista(){
   $('tParcSum').innerHTML=`<span class="pi">${svgI('repasse')}</span><b>Parceiros</b><span class="muted">${[na?na+(na===1?' alteração de conta':' alterações de conta'):'',nn?nn+(nn===1?' parceiro novo para conferir':' parceiros novos para conferir'):''].filter(Boolean).join(' · ')}</span>`;
   $('tParcList').innerHTML=l.map(x=>`<button type="button" class="pli" data-pcli="${x.cli}"><span class="chip ${x.t==='alt'?'c-bad':'c-warn'}">${x.t==='alt'?'Alteração de conta':'Parceiro novo'}</span><b>${esc(x.nome)}</b><span class="muted">${esc(cn(x.cli))}${x.quando?' · '+dBR(String(x.quando).slice(0,10)):''}${x.obs?' · '+esc(x.obs):''}</span><span class="go">›</span></button>`).join('');
 }
-// abre Comunicação › Parceiros na empresa do pedido, só com os parceiros com alerta
+// abre Gestão financeira › Parceiros na empresa do pedido, só com os parceiros com alerta
 function parcAbre(cli){if(cli&&[...escCli.options].some(o=>o.value===cli)){escCli.value=cli;guardaEmp()}else if(cli){EMP=cli;try{localStorage.setItem(EMPK,cli)}catch(e){}}$('pFiltro').value='alerta';go('repasse')}
 $('tParcList').addEventListener('click',e=>{const b=e.target.closest('[data-pcli]');if(b)parcAbre(b.dataset.pcli)});
 async function pjNovidades(){
