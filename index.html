@@ -2621,7 +2621,9 @@ const PALAVRAS={
   'Taxa Detran (Despachante/ Transferência/ Emplacamento)':['detran','ipva','emplacamento','licenciamento','despachante'],
   'Locação de Máquinas e Equipamentos':['locacao de maquina','aluguel de maquina','aluguel de equipamento','locacao de equipamento'],
   'Reformas':['reforma','obra'],
-  'FGTS':['fgts'],'INSS':['inss'],'DAS - Simples Nacional':['simples nacional','guia do das']
+  'FGTS':['fgts'],'INSS':['inss'],'DAS - Simples Nacional':['simples nacional','guia do das'],
+  // devolução ao paciente abate a receita na mesma categoria (pedido da Carol, 30/10)
+  'Recebimento de Atendimentos':['devolucao','devolucoes','devolucao ao paciente','devolucao paciente']
 };
 function sugerirPorTexto(t){
   const lim=x=>' '+chave(x).replace(/[^a-z0-9]+/g,' ').trim()+' ';t=lim(t);
@@ -7385,6 +7387,10 @@ async function renderRel(){
 const relTp=m=>{if(!relSemTr(m)||ehAporte(m))return null;const n=REL.nat?.[m.categoria];return n?(n==='Receita'?'entrada':'saida'):REL.cart.has(m.conta_id)?'saida':m.tipo};
 const relVl=m=>{const tp=relTp(m),lado=REL.cart.has(m.conta_id)&&!REL.nat?.[m.categoria]?'saida':m.tipo;return tp&&lado!==tp?-m.valor:+m.valor};
 // para o caixa: só as contas bancárias; o pagamento da fatura (transferência para o cartão) é saída de caixa
+// categorias de estorno e devolução foram excluídas (pedido da Carol, 30/10): nos relatórios esses lançamentos
+// aparecem juntos numa linha "A corrigir" até alguém escolher a categoria certa (Movimentação › Revisar categoria).
+const CAT_CORRIGIR='A corrigir (categoria de estorno ou devolução excluída)',catExcl=c=>/estorno|devolu/i.test(c||'');
+const relCat=m=>m.cat_revisar||catExcl(m.categoria)?CAT_CORRIGIR:m.categoria||'Sem categoria';
 const relCaixa=m=>!REL.cart.has(m.conta_id)&&(!m.transf_id||REL.trCart.has(m.transf_id));
 const relFalta=t=>Math.max(0,r2(t.valor-(REL.pago[t.id]||0)));
 const sgn=m=>(m.tipo==='entrada'?1:-1)*m.valor;
@@ -7521,7 +7527,7 @@ function dsDesenha(cli){
   const pm=ms.map(k=>{const l=REL.movs.filter(m=>m.data.startsWith(k));return {k,e:r2(l.filter(m=>relTp(m)==='entrada').reduce((x,m)=>x+relVl(m),0)),s:r2(l.filter(m=>relTp(m)==='saida').reduce((x,m)=>x+relVl(m),0))}});
   DS.pm=pm;
   // despesas do mês por categoria (as 6 maiores e "Outras")
-  const dc={};mm.filter(m=>relTp(m)==='saida').forEach(m=>{const k=m.categoria||'Sem categoria';dc[k]=r2((dc[k]||0)+relVl(m))});
+  const dc={};mm.filter(m=>relTp(m)==='saida').forEach(m=>{const k=relCat(m);dc[k]=r2((dc[k]||0)+relVl(m))});
   let cats=Object.entries(dc).sort((a,b)=>b[1]-a[1]);if(cats.length>7)cats=[...cats.slice(0,6),['Outras',r2(cats.slice(6).reduce((x,c)=>x+c[1],0))]];
   const cmx=Math.max(1,...cats.map(c=>c[1])),vazio=t=>`<div class="dvazio"><span class="ok">✓</span>${t}</div>`;
   const catH=cats.length?`<div class="dcat">${cats.map(([k,v])=>`<div class="r"><div class="t"><span>${esc(k)}</span><span>${fm(v)} ${mu(sai?Math.round(v/sai*100)+'%':'')}</span></div><div class="bar"><i style="width:${Math.max(1.5,v/cmx*100)}%"></i></div></div>`).join('')}</div>`:vazio(`Nenhuma despesa lançada em ${MESES[+mes.slice(5)-1].toLowerCase()}.`);
@@ -7589,7 +7595,7 @@ function relDre(){
   const ini=$('relIni').value,fim=$('relFim').value;if(!ini||!fim||fim<ini)return;
   const ms=mesesEntre(ini.slice(0,7),fim.slice(0,7)),mv=REL.movs.filter(m=>m.data>=ini&&m.data<=fim&&relTp(m));
   const cod=c=>REL.plano.find(p=>p.categoria===c)?.codigo||'',lab=c=>(cod(c)?cod(c)+' · ':'')+c;
-  const grupo=tp=>{const g={};mv.filter(m=>relTp(m)===tp).forEach(m=>{const k=m.categoria||'Sem categoria';(g[k]||=Object.fromEntries(ms.map(x=>[x,0])))[m.data.slice(0,7)]+=relVl(m)});
+  const grupo=tp=>{const g={};mv.filter(m=>relTp(m)===tp).forEach(m=>{const k=relCat(m);(g[k]||=Object.fromEntries(ms.map(x=>[x,0])))[m.data.slice(0,7)]+=relVl(m)});
     return Object.entries(g).sort((a,b)=>(cod(a[0])||'zz').localeCompare(cod(b[0])||'zz',undefined,{numeric:true})||a[0].localeCompare(b[0]))};
   const R=grupo('entrada'),D=grupo('saida'),tot=l=>Object.fromEntries(ms.map(x=>[x,r2(l.reduce((s,[,v])=>s+v[x],0))])),TR=tot(R),TD=tot(D),soma=o=>r2(Object.values(o).reduce((a,b)=>a+b,0));
   const linha=(n,v,cl,b)=>`<tr${b?' style="background:var(--sunk)"':''}><td class="l">${b?`<b>${esc(n)}</b>`:esc(n)}</td>${ms.map(x=>cvl(v[x],cl)).join('')}${cvl(soma(v),cl)}</tr>`;
@@ -7605,14 +7611,14 @@ function relDre(){
     +`<tr><td class="l">Margem</td>${ms.map(x=>`<td>${TR[x]?Math.round(RES[x]/TR[x]*100)+'%':'—'}</td>`).join('')}<td>${soma(TR)?Math.round(soma(RES)/soma(TR)*100)+'%':'—'}</td></tr>`;
   $('relFoot').innerHTML='';
   $('relTiles').innerHTML=tileH([['Receitas',fm(soma(TR)),ms.length+(ms.length===1?' mês':' meses'),'pos'],['Despesas',fm(soma(TD)),D.length+' categorias','neg'],['Resultado',fm(soma(RES)),'receitas menos despesas',soma(RES)<0?'neg':'pos'],['Margem',soma(TR)?Math.round(soma(RES)/soma(TR)*100)+'%':'—','resultado sobre receitas']]);
-  const sc=mv.filter(m=>!m.categoria).length;
-  $('relNote').textContent=(sc?`${sc} ${sc===1?'lançamento está':'lançamentos estão'} sem categoria: classifique nas contas a pagar e a receber ou no extrato. `:'')+'Pelo regime de caixa: entra no mês em que foi pago ou recebido. Transferências entre contas não entram.';
+  const sc=mv.filter(m=>!m.categoria).length,cc=mv.filter(m=>relCat(m)===CAT_CORRIGIR).length;
+  $('relNote').textContent=(cc?`${cc} ${cc===1?'lançamento usa':'lançamentos usam'} categoria de estorno ou devolução, que foi excluída: estão na linha “A corrigir”. Escolha a categoria certa na Movimentação (situação “Revisar categoria”). `:'')+(sc?`${sc} ${sc===1?'lançamento está':'lançamentos estão'} sem categoria: classifique nas contas a pagar e a receber ou no extrato. `:'')+'Pelo regime de caixa: entra no mês em que foi pago ou recebido. Transferências entre contas não entram.';
 }
 function relDesp(){
   const M=VIEW,ini=$('relIni').value,fim=$('relFim').value,base=$('relBase').value;if(!ini||!fim||fim<ini)return;
-  const chaveDe=M==='gfdcat'?(x=>x.categoria||'Sem categoria'):M==='gfdforn'?(x=>x.pessoa_nome||'Sem fornecedor'):(x=>x.forma||'Não informada');
-  const itens=base==='pago'?REL.movs.filter(m=>relTp(m)==='saida'&&m.data>=ini&&m.data<=fim).map(m=>{const t=REL.tit[m.titulo_id];return {categoria:m.categoria,pessoa_nome:m.pessoa_nome,forma:REL.cart.has(m.conta_id)?'Cartão de crédito':m.forma||t?.forma||(t?null:'Lançamento avulso'),valor:relVl(m)}})
-    :REL.tits.filter(t=>t.tipo==='pagar'&&t.vencimento>=ini&&t.vencimento<=fim).map(t=>({categoria:t.categoria,pessoa_nome:t.pessoa_nome,forma:t.forma,valor:+t.valor,aberto:relFalta(t)}));
+  const chaveDe=M==='gfdcat'?(x=>relCat(x)):M==='gfdforn'?(x=>x.pessoa_nome||'Sem fornecedor'):(x=>x.forma||'Não informada');
+  const itens=base==='pago'?REL.movs.filter(m=>relTp(m)==='saida'&&m.data>=ini&&m.data<=fim).map(m=>{const t=REL.tit[m.titulo_id];return {categoria:m.categoria,cat_revisar:m.cat_revisar,pessoa_nome:m.pessoa_nome,forma:REL.cart.has(m.conta_id)?'Cartão de crédito':m.forma||t?.forma||(t?null:'Lançamento avulso'),valor:relVl(m)}})
+    :REL.tits.filter(t=>t.tipo==='pagar'&&t.vencimento>=ini&&t.vencimento<=fim).map(t=>({categoria:t.categoria,cat_revisar:t.cat_revisar,pessoa_nome:t.pessoa_nome,forma:t.forma,valor:+t.valor,aberto:relFalta(t)}));
   const g={};itens.forEach(x=>{const k=chaveDe(x),o=g[k]||={n:0,v:0,a:0};o.n++;o.v+=x.valor;o.a+=x.aberto||0});
   const ls=Object.entries(g).sort((a,b)=>b[1].v-a[1].v),T=r2(ls.reduce((s,[,o])=>s+o.v,0)),mx=ls[0]?.[1].v||1,V=base==='venc';
   const nome={gfdcat:'Categoria',gfdforn:'Fornecedor',gfdforma:'Forma de pagamento'}[M];
@@ -9676,6 +9682,9 @@ const NOVIDADES=[
     {x:'Fornecedores do Bom Controle dentro de Gestão financeira › Clientes e fornecedores: o botão “Importar fornecedores do Bom Controle” fica lá, e os que faltarem entram sozinhos. Saiu do menu Configurações › Fornecedores.',para:'esc'},
     {x:'Cartão de crédito ligado em todas as empresas com gestão financeira (desmarque em Configurações › Empresas as que não têm). Nas MP/MPA, do RH aparecem só o Pedido de benefícios e os colaboradores.',para:'esc'},
     {x:'Tarefas e recados liberadas para todos os usuários, em todas as empresas em que cada um tem acesso.',mods:['tarefas']}]},
+  {k:'2026-11-03e',data:'2026-11-03',t:'Categorias de estorno e devolução excluídas',itens:[
+    {x:'As categorias de estorno e de devolução foram excluídas do plano de contas. Devolução ao paciente agora vai na categoria “Recebimento de Atendimentos”, que abate a receita (o sistema já sugere sozinho).',para:'esc'},
+    {x:'DRE gerencial, Despesas por categoria e Dashboard: os lançamentos que ainda estavam nessas categorias aparecem juntos na linha “A corrigir” e com o aviso “Revisar categoria” na Movimentação, até a categoria certa ser escolhida.',para:'esc'}]},
   {k:'2026-11-03d',data:'2026-11-03',t:'Importar do Bom Controle',itens:[
     {x:'Gestão financeira › Movimentação financeira: botão “Importar do Bom Controle”. Envie o arquivo de movimentações exportado do BC (pode ser mais de um, um por conta) e os lançamentos entram na empresa escolhida no topo. O que já existe (mesma conta, data, tipo e valor) fica de fora, então pode importar o mesmo arquivo de novo. Categoria do BC que não existe no plano aparece num aviso com a sugestão, para escolher outra ou cadastrar. Transferências com as duas contas no arquivo viram uma só; “Ordem de Pagamento de Terceiros” entra como Restituições; contas em aberto vão para as contas a pagar e a receber. A conta Tesouraria fica de fora por padrão.',para:'esc'}]},
   {k:'2026-11-03r',data:'2026-11-03',t:'Repasse de parceiros: separar, pagar e avisos',itens:[
