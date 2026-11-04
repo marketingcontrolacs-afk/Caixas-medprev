@@ -467,6 +467,24 @@ body.lg header.top .logo{visibility:hidden}
 .agdias{display:flex;gap:6px;flex-wrap:wrap}.agdias label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;cursor:pointer;font-size:13px}
 @media (max-width:880px){.aggrid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:520px){.agsem{gap:3px}.agsem .dw{font-size:10px}.agsem .dn{font-size:15px}.agsem .dc{font-size:10px}.agit{grid-template-columns:auto 40px minmax(0,1fr);}.agit .acts{grid-column:2/-1}}
+/* Manual do sistema (Configurações › Manual do sistema, todos os usuários) */
+.mnwrap{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;align-items:start;margin-top:14px}
+.mnidx{position:sticky;top:12px;padding:12px;max-height:calc(100vh - 40px);overflow:auto}
+.mnidx h3{font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 6px 4px}
+.mnidx h3:first-child{margin-top:2px}
+.mnidx a{display:block;padding:6px 8px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14px}
+.mnidx a:hover{background:var(--sunk)}
+.mnsec{padding:22px 24px;margin-bottom:16px;scroll-margin-top:12px}
+.mnsec .mng{font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin:0 0 4px}
+.mnsec h2{margin:0 0 8px}
+.mnsec p,.mnsec li{line-height:1.55;max-width:80ch}
+.mnsec ol,.mnsec ul{padding-left:22px;margin:6px 0 10px}
+.mnsec h4{margin:14px 0 4px;font-size:15px}
+.mnimg{display:block;margin:12px 0 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-width:960px;cursor:zoom-in;background:var(--sunk)}
+.mnimg img{display:block;width:100%;height:auto}
+.mndica{background:var(--brand-soft);border-radius:10px;padding:10px 14px;margin:10px 0;max-width:80ch}
+.mnquem{font-size:13px;color:var(--muted);margin:0 0 6px}
+@media (max-width:820px){.mnwrap{grid-template-columns:minmax(0,1fr)}.mnidx{position:static;max-height:none}.mnsec{padding:16px}}
 </style>
 </head>
 <body>
@@ -896,6 +914,13 @@ body.lg header.top .logo{visibility:hidden}
   </section>
 
   <!-- AGENDA (planner diário, v90): cada usuário vê só a sua (Carol, 04/11) -->
+  <section id="viewManual" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Manual do sistema</h1><p class="sub">Como usar cada tela do portal, com imagens de exemplo (empresas e nomes fictícios). Aparecem aqui as telas que você tem liberadas.</p></div>
+      <input type="search" id="mnBusca" placeholder="Buscar no manual" aria-label="Buscar no manual" style="max-width:280px">
+    </div>
+    <div class="mnwrap"><nav class="card mnidx" id="mnIdx" aria-label="Índice do manual"></nav><div id="mnConteudo"></div></div>
+  </section>
   <section id="viewAgenda" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Agenda</h1><p class="sub">Seu planner do dia: rotinas, compromissos e as tarefas e recados destinados a você. Só você vê o que está aqui.</p></div>
@@ -1402,7 +1427,7 @@ const ehEsc=()=>ME&&ME.papel==='escritorio';
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda'];
+const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
@@ -1539,16 +1564,18 @@ const NAV=[
   {k:'cfgusr',t:'Cadastro de usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  // manual com prints e explicação de cada tela, para todos os usuários (Carol, 04/11). Toda melhoria atualiza também o MANUAL
+  {k:'manual',t:'Manual do sistema',g:'Configurações',s:'Ajuda',ok:()=>!!ME},
   // Configurações › Fornecedores (Bom Controle) foi unificado em Gestão financeira › Clientes e fornecedores (Carol, 04/11)
 ];
 const NAVBADGE={};
 // módulos no topo (um ícone cada); as seções e as telas abrem num painel, como no Bom Controle
 const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Configurações',i:'cfg'}];
-const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado'];
+const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado','Ajuda'];
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k.startsWith('cfg')||k==='avisos'||k==='projetos'||k==='agenda';
+const telaSemEmp=k=>k.startsWith('cfg')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -1628,7 +1655,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos'||m==='agenda';
+  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos'||m==='agenda'||m==='manual';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
@@ -1677,7 +1704,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfdash','gfresumo','gffluxo','gfdre','gfdc
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -1700,6 +1727,7 @@ function openView(){
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='agenda'){$('viewAgenda').hidden=false;renderAgenda()}
+  else if(VIEW==='manual'){$('viewManual').hidden=false;renderManual()}
   else if(VIEW==='gfpes'||VIEW==='gfcontas'){$('viewGF').hidden=false;gfTab=VIEW==='gfcontas'?'contas':'pessoas';renderGF()}
   else if(['gfmov','gfpagar','gfrec','gfinad','gfagenda'].includes(VIEW)){$('viewGT').hidden=false;renderGT()}
   else if(VIEW==='gfremessa'||VIEW==='gfretorno'){$('viewGR').hidden=false;renderGR()}
@@ -2720,7 +2748,7 @@ const icoSvg=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 // situação de um módulo para o usuário: 'exec' (alguma ferramenta liberada para executar), 'ver' (só visualiza) ou '' (bloqueado)
 function modSit(u,g){
   const t=tipoUsr(u);if(t==='admin')return 'exec';if(t==='pendente')return '';
-  if(ehTipoEquipe(t)&&NAV.some(n=>navGrp(n)===g&&SEMPRE.includes(n.k)))return 'exec';
+  if(ehTipoEquipe(t)&&NAV.some(n=>navGrp(n)===g&&SEMPRE.includes(n.k)&&n.k!=='manual'))return 'exec';
   const p=permsDe(u,t),vs=ferramentas(t).filter(n=>navGrp(n)===g).map(n=>p[n.k]).filter(Boolean);
   return vs.includes('exec')?'exec':vs.length?'ver':'';
 }
@@ -9327,6 +9355,118 @@ async function agCarrega(){
   AGCONC=agConc(AGR,b.data||[]);
   return null;
 }
+// ---------- Manual do sistema (Configurações › Manual do sistema, Carol 04/11) ----------
+// REGRA: toda melhoria ou atualização visível também atualiza o MANUAL (texto e, se a tela mudou, o print em manual/).
+// k = tela do NAV (o item só aparece para quem tem a tela liberada); k começando com '_' aparece para todos.
+// Os prints usam empresas e pessoas fictícias. Feito por partes: as telas que ainda não têm explicação ficam listadas no fim.
+const MANUAL=[
+  {g:'Primeiros passos',itens:[
+    {k:'_inicio',t:'Como navegar no portal',img:'menu.png',
+      txt:`<p>Entre com o seu e-mail e a sua senha. No alto da tela ficam a <b>Empresa</b>, os <b>módulos</b> e o caminho da tela aberta.</p>
+<ol>
+<li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas.</li>
+<li><b>Módulos:</b> Dashboard, Rotina diária, Gestão financeira, Contabilidade, RH, Comunicação e Configurações. Passe o mouse (ou clique) num módulo para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
+<li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
+<li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
+</ol>
+<div class="mndica"><b>Dicas:</b> atualizar a página (F5) mantém a tela aberta. Ao trocar de tela, os filtros e as buscas voltam ao padrão. Quando houver uma atualização do portal, aparece uma janela com as novidades ao entrar: leia e clique em <b>Visualizei</b>. Se aparecer a faixa <b>Somente visualização</b>, você pode ver e baixar, mas não lançar nem alterar nada naquela tela.</div>`}]},
+  {g:'Dashboard',itens:[
+    {k:'gfdash',t:'Dashboard da empresa',img:'gfdash.png',
+      txt:`<p>O resumo da empresa escolhida no alto (ou de todas as empresas). Cada pessoa vê só o que tem liberado.</p>
+<ul>
+<li><b>Saldo nas contas:</b> o saldo de hoje e o saldo projetado para daqui a 30 dias, com o que já está a pagar e a receber.</li>
+<li><b>A receber</b> e <b>A pagar em aberto:</b> o total em aberto, com o valor já vencido em vermelho.</li>
+<li><b>Resultado do mês:</b> receitas menos despesas do mês atual.</li>
+<li><b>Entradas e saídas:</b> o gráfico dos últimos 12 meses, pelo regime de caixa (data do pagamento ou do recebimento). Passe o mouse numa barra para ver os valores.</li>
+<li><b>Pendências:</b> tarefas, contas vencidas, parceiros para conferir e documentos enviados pelo cliente para validar. Clique numa linha para abrir a tela certa.</li>
+</ul>
+<p>Para o operador da empresa, o Dashboard mostra também o caixa de hoje, o saldo da tesouraria, os boletos a pagar e as suas tarefas.</p>
+<p>Use <b>Atualizar</b> para buscar os números de novo sem sair da tela.</p>`}]},
+  {g:'Rotina diária',itens:[
+    {k:'caixa',t:'Caixa (fechamento do dia)',img:'caixa.png',
+      txt:`<p>Aqui a recepção fecha o caixa de cada dia e envia para a Controlacs conferir.</p>
+<ol>
+<li>Confira o <b>Dia do fechamento</b> no alto à direita. Nas empresas com mais de um caixa por dia, escolha também o caixa.</li>
+<li><b>Dinheiro:</b> informe o total em dinheiro que o sistema da clínica mostra e o dinheiro contado (sangria).</li>
+<li><b>Saídas do caixa:</b> clique em <b>+ Adicionar saída</b> para cada dinheiro que saiu do caixa: devolução (com o nº da guia), repasse (com o nome do parceiro), água ou voucher, material de limpeza ou outra despesa. Informe o nº do documento ou da NF, o valor, e anexe o comprovante (foto ou PDF).</li>
+<li><b>Cartão de débito</b> e <b>Cartão de crédito:</b> informe o valor do sistema e o valor do relatório da máquina. A diferença aparece logo abaixo.</li>
+<li>Confira o <b>Resumo do dia</b> à direita: ele calcula o dinheiro esperado e mostra a falta ou a sobra. Se houver diferença, escreva nas observações o que aconteceu.</li>
+<li>Clique em <b>Enviar fechamento</b>.</li>
+</ol>
+<p>O quadro <b>Últimos dias</b> mostra a situação dos dias anteriores. Dias sem lançamento ou com diferença sem explicação aparecem marcados para você resolver.</p>`},
+    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar.png',
+      txt:`<p>O cliente envia o boleto e a nota fiscal de cada conta, e a Controlacs faz o pagamento.</p>
+<ol>
+<li>Clique em <b>+ Nova conta</b>.</li>
+<li>Cole a linha digitável do boleto (o portal lê o valor e o vencimento) e preencha o fornecedor, do que se trata a despesa, o nº da NF ou do documento, o vencimento e o valor.</li>
+<li>Anexe o boleto e a nota fiscal. Dá para anexar mais de um documento no mesmo lançamento e escolher vários arquivos de uma vez.</li>
+<li>Salve.</li>
+</ol>
+<p>Os quadros mostram o total a pagar, o que vence em 7 dias, o que está vencido e o que já foi pago. Em <b>Mostrar</b> escolha <i>Em aberto</i> ou um período. Contas sem anexo aparecem com <span style="color:var(--bad)">sem documento</span>. Clique numa linha para ver os documentos; o escritório marca a conta como paga.</p>`},
+    {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',
+      txt:`<p>O controle do dinheiro guardado na empresa: o que entra do caixa, as despesas pagas em dinheiro e os depósitos no banco.</p>
+<ol>
+<li>Clique em <b>+ Novo lançamento</b> e escolha o tipo: <b>Suprimento</b> (dinheiro que entrou na tesouraria), <b>Despesa</b> (anexe a nota, o cupom ou o recibo) ou <b>Depósito bancário</b> (escolha o banco de destino).</li>
+<li>Preencha a data, a descrição, o documento e o valor, e salve.</li>
+</ol>
+<p>Os quadros mostram o saldo anterior, as entradas, as despesas, os depósitos, o saldo atual e quantos lançamentos o escritório ainda vai conferir. Troque o mês em <b>Período</b>.</p>
+<h4>Conferência física</h4>
+<p>Pelo menos uma vez por semana, conte o dinheiro e use <b>Conferir o dinheiro agora</b>. O portal compara com o saldo e mostra a falta ou a sobra. Empresas sem conferência há mais de 7 dias aparecem em vermelho e com aviso no menu.</p>`},
+    {k:'cartao',t:'Cartão de crédito',img:'cartao.png',
+      txt:`<p>As notas fiscais das compras pagas com o cartão de crédito da empresa.</p>
+<ol>
+<li>Clique em <b>+ Nova nota</b>.</li>
+<li>Informe a data da compra, o fornecedor, do que se trata, o nº da NF ou do cupom, o valor total e as parcelas.</li>
+<li>Anexe a nota fiscal da compra e salve.</li>
+</ol>
+<p>Os quadros mostram as compras do período, o que falta conferir com a fatura e as compras sem nota anexada (essas precisam ser cobradas). O escritório marca cada compra como conferida com a fatura.</p>`}]},
+  {g:'Comunicação',itens:[
+    {k:'tarefas',t:'Tarefas e recados',img:'tarefas.png',
+      txt:`<p>Um quadro com as tarefas da equipe e os recados trocados com os clientes, em quatro colunas: <b>A fazer</b>, <b>Em andamento</b>, <b>Aguardando terceiros</b> e <b>Concluída</b>.</p>
+<ol>
+<li>Clique em <b>+ Nova tarefa</b> e preencha o título, a descrição, a empresa, a prioridade e o prazo. Escolha quem executa e, se precisar, os validadores e quem deve ficar ciente.</li>
+<li>Arraste o cartão para mudar de coluna.</li>
+<li>Clique no cartão para abrir a conversa e escrever mensagens e notas internas (o cliente não vê as notas internas).</li>
+</ol>
+<p>Use a busca e os filtros <b>Responsável</b> e <b>Concluídas</b>. Quando a tarefa é concluída, os envolvidos dão ciente. As concluídas há mais de 30 dias saem do quadro, mas continuam em <i>Concluídas: Todas</i>.</p>`},
+    {k:'avisos',t:'Avisos e notícias',img:'avisos.png',
+      txt:`<p>Avisos da Controlacs para os clientes e para a equipe, como feriados, prazos e mudanças de rotina.</p>
+<ul>
+<li>Os avisos novos aparecem no alto do portal até você ler. Os marcados como <b>Importante</b> ficam em destaque.</li>
+<li>O escritório usa <b>+ Novo aviso</b> para publicar: escreve o título e o texto, escolhe quem vê, pode marcar como importante, definir até quando vale e anexar um arquivo. Em cada aviso aparece quantas pessoas já leram.</li>
+<li><b>Atualizações do portal</b>, no fim da tela, guarda o histórico das novidades do sistema.</li>
+</ul>`},
+    {k:'agenda',t:'Agenda',img:'agenda.png',
+      txt:`<p>O seu planner do dia. Só você vê o que está na sua agenda.</p>
+<ul>
+<li><b>Rotinas e compromissos:</b> use <b>+ Nova rotina</b> para criar um compromisso com horário e escolher quando ele se repete. Marque a caixinha quando fizer.</li>
+<li><b>Tarefas e recados para você:</b> as tarefas em que você está envolvido, com prazo hoje e nos próximos 7 dias. Clique para abrir a tarefa.</li>
+<li><b>Anotações do dia:</b> um espaço livre para anotar o que precisar.</li>
+<li>Use as setas, a data ou os dias da semana no alto para ver outros dias. Embaixo de cada dia aparece quantas rotinas já foram feitas.</li>
+</ul>`},
+    {k:'projetos',t:'Projetos e melhorias',img:'projetos.png',
+      txt:`<p>Onde a equipe pede a criação de algo novo ou a melhoria de uma tela, e a administradora valida.</p>
+<ol>
+<li>Clique em <b>+ Novo pedido</b>, escolha se é criação ou melhoria e explique o que precisa e por quê. Dá para anexar um arquivo.</li>
+<li>Acompanhe a situação: Aguardando validação, Precisa de ajuste, Aprovado, Em andamento, Concluído ou Recusado. As respostas aparecem no pedido.</li>
+</ol>`}]},
+  {g:'Configurações',itens:[
+    {k:'manual',t:'Manual do sistema',
+      txt:`<p>Este manual. Ele é atualizado a cada melhoria do portal. Use a busca no alto para achar um assunto, e clique numa imagem para abri-la em tamanho maior.</p>`}]},
+];
+function renderManual(){
+  const ok=k=>k.startsWith('_')||NAV.some(n=>n.k===k&&n.ok()&&eqPode(k));
+  const b=($('mnBusca').value||'').trim().toLowerCase(),txt=h=>h.replace(/<[^>]+>/g,' ').toLowerCase();
+  const grupos=MANUAL.map(x=>({g:x.g,itens:x.itens.filter(i=>ok(i.k)&&(!b||(i.t+' '+txt(i.txt)).toLowerCase().includes(b)))})).filter(x=>x.itens.length);
+  const ids=i=>'mn_'+i.k.replace(/[^a-z0-9]/gi,'');
+  $('mnIdx').innerHTML=grupos.map(x=>`<h3>${esc(x.g)}</h3>${x.itens.map(i=>`<a href="#${ids(i)}" data-mn="${ids(i)}">${esc(i.t)}</a>`).join('')}`).join('')||'<p class="muted" style="margin:6px">Nada encontrado.</p>';
+  const feitas=new Set(MANUAL.flatMap(x=>x.itens.map(i=>i.k)));
+  const faltam=NAV.filter(n=>!n.aba&&!feitas.has(n.k)&&n.ok()&&eqPode(n.k)).map(n=>n.t);
+  $('mnConteudo').innerHTML=grupos.map(x=>x.itens.map(i=>`<article class="card mnsec" id="${ids(i)}"><p class="mng">${esc(x.g)}</p><h2>${esc(i.t)}</h2>${i.img?`<a class="mnimg" href="manual/${i.img}" target="_blank" rel="noopener" title="Abrir a imagem em tamanho maior"><img src="manual/${i.img}" loading="lazy" alt="Exemplo da tela ${esc(i.t)}"></a>`:''}${i.txt}</article>`).join('')).join('')
+    +(!b&&faltam.length?`<article class="card mnsec"><p class="mng">Em construção</p><h2>Próximas partes do manual</h2><p>O manual está sendo escrito por partes. Estas telas que você usa ainda vão ganhar explicação: ${esc(faltam.join(', '))}.</p></article>`:'');
+}
+$('mnBusca').addEventListener('input',()=>renderManual());
+$('mnIdx').addEventListener('click',e=>{const a=e.target.closest('[data-mn]');if(!a)return;e.preventDefault();document.getElementById(a.dataset.mn)?.scrollIntoView({behavior:'smooth',block:'start'})});
 async function renderAgenda(){
   if(!AGDIA)AGDIA=TODAY;
   $('agData').value=AGDIA;
@@ -9491,6 +9631,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-04man',data:'2026-11-04',t:'Manual do sistema',itens:[
+    {x:'Novo: Configurações › Manual do sistema, para todos os usuários. Ele explica como usar cada tela, com imagens de exemplo, e mostra só as telas que você tem liberadas.'},
+    {x:'Nesta primeira parte estão os primeiros passos, o Dashboard, a Rotina diária (Caixa, Boletos e notas fiscais a pagar, Tesouraria e Cartão de crédito) e a Comunicação. As outras telas entram nas próximas atualizações.'}]},
   {k:'2026-11-04lf',data:'2026-11-04',t:'Filtros limpos ao trocar de tela',itens:[
     {x:'Ao sair de uma tela e voltar (ex.: Movimentação financeira, Contas a pagar, Contas a receber), os filtros e a busca voltam ao padrão. O nome de fornecedor digitado não fica mais lá esquecido.'},
     {x:'Atualizar a página (F5) continua na mesma tela, e trocar só a empresa no alto mantém os filtros.'}]},
