@@ -157,6 +157,7 @@ dialog[open].cheia{width:calc(100vw - 16px)!important;max-width:none;height:calc
 .dcheia{margin-left:auto;flex:none}select[data-pg]{min-width:230px}#bnCad select{min-width:160px}#bnVa select{min-width:140px}
 .dh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .db{padding:16px 18px;display:grid;gap:12px;overflow:auto}
+dialog[open]#dlgBCI{display:flex;flex-direction:column}#dlgBCI .db{flex:1;min-height:0;display:block}#dlgBCI .db>*+*{margin-top:12px}#dlgBCI .tablebox{max-height:none}#dlgBCI select{max-width:280px;min-width:180px}#dlgBCI .alerta{flex-wrap:wrap}
 #dlg.edit{width:min(860px,calc(100vw - 32px))} #dlg .db>*{min-width:0} .ajuste .de{color:var(--muted);text-decoration:line-through;font-weight:500}
 #dlgFer,#dlgRep,#dlgFol,#dlgColab{width:min(860px,calc(100vw - 32px))} #dlgCC{width:min(1180px,calc(100vw - 32px))}
 .ccgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}.ccgrid>*{min-width:0}
@@ -564,7 +565,7 @@ body.lg header.top .logo{visibility:hidden}
   <section id="viewGT" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="gtTitle"></h1><p class="sub" id="gtSub"></p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button></div>
+      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button></div>
     </div>
     <div class="alerta" id="mvAviso" hidden></div>
     <div class="tiles" id="gtTiles"></div>
@@ -1162,6 +1163,11 @@ body.lg header.top .logo{visibility:hidden}
     <div class="db"><div class="fields" id="gfFields"></div><p class="err" id="gfErr" hidden></p></div>
     <div class="df"><button type="button" class="btn ghost" id="gfDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="gfClose">Fechar</button><button type="submit" class="btn primary" id="gfSave">Salvar</button></div>
   </form>
+</dialog>
+<dialog id="dlgBCI" style="width:min(1040px,calc(100vw - 32px))">
+  <div class="dh"><h2 id="bciTitle">Importar do Bom Controle</h2></div>
+  <div class="db" id="bciBody"></div>
+  <div class="df"><span class="note" id="bciInfo"></span><span class="spacer"></span><button type="button" class="btn ghost" id="bciFechar">Cancelar</button><button type="button" class="btn primary" id="bciOk" disabled>Importar</button></div>
 </dialog>
 <dialog id="dlgCatNova" style="max-width:460px">
   <form id="cnForm" novalidate>
@@ -6187,6 +6193,7 @@ async function renderGT(){
   ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtFiltroBox').hidden=!lista||M==='gfmov';
   document.querySelectorAll('.mvf').forEach(x=>x.hidden=M!=='gfmov');(pt=>{if(pt?.classList.contains('per'))pt.firstElementChild.textContent=M==='gfmov'?'Data':'Vencimento'})($('gtIniBox').previousElementSibling);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
   $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';
+  $('gtBC').hidden=!cli||tod||M!=='gfmov'||!ehEsc();   // importar do Bom Controle (Carol, 03/11)
   if(tod)$('gtSub').textContent=GTMODOS[M][1]+' Todas as empresas juntas: escolha o período para ver o resumo.';
   if(!cli)return gtVazio('Escolha uma empresa.');
   if(GT.key!==tipo+'|'+cli.id){gtVazio('Carregando…');
@@ -7798,6 +7805,239 @@ async function gxAcao(a){
 }
 // o avulso também abre pela Movimentação financeira
 const gxVolta=()=>VIEW==='gfmov'?(GT.key='',renderGT()):renderGX();
+// ---------- Gestão financeira › Importar do Bom Controle (Carol, 03/11) ----------
+// Lê o arquivo de movimentações exportado do Bom Controle (.xls do BC, .xlsx ou .csv) e cria os lançamentos na
+// empresa escolhida no topo, com as regras usadas no histórico da MPA Palmas:
+// - quitado = lançamento na conta (Movimentação); em aberto = conta a pagar ou a receber;
+// - a categoria do BC vem como "Categoria / Grupo": vale a categoria; a que não existe no plano de contas aparece
+//   num aviso com a sugestão, para escolher uma do plano ou cadastrar;
+// - transferência: as duas pontas do arquivo (mesma data e valor, contas diferentes) viram uma transferência só; a
+//   ponta sem par fica "a validar" (o BC não diz a outra conta); "para Ordem de Pagamento de Terceiros" é repasse às
+//   clínicas (Restituições); "Pendência" do BC fica a validar;
+// - não duplica: o que já existe na mesma conta, data, tipo e valor (ou a conta em aberto com o mesmo vencimento e
+//   valor) fica de fora, então pode importar o mesmo arquivo de novo;
+// - a conta Tesouraria fica de fora por padrão (a tesouraria vem da Rotina diária).
+const BCI={cli:null,linhas:[],contas:[],mapa:{},cats:{},pes:{},plano:[],criarPes:true};
+const bcNum=v=>{if(typeof v==='number')return v;let t=String(v??'').trim().replace(/[R$\s]/g,'');if(!t)return 0;if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');return +t||0};
+function bcData(v){
+  if(v==null||v==='')return null;
+  if(typeof v==='number'){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10)}
+  if(v instanceof Date)return isoLocal(v);
+  const t=String(v).trim();let m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t);if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=/^(\d{4})-(\d{2})-(\d{2})/.exec(t);return m?m[0]:null;
+}
+const bcSim=v=>/^(sim|s|true|1)$/i.test(String(v??'').trim());
+const bcFORMA=f=>{const k=chave(f);if(!k)return null;if(k.includes('pix'))return 'Pix';if(k.includes('boleto'))return 'Boleto';if(k.includes('dinheiro'))return 'Dinheiro';if(k.includes('cartao'))return 'Cartão';
+  if(k.includes('debito em conta')||k.includes('debito automatico'))return 'Débito automático';if(k.includes('transf')||k.includes('ted')||k.includes('doc'))return 'Transferência';return f};
+const bcNomeP=t=>String(t||'').replace(/\*+$/,'').trim();
+// descrição: o BC escreve "Pagamento DO(A) Fulano NO VALOR R$ ..." quando ninguém digitou nada; aí vale a observação
+function bcDesc(d,o){
+  d=String(d||'').trim();o=String(o||'').trim();
+  const auto=/^(recebimento|pagamento) do\(a\) .* no valor r\$/i.test(d);
+  if(auto)return o||(/^receb/i.test(d)?'Recebimento':'Pagamento');
+  if(o&&!chave(d).includes(chave(o)))return d?d+' · '+o:o;
+  return d||o||null;
+}
+async function bcLerArquivo(f){
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+  for(const nm of wb.SheetNames){
+    const a=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,defval:null,raw:true});
+    const hi=a.findIndex(r=>(r||[]).some(c=>chave(c)==='nome da conta financeira'));if(hi<0)continue;
+    const H=a[hi].map(chave),col=(...ns)=>{for(const n of ns){const i=H.indexOf(chave(n));if(i>=0)return i}return -1};
+    const C={tipo:col('Tipo'),transf:col('Transferência'),conta:col('Nome da Conta Financeira'),quit:col('Quitado'),parc:col('Quitado Parcialmente'),conc:col('Conciliado'),
+      desc:col('Observação/Descrição','Descrição'),obs:col('Observação'),venc:col('Vencimento'),real:col('Data Realizado','Data Pagamento'),valor:col('Valor (R$)','Valor'),
+      vreal:col('Valor Realizado'),cat:col('Categoria','Categoria Financeira'),pes:col('Cliente/Fornecedor','Nome do Cliente/Fornecedor'),doc:col('Documento Cliente/Fornecedor','CNPJ/CPF'),
+      forma:col('Forma de Pagamento - Quitação','Forma de Pagamento'),forma2:col('Forma de Pagamento - Parcela'),num:col('Número do Documento','Nº Documento'),nf:col('Numero da Nota Fiscal')};
+    if(C.tipo<0||C.valor<0)continue;
+    const g=(r,k)=>C[k]>=0?r[C[k]]:null,out=[];
+    a.slice(hi+1).forEach((r,i)=>{
+      if(!r||!r.some(x=>x!=null&&x!==''))return;
+      const valor=Math.abs(r2(bcNum(g(r,'valor'))));if(!(valor>0))return;
+      const [cat,grupo]=String(g(r,'cat')||'').split(' / ').map(x=>x.trim());
+      const quit=C.quit<0||bcSim(g(r,'quit')),parc=!quit&&bcSim(g(r,'parc'));
+      out.push({arq:f.name,linha:hi+i+2,tipo:/receita|entrada|credito/i.test(chave(g(r,'tipo')))?'entrada':'saida',transf:bcSim(g(r,'transf')),contaBC:String(g(r,'conta')||'').trim(),
+        quit,parc,conc:bcSim(g(r,'conc')),venc:bcData(g(r,'venc')),data:bcData(g(r,'real'))||bcData(g(r,'venc')),valor,vreal:Math.abs(r2(bcNum(g(r,'vreal'))))||valor,
+        cat:cat&&cat!=='null'?cat:'',grupo:grupo&&grupo!=='null'?grupo:'',pessoa:bcNomeP(g(r,'pes')),doc:String(g(r,'doc')||'').trim(),
+        forma:bcFORMA(g(r,'forma')||g(r,'forma2')),documento:String(g(r,'num')||g(r,'nf')||'').trim()||null,descricao:bcDesc(g(r,'desc'),g(r,'obs')),
+        txt:chave(String(g(r,'desc')||'')+' '+String(g(r,'obs')||''))});
+    });
+    return out;
+  }
+  throw new Error(`“${f.name}” não parece a planilha de movimentações do Bom Controle (falta a coluna “Nome da Conta Financeira”). No Bom Controle, exporte em Financeiro › Movimentações.`);
+}
+// categoria do plano mais parecida com a do BC: mesmo nome sem acento; senão, a que tem mais palavras em comum
+function bcSugCat(nome,tipo,plano){
+  const w=t=>new Set(pessoaChave(t).split(' ').filter(x=>x.length>2&&!['das','dos','para','com'].includes(x)));
+  const a=w(nome);let best=null,bs=0;
+  plano.forEach(p=>{const b=w(p.categoria);if(!b.size||!a.size)return;let n=0;a.forEach(x=>{if(b.has(x)||x.length>5&&[...b].some(y=>y.length>5&&y.slice(0,6)===x.slice(0,6)))n++});
+    const s=n/Math.max(a.size,b.size)+((p.tipo||'Despesa')===tipo?.01:0);if(s>bs){bs=s;best=p.categoria}});
+  if(bs>=.5)return best;
+  const s=sugerirCat('',nome);return plano.some(p=>p.categoria===s)?s:'';
+}
+const bcLS=cid=>{try{return JSON.parse(localStorage.getItem('bcCat:'+cid)||'{}')}catch(e){return {}}};
+$('gtBCArq').addEventListener('change',async e=>{
+  const fs=[...e.target.files];e.target.value='';const cli=cliAtual();if(!fs.length||!cli)return;
+  $('gtBC').classList.add('busy');
+  try{
+    let linhas=[];for(const f of fs)linhas=linhas.concat(await bcLerArquivo(f));
+    if(!linhas.length)return toast('Nenhum lançamento encontrado no arquivo.');
+    if(!PCAT.ok)await loadCats();
+    const [contas,plano,pes]=await Promise.all([gfContasDe(cli.id,true),planoDe(cli),gfPessoasDe(cli.id,'fornecedor')]);
+    Object.assign(BCI,{cli,linhas,contas,plano:plano.filter(p=>p.ativo!==false),pesLista:pes,arqs:fs.map(f=>f.name),mapa:{},cats:{},criarPes:true});
+    // contas do arquivo × contas da empresa (pelo nome no Bom Controle ou pelo nome da conta)
+    const tes=chave(cli.conta_tesouraria_bc);
+    [...new Set(linhas.map(l=>l.contaBC))].forEach(n=>{
+      const c=contas.find(x=>chave(x.conta_bc)===chave(n))||contas.find(x=>chave(x.nome)===chave(n));
+      const pula=/ordem de pagamento/.test(chave(n))||tes&&chave(n)===tes||c?.tipo==='Caixa / tesouraria'||/^tesouraria/.test(chave(n));
+      BCI.mapa[n]=pula?'':c?.id||null;   // '' = não importar; null = falta escolher
+    });
+    // categorias do arquivo que não estão no plano
+    const ls=bcLS(cli.id),pk=Object.fromEntries(BCI.plano.map(p=>[chave(p.categoria),p.categoria]));
+    linhas.forEach(l=>{if(!l.cat||chave(l.cat)==='transferencia'||/^pendencia/.test(chave(l.cat)))return;
+      if(pk[chave(l.cat)]){l.catOk=pk[chave(l.cat)];return}
+      const c=BCI.cats[l.cat]||={nome:l.cat,grupo:l.grupo,tipo:l.tipo==='entrada'?'Receita':'Despesa',n:0,total:0,escolha:null};c.n++;c.total=r2(c.total+l.valor)});
+    Object.values(BCI.cats).forEach(c=>{const ant=ls[c.nome];c.sug=bcSugCat(c.nome,c.tipo,BCI.plano);c.escolha=ant&&BCI.plano.some(p=>p.categoria===ant)?ant:c.sug;c.lembrada=!!(ant&&c.escolha===ant)});
+    await bcPrevia();
+    $('dlgBCI').showModal();
+  }catch(err){console.error(err);toast(err.message&&/Bom Controle/.test(err.message)?err.message:'Não foi possível ler o arquivo. '+(err.message||''))}
+  finally{$('gtBC').classList.remove('busy')}
+});
+// monta o que vai entrar, sem gravar nada
+async function bcMonta(){
+  const cli=BCI.cli,pk=Object.fromEntries(BCI.plano.map(p=>[chave(p.categoria),p.categoria]));
+  const L=BCI.linhas.filter(l=>BCI.mapa[l.contaBC]);
+  const ids=[...new Set(L.map(l=>BCI.mapa[l.contaBC]))],ds=L.map(l=>l.data).filter(Boolean).sort(),vs=L.map(l=>l.venc).filter(Boolean).sort();
+  const key=BCI.dbKey=ids.join(',')+'|'+ds[0]+'|'+ds.at(-1);
+  if(BCI.dbKeyOk!==key){
+    const [movs,tits]=await Promise.all([ids.length&&ds.length?todas(()=>sb.from('fin_movimentos').select('id,conta_id,data,tipo,valor,transf_id').in('conta_id',ids).gte('data',ds[0]).lte('data',ds.at(-1))):[],
+      vs.length?todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor').eq('cliente_id',cli.id).gte('vencimento',vs[0]).lte('vencimento',vs.at(-1))):[]]);
+    BCI.movs=movs;BCI.tits=tits;BCI.dbKeyOk=key;
+  }
+  const ja={},jt={};BCI.movs.forEach(m=>(ja[m.conta_id+'|'+m.data+'|'+m.tipo+'|'+Math.round(m.valor*100)]||=[]).push(m));
+  BCI.tits.forEach(t=>(jt[t.tipo+'|'+t.vencimento+'|'+Math.round(t.valor*100)]||=[]).push(t));
+  const usa=(o,k)=>{const a=o[k];return a&&a.length?a.shift():null};
+  // clientes e fornecedores: mesmo nome (regra da v58) ou mesmo CNPJ/CPF
+  const pes=BCI.pesLista,dig=t=>String(t||'').replace(/\D/g,''),novosP={};
+  const achaP=(n,d)=>pes.find(p=>d&&dig(p.documento)===d)||pes.find(p=>pessoaChave(p.nome)===pessoaChave(n)||p.fantasia&&pessoaChave(p.fantasia)===pessoaChave(n));
+  const catDe=l=>l.catOk||(BCI.cats[l.cat]?.escolha&&pk[chave(BCI.cats[l.cat].escolha)])||null;
+  const R={movs:[],tits:[],ja:0,jaT:0,pulo:BCI.linhas.length-L.length,trPar:0,trSem:0,ordem:0,pend:0,semCat:0,porConta:{}};
+  const pc=n=>R.porConta[n]||={linhas:0,novos:0,ja:0,ent:0,sai:0};
+  BCI.linhas.forEach(l=>{pc(l.contaBC).linhas++});
+  // transferências: as duas pontas do arquivo viram uma só
+  const tr=L.filter(l=>l.quit&&l.transf&&!/ordem de pagamento/.test(l.txt)),livres={};
+  tr.forEach(l=>{if(l.tipo==='entrada')(livres[l.data+'|'+Math.round(l.valor*100)]||=[]).push(l)});
+  tr.forEach(l=>{if(l.tipo!=='saida')return;const a=livres[l.data+'|'+Math.round(l.valor*100)]||[],i=a.findIndex(x=>BCI.mapa[x.contaBC]!==BCI.mapa[l.contaBC]);
+    if(i>=0){const p=a.splice(i,1)[0];l.par=p;p.par=l}});
+  const pessoaDe=(l)=>{if(!l.pessoa)return {nome:null,id:null};const p=achaP(l.pessoa,dig(l.doc));if(p)return {nome:pesNome(p),id:p.id};
+    const k=pessoaChave(l.pessoa),n=novosP[k]||={nome:l.pessoa,documento:l.doc||null,papel:null};const pp=l.tipo==='entrada'?'cliente':'fornecedor';n.papel=n.papel&&n.papel!==pp?'ambos':pp;return {nome:l.pessoa,id:null,novo:k}};
+  const feitos=new Set();
+  L.forEach(l=>{
+    if(feitos.has(l))return;feitos.add(l);
+    const conta=BCI.mapa[l.contaBC],c=pc(l.contaBC);
+    if(!l.quit&&!l.parc&&l.transf)return;   // transferência em aberto não entra
+    if(l.quit&&!l.data||!l.quit&&!(l.venc||l.data))return;   // linha sem data
+    let cat=catDe(l),validar=null,pessoa=pessoaDe(l),tipo=l.tipo;
+    if(/^pendencia/.test(chave(l.cat))){validar='Pendência marcada no Bom Controle';R.pend++}
+    if(l.transf&&/ordem de pagamento/.test(l.txt)){   // repasse às clínicas (regra da MPA Palmas)
+      cat=pk[chave('Restituições')]||'Restituições';pessoa=pessoa.nome?pessoa:{nome:'Clínicas (ordem de pagamento)',id:null};R.ordem++}
+    else if(l.transf){cat=null}
+    if(!cat&&!l.transf)R.semCat++;
+    const base={cliente_id:cli.id,conta_id:conta,categoria:cat,pessoa_nome:pessoa.nome,descricao:l.descricao,forma:l.forma,documento:l.documento};
+    if(l.quit){
+      const mk=m=>conta+'|'+m.data+'|'+m.tipo+'|'+Math.round(m.valor*100);
+      if(l.transf&&!/ordem de pagamento/.test(l.txt)){
+        const legs=[l,l.par].filter(Boolean);legs.forEach(x=>feitos.add(x));
+        const ex=legs.map(x=>usa(ja,BCI.mapa[x.contaBC]+'|'+x.data+'|'+x.tipo+'|'+Math.round(x.valor*100)));
+        const tid=ex.find(x=>x?.transf_id)?.transf_id||crypto.randomUUID();
+        legs.forEach((x,i)=>{const cx=pc(x.contaBC);if(ex[i]){cx.ja++;R.ja++;return}
+          R.movs.push({...base,conta_id:BCI.mapa[x.contaBC],tipo:x.tipo,data:x.data,valor:x.valor,descricao:x.descricao||'Transferência',pessoa_nome:null,categoria:null,forma:x.forma,documento:x.documento,
+            transf_id:tid,conciliado:x.conc,validar:legs.length<2&&!ex.some(Boolean)?'Transferência: o Bom Controle não diz a outra conta':null,_l:x});
+          cx.novos++;cx[x.tipo==='entrada'?'ent':'sai']=r2(cx[x.tipo==='entrada'?'ent':'sai']+x.valor)});
+        if(legs.length>1)R.trPar++;else R.trSem++;return;
+      }
+      if(usa(ja,mk({data:l.data,tipo,valor:l.vreal}))){c.ja++;R.ja++;return}
+      R.movs.push({...base,tipo,data:l.data,valor:l.vreal,conciliado:l.conc,validar,_l:l,_p:pessoa.novo});
+      c.novos++;c[tipo==='entrada'?'ent':'sai']=r2(c[tipo==='entrada'?'ent':'sai']+l.vreal);return;
+    }
+    // em aberto (ou pago em parte): conta a pagar ou a receber
+    const tp=tipo==='entrada'?'receber':'pagar';
+    if(usa(jt,tp+'|'+(l.venc||l.data)+'|'+Math.round(l.valor*100))){c.ja++;R.jaT++;return}
+    const id=crypto.randomUUID();
+    R.tits.push({id,cliente_id:cli.id,tipo:tp,pessoa_id:pessoa.id,pessoa_nome:pessoa.nome,descricao:l.descricao,categoria:cat,vencimento:l.venc||l.data,valor:l.valor,forma:l.forma,conta_id:conta,documento:l.documento,_p:pessoa.novo});
+    if(l.parc&&l.vreal<l.valor)R.movs.push({...base,tipo,data:l.data,valor:l.vreal,titulo_id:id,conciliado:l.conc,_l:l,_p:pessoa.novo});
+    c.novos++;
+  });
+  R.novosP=novosP;return R;
+}
+async function bcPrevia(){
+  const cli=BCI.cli,R=await bcMonta();BCI.R=R;
+  const falta=Object.keys(BCI.mapa).filter(n=>BCI.mapa[n]===null);
+  const cOpts=sel=>`<option value="">Não importar</option>${BCI.contas.filter(c=>c.ativo!==false).map(c=>`<option value="${c.id}"${c.id===sel?' selected':''}>${esc(c.nome)}${c.conta_bc?' · BC: '+esc(c.conta_bc):''}</option>`).join('')}`;
+  const pOpts=(sel,tipo)=>`<option value="">Deixar sem categoria</option>`+['Receita','Despesa'].map(tp=>{const l=BCI.plano.filter(p=>(p.tipo||'Despesa')===tp);return l.length?`<optgroup label="${tp==='Receita'?'Receitas':'Despesas'}">${l.map(p=>`<option${p.categoria===sel?' selected':''}>${esc(p.categoria)}</option>`).join('')}</optgroup>`:''}).join('')+catNovaOpt;
+  const cats=Object.values(BCI.cats).sort((a,b)=>b.n-a.n),nP=Object.keys(R.novosP).length;
+  const totE=R.movs.filter(m=>m.tipo==='entrada'&&!m.transf_id).reduce((s,m)=>s+m.valor,0),totS=R.movs.filter(m=>m.tipo==='saida'&&!m.transf_id).reduce((s,m)=>s+m.valor,0);
+  $('bciTitle').textContent='Importar do Bom Controle · '+cli.nome;
+  $('bciBody').innerHTML=`<p class="note" style="margin:0">${esc(BCI.arqs.join(', '))}: ${BCI.linhas.length} linhas. Os lançamentos entram em <b>${esc(cli.nome)}</b> (a empresa escolhida no topo). O que já existe na mesma conta, com a mesma data, tipo e valor, fica de fora: pode importar o mesmo arquivo de novo sem duplicar.</p>
+    ${falta.length?`<div class="alerta"><div><b>⚠ Escolha a conta de ${falta.length===1?'1 conta do arquivo':falta.length+' contas do arquivo'}</b><br><span class="note">Não achei uma conta de ${esc(cli.nome)} com este nome no Bom Controle. Escolha a conta (o nome fica guardado nela) ou “Não importar”.</span></div></div>`:''}
+    <h3 style="margin:4px 0 0">Contas</h3>
+    <div class="tablebox" style="margin:0"><table class="cfg"><thead><tr><th class="l">Conta no Bom Controle</th><th class="l">Conta no portal</th><th>Linhas</th><th>Novos</th><th>Já existem</th><th>Entradas novas</th><th>Saídas novas</th></tr></thead><tbody>${
+      Object.keys(BCI.mapa).map(n=>{const p=R.porConta[n]||{},v=BCI.mapa[n];return `<tr><td class="l">${esc(n)}${v===''&&(/tesouraria/.test(chave(n)))?`<br><span class="note">A tesouraria vem da Rotina diária › Tesouraria</span>`:''}</td><td class="l"><select data-bcconta="${esc(n)}"${v===null?' style="border-color:var(--bad)"':''}>${v===null?'<option value="?" selected>Escolha…</option>':''}${cOpts(v)}</select></td><td>${p.linhas||0}</td><td>${v?p.novos||0:'—'}</td><td>${v?p.ja||0:'—'}</td><td class="pos">${v&&p.ent?fm(p.ent):''}</td><td class="neg">${v&&p.sai?fm(p.sai):''}</td></tr>`}).join('')}</tbody></table></div>
+    ${cats.length?`<div class="alerta" style="display:block"><b>⚠ ${cats.length===1?'1 categoria do Bom Controle não existe':cats.length+' categorias do Bom Controle não existem'} no plano de contas${cli.plano_proprio?' de '+esc(cli.nome):''}</b><br><span class="note">Confira a sugestão, escolha outra do plano ou cadastre a categoria (“+ Cadastrar nova categoria…” no fim da lista ou o botão ao lado). A escolha fica guardada para as próximas importações desta empresa.</span>
+      <div class="tablebox" style="margin:8px 0 0;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th class="l">No Bom Controle</th><th>Lançamentos</th><th>Valor</th><th class="l">Usar no portal</th><th></th></tr></thead><tbody>${
+        cats.map((c,i)=>`<tr><td class="l"><b>${esc(c.nome)}</b>${c.grupo?`<br><span class="note">${esc(c.grupo)} · ${c.tipo}</span>`:''}</td><td>${c.n}</td><td>${fm(c.total)}</td><td class="l"><select data-bccat="${i}" data-catnova="${c.tipo}">${pOpts(c.escolha,c.tipo)}</select>${c.escolha&&c.escolha===c.sug&&!c.lembrada?' <span class="chip c-warn">sugestão</span>':c.lembrada?' <span class="chip c-none">da última importação</span>':''}</td><td><button type="button" class="btn small" data-bcnova="${i}" title="Cadastrar “${esc(c.nome)}” no plano de contas">+ Cadastrar</button></td></tr>`).join('')}</tbody></table></div></div>`:''}
+    ${nP?`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bciPes" style="width:auto"${BCI.criarPes?' checked':''}> Cadastrar ${nP===1?'o cliente ou fornecedor novo':`os ${nP} clientes e fornecedores novos`} (${esc(Object.values(R.novosP).slice(0,4).map(p=>p.nome).join(', '))}${nP>4?'…':''})</label>`:''}
+    <ul class="note" style="margin:0;padding-left:18px">
+      <li><b>${R.movs.length}</b> ${R.movs.length===1?'lançamento novo':'lançamentos novos'} na Movimentação (entradas ${fm(totE)}, saídas ${fm(totS)}, fora as transferências)${R.ja?` · ${R.ja} já ${R.ja===1?'existia':'existiam'} e ${R.ja===1?'fica':'ficam'} de fora`:''}.</li>
+      ${R.tits.length||R.jaT?`<li><b>${R.tits.length}</b> ${R.tits.length===1?'conta em aberto vai':'contas em aberto vão'} para as contas a pagar e a receber${R.jaT?` · ${R.jaT} já ${R.jaT===1?'existia':'existiam'}`:''}.</li>`:''}
+      ${R.trPar||R.trSem?`<li>Transferências: ${R.trPar} com as duas contas no arquivo${R.trSem?`; <b>${R.trSem}</b> só com uma ponta (o Bom Controle não diz a outra conta) ${R.trSem===1?'fica':'ficam'} “a validar”. Para ligar as duas pontas, importe junto o arquivo da outra conta.`:'.'}</li>`:''}
+      ${R.ordem?`<li>${R.ordem} ${R.ordem===1?'transferência':'transferências'} para Ordem de Pagamento de Terceiros ${R.ordem===1?'entra':'entram'} como repasse às clínicas (Restituições).</li>`:''}
+      ${R.pend?`<li>${R.pend} ${R.pend===1?'lançamento marcado':'lançamentos marcados'} como Pendência no Bom Controle ${R.pend===1?'fica':'ficam'} “a validar”.</li>`:''}
+      ${R.semCat?`<li>${R.semCat} ${R.semCat===1?'lançamento fica':'lançamentos ficam'} sem categoria.</li>`:''}
+      ${R.pulo?`<li>${R.pulo} ${R.pulo===1?'linha de conta':'linhas de contas'} marcada${R.pulo===1?'':'s'} “Não importar”.</li>`:''}
+    </ul>`;
+  const n=R.movs.length+R.tits.length;
+  $('bciOk').disabled=!!falta.length||!n;$('bciOk').textContent=n?`Importar ${n} ${n===1?'lançamento':'lançamentos'}`:'Nada novo para importar';
+  $('bciInfo').textContent=falta.length?'Escolha a conta de cada linha da tabela de contas.':'';
+}
+$('bciFechar').onclick=()=>$('dlgBCI').close();
+$('bciBody').addEventListener('change',async e=>{
+  const s=e.target;
+  if(s.dataset.bcconta!=null){BCI.mapa[s.dataset.bcconta]=s.value==='?'?null:s.value;return bcPrevia()}
+  if(s.dataset.bccat!=null){if(s.value===CATNOVA)return;const c=Object.values(BCI.cats).sort((a,b)=>b.n-a.n)[+s.dataset.bccat];
+    if(s.value&&!BCI.plano.some(p=>p.categoria===s.value)){delete PLANOS[BCI.cli.id];BCI.plano=(await planoDe(BCI.cli)).filter(p=>p.ativo!==false)}
+    c.escolha=s.value||null;c.lembrada=false;return bcPrevia()}
+  if(s.id==='bciPes')BCI.criarPes=s.checked;
+});
+$('bciBody').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-bcnova]');if(!b)return;
+  const c=Object.values(BCI.cats).sort((a,b)=>b.n-a.n)[+b.dataset.bcnova],nova=await catNova(BCI.cli,c.tipo,c.nome);if(!nova)return;
+  delete PLANOS[BCI.cli.id];if(!BCI.cli.plano_proprio)await loadCats();BCI.plano=(await planoDe(BCI.cli)).filter(p=>p.ativo!==false);
+  c.escolha=nova;c.lembrada=false;bcPrevia();
+});
+$('bciOk').onclick=async()=>{
+  const cli=BCI.cli,b=$('bciOk');b.disabled=true;b.textContent='Importando…';
+  try{
+    const R=await bcMonta();
+    // guarda a escolha das categorias e o nome do BC nas contas escolhidas à mão
+    try{const ls=bcLS(cli.id);Object.values(BCI.cats).forEach(c=>{if(c.escolha)ls[c.nome]=c.escolha});localStorage.setItem('bcCat:'+cli.id,JSON.stringify(ls))}catch(e){}
+    for(const [n,id] of Object.entries(BCI.mapa)){const c=id&&BCI.contas.find(x=>x.id===id);if(c&&!c.conta_bc){const {error}=await sb.from('fin_contas').update({conta_bc:n}).eq('id',id);if(!error)c.conta_bc=n}}
+    // clientes e fornecedores novos
+    const pid={};
+    if(BCI.criarPes&&Object.keys(R.novosP).length){
+      for(const [k,p] of Object.entries(R.novosP)){
+        const {data,error}=await sb.from('fin_pessoas').insert({cliente_id:cli.id,nome:p.nome,documento:p.documento,papel:p.papel}).select('id,nome').single();
+        if(!error)pid[k]=data.id;else console.warn('cadastro não criado (já existe com outro jeito de escrever?)',p.nome,error.message);
+      }
+      GFP.key='';GFPT.cid=null;
+    }
+    const tits=R.tits.map(({_p,...t})=>({...t,pessoa_id:t.pessoa_id||(_p&&pid[_p])||null}));
+    for(let i=0;i<tits.length;i+=500){const {error}=await sb.from('fin_titulos').insert(tits.slice(i,i+500));if(error)throw error}
+    const movs=R.movs.map(({_l,_p,...m})=>m);
+    for(let i=0;i<movs.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(movs.slice(i,i+500));if(error)throw error}
+    toast(`Importado: ${movs.length} ${movs.length===1?'lançamento':'lançamentos'}${tits.length?` e ${tits.length} ${tits.length===1?'conta em aberto':'contas em aberto'}`:''}`);
+    $('dlgBCI').close();BCI.dbKeyOk='';GT.key='';renderGT();
+  }catch(err){console.error(err);toast((v45(err)?v45Msg:'Não foi possível importar: '+(err.message||'verifique a internet'))+(err.message&&/validar|conciliado/.test(err.message)?' (rode a atualização v66 do banco)':''));bcPrevia()}
+};
 // ---------- Gestão financeira › Conciliação bancária pelo OFX (v47) ----------
 // Cada linha do extrato do banco (fin_ofx) é ligada a um lançamento do sistema (fin_movimentos.ofx_id).
 // Sugestões, nesta ordem: lançamento já feito com o mesmo valor (até 3 dias), conta a pagar/receber em aberto
@@ -8546,6 +8786,8 @@ $('avFiltro').onchange=renderAvisos;
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-03d',data:'2026-11-03',t:'Importar do Bom Controle',itens:[
+    {x:'Gestão financeira › Movimentação financeira: botão “Importar do Bom Controle”. Envie o arquivo de movimentações exportado do BC (pode ser mais de um, um por conta) e os lançamentos entram na empresa escolhida no topo. O que já existe (mesma conta, data, tipo e valor) fica de fora, então pode importar o mesmo arquivo de novo. Categoria do BC que não existe no plano aparece num aviso com a sugestão, para escolher outra ou cadastrar. Transferências com as duas contas no arquivo viram uma só; “Ordem de Pagamento de Terceiros” entra como Restituições; contas em aberto vão para as contas a pagar e a receber. A conta Tesouraria fica de fora por padrão.',para:'esc'}]},
   {k:'2026-11-03r',data:'2026-11-03',t:'Repasse de parceiros: separar, pagar e avisos',itens:[
     {x:'Repasse de parceiros: os botões “Pagar em …” do alto já criam a conta a pagar na empresa escolhida, e a coluna “Pagar em” passa a só mostrar a empresa. Trocar a empresa de um repasse ainda não pago leva a conta a pagar para a empresa nova.',para:'esc'},
     {x:'Repasse de parceiros: novo filtro Situação (Falta pagar, Em aberto, Atrasados, Pagos, Conciliados) e quadro “Falta pagar”, que filtra ao clicar.',para:'esc'},
