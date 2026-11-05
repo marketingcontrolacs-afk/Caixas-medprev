@@ -716,7 +716,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     </div>
     <div class="cal" id="gtCal" hidden></div>
     <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
-    <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
     <p class="note" id="gtNote"></p>
   </section>
@@ -774,6 +774,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <label class="f">Conta<select id="gxConta"></select></label>
       <label class="f">De<input type="date" id="gxIni"></label>
       <label class="f">Até<input type="date" id="gxFim"></label>
+      <label class="f">Mostrar<select id="gxVer" title="Só conciliados = como o extrato do banco (igual ao relatório de extrato do Bom Controle)"><option value="">Todos os lançamentos</option><option value="conc">Só conciliados (como o extrato do banco)</option><option value="nconc">Só não conciliados</option></select></label>
     </div>
     <div id="gxBanco">
     <div class="tiles" id="gxTiles"></div>
@@ -6839,6 +6840,22 @@ function gtTabela(rows,vazio){
     :rows.length?`<tr><td></td><td></td><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td colspan="4" class="l">A receber ${fm(sv(t=>t.tipo==='receber'?gtFalta(t):0))} · a pagar ${fm(sv(t=>t.tipo==='pagar'?gtFalta(t):0))} em aberto</td></tr>`:'';
   gtBulk();
 }
+// ---------- Conciliar sem reenviar o extrato (Carol, 05/11) ----------
+// Liga o pagamento à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias, ainda não ligada e não ignorada).
+// Sem linha no extrato, pergunta se marca como conciliado mesmo assim (como o "Criar conciliado" do Bom Controle).
+async function concLigar(ms,perguntar=true){
+  ms=ms.filter(m=>!movConc(m));if(!ms.length)return {lig:0,man:0};
+  const usados=new Set(),sem=[];let lig=0,man=0;
+  for(const m of ms){const v=(m.tipo==='entrada'?1:-1)*(+m.valor);
+    let ls=[];try{const {data,error}=await sb.from('fin_ofx').select('id,data,valor,ignorado').eq('conta_id',m.conta_id).gte('data',addDias(m.data,-7)).lte('data',addDias(m.data,7)).gte('valor',r2(v-0.005)).lte('valor',r2(v+0.005));if(error)throw error;ls=(data||[]).filter(l=>!l.ignorado&&!usados.has(l.id))}catch(e){console.error(e)}
+    if(ls.length){const {data:lk}=await sb.from('fin_movimentos').select('ofx_id').in('ofx_id',ls.map(l=>l.id));const ja=new Set((lk||[]).map(x=>x.ofx_id));ls=ls.filter(l=>!ja.has(l.id))}
+    const dd=l=>Math.abs(new Date(l.data)-new Date(m.data)),l=ls.sort((a,b)=>dd(a)-dd(b))[0];
+    if(l){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',m.id);if(error)throw error;usados.add(l.id);lig++}else sem.push(m)}
+  if(sem.length&&(!perguntar||confirm(`${sem.length===1?'Não achei a linha':'Não achei as linhas'} do extrato importado para ${sem.length} ${sem.length===1?'lançamento':'lançamentos'} (mesma conta, mesmo valor, até 7 dias).\n\nMarcar como conciliado mesmo assim? (OK = marcar, Cancelar = deixar sem conciliar)`))){
+    const ids=sem.map(m=>m.id);for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({conciliado:true}).in('id',ids.slice(i,i+200));if(error)throw error}man=sem.length}
+  return {lig,man};
+}
+const concTxt=r=>r.lig||r.man?[r.lig?`${r.lig} ${r.lig===1?'ligado':'ligados'} ao extrato do banco`:'',r.man?`${r.man} ${r.man===1?'marcado':'marcados'} como conciliado sem linha do extrato`:''].filter(Boolean).join(' e '):'Nada foi conciliado';
 // ---------- Contas a pagar e a receber: ações em massa (Quitar, Estornar, Desconciliar, Excluir; Carol, 05/11) ----------
 const gtSelRows=()=>(GT.tabRows||[]).filter(t=>GT.sel.has(t.id));
 function gtBulk(){
@@ -6846,7 +6863,7 @@ function gtBulk(){
   const ls=gtSelRows(),ab=ls.filter(t=>gtFalta(t)>0.004).length,pg=ls.filter(t=>(GT.movs[t.id]||[]).length).length,cc=ls.filter(t=>(GT.movs[t.id]||[]).some(movConc)).length;
   $('gtBulkTxt').innerHTML=`<b>${n} ${n===1?'conta selecionada':'contas selecionadas'}</b> · valor <b>${fm(r2(ls.reduce((a,t)=>a+(+t.valor),0)))}</b> · ${ab} em aberto · ${pg} ${pg===1?'paga ou recebida':'pagas ou recebidas'}${cc?` · ${cc} ${cc===1?'conciliada':'conciliadas'}`:''}`;
   const bt=k=>$('gtBulk').querySelector(`[data-gb="${k}"]`);
-  bt('quitar').disabled=!ab;bt('estornar').disabled=!pg;bt('desconc').disabled=!cc;bt('excluir').disabled=!ls.some(t=>!(GT.movs[t.id]||[]).length);
+  bt('quitar').disabled=!ab;bt('estornar').disabled=!pg;bt('desconc').disabled=!cc;bt('conc').disabled=!ls.some(t=>(GT.movs[t.id]||[]).some(m=>!movConc(m)));bt('excluir').disabled=!ls.some(t=>!(GT.movs[t.id]||[]).length);
 }
 $('gtBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-gb]');if(!b||b.disabled)return;const a=b.dataset.gb;
   if(a==='limpa'){GT.sel.clear();return gtDesenha()}
@@ -6862,6 +6879,9 @@ async function gtLote(a){
     for(let i=0;i<tr.length;i+=200){const {error}=await sb.from('fin_movimentos').delete().in('transf_id',tr.slice(i,i+200));if(error)throw error}
     const org=com.filter(t=>t.origem_id).map(t=>t.origem_id);if(org.length){const {error}=await sb.from('contas_pagar').update({conferido:false,pago_em:null}).in('id',org);if(error)console.error(error)}
     toast(com.length===1?'Conta estornada':com.length+' contas estornadas')}
+  else if(a==='conc'){const ms=ls.flatMap(movsDe).filter(m=>!movConc(m));if(!ms.length)return;
+    if(!confirm(`Conciliar ${ms.length} ${ms.length===1?'pagamento ou recebimento':'pagamentos ou recebimentos'}?\n\nCada um é ligado à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias). Os que não tiverem linha no extrato: o portal pergunta antes de marcar.`))return;
+    toast(concTxt(await concLigar(ms)))}
   else if(a==='desconc'){const ms=ls.flatMap(movsDe).filter(movConc);if(!ms.length)return;
     if(!confirm(`Desconciliar ${ms.length} ${ms.length===1?'pagamento ou recebimento':'pagamentos ou recebimentos'}?\n\nO lançamento continua pago; só a ligação com o extrato do banco é desfeita (a linha volta a ficar pendente na Conciliação bancária).`))return;
     const ids=ms.map(m=>m.id);for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({ofx_id:null,conciliado:false}).in('id',ids.slice(i,i+200));if(error)throw error}
@@ -7265,7 +7285,7 @@ async function abrirGT(t,tipo,pre){
   if(irmasP.length>1)h+=`<details><summary style="cursor:pointer"><b>Parcelas deste lançamento (${irmasP.length})</b></summary><div class="tablebox" style="margin:6px 0 0;max-height:260px"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th><th class="l">Situação</th></tr></thead><tbody>${irmasP.map(x=>{const s=gtSit(x);return `<tr${x.id===t.id?' style="font-weight:700"':''}><td>${x.parcela}/${x.parcelas}</td><td>${dBR(x.vencimento)}</td><td>${fm(x.valor)}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span></td></tr>`}).join('')}</tbody></table></div></details>`;
   h+=faHTML(t?irmasP.length>1:true);
   if(t){
-    h+=`<h3 style="margin:8px 0 0">${P?'Pagamentos':'Recebimentos'}</h3>`+(movs.length?`<div class="tablebox" style="margin:0"><table><thead><tr><th>Data</th><th class="l">Conta</th><th>Valor</th><th>Juros/multa</th><th>Desconto</th><th></th></tr></thead><tbody>${movs.map(m=>`<tr><td>${dBR(m.data)}</td><td class="l">${esc(contaNome(m.conta_id))}</td><td>${fm(m.valor)}</td><td>${+m.juros?fm(m.juros):mu('—')}</td><td>${+m.desconto?fm(m.desconto):mu('—')}</td><td>${movConc(m)?'<span class="chip c-ok" title="Conciliado com o extrato do banco">✓ Conciliado</span> ':''}<button type="button" class="btn small ghost" data-act="desfaz" data-id="${m.id}" title="Estorna ${P?'o pagamento':'o recebimento'}: a conta volta a ficar em aberto${movConc(m)?' e a conciliação é desfeita':''}">Estornar</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">Nenhum ${P?'pagamento':'recebimento'} registrado.</p>`);
+    h+=`<h3 style="margin:8px 0 0">${P?'Pagamentos':'Recebimentos'}</h3>`+(movs.length?`<div class="tablebox" style="margin:0"><table><thead><tr><th>Data</th><th class="l">Conta</th><th>Valor</th><th>Juros/multa</th><th>Desconto</th><th></th></tr></thead><tbody>${movs.map(m=>`<tr><td>${dBR(m.data)}</td><td class="l">${esc(contaNome(m.conta_id))}</td><td>${fm(m.valor)}</td><td>${+m.juros?fm(m.juros):mu('—')}</td><td>${+m.desconto?fm(m.desconto):mu('—')}</td><td>${movConc(m)?`<span class="chip c-ok" title="Conciliado com o extrato do banco">✓ Conciliado</span> <button type="button" class="btn small ghost" data-act="desconc" data-id="${m.id}" title="Tira a ligação com o extrato do banco; continua ${P?'pago':'recebido'}">Desconciliar</button> `:`<button type="button" class="btn small" data-act="conc" data-id="${m.id}" title="Liga à linha do extrato já importado (mesma conta e valor, até 7 dias)">🔗 Conciliar</button> `}<button type="button" class="btn small ghost" data-act="desfaz" data-id="${m.id}" title="Estorna ${P?'o pagamento':'o recebimento'}: a conta volta a ficar em aberto${movConc(m)?' e a conciliação é desfeita':''}">Estornar</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">Nenhum ${P?'pagamento':'recebimento'} registrado.</p>`);
     if(falta>0.004)h+=`<div class="fields" style="background:var(--sunk);padding:12px;border-radius:10px">
       <label class="f">Data *<input type="date" id="gb_data" value="${TODAY}"></label>
       <label class="f">Conta *<select id="gb_conta">${opt(ativas,t.conta_id||(ativas.length===1?ativas[0][0]:''))}</select></label>
@@ -7279,7 +7299,7 @@ async function abrirGT(t,tipo,pre){
   $('gtdBody').innerHTML=h;
   if(trava){$('gtdBody').querySelectorAll('[id^="gt_"]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true});
     $('gtdBody').querySelectorAll('[data-pesnova],[data-pesnova-btn],[data-catnova]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true})}
-  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':proxN?`<button type="button" class="btn${falta>0.004?'':' primary'}" data-act="salvar" title="A correção vale só para esta parcela">Salvar só esta</button><button type="button" class="btn" data-act="salvar" data-prox="1" title="A mesma correção vale também para as próximas parcelas em aberto">Salvar esta e as próximas (${proxN})</button>`:`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
+  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" data-conc="1" title="Lança a conta já ${P?'paga':'recebida'} e conciliada com a linha do extrato já importado">🔗 Salvar quitado e conciliado</button><button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':proxN?`<button type="button" class="btn${falta>0.004?'':' primary'}" data-act="salvar" title="A correção vale só para esta parcela">Salvar só esta</button><button type="button" class="btn" data-act="salvar" data-prox="1" title="A mesma correção vale também para as próximas parcelas em aberto">Salvar esta e as próximas (${proxN})</button>`:`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
   // colar a linha digitável preenche o vencimento e o valor que estiverem vazios
   $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
     if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
@@ -7364,9 +7384,10 @@ async function gtAcao(a,b){
       if(!error)await faLiga((novos||[]).sort((a,b)=>a.parcela-b.parcela).map(x=>x.id));
       // já pago ou recebido: a baixa entra junto, igual ao "Registrar pagamento"
       if(!error&&jaPago){const qu=(novos||[]).filter(x=>jTodas||x.parcela===1);
-        const {error:e4}=await sb.from('fin_movimentos').insert(qu.map(x=>({cliente_id:cli.id,conta_id:jConta,data:jData,tipo:GT.dlg==='pagar'?'saida':'entrada',valor:r2(x.valor),juros:0,desconto:0,titulo_id:x.id,
-          descricao:row.descricao||(GT.dlg==='pagar'?'Pagamento':'Recebimento')+(x.parcelas>1?` ${x.parcela}/${x.parcelas}`:''),pessoa_nome:row.pessoa_nome,documento:row.documento,categoria:row.categoria,forma:row.forma||null})));
+        const {data:mvs,error:e4}=await sb.from('fin_movimentos').insert(qu.map(x=>({cliente_id:cli.id,conta_id:jConta,data:jData,tipo:GT.dlg==='pagar'?'saida':'entrada',valor:r2(x.valor),juros:0,desconto:0,titulo_id:x.id,
+          descricao:row.descricao||(GT.dlg==='pagar'?'Pagamento':'Recebimento')+(x.parcelas>1?` ${x.parcela}/${x.parcelas}`:''),pessoa_nome:row.pessoa_nome,documento:row.documento,categoria:row.categoria,forma:row.forma||null}))).select('*');
         if(e4){console.error(e4);jaErr=true}
+        else if(b?.dataset.conc==='1'){try{GT.concR=await concLigar(mvs||[])}catch(e){console.error(e);GT.concR={lig:0,man:0}}}
         else if(gb){const c=GFC.lista.find(x=>x.id===jConta);
           const {error:e5}=await sb.from('contas_pagar').update({conferido:true,pago_em:jData,banco:c?.conta_bc||c?.nome||null}).eq('id',gb.bol.id);if(e5)console.error(e5)}}
       // lançamento feito a partir do documento do cliente: os anexos dele vão para o lançamento e o envio dele fica completo
@@ -7380,7 +7401,7 @@ async function gtAcao(a,b){
     const qual=GT.dlg==='pagar'?'pagamento':'recebimento';
     if(jaErr)alert(`A conta foi lançada, mas o ${qual} não foi registrado. Abra a conta e use “Registrar ${qual}”.`);
     if(t&&GT.proxOk){toast(`Correção salva nesta e nas próximas ${GT.proxOk} parcelas`);GT.proxOk=0;dlgGT.close();GT.key='';return renderGT()}
-    toast(t?'Correção salva':jaPago&&!jaErr?(GT.dlg==='pagar'?'Conta lançada e paga':'Conta lançada e recebida'):'Conta lançada');dlgGT.close();GT.key='';renderGT();
+    toast(t?'Correção salva':jaPago&&!jaErr?(GT.dlg==='pagar'?'Conta lançada e paga':'Conta lançada e recebida')+(GT.concR?' · '+concTxt(GT.concR):''):'Conta lançada');GT.concR=null;dlgGT.close();GT.key='';renderGT();
   }else if(a==='baixa'){
     const data=$('gb_data').value,conta=$('gb_conta').value,valor=parseMoney($('gb_valor').value),juros=parseMoney($('gb_juros').value)||0,desconto=parseMoney($('gb_desconto').value)||0;
     if(!data)return gtErr('Informe a data.');if(!conta)return gtErr('Escolha a conta. Se não houver, cadastre em Gestão financeira › Contas bancárias.');
@@ -7395,6 +7416,12 @@ async function gtAcao(a,b){
     if(t.origem_id&&ab>=falta-0.004){const c=GFC.lista.find(x=>x.id===conta);
       const {error:e2}=await sb.from('contas_pagar').update({conferido:true,pago_em:data,banco:c?.conta_bc||c?.nome||null}).eq('id',t.origem_id);if(e2)console.error(e2)}
     toast(P?'Pagamento registrado':'Recebimento registrado');dlgGT.close();GT.key='';renderGT();
+  }else if(a==='conc'||a==='desconc'){
+    const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);if(!mv)return;
+    if(a==='desconc'){if(!confirm('Desconciliar este '+(P?'pagamento':'recebimento')+'? Continua '+(P?'pago':'recebido')+'; só a ligação com o extrato do banco é desfeita.'))return;
+      const {error}=await sb.from('fin_movimentos').update({ofx_id:null,conciliado:false}).eq('id',mv.id);if(error)return fail(error,'Não foi possível desconciliar');toast('Desconciliado')}
+    else{let r;try{r=await concLigar([mv])}catch(e){return fail(e,'Não foi possível conciliar')}toast(concTxt(r))}
+    dlgGT.close();GT.key='';renderGT();
   }else if(a==='desfaz'){
     const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);
     if(!confirm('Confirmar o estorno '+(P?'do pagamento':'do recebimento')+'?\n\nO saldo da conta muda e o lançamento volta a ficar em aberto. Ele sai também do extrato da conta.'+(mv&&movConc(mv)?'\nA conciliação com o extrato do banco também será desfeita (a linha volta a ficar pendente na Conciliação bancária).':'')))return;   // pagamento de fatura: sai também a entrada no cartão
@@ -8839,16 +8866,23 @@ async function renderGX(){
   if(vis.some(c=>c.id===cur))sel.value=cur;
   const c=vis.find(x=>x.id===sel.value);
   // conta Tesouraria: mostra a revisão dos lançamentos do cliente (o que era Gestão financeira › Tesouraria)
-  const tes=!!c&&!!c.espelho_tes;$('gxBanco').hidden=tes;$('gxTes').hidden=!tes;
+  const tes=!!c&&!!c.espelho_tes;$('gxBanco').hidden=tes;$('gxTes').hidden=!tes;$('gxVer').closest('label').hidden=tes;
   if(tes){$('gxBaixar').hidden=true;const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini){$('gxBanco').hidden=false;$('gxTes').hidden=true;return gxVazio('Escolha o período.')}return renderGTes()}
   if(!c)return gxVazio('Nenhuma conta bancária cadastrada nesta empresa. Cadastre em Gestão financeira › Contas bancárias.');
   const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini)return gxVazio('Escolha o período.');
   let movs;try{movs=await todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',c.saldo_data||'1900-01-01').lte('data',fim).order('data').order('criado_em'))}
   catch(e){console.error(e);return gxVazio(v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   const sg=m=>(m.tipo==='entrada'?1:-1)*m.valor;
-  GX.conta=c;GX.ini=ini;GX.fim=fim;GX.ant=r2(+c.saldo_inicial+movs.filter(m=>m.data<ini).reduce((x,m)=>x+sg(m),0));GX.per=movs.filter(m=>m.data>=ini);
-  $('gxAvulso').hidden=false;gxDesenha();
+  GX.conta=c;GX.ini=ini;GX.fim=fim;GX.all=movs;GX.sIni=+c.saldo_inicial||0;
+  $('gxAvulso').hidden=false;gxAplica();
 }
+// todos, só conciliados (como o extrato do banco) ou só não conciliados: o saldo segue a mesma escolha (Carol, 05/11)
+function gxAplica(){
+  const v=$('gxVer').value,ok=m=>v==='conc'?movConc(m):v==='nconc'?!movConc(m):true,sg=m=>(m.tipo==='entrada'?1:-1)*m.valor,ms=(GX.all||[]).filter(ok);
+  GX.ver=v;GX.ant=r2((v==='nconc'?0:GX.sIni)+ms.filter(m=>m.data<GX.ini).reduce((x,m)=>x+sg(m),0));GX.per=ms.filter(m=>m.data>=GX.ini);
+  GX.nconc=(GX.all||[]).filter(m=>m.data>=GX.ini&&!movConc(m));gxDesenha();
+}
+$('gxVer').onchange=()=>{if(GX.conta&&!$('gxBanco').hidden)gxAplica()};
 function gxLinhas(){ // [{m}|{dia,ent,sai,saldo}] na ordem do extrato
   const out=[];let saldo=GX.ant,dia=null,ent=0,sai=0;
   const fecha=()=>{if(dia)out.push({dia,ent:r2(ent),sai:r2(sai),saldo:r2(saldo)})};
@@ -8862,20 +8896,24 @@ function gxDesenha(){
   const antes=isoLocal(new Date(dObj(GX.ini).getTime()-864e5));
   $('gxHead').innerHTML='<tr><th>Data</th><th class="l">Fornecedor ou cliente</th><th class="l">Categoria</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr>';
   $('gxBody').innerHTML=`<tr><td>${dBR(antes)}</td><td class="l muted" colspan="6">Saldo anterior</td><td class="${GX.ant<0?'neg':''}"><b>${fm(GX.ant)}</b></td></tr>`
-    +L.map(x=>x.m?`<tr${x.m.titulo_id?'':` class="click" data-id="${x.m.id}" tabindex="0"`}><td>${dBR(x.m.data)}</td><td class="l">${esc(x.m.pessoa_nome||'')}</td><td class="l">${esc(x.m.categoria||'')||mu('—')}</td><td class="l">${esc(x.m.descricao||'')||mu('—')}${x.m.transf_id?` ${mu('· transferência')}`:x.m.titulo_id?'':` ${mu('· avulso')}`}${x.m.ofx_id?` <span class="pos" title="Conciliado com o extrato do banco">✓</span>`:''}</td><td class="l">${esc(x.m.documento||'')}</td><td class="pos">${x.m.tipo==='entrada'?fm(x.m.valor):''}</td><td class="neg">${x.m.tipo==='saida'?fm(x.m.valor):''}</td><td class="muted">${fm(x.saldo)}</td></tr>`
+    +L.map(x=>x.m?`<tr${x.m.titulo_id?'':` class="click" data-id="${x.m.id}" tabindex="0"`}><td>${dBR(x.m.data)}</td><td class="l">${esc(x.m.pessoa_nome||'')}</td><td class="l">${esc(x.m.categoria||'')||mu('—')}</td><td class="l">${esc(x.m.descricao||'')||mu('—')}${x.m.transf_id?` ${mu('· transferência')}`:x.m.titulo_id?'':` ${mu('· avulso')}`}${movConc(x.m)?` <span class="pos" title="Conciliado com o extrato do banco">✓</span>`:` <span class="muted" title="Ainda não conciliado com o extrato do banco">· não conciliado</span>`}</td><td class="l">${esc(x.m.documento||'')}</td><td class="pos">${x.m.tipo==='entrada'?fm(x.m.valor):''}</td><td class="neg">${x.m.tipo==='saida'?fm(x.m.valor):''}</td><td class="muted">${fm(x.saldo)}</td></tr>`
       :`<tr style="background:var(--sunk)"><td><b>${dBR(x.dia)}</b></td><td class="l" colspan="4"><b>Total do dia</b></td><td><b>${x.ent?fm(x.ent):''}</b></td><td><b>${x.sai?fm(x.sai):''}</b></td><td class="${x.saldo<0?'neg':''}"><b>${fm(x.saldo)}</b></td></tr>`).join('')
     +(GX.per.length?'':`<tr><td class="l muted" colspan="8">Nenhuma entrada ou saída no período.</td></tr>`);
-  $('gxTiles').innerHTML=[['Saldo anterior',fm(GX.ant),'em '+dBR(antes)],['Entradas',fm(E),GX.per.filter(m=>m.tipo==='entrada').length+' lançamentos'],['Saídas',fm(S),GX.per.filter(m=>m.tipo==='saida').length+' lançamentos'],['Saldo final',fm(F),'em '+dBR(GX.fim)]]
+  const vt=GX.ver==='conc'?' conciliado':GX.ver==='nconc'?' não conciliado':'';
+  $('gxTiles').innerHTML=[['Saldo anterior'+vt,fm(GX.ant),'em '+dBR(antes)],['Entradas',fm(E),GX.per.filter(m=>m.tipo==='entrada').length+' lançamentos'],['Saídas',fm(S),GX.per.filter(m=>m.tipo==='saida').length+' lançamentos'],[GX.ver==='nconc'?'Diferença não conciliada':'Saldo final'+vt,fm(F),'em '+dBR(GX.fim)]]
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===3&&F<0?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   $('gxSub').textContent=`${c.nome}${c.banco?' · '+c.banco:''}${c.agencia||c.conta?` · Ag. ${c.agencia||'—'} · ${c.conta||'—'}`:''}. Confira o saldo de cada dia com o extrato do banco.`;
-  $('gxNote').textContent=(c.saldo_data&&GX.ini<c.saldo_data?`O saldo inicial da conta (${fm(c.saldo_inicial)}) é do início de ${dBR(c.saldo_data)}; o que for anterior a essa data não entra. `:'')
+  const nc=GX.nconc||[];
+  $('gxNote').textContent=(nc.length&&GX.ver!=='nconc'?`Atenção: ${nc.length} ${nc.length===1?'lançamento do período ainda não está conciliado':'lançamentos do período ainda não estão conciliados'} com o extrato do banco (${fm(r2(nc.reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)))}). ${GX.ver==='conc'?'Eles não entram nesta visão: escolha “Só não conciliados” para ver.':'Escolha “Só conciliados” para conferir com o extrato do banco.'} `:'')
+    +(GX.ver==='nconc'?'Só os lançamentos ainda não conciliados: o saldo anterior é a soma dos não conciliados antes do período. ':'')
+    +(c.saldo_data&&GX.ini<c.saldo_data?`O saldo inicial da conta (${fm(c.saldo_inicial)}) é do início de ${dBR(c.saldo_data)}; o que for anterior a essa data não entra. `:'')
     +'Os pagamentos e recebimentos entram aqui sozinhos. Tarifas, transferências e outros lançamentos sem conta a pagar ou receber entram por “Lançamento avulso” (clique num avulso para corrigir).';
   $('gxBaixar').hidden=false;
 }
 ['gxConta','gxIni','gxFim'].forEach(id=>$(id).onchange=renderGX);
 $('gxBaixar').onclick=()=>{
   const c=GX.conta,cli=cliAtual(),antes=isoLocal(new Date(dObj(GX.ini).getTime()-864e5));
-  const aoa=[[`Extrato da conta ${c.nome} · ${cli?.nome||''}`],[`Período: ${dBR(GX.ini)} a ${dBR(GX.fim)}`],[],['Data','Descrição','Fornecedor ou cliente','Documento','Categoria','Entradas','Saídas','Saldo'],[dBR(antes),'Saldo anterior','','','','','',GX.ant]];
+  const aoa=[[`Extrato da conta ${c.nome} · ${cli?.nome||''}`],[`Período: ${dBR(GX.ini)} a ${dBR(GX.fim)}${GX.ver==='conc'?' · só conciliados':GX.ver==='nconc'?' · só não conciliados':''}`],[],['Data','Descrição','Fornecedor ou cliente','Documento','Categoria','Entradas','Saídas','Saldo'],[dBR(antes),'Saldo anterior','','','','','',GX.ant]];
   gxLinhas().forEach(x=>aoa.push(x.m?[dBR(x.m.data),x.m.descricao||'',x.m.pessoa_nome||'',x.m.documento||'',x.m.categoria||'',x.m.tipo==='entrada'?+x.m.valor:'',x.m.tipo==='saida'?+x.m.valor:'',x.saldo]:[dBR(x.dia),'Total do dia','','','',x.ent||'',x.sai||'',x.saldo]));
   const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:11},{wch:40},{wch:30},{wch:14},{wch:24},{wch:14},{wch:14},{wch:14}];
   for(let r=4;r<aoa.length;r++)for(const col of [5,6,7]){const cell=ws[XLSX.utils.encode_cell({r,c:col})];if(cell&&cell.t==='n')cell.z='#,##0.00'}
@@ -10366,8 +10404,17 @@ const MANUAL=[
 <li><b>Ícones na Situação:</b> o <b>$</b> mostra se a conta está paga (ou recebida) e o <b>elo</b> se está conciliada com o extrato do banco. Com o ✓ verde, já está feito.</li>
 <li><b>Para editar uma conta paga ou conciliada:</b> ela fica travada. Abra a conta e use <b>Estornar</b> no pagamento: a conta volta a ficar em aberto, sai do extrato e, se estava conciliada, a conciliação também é desfeita (a linha do banco volta a ficar pendente na Conciliação bancária). Depois corrija e registre o pagamento de novo.</li>
 <li><b>Conta com parcelas ou recorrência:</b> ao corrigir uma parcela, use <b>Salvar só esta</b> ou <b>Salvar esta e as próximas</b>. Na segunda opção, o que você mudou (valor, vencimento, categoria, conta, descrição ou outro campo) vai também para as próximas parcelas em aberto, e o vencimento segue o mesmo dia, mês a mês. Parcelas já pagas não mudam.</li>
-<li><b>Várias contas de uma vez:</b> marque as contas na caixinha da esquerda (a do título marca todas do filtro). Na barra que aparece: <b>$ Quitar</b> (data: o vencimento de cada conta, ou hoje se ainda não venceu, ou uma data só; conta: a prevista de cada uma ou outra), <b>Estornar</b> (volta para em aberto e desfaz a conciliação), <b>Desconciliar</b> (continua pago, só tira a ligação com o extrato do banco) e <b>Excluir</b> (conta paga não é excluída: estorne antes).</li>
+<li><b>Conciliar sem enviar o extrato de novo:</b> abra a conta e use <b>🔗 Conciliar</b> no pagamento (por exemplo, depois de estornar para corrigir a categoria e registrar o pagamento de novo). O portal liga à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias); se não achar, pergunta se marca como conciliado mesmo assim. <b>Desconciliar</b> tira só a ligação com o extrato. Na conta nova, <b>🔗 Salvar quitado e conciliado</b> já lança paga e conciliada.</li>
+<li><b>Várias contas de uma vez:</b> marque as contas na caixinha da esquerda (a do título marca todas do filtro). Na barra que aparece: <b>$ Quitar</b> (data: o vencimento de cada conta, ou hoje se ainda não venceu, ou uma data só; conta: a prevista de cada uma ou outra), <b>Estornar</b> (volta para em aberto e desfaz a conciliação), <b>🔗 Conciliar</b>, <b>Desconciliar</b> (continua pago, só tira a ligação com o extrato do banco) e <b>Excluir</b> (conta paga não é excluída: estorne antes).</li>
 </ul>`},
+    {k:'gfext',t:'Extrato da conta',
+      txt:`<p>Todas as entradas e saídas de uma conta bancária, dia a dia, com o saldo de cada dia para conferir com o extrato do banco.</p>
+<ol>
+<li>Escolha a <b>Conta</b> e o período (<b>De</b> e <b>Até</b>).</li>
+<li>Em <b>Mostrar</b>, escolha <b>Todos os lançamentos</b>, <b>Só conciliados</b> (como o extrato do banco, igual ao relatório de extrato do Bom Controle) ou <b>Só não conciliados</b>. O saldo anterior, as entradas, as saídas e o saldo final seguem a escolha.</li>
+<li>Os lançamentos conciliados têm um ✓; os outros aparecem como <i>não conciliado</i>. Um aviso embaixo mostra quantos lançamentos do período ainda faltam conciliar, para achar as divergências antes de mandar para a contabilidade.</li>
+</ol>
+<ul><li><b>Baixar planilha</b> sai com a mesma escolha do Mostrar.</li></ul>`},
     {k:'gfrec',t:'Contas a receber',
       txt:`<p>Funciona como as Contas a pagar, para o que os clientes vão pagar à empresa: <b>+ Nova conta a receber</b> para lançar e <b>Registrar recebimento</b> para dar baixa. Se o dinheiro já entrou, use <b>$ Salvar quitado</b> ao lançar, com a data e a conta do recebimento, e a conta já entra quitada.</p>`},
     {k:'gfconc',t:'Conciliação bancária (extrato OFX)',img:'gfconc.png',
@@ -10610,6 +10657,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05conc',data:'2026-11-05',t:'Conciliar sem reenviar o extrato e extrato só com os conciliados',itens:[
+    {x:'Contas a pagar e a receber: em cada pagamento ou recebimento da conta há os botões “🔗 Conciliar” e “Desconciliar”. O Conciliar liga de novo à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias), sem precisar enviar o OFX outra vez. Útil depois de estornar para corrigir algo. Se não achar a linha, pergunta se marca como conciliado mesmo assim.',mods:['gfpagar','gfrec','gfmov']},
+    {x:'Na conta nova há também “🔗 Salvar quitado e conciliado”, e na seleção de várias contas o botão “🔗 Conciliar”.',mods:['gfpagar','gfrec']},
+    {x:'Extrato da conta: novo campo “Mostrar” com Todos os lançamentos, Só conciliados (como o extrato do banco, igual ao relatório de extrato do Bom Controle) ou Só não conciliados. O saldo segue a escolha, e um aviso mostra quantos lançamentos do período ainda não estão conciliados. A planilha baixada também segue a escolha.',mods:['gfext']}]},
   {k:'2026-11-05prox',data:'2026-11-05',t:'Corrigir só esta parcela ou também as próximas',itens:[
     {x:'Contas a pagar e a receber com parcelas ou recorrência: ao corrigir uma parcela (valor, vencimento, categoria ou qualquer outro campo), escolha “Salvar só esta” ou “Salvar esta e as próximas”. As próximas parcelas em aberto recebem a mesma mudança; o vencimento segue o mesmo dia, mês a mês. Parcelas já pagas não mudam.',mods:['gfpagar','gfrec','gfmov']}]},
   {k:'2026-11-05lote',data:'2026-11-05',t:'Contas a pagar e a receber: selecionar várias e alterar de uma vez',itens:[
