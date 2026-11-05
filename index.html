@@ -7570,7 +7570,7 @@ async function gtAcao(a,b){
   }
 }
 
-// ---------- Remessa de pagamentos CNAB 240 (Sicredi e Inter) e leitura do retorno (v48) ----------
+// ---------- Remessa de pagamentos CNAB 240 (Sicredi, Inter e Santander) e leitura do retorno (v48) ----------
 // Layout "Pagamento a Fornecedor CNAB 240" do Sicredi (manual v1.2 e arquivo modelo PAGFOR):
 // boletos (segmentos J e J-52), contas de consumo e tributos com código de barras (O) e Pix por chave (A e B).
 const v48=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||/fin_remessa|cnab_/.test(e.message||''));
@@ -7586,7 +7586,8 @@ const OCOR={'00':'pago','01':'saldo insuficiente','02':'cancelado pelo pagador',
   PA:'Pix não efetivado',PB:'Pix interrompido no banco do recebedor',PC:'conta do recebedor encerrada',PF:'CPF ou CNPJ não confere com a conta do Pix',PG:'CPF ou CNPJ do recebedor incorreto',
   PH:'Pix rejeitado pelo banco do recebedor',PJ:'chave Pix não cadastrada',PM:'chave Pix inválida',PN:'chave Pix não informada',TA:'totais do lote com diferença',
   YA:'boleto não encontrado',PK:'QR Code inválido ou vencido',PD:'tipo de conta incorreto',PE:'transação não autorizada na conta',PI:'ISPB do pagador inválido',
-  AS:'identificação do favorecido inválida',ZH:'sistema do banco em contingência',ZJ:'limite diário de pagamentos excedido',ZE:'boleto bloqueado',ZG:'boleto vencido',ZI:'beneficiário divergente',ZK:'boleto já pago'};
+  AS:'identificação do favorecido inválida',B1:'aguardando autorização no banco',B3:'bloqueado pelo cliente',HU:'data ou hora de envio inválida',ZA:'transferência devolvida',ZW:'banco destino não recebe essa modalidade',ZX:'banco destino inoperante',
+  ZV:'autorização iniciada no Internet Banking',AT:'CPF ou CNPJ do favorecido inválido ou divergente',HL:'versão do layout inválida',ZH:'sistema do banco em contingência',ZJ:'limite diário de pagamentos excedido',ZE:'boleto bloqueado',ZG:'boleto vencido',ZI:'beneficiário divergente',ZK:'boleto já pago'};
 const ocorTxt=cs=>cs.map(c=>OCOR[c]?`${c} (${OCOR[c]})`:c).join(', ');
 // campos do CNAB: numérico à direita com zeros; texto à esquerda com brancos, maiúsculo e sem acento
 const cN=(v,n)=>String(v??'').replace(/\D/g,'').slice(-n).padStart(n,'0');
@@ -7620,19 +7621,20 @@ function rmForma(t,pes){
   return {erro:'sem linha digitável nem chave Pix'};
 }
 const RMNOME={boleto:'Boleto',consumo:'Conta de consumo ou tributo',pix:'Pix'};
-// bancos da remessa: Sicredi e Inter têm o layout pronto; os outros esperam o manual de pagamentos do banco
+// bancos da remessa: Sicredi, Inter e Santander têm o layout pronto; os outros esperam o manual de pagamentos do banco
 // semConv: o banco não usa código de convênio (o Inter identifica a empresa pela conta)
-const RMBANCOS=[{k:'sicredi',n:'Sicredi',cod:'748',ok:true},{k:'santander',n:'Santander',cod:'033'},{k:'inter',n:'Inter',cod:'077',ok:true,semConv:true},{k:'bb',n:'Banco do Brasil',cod:'001'},{k:'itau',n:'Itaú',cod:'341'},{k:'bradesco',n:'Bradesco',cod:'237'},{k:'caixa',n:'Caixa',cod:'104'}];
+const RMBANCOS=[{k:'sicredi',n:'Sicredi',cod:'748',ok:true},{k:'santander',n:'Santander',cod:'033',ok:true},{k:'inter',n:'Inter',cod:'077',ok:true,semConv:true},{k:'bb',n:'Banco do Brasil',cod:'001'},{k:'itau',n:'Itaú',cod:'341'},{k:'bradesco',n:'Bradesco',cod:'237'},{k:'caixa',n:'Caixa',cod:'104'}];
 // banco da conta pelo campo Banco (ou pelo nome da conta): "Sicredi", "748 - Sicredi", "Banco Inter"...
 function bancoDe(c){if(!c)return null;const t=chave((c.banco||'')+' '+(c.nome||'')),d=soDig(c.banco);
   const b=RMBANCOS.find(b=>d&&+d===+b.cod)||RMBANCOS.find(b=>t.includes(chave(b.n))||b.k==='bb'&&/\bbb\b|brasil/.test(t)||b.k==='caixa'&&/\bcef\b|caixa economica/.test(t));
   // conta antiga sem banco preenchido, com convênio: era do Sicredi (o único com layout)
   return b?b.k:c.cnab_convenio?'sicredi':null}
-// conta que gera remessa: tem convênio (Sicredi) ou é do Inter, que não usa convênio
+// conta que gera remessa: tem convênio (Sicredi, Santander) ou é do Inter, que não usa convênio
 const rmContaOk=(c,b)=>bancoDe(c)===b.k&&(b.semConv||!!c.cnab_convenio);
 // onde enviar e onde pegar o retorno no internet banking de cada banco
 const RMONDE={sicredi:['no Sicredi: Pagamentos › Troca de arquivos','no Sicredi, o retorno sai em Pagamentos › Troca de arquivos'],
-  inter:['no Inter: Pagar ou transferir › Pagar › Pagamento via arquivo › Importar arquivo CNAB','no Inter, na mesma tela, aba Retorno › Solicitar arquivo retorno, com o período que inclui a data do pagamento']};
+  inter:['no Inter: Pagar ou transferir › Pagar › Pagamento via arquivo › Importar arquivo CNAB','no Inter, na mesma tela, aba Retorno › Solicitar arquivo retorno, com o período que inclui a data do pagamento'],
+  santander:['no Santander: pela transmissão de arquivos do Pagamento a Fornecedores, até as 20h do dia do pagamento','no Santander, o retorno sai pelo canal combinado no convênio']};
 // monta o arquivo; itens: {forma,seu,valor,dataPag,venc,nome,doc,barra,nominal,banco,tipo,chave}
 function cnabSicredi({conta,empresa,nsa,agora,itens}){
   const a=agConta(conta),cnpj=soDig(empresa.cnpj),ti=cnpj.length===11?'1':'2',conv=conta.cnab_convenio;
@@ -7698,6 +7700,42 @@ function cnabInter({conta,empresa,nsa,agora,itens}){
   lin('077'+'9999'+'9'+cB(9)+cN(lote,6)+cN(L.length+1,6)+cB(211));
   return L.join('\r\n')+'\r\n';
 }
+// Layout "Pagamento a Fornecedores CNAB 240" do Santander (manual YLEC_2403 v11.7, junho/2026): boletos (J e J52, com CNPJ/CPF
+// do beneficiário obrigatório), contas de consumo e tributos com código de barras (O) e Pix por chave (A e B).
+// Convênio no arquivo: 0033 + agência (4) + número do convênio (12). No cadastro pode ir só o número do convênio ou os 20 dígitos.
+const convSantander=c=>{const d=soDig(c.cnab_convenio);return d.length>=16?cN(d,20):'0033'+cN(soDig(c.agencia),4)+cN(d,12)};
+function cnabSantander({conta,empresa,nsa,agora,itens}){
+  const a=agConta(conta),cnpj=soDig(empresa.cnpj),ti=cnpj.length===11?'1':'2',E=docEmp(empresa),conv=convSantander(conta);
+  const L=[],lin=s=>{if(s.length!==240)throw new Error('Linha do CNAB com '+s.length+' posições');L.push(s)};
+  const hh=agora.toTimeString().slice(0,8).replace(/:/g,''),hoje=isoLocal(agora),emp=cN(cnpj,14)+conv+cN(a.ag,5)+' '+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30);
+  lin('033'+'0000'+'0'+cB(9)+ti+emp+cX('BANCO SANTANDER',30)+cB(10)+'1'+cD(hoje)+hh+cN(nsa,6)+'060'+cN(0,5)+cB(20)+cB(20)+cB(19)+cB(10));
+  // [serviço, forma, versão do lote, filtro]
+  const grupos=[['20','30','030',i=>i.forma==='boleto'&&i.banco==='033'],['20','31','030',i=>i.forma==='boleto'&&i.banco!=='033'],['22','11','010',i=>i.forma==='consumo'],['20','45','031',i=>i.forma==='pix']];
+  let lote=0;
+  for(const [serv,forma,ver,f] of grupos){const its=itens.filter(f);if(!its.length)continue;lote++;
+    const lt=cN(lote,4),ini=L.length;let seq=0,soma=0;const sq=()=>cN(++seq,5);
+    lin('033'+lt+'1'+'C'+serv+forma+ver+' '+ti+emp+cB(40)+cB(30)+cN(0,5)+cB(15)+cX(E.cidade,20)+cN(0,5)+cN(0,3)+cX(E.uf,2)+cB(8)+cB(10));
+    for(const i of its){soma+=Math.round(i.valor*100);
+      if(i.forma==='boleto'){
+        const nom=i.nominal||i.valor,dif=r2(i.valor-nom),dn=i.doc?soDig(i.doc):'';
+        lin('033'+lt+'3'+sq()+'J'+'0'+'00'+cX(i.barra,44)+cX(i.nome,30)+cD(i.venc)+cV(nom,15)+cV(dif<0?-dif:0,15)+cV(dif>0?dif:0,15)+cD(i.dataPag)+cV(i.valor,15)+cN(0,15)+cX(i.seu,20)+cB(20)+'09'+cB(6)+cB(10));
+        lin('033'+lt+'3'+sq()+'J'+' '+'00'+'52'+ti+cN(cnpj,15)+cX(empresa.nome,40)+(dn.length===11?'1':'2')+cN(dn,15)+cX(i.nome,40)+'0'+cN(0,15)+cB(40)+cB(53));
+      }else if(i.forma==='consumo'){
+        lin('033'+lt+'3'+sq()+'O'+'0'+'00'+cX(i.barra,44)+cX(i.nome,30)+cD(i.venc)+cD(i.dataPag)+cV(i.valor,15)+cX(i.seu,20)+cB(20)+cB(68)+cB(10));
+      }else{
+        // Pix por chave: câmara 009, banco/agência/conta do favorecido em zeros (só se usam no Pix por dados bancários)
+        const dn=soDig(i.tipo==='03'?i.chave:i.doc||''),tin=dn.length===11?'1':dn.length===14?'2':'0',doc=dn.length===11||dn.length===14?dn:'';
+        lin('033'+lt+'3'+sq()+'A'+'0'+'00'+'009'+cN(0,3)+cN(0,5)+' '+cN(0,12)+' '+' '+cX(i.nome,30)+cX(i.seu,20)+cD(i.dataPag)+'BRL'+cN(0,15)+cV(i.valor,15)+cB(20)+cN(0,8)+cN(0,15)
+          +cB(40)+cB(2)+cB(5)+cB(2)+cB(3)+'0'+cB(10));
+        lin('033'+lt+'3'+sq()+'B'+i.tipo+' '+tin+(doc?cN(doc,14):cN(0,14))+cB(35)+cB(60)+((i.tipo==='03'?dn:i.chave)+cB(99)).slice(0,99)+cB(6)+cB(8));
+      }
+    }
+    lin('033'+lt+'5'+cB(9)+cN(L.length-ini+1,6)+cN(soma,18)+cN(0,18)+cN(0,6)+cB(165)+cB(10));
+  }
+  lin('033'+'9999'+'9'+cB(9)+cN(lote,6)+cN(L.length+1,6)+cB(211));
+  return L.join('\r\n')+'\r\n';
+}
+const rmArquivoSantander=(nsa,iso)=>`PAGFOR_SANTANDER_${cN(nsa,6)}_${cD(iso)}.REM`;
 // nome pedido pelo Inter: CI240_001_NNNNNNN.REM (o mesmo número sequencial do header)
 const rmArquivoInter=nsa=>`CI240_001_${cN(nsa,7)}.REM`;
 // nome pedido pelo Sicredi: CCCCDDSS.REM (convênio de 4) ou CCCDDMSS.REM (convênio de 3)
@@ -7718,7 +7756,7 @@ const grErr=t=>{$('grErr').textContent=t;$('grErr').hidden=false};
 async function renderGR(retHtml){
   const cli=cliAtual(),ENV=VIEW==='gfremessa';
   $('grTitle').textContent=ENV?'Envio de remessa':'Retorno de remessa';
-  $('grSub').textContent=ENV?'Gere o arquivo de pagamentos para o banco: boletos, contas de consumo e Pix das contas a pagar. Depois envie o arquivo no internet banking ('+RMONDE.sicredi[0]+'; '+RMONDE.inter[0]+').'
+  $('grSub').textContent=ENV?'Gere o arquivo de pagamentos para o banco: boletos, contas de consumo e Pix das contas a pagar. Depois envie o arquivo no internet banking ('+RMONDE.sicredi[0]+'; '+RMONDE.inter[0]+'; '+RMONDE.santander[0]+').'
     :'Leia o arquivo de retorno que o banco devolve. Cada pagamento fica como agendado, pago ou recusado, e os pagos recebem a baixa nas contas a pagar e no extrato da conta. ('+RMONDE.inter[1]+'.)';
   $('grFoot').innerHTML='';
   if(!cli){$('grBody').innerHTML='<p class="muted" style="margin:0">Escolha uma empresa.</p>';return}
@@ -7744,6 +7782,7 @@ async function renderGR(retHtml){
     <div class="tablebox" style="margin:0;max-height:52vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="rm_todas" style="width:auto" aria-label="Marcar todas"></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Como paga</th><th>Valor</th></tr></thead><tbody id="rmBody"></tbody></table></div>
     <p class="note" id="rmNote" style="margin:0"></p>`
       :!bco.ok?`<p class="note" style="margin:0">A remessa do ${bco.n} ainda não está pronta: cada banco tem o próprio layout de pagamentos (CNAB 240). Mande o manual de pagamentos do ${bco.n} e o sistema passa a gerar o arquivo dele. Até lá, pague estas contas pelo internet banking.</p>`
+      :bco.k==='santander'?`<p class="note" style="margin:0">Nenhuma conta do Santander com convênio de pagamentos nesta empresa. Em Gestão financeira › Contas bancárias, abra a conta do Santander (o campo Banco precisa dizer Santander), confira a agência e a conta com o dígito e preencha o “Convênio de pagamentos (CNAB)” com o número do convênio de Pagamento a Fornecedores que o banco passou.</p>`
       :bco.semConv?`<p class="note" style="margin:0">Nenhuma conta do ${bco.n} nesta empresa. Em Gestão financeira › Contas bancárias, cadastre a conta do ${bco.n} com o campo Banco dizendo ${bco.n} e o número da conta com o dígito (o ${bco.n} não usa convênio).</p>`
       :`<p class="note" style="margin:0">Nenhuma conta do ${bco.n} com convênio de pagamentos nesta empresa. Em Gestão financeira › Contas bancárias, abra a conta do ${bco.n} (o campo Banco precisa dizer ${bco.n}) e preencha o “Convênio de pagamentos (CNAB)”, o código que o banco passou.</p>`)
       +`<p class="err" id="grErr" hidden></p>`+lista;
@@ -7767,7 +7806,9 @@ function rmDesenha(){
   const pes=GFP.lista,falta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
   const so=RM.so?.cli===cliAtual()?.id?RM.so:null;
   const ab=GT.lista.filter(t=>falta(t)>0.004&&(so?so.ids.has(t.id):!ate||t.vencimento<=ate));
-  RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),f=rmForma(t,p),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
+  const sant=bancoDe(GFC.lista.find(c=>c.id===RM.conta))==='santander';
+  RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
+    let f=rmForma(t,p);if(sant&&f.forma==='boleto'&&!soDig(p?.documento))f={erro:'boleto sem CNPJ/CPF do fornecedor no cadastro (o Santander exige)'};
     return {t,p,f,ja,it,valor:falta(t)}});
   $('rmBody').innerHTML=RM.lista.map((x,i)=>{const ok=!x.f.erro&&!x.ja;
     return `<tr><td><input type="checkbox" data-id="${i}" style="width:auto"${ok?' checked':' disabled'}></td><td class="${x.t.vencimento<TODAY?'neg':''}">${dBR(x.t.vencimento)}</td><td class="l"><b>${esc(x.t.pessoa_nome||'')}</b>${x.t.descricao?`<br>${mu(esc(x.t.descricao))}`:''}</td><td class="l">${x.f.erro?`<span class="neg">${esc(x.f.erro)}</span>`:RMNOME[x.f.forma]+(x.f.forma==='pix'?`<br>${mu(esc(x.f.chave))}`:'')}${x.ja?`<br><span class="chip ${RMSTATUS[x.it.status][0]}">${RMSTATUS[x.it.status][1]}</span>`:''}</td><td>${fm(x.valor)}</td></tr>`}).join('')
@@ -7779,6 +7820,7 @@ function rmTotal(){const sel=[...$('rmBody').querySelectorAll('input[data-id]:ch
   $('rmNote').textContent=`${sel.length} ${sel.length===1?'pagamento marcado':'pagamentos marcados'}: ${fm(r2(sel.reduce((s,x)=>s+x.valor,0)))}. `
     +(venc?`${venc} já ${venc===1?'estará vencida':'estarão vencidas'} na data do pagamento: o banco pode recusar ou cobrar juros. `:'')
     +(semDoc?`${semDoc} ${semDoc===1?'boleto sem':'boletos sem'} CNPJ do fornecedor no cadastro (vai em branco). `:'')
+    +(()=>{const c=GFC.lista.find(c=>c.id===$('rm_conta').value);return bancoDe(c)==='santander'&&(+c.cnab_seq||0)<10?`Se o convênio do Santander tiver o “teste” contratado, as remessas nº 1 a 10 são só teste e não pagam nada: nesse caso, mude o “Nº da última remessa” da conta para 10. `:''})()
     +`O arquivo vai para o internet banking (${(RMONDE[bancoDe(GFC.lista.find(c=>c.id===$('rm_conta').value))]||RMONDE.sicredi)[0]}). Depois de enviar, leia aqui o arquivo de retorno.`}
 async function rmAcao(a,b){
   const cli=cliAtual();
@@ -7796,10 +7838,11 @@ async function rmAcao(a,b){
     const {data:c2,error:e1}=await sb.from('fin_contas').select('cnab_seq').eq('id',conta.id).single();if(e1)throw e1;
     const nsa=(c2.cnab_seq||0)+1,agora=new Date(),hoje=isoLocal(agora);
     const {count}=await sb.from('fin_remessas').select('id',{count:'exact',head:true}).eq('conta_id',conta.id).gte('gerado_em',hoje+'T00:00:00');
-    const inter=bancoDe(conta)==='inter',seu=i=>inter?`${nsa}${cN(i+1,4)}`:`R${nsa}-${i+1}`;   // no Inter o seu número do boleto só aceita números
+    const bq=bancoDe(conta),inter=bq==='inter',seu=i=>inter?`${nsa}${cN(i+1,4)}`:`R${nsa}-${i+1}`;   // no Inter o seu número do boleto só aceita números
     const itens=sel.map((x,i)=>({forma:x.f.forma,seu:seu(i),valor:x.valor,dataPag,venc:x.f.venc||x.t.vencimento,nome:x.t.pessoa_nome||x.p?.nome||'',doc:x.p?.documento||'',
       barra:x.f.barra,nominal:x.f.nominal,banco:x.f.banco,tipo:x.f.tipo,chave:x.f.chave}));
-    const txt=(inter?cnabInter:cnabSicredi)({conta,empresa:inter?cli:{cnpj:cli.cnpj,nome:cli.nome},nsa,agora,itens}),arquivo=inter?rmArquivoInter(nsa):rmArquivo(conta.cnab_convenio,hoje,count||0);
+    const txt=(inter?cnabInter:bq==='santander'?cnabSantander:cnabSicredi)({conta,empresa:inter||bq==='santander'?cli:{cnpj:cli.cnpj,nome:cli.nome},nsa,agora,itens}),
+      arquivo=inter?rmArquivoInter(nsa):bq==='santander'?rmArquivoSantander(nsa,hoje):rmArquivo(conta.cnab_convenio,hoje,count||0);
     const {error:e2}=await sb.from('fin_contas').update({cnab_seq:nsa}).eq('id',conta.id);if(e2)throw e2;
     const {data:rem,error:e3}=await sb.from('fin_remessas').insert({cliente_id:cli.id,conta_id:conta.id,nsa,arquivo,conteudo:txt,qtd:itens.length,valor:r2(itens.reduce((s,i)=>s+i.valor,0))}).select().single();if(e3)throw e3;
     const {error:e4}=await sb.from('fin_remessa_itens').insert(sel.map((x,i)=>({remessa_id:rem.id,cliente_id:cli.id,conta_id:conta.id,titulo_id:x.t.id,seu_numero:seu(i),forma:x.f.forma,favorecido:itens[i].nome,valor:x.valor,data_pagamento:dataPag})));if(e4)throw e4;
@@ -7812,7 +7855,7 @@ function lerRetorno(txt){
   const ls=txt.split(/\r?\n/).filter(l=>l.length>=240),out={itens:[],lotes:[],conv:'',banco:'',conta:''};
   for(const l of ls){
     const tipo=l[7],seg=l[13],oc=l.slice(230,240).match(/../g).map(s=>s.trim()).filter(Boolean),dt=s=>/^\d{8}$/.test(s)&&s!=='00000000'?s.slice(4)+'-'+s.slice(2,4)+'-'+s.slice(0,2):null;
-    if(tipo==='0'){out.conv=l.slice(32,36).trim();out.banco=l.slice(0,3);out.conta=l.slice(58,70).replace(/^0+/,'')}
+    if(tipo==='0'){out.conv=l.slice(0,3)==='033'?soDig(l.slice(32,52)).slice(-12).replace(/^0+/,''):l.slice(32,36).trim();out.banco=l.slice(0,3);out.conta=l.slice(58,70).replace(/^0+/,'')}
     else if(tipo==='1'&&oc.length)out.lotes.push({lote:+l.slice(3,7),oc});
     else if(tipo==='3'){
       if(seg==='J'&&l.slice(17,19)==='52'&&l[14]===' ')continue;
@@ -7823,7 +7866,7 @@ function lerRetorno(txt){
   }
   return out;
 }
-const rmStatusDe=oc=>oc.some(c=>c==='00'||c==='03')?'pago':oc.includes('BF')?'excluido':oc.some(c=>c==='BD'||c==='BE')||!oc.length?'agendado':'recusado';
+const rmStatusDe=oc=>oc.some(c=>c==='00'||c==='03')?'pago':oc.includes('BF')?'excluido':oc.some(c=>c==='BD'||c==='BE'||c==='B1')||!oc.length?'agendado':'recusado';
 async function rmRetorno(f){
   const cli=cliAtual();$('rmRet').innerHTML='<p class="note">Lendo o retorno…</p>';
   try{
@@ -7832,6 +7875,7 @@ async function rmRetorno(f){
     const {data:its,error}=await sb.from('fin_remessa_itens').select('*').eq('cliente_id',cli.id);if(error)throw error;
     // o Inter não tem convênio: acha a conta pelo número que vem no header do retorno
     const contas=GFC.lista,cv=contas.filter(c=>r.banco==='077'?bancoDe(c)==='inter'&&agConta(c).conta.replace(/^0+/,'')===r.conta
+      :r.banco==='033'?bancoDe(c)==='santander'&&soDig(convSantander(c)).slice(-12).replace(/^0+/,'')===r.conv
       :(c.cnab_convenio||'').toUpperCase()===r.conv.toUpperCase()).map(c=>c.id);
     const mesmoSeu=(a,b)=>a===b||/^\d+$/.test(a)&&/^\d+$/.test(b)&&a.replace(/^0+/,'')===b.replace(/^0+/,'');
     const doArq=its.filter(i=>!cv.length||cv.includes(i.conta_id));
@@ -11059,15 +11103,16 @@ const MANUAL=[
     {k:'gfrec',t:'Contas a receber',
       txt:`<p>Funciona como as Contas a pagar, para o que os clientes vão pagar à empresa: <b>+ Nova conta a receber</b> para lançar e <b>Registrar recebimento</b> para dar baixa. Se o dinheiro já entrou, use <b>$ Salvar quitado</b> ao lançar, com a data e a conta do recebimento, e a conta já entra quitada.</p>`},
     {k:'gfremessa',t:'Envio e retorno de remessa (pagamentos pelo banco)',
-      txt:`<p>Gera o arquivo de pagamentos (CNAB 240) com as contas a pagar, para pagar tudo de uma vez pelo internet banking. Funciona com o <b>Sicredi</b> e o <b>Inter</b>, em qualquer empresa.</p>
+      txt:`<p>Gera o arquivo de pagamentos (CNAB 240) com as contas a pagar, para pagar tudo de uma vez pelo internet banking. Funciona com o <b>Sicredi</b>, o <b>Inter</b> e o <b>Santander</b>, em qualquer empresa.</p>
 <ol>
-<li><b>Conta do banco:</b> em Gestão financeira › Contas bancárias, a conta precisa ter o campo <b>Banco</b> com o nome do banco e o número da <b>Conta</b> com o dígito. No Sicredi preencha também o <b>Convênio de pagamentos (CNAB)</b>; o Inter não usa convênio.</li>
+<li><b>Conta do banco:</b> em Gestão financeira › Contas bancárias, a conta precisa ter o campo <b>Banco</b> com o nome do banco e o número da <b>Conta</b> com o dígito. No Sicredi e no Santander preencha também o <b>Convênio de pagamentos (CNAB)</b> (no Santander, o número do convênio de Pagamento a Fornecedores); o Inter não usa convênio.</li>
 <li>Em <b>Envio de remessa</b>, escolha o <b>Banco</b>, a <b>Conta que paga</b>, a <b>Data do pagamento</b> e até que vencimento mostrar. Marque as contas e clique em <b>Gerar arquivo</b>. Vão no arquivo os boletos (pela linha digitável), as contas de consumo e tributos com código de barras e os Pix por chave.</li>
 <li>Envie o arquivo no internet banking. <b>Sicredi:</b> Pagamentos › Troca de arquivos. <b>Inter:</b> Pagar ou transferir › Pagar › Pagamento via arquivo › Importar arquivo CNAB (o arquivo do Inter se chama <i>CI240_001_0000001.REM</i>, com o número da remessa).</li>
 <li>Depois que o banco processar, baixe o arquivo de retorno (no Inter: na mesma tela, aba Retorno › Solicitar arquivo retorno, com o período que inclui a data do pagamento) e leia em <b>Retorno de remessa</b>. Os pagos recebem a baixa nas contas a pagar e no extrato da conta; os recusados mostram o motivo.</li>
 </ol>
 <ul>
 <li>No Inter, só Pix pode ser agendado para sábado, domingo ou feriado; boletos e contas precisam de dia útil.</li>
+<li>No Santander, envie o arquivo até as 20h do dia do pagamento. Boleto precisa do CNPJ/CPF do fornecedor no cadastro (sem ele a conta não fica disponível para marcar). Se o convênio tiver o “teste” contratado, as remessas nº 1 a 10 são só teste.</li>
 <li>No Repasse de parceiros, o botão <b>Remessa</b> de cada empresa abre esta tela só com os repasses.</li>
 </ul>`},
     {k:'gfconc',t:'Conciliação bancária (extrato OFX)',img:'gfconc.png',
@@ -11352,6 +11397,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05santander',data:'2026-11-05',t:'Remessa de pagamentos do Santander',itens:[
+    {x:'Gestão financeira › Envio de remessa agora gera também o arquivo de pagamentos do Santander (boletos, contas de consumo e tributos com código de barras e Pix por chave). Na conta do Santander, preencha o “Convênio de pagamentos (CNAB)” com o número do convênio de Pagamento a Fornecedores.',mods:['gfremessa']},
+    {x:'No Santander, o boleto precisa do CNPJ/CPF do fornecedor no cadastro. O retorno do Santander é lido em Retorno de remessa, como o dos outros bancos.',mods:['gfremessa','gfretorno']}]},
   {k:'2026-11-05rnremsel',data:'2026-11-05',t:'Repasse da semana: remessa só dos repasses marcados',itens:[
     {x:'A remessa do repasse agora é feita só com o que você marcar. Marque os repasses que vão no arquivo do banco e clique em “Gerar remessa”: escolha a empresa que vai pagar e o Envio de remessa abre só com eles. Os outros repasses da empresa (pagos por fora ou em outro dia) não entram.'},
     {x:'Repasse ainda sem empresa é separado na empresa escolhida na hora. Repasse já separado em outra empresa fica de fora e aparece no aviso.'},
