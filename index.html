@@ -535,6 +535,9 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 .bxvazio{padding:10px;color:var(--muted);font-size:13px}
 .bxnova{color:var(--brand);font-weight:600}
 .bxcodtag{justify-self:start;font-size:12px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:6px;padding:1px 7px}
+/* Gestão da Controlacs (v104) */
+#dlgCtl{width:min(820px,calc(100vw - 32px))}
+.ctsv{display:flex;gap:10px;align-items:center}.ctsv label{display:flex;gap:8px;align-items:center;flex:1;margin:0;font-weight:500;cursor:pointer}.ctsv input[type=checkbox]{width:auto;flex:none}.ctsv .money{max-width:140px}
 </style>
 </head>
 <body>
@@ -971,6 +974,25 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <p class="note" id="pjNote"></p>
   </section>
 
+  <!-- GESTÃO DA CONTROLACS (v104): só a Master (Carol, 05/11) -->
+  <section id="viewCtl" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Gestão da Controlacs</h1><p class="sub">Os seus clientes, os serviços que você presta, os contratos, os reajustes e os documentos. Só você (Master) vê esta área.</p></div>
+      <div class="row" style="align-items:flex-end" id="ctAcoes"></div>
+    </div>
+    <div class="tabs" role="tablist" id="tabsCtl">
+      <button type="button" role="tab" data-tab="ctlpainel">Painel</button>
+      <button type="button" role="tab" data-tab="ctlcli">Clientes</button>
+      <button type="button" role="tab" data-tab="ctlcont">Contratos e reajustes</button>
+      <button type="button" role="tab" data-tab="ctlfin">Financeiro</button>
+      <button type="button" role="tab" data-tab="ctlserv">Serviços</button>
+      <button type="button" role="tab" data-tab="ctldocs">Documentos</button>
+    </div>
+    <div class="toolbar" id="ctBar"><label class="f" id="ctMesBox" hidden>Mês<input type="month" id="ctMes"></label><label class="f" id="ctTipoBox" hidden>Tipo<select id="ctTipo"><option value="">Receitas e despesas</option><option value="receita">Receitas</option><option value="despesa">Despesas</option></select></label><input id="ctBusca" placeholder="Buscar" style="max-width:280px"><label class="f" id="ctSitBox">Situação<select id="ctSit"><option value="">Todas</option></select></label></div>
+    <div id="ctConteudo"></div>
+    <p class="note" id="ctNote"></p>
+  </section>
+
   <!-- AGENDA (planner diário, v90): cada usuário vê só a sua (Carol, 04/11) -->
   <section id="viewManual" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -1299,6 +1321,11 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <div class="db" id="adBody"></div>
   <div class="df" id="adFoot"></div>
 </dialog>
+<dialog id="dlgCtl">
+  <div class="dh"><h2 id="ctdTitle"></h2><span class="spacer"></span><span id="ctdChip" class="chips"></span></div>
+  <div class="db" id="ctdBody"></div>
+  <div class="df" id="ctdFoot"></div>
+</dialog>
 <dialog id="dlgProj">
   <div class="dh"><h2 id="pdTitle"></h2><span class="spacer"></span><span id="pdChip" class="chips"></span></div>
   <div class="db" id="pdBody"></div>
@@ -1507,7 +1534,7 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
-const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout'];
+const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin'];
 const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 // permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
@@ -1576,6 +1603,7 @@ const ICO={
   m_rh:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-5"/>',
   m_com:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/>',
   m_esc:'<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
+  m_ctl:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M11 13v2h2v-2"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
@@ -1641,18 +1669,26 @@ const NAV=[
   {k:'cfgusr',t:'Cadastro de usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  // Gestão da Controlacs: clientes, serviços, contratos, reajustes e documentos da própria Controlacs; só a Master (Carol, 05/11; v104)
+  {k:'ctlpainel',t:'Painel e avisos de reajuste',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
+  {k:'ctlcont',t:'Contratos e reajustes',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
+  // financeiro só da Controlacs: mensalidades dos contratos, outras receitas e despesas (Carol, 05/11)
+  {k:'ctlfin',t:'Financeiro da Controlacs',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
+  {k:'ctlcli',t:'Clientes',g:'Controlacs',s:'Cadastros',ok:ehAdm},
+  {k:'ctlserv',t:'Serviços',g:'Controlacs',s:'Cadastros',ok:ehAdm},
+  {k:'ctldocs',t:'Documentos e contratos assinados',g:'Controlacs',s:'Cadastros',ok:ehAdm},
   // manual com prints e explicação de cada tela, para todos os usuários (Carol, 04/11). Toda melhoria atualiza também o MANUAL
   {k:'manual',t:'Manual do sistema',g:'Configurações',s:'Ajuda',ok:()=>!!ME},
   // Configurações › Fornecedores (Bom Controle) foi unificado em Gestão financeira › Clientes e fornecedores (Carol, 04/11)
 ];
 const NAVBADGE={};
 // módulos no topo (um ícone cada); as seções e as telas abrem num painel, como no Bom Controle
-const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Configurações',i:'cfg'}];
+const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'cfg'}];
 const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado','Ajuda'];
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k.startsWith('cfg')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
+const telaSemEmp=k=>k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -1660,7 +1696,7 @@ function serveEmp(n){
 }
 const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k)&&serveEmp(n));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
-const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gfext'?'Tesouraria: lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':n.k==='repasse'?'Alterações de conta e parceiros novos para conferir':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
+const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gfext'?'Tesouraria: lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':n.k==='repasse'?'Alterações de conta e parceiros novos para conferir':n.k==='ctlpainel'?'Reajustes chegando, contratos terminando ou documentos vencendo':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
   // atalho do Dashboard no início dos módulos (Carol, 30/10); ele não aparece mais dentro da Gestão financeira (Carol, 03/11)
@@ -1732,7 +1768,7 @@ function fillClientes(){
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
   escCli.innerHTML=todas+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
-  $('ctxbar').hidden=m.startsWith('cfg')||m==='avisos'||m==='projetos'||m==='agenda'||m==='manual';
+  $('ctxbar').hidden=m.startsWith('cfg')||m.startsWith('ctl')||m==='avisos'||m==='projetos'||m==='agenda'||m==='manual';
   escCli.disabled=escCli.options.length<2;
 }
 escCli.onchange=()=>{guardaEmp();openView()};
@@ -1740,7 +1776,7 @@ escCli.onchange=()=>{guardaEmp();openView()};
 const SECK='portal_secao';
 // filtros e buscas das telas voltam ao padrão ao trocar de tela: o nome de fornecedor digitado não fica lá esquecido (Carol, 04/11)
 // o F5 continua na mesma tela; trocar só a empresa mantém os filtros; o período das outras telas (extrato, conciliação, relatórios) não muda
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -1781,7 +1817,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfdash','gfresumo','gffluxo','gfdre','gfdc
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -1817,6 +1853,7 @@ function openView(){
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
+  else if(VIEW.startsWith('ctl')){$('viewCtl').hidden=false;renderCtl()}
   avBanner();tpBanner();soVerBanner();
 }
 // aviso no alto da tela de quem só tem "Visualizar" nela
@@ -1843,7 +1880,7 @@ async function boot(){
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
   show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);nvMostra();
-  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge();ctlBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('lgErr').hidden=true;$('lgBtn').disabled=true;
@@ -10341,6 +10378,379 @@ async function agCarrega(){
 // REGRA: toda melhoria ou atualização visível também atualiza o MANUAL (texto e, se a tela mudou, o print em manual/).
 // k = tela do NAV (o item só aparece para quem tem a tela liberada); k começando com '_' aparece para todos.
 // Os prints usam empresas e pessoas fictícias. Feito por partes: as telas que ainda não têm explicação ficam listadas no fim.
+// ---------- Gestão da Controlacs (v104): clientes, serviços, contratos, reajustes e documentos da própria Controlacs ----------
+// só a Master vê e grava (RLS eh_admin nas tabelas ctl_* e no bucket "controlacs"). Carol, 05/11: "uma coisa à parte que só eu tivesse acesso"
+const CTL={cli:[],serv:[],cont:[],reaj:[],docs:[],lanc:[],dlg:null};
+const CTSIT={
+  ctlcli:{prospecto:['c-none','Prospecto'],ativo:['c-ok','Ativo'],suspenso:['c-warn','Suspenso'],encerrado:['c-none','Encerrado']},
+  ctlcont:{proposta:['c-none','Proposta'],vigente:['c-ok','Vigente'],suspenso:['c-warn','Suspenso'],encerrado:['c-none','Encerrado']}};
+const CTCOB={mensal:'Mensal',avulso:'Avulso',anual:'Anual',hora:'Por hora'};
+const CTDOC={contrato:'Contrato',aditivo:'Aditivo',proposta:'Proposta',procuracao:'Procuração',distrato:'Distrato',outro:'Outro'};
+const CTIND=['IPCA','IGP-M','INPC','Salário mínimo','Percentual fixo','Outro'];
+const ctChip=(t,s)=>{const x=CTSIT[t]?.[s];return x?`<span class="chip ${x[0]}">${x[1]}</span>`:''};
+const ctOpts=(o,v)=>(Array.isArray(o)?o.map(k=>[k,k]):Object.entries(o).map(([k,x])=>[k,Array.isArray(x)?x[1]:x])).map(([k,t])=>`<option value="${esc(k)}"${k===v?' selected':''}>${esc(t)}</option>`).join('');
+const ctDias=d=>Math.round((dObj(d)-dObj(TODAY))/864e5);
+function ctMeses(iso,n){const d=dObj(iso),dia=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+n);d.setDate(Math.min(dia,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return isoLocal(d)}
+const ctPct=v=>v==null||v===''?'':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:4})+'%';
+const ctCli=id=>CTL.cli.find(c=>c.id===id);
+// reajuste: atrasado (passou da data), próximo (dentro do aviso) ou em dia
+function ctReaj(c){if(c.situacao!=='vigente'||!c.data_reajuste)return null;const d=ctDias(c.data_reajuste);return d<0?'atrasado':d<=(c.aviso_dias??30)?'proximo':'ok'}
+function ctReajChip(c){const s=ctReaj(c);if(!s)return c.data_reajuste?dBR(c.data_reajuste):'<span class="muted">—</span>';const d=ctDias(c.data_reajuste);
+  return s==='atrasado'?`<span class="chip c-bad">Atrasado desde ${dBR(c.data_reajuste)}</span>`:s==='proximo'?`<span class="chip c-warn">${d===0?'Hoje':'Em '+d+(d===1?' dia':' dias')} · ${dBR(c.data_reajuste)}</span>`:dBR(c.data_reajuste)}
+// contrato que termina dentro do aviso (ou já terminou e continua vigente)
+const ctFim=c=>c.situacao==='vigente'&&c.fim&&ctDias(c.fim)<=(c.aviso_dias??30);
+const ctDocVence=d=>d.validade&&ctDias(d.validade)<=30;
+const ctNovoValor=(v,p)=>r2((Number(v)||0)*(1+(Number(p)||0)/100));
+async function ctCarrega(){
+  const q=t=>sb.from(t).select('*');
+  const r=await Promise.all([q('ctl_clientes').order('nome'),q('ctl_servicos').order('nome'),q('ctl_contratos').order('titulo'),q('ctl_reajustes').order('data',{ascending:false}),q('ctl_documentos').order('criado_em',{ascending:false}),q('ctl_lancamentos').order('vencimento')]);
+  const e=r.find(x=>x.error)?.error;if(e)throw e;
+  [CTL.cli,CTL.serv,CTL.cont,CTL.reaj,CTL.docs,CTL.lanc]=r.map(x=>x.data||[]);
+}
+// número vermelho no menu: reajustes atrasados ou próximos, contratos terminando e documentos vencendo
+async function ctlBadge(){
+  if(!ehAdm())return;
+  try{await ctCarrega()}catch(e){return}
+  ctBadgeCalc();
+}
+function ctBadgeCalc(){
+  const n=CTL.cont.filter(c=>ctReaj(c)==='atrasado'||ctReaj(c)==='proximo'||ctFim(c)).length+CTL.docs.filter(ctDocVence).length+CTL.lanc.filter(l=>l.tipo==='receita'&&ctLSit(l)==='atrasado').length;
+  if((NAVBADGE.ctlpainel||0)!==n){NAVBADGE.ctlpainel=n;renderNav()}
+}
+const CTSITBOX={ctlfin:{aberto:'Em aberto',atrasado:'Atrasados (todos os meses)',pago:'Pagos e recebidos'},ctlcli:CTSIT.ctlcli,ctlcont:CTSIT.ctlcont,ctlserv:{ativo:'Ativos',inativo:'Inativos'},ctldocs:CTDOC};
+async function renderCtl(){
+  document.querySelectorAll('#tabsCtl button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===VIEW));
+  const box=CTSITBOX[VIEW];$('ctBar').hidden=VIEW==='ctlpainel';$('ctSitBox').firstChild.textContent=VIEW==='ctldocs'?'Tipo':'Situação';
+  if(box&&$('ctSit').dataset.t!==VIEW){$('ctSit').innerHTML=`<option value="">${VIEW==='ctldocs'?'Todos':'Todas'}</option>`+ctOpts(box,'');$('ctSit').dataset.t=VIEW;
+    if(VIEW==='ctlcli')$('ctSit').value='ativo';if(VIEW==='ctlcont')$('ctSit').value='vigente';if(VIEW==='ctlserv')$('ctSit').value='ativo'}
+  $('ctMesBox').hidden=$('ctTipoBox').hidden=VIEW!=='ctlfin';if(!$('ctMes').value)$('ctMes').value=TODAY.slice(0,7);
+  $('ctBusca').placeholder={ctlfin:'Buscar descrição, cliente ou categoria',ctlcli:'Buscar por nome, CNPJ/CPF ou contato',ctlcont:'Buscar por contrato ou cliente',ctlserv:'Buscar serviço',ctldocs:'Buscar documento ou cliente'}[VIEW]||'Buscar';
+  $('ctAcoes').innerHTML={ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
+  $('ctConteudo').innerHTML='<p class="note">Carregando…</p>';
+  try{await ctCarrega()}catch(e){console.error(e);$('ctConteudo').innerHTML=`<div class="alerta bad"><b>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Esta área precisa da atualização v104 do banco.':'Erro ao carregar.'}</b><span>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Rode o SQL “v104 - Gestao da Controlacs” no Supabase e atualize a página.':'Verifique a internet e tente de novo.'}</span></div>`;return}
+  ctDesenha();ctBadgeCalc();
+}
+function ctDesenha(){
+  const b=$('ctBusca').value.trim().toLowerCase(),sit=$('ctSit').value,tem=(...x)=>!b||x.some(v=>String(v||'').toLowerCase().includes(b));
+  const tab=(head,rows,vazio)=>`<div class="card tablebox"><table><thead><tr>${head}</tr></thead><tbody>${rows||`<tr><td class="l muted" colspan="9">${vazio}</td></tr>`}</tbody></table></div>`;
+  const vig=CTL.cont.filter(c=>c.situacao==='vigente');
+  if(VIEW==='ctlpainel'){
+    const reaj=CTL.cont.filter(c=>['atrasado','proximo'].includes(ctReaj(c))).sort((x,y)=>x.data_reajuste>y.data_reajuste?1:-1);
+    const fim=CTL.cont.filter(ctFim).sort((x,y)=>x.fim>y.fim?1:-1),docs=CTL.docs.filter(ctDocVence).sort((x,y)=>x.validade>y.validade?1:-1);
+    const ate60=vig.filter(c=>c.data_reajuste&&ctDias(c.data_reajuste)<=60).length;
+    $('ctConteudo').innerHTML=`<div class="tiles">
+      <div class="card tile"><div class="k">Clientes ativos</div><div class="v">${CTL.cli.filter(c=>c.situacao==='ativo').length}</div><div class="n">${CTL.cli.filter(c=>c.situacao==='prospecto').length} prospecto(s)</div></div>
+      <div class="card tile"><div class="k">Contratos vigentes</div><div class="v">${vig.length}</div><div class="n">${CTL.cont.filter(c=>c.situacao==='proposta').length} proposta(s)</div></div>
+      <div class="card tile"><div class="k">Receita mensal contratada</div><div class="v">${fm(vig.reduce((a,c)=>a+(Number(c.valor_mensal)||0),0))}</div><div class="n">soma dos contratos vigentes</div></div>
+      <div class="card tile"><div class="k">A receber em atraso</div><div class="v">${fm(CTL.lanc.filter(l=>l.tipo==='receita'&&ctLSit(l)==='atrasado').reduce((a,l)=>a+(Number(l.valor)||0),0))}</div><div class="n">${CTL.lanc.filter(l=>l.tipo==='receita'&&ctLSit(l)==='atrasado').length} mensalidade(s) ou receita(s)</div></div>
+      <div class="card tile"><div class="k">Reajustes em 60 dias</div><div class="v">${ate60}</div><div class="n">${reaj.filter(c=>ctReaj(c)==='atrasado').length} atrasado(s)</div></div></div>
+      ${!CTL.cli.length?`<div class="alerta"><b>Comece cadastrando os seus serviços e os seus clientes.</b><span>Depois, em cada cliente, crie o contrato com o valor, a data e o índice de reajuste, e anexe o contrato assinado. O painel avisa quando um reajuste estiver chegando.</span></div>`:''}
+      <h2 style="margin-top:22px">Reajustes atrasados ou chegando</h2>
+      ${tab('<th class="l">Contrato</th><th class="l">Cliente</th><th>Data do reajuste</th><th>Índice</th><th>Percentual</th><th>Valor atual</th><th>Valor reajustado</th><th></th>',
+        reaj.map(c=>`<tr data-ctcont="${c.id}"><td class="l"><b>${esc(c.titulo)}</b></td><td class="l">${esc(ctCli(c.cliente_id)?.nome||'')}</td><td>${ctReajChip(c)}</td><td>${esc(c.indice_reajuste||'')}</td><td>${ctPct(c.percentual_reajuste)||'<span class="muted">a definir</span>'}</td><td>${fm(c.valor_mensal)}</td><td>${c.percentual_reajuste!=null?fm(ctNovoValor(c.valor_mensal,c.percentual_reajuste)):'—'}</td><td><button type="button" class="btn small primary" data-ctreaj="${c.id}">Aplicar reajuste</button></td></tr>`).join(''),
+        'Nenhum reajuste atrasado ou dentro do prazo de aviso.')}
+      <h2 style="margin-top:22px">Contratos terminando</h2>
+      ${tab('<th class="l">Contrato</th><th class="l">Cliente</th><th>Fim</th><th>Renovação</th><th>Valor mensal</th>',
+        fim.map(c=>`<tr data-ctcont="${c.id}"><td class="l"><b>${esc(c.titulo)}</b></td><td class="l">${esc(ctCli(c.cliente_id)?.nome||'')}</td><td><span class="chip ${ctDias(c.fim)<0?'c-bad':'c-warn'}">${dBR(c.fim)}</span></td><td>${c.renovacao_automatica?'Automática':'<b>Precisa renovar</b>'}</td><td>${fm(c.valor_mensal)}</td></tr>`).join(''),
+        'Nenhum contrato terminando dentro do prazo de aviso.')}
+      <h2 style="margin-top:22px">Documentos vencendo (30 dias)</h2>
+      ${tab('<th class="l">Documento</th><th class="l">Cliente</th><th>Tipo</th><th>Validade</th>',
+        docs.map(d=>`<tr data-ctdoc="${d.id}"><td class="l"><b>${esc(d.nome)}</b></td><td class="l">${esc(ctCli(d.cliente_id)?.nome||'')}</td><td>${esc(CTDOC[d.tipo]||d.tipo)}</td><td><span class="chip ${ctDias(d.validade)<0?'c-bad':'c-warn'}">${dBR(d.validade)}</span></td></tr>`).join(''),
+        'Nenhum documento vencendo.')}`;
+    $('ctNote').textContent='O aviso do reajuste aparece a partir do número de dias escolhido em cada contrato (padrão 30). O número vermelho no menu soma reajustes, contratos terminando e documentos vencendo.';
+  }else if(VIEW==='ctlfin'){
+    const mes=$('ctMes').value||TODAY.slice(0,7),tp=$('ctTipo').value,cn=l=>ctCli(l.cliente_id)?.nome||'';
+    const doMes=CTL.lanc.filter(l=>l.vencimento.startsWith(mes));
+    const l=(sit==='atrasado'?CTL.lanc:doMes).filter(x=>(!tp||x.tipo===tp)&&(!sit||ctLSit(x)===sit)&&tem(x.descricao,x.categoria,cn(x),x.obs));
+    const soma=(f)=>doMes.filter(f).reduce((a,x)=>a+(Number(x.pago_em?x.valor_pago??x.valor:x.valor)||0),0);
+    const rec=soma(x=>x.tipo==='receita'),recPg=soma(x=>x.tipo==='receita'&&x.pago_em),des=soma(x=>x.tipo==='despesa'),desPg=soma(x=>x.tipo==='despesa'&&x.pago_em);
+    const atr=CTL.lanc.filter(x=>x.tipo==='receita'&&ctLSit(x)==='atrasado'&&!x.vencimento.startsWith(mes));
+    const [a,m]=mes.split('-');
+    $('ctConteudo').innerHTML=`<div class="tiles">
+      <div class="card tile"><div class="k">Receitas de ${MESES[m-1]}/${a}</div><div class="v">${fm(rec)}</div><div class="n">recebido ${fm(recPg)} · falta ${fm(rec-recPg)}</div></div>
+      <div class="card tile"><div class="k">Despesas de ${MESES[m-1]}/${a}</div><div class="v">${fm(des)}</div><div class="n">pago ${fm(desPg)} · falta ${fm(des-desPg)}</div></div>
+      <div class="card tile"><div class="k">Resultado previsto</div><div class="v ${rec-des<0?'neg':''}">${fm(rec-des)}</div><div class="n">receitas menos despesas do mês</div></div>
+      <div class="card tile"><div class="k">Resultado realizado</div><div class="v ${recPg-desPg<0?'neg':''}">${fm(recPg-desPg)}</div><div class="n">recebido menos pago</div></div></div>
+      ${atr.length&&sit!=='atrasado'?`<div class="alerta bad"><b>${atr.length} ${atr.length===1?'receita atrasada':'receitas atrasadas'} de outros meses: ${fm(atr.reduce((s,x)=>s+(Number(x.valor)||0),0))}.</b><span>Escolha a situação “Atrasados” para ver todas.</span></div>`:''}
+      ${!CTL.lanc.length?`<div class="alerta"><b>Comece pelo botão “Gerar mensalidades do mês”.</b><span>Ele cria a mensalidade de cada contrato vigente, com o valor e o dia do vencimento do contrato. Depois é só dar baixa quando o cliente pagar. Lance as despesas da Controlacs em “+ Despesa”.</span></div>`:''}
+      ${tab('<th>Vencimento</th><th class="l">Descrição</th><th class="l">Cliente</th><th class="l">Categoria</th><th>Valor</th><th>Situação</th><th></th>',
+        l.sort((x,y)=>x.vencimento>y.vencimento?1:x.vencimento<y.vencimento?-1:x.tipo.localeCompare(y.tipo))
+        .map(x=>{const st=ctLSit(x);return `<tr data-ctlanc="${x.id}"><td>${dBR(x.vencimento)}</td><td class="l"><span class="chip ${x.tipo==='receita'?'c-ok':'c-none'}">${x.tipo==='receita'?'Receita':'Despesa'}</span> <b>${esc(x.descricao)}</b></td><td class="l">${esc(cn(x))}</td><td class="l">${esc(x.categoria||'')}</td><td class="${x.tipo==='despesa'?'neg':''}">${x.tipo==='despesa'?'−':''}${fm(x.pago_em?x.valor_pago??x.valor:x.valor)}</td>
+          <td>${st==='pago'?`<span class="chip c-done">${x.tipo==='receita'?'Recebido':'Pago'} ${dBR(x.pago_em)}</span>`:st==='atrasado'?'<span class="chip c-bad">Atrasado</span>':'<span class="chip c-warn">Em aberto</span>'}</td>
+          <td>${st==='pago'?'':`<button type="button" class="btn small" data-ctbx="${x.id}">${x.tipo==='receita'?'Recebido':'Pago'} hoje</button>`}</td></tr>`}).join(''),
+        doMes.length||sit==='atrasado'?'Nenhum lançamento com estes filtros.':'Nenhum lançamento neste mês.')}`;
+    $('ctNote').textContent='Clique no lançamento para corrigir, informar outra data ou valor de pagamento, ou estornar a baixa. Estas contas são só da Controlacs e não aparecem na Gestão financeira das empresas.';
+  }else if(VIEW==='ctlcli'){
+    const l=CTL.cli.filter(c=>(!sit||c.situacao===sit)&&tem(c.nome,c.razao_social,c.cnpj_cpf,c.contato,c.email));
+    $('ctConteudo').innerHTML=tab('<th class="l">Cliente</th><th class="l">CNPJ/CPF</th><th class="l">Contato</th><th>Situação</th><th>Contratos vigentes</th><th>Valor mensal</th><th>Próximo reajuste</th>',
+      l.map(c=>{const cs=vig.filter(x=>x.cliente_id===c.id),pr=cs.filter(x=>x.data_reajuste).sort((x,y)=>x.data_reajuste>y.data_reajuste?1:-1)[0];
+        return `<tr data-ctcli="${c.id}"><td class="l"><b>${esc(c.nome)}</b>${c.razao_social&&c.razao_social!==c.nome?`<br><span class="muted">${esc(c.razao_social)}</span>`:''}</td><td class="l">${esc(c.cnpj_cpf||'')}</td><td class="l">${esc(c.contato||'')}${c.telefone?`<br><span class="muted">${esc(c.telefone)}</span>`:''}</td><td>${ctChip('ctlcli',c.situacao)}</td><td>${cs.length}</td><td>${fm(cs.reduce((a,x)=>a+(Number(x.valor_mensal)||0),0))}</td><td>${pr?ctReajChip(pr):'<span class="muted">—</span>'}</td></tr>`}).join(''),
+      CTL.cli.length?'Nenhum cliente com estes filtros.':'Nenhum cliente ainda. Use “+ Novo cliente”.');
+    $('ctNote').textContent='Clique no cliente para ver os dados, os contratos e os documentos dele.';
+  }else if(VIEW==='ctlcont'){
+    const l=CTL.cont.filter(c=>(!sit||c.situacao===sit)&&tem(c.titulo,c.numero,ctCli(c.cliente_id)?.nome)).sort((x,y)=>(ctCli(x.cliente_id)?.nome||'').localeCompare(ctCli(y.cliente_id)?.nome||'')||x.titulo.localeCompare(y.titulo));
+    $('ctConteudo').innerHTML=tab('<th class="l">Contrato</th><th class="l">Cliente</th><th>Situação</th><th>Vigência</th><th>Valor mensal</th><th>Índice</th><th>Próximo reajuste</th>',
+      l.map(c=>`<tr data-ctcont="${c.id}"><td class="l"><b>${esc(c.titulo)}</b>${c.numero?`<br><span class="muted">Nº ${esc(c.numero)}</span>`:''}</td><td class="l">${esc(ctCli(c.cliente_id)?.nome||'')}</td><td>${ctChip('ctlcont',c.situacao)}</td><td>${c.inicio?dBR(c.inicio):'—'} a ${c.fim?dBR(c.fim):'indeterminado'}</td><td>${fm(c.valor_mensal)}</td><td>${esc(c.indice_reajuste||'')}${c.percentual_reajuste!=null?' · '+ctPct(c.percentual_reajuste):''}</td><td>${ctReajChip(c)}</td></tr>`).join(''),
+      CTL.cont.length?'Nenhum contrato com estes filtros.':'Nenhum contrato ainda. Cadastre o cliente e use “+ Novo contrato”.');
+    $('ctNote').textContent='Abra o contrato para alterar, anexar documentos, ver o histórico e aplicar o reajuste. Ao aplicar, o valor mensal é atualizado e a data do próximo reajuste avança (12 meses, ou o que estiver no contrato).';
+  }else if(VIEW==='ctlserv'){
+    const l=CTL.serv.filter(s=>(!sit||(sit==='ativo')===s.ativo)&&tem(s.nome,s.descricao));
+    $('ctConteudo').innerHTML=tab('<th class="l">Serviço</th><th>Cobrança</th><th>Valor padrão</th><th>Contratos vigentes</th><th>Situação</th>',
+      l.map(s=>`<tr data-ctserv="${s.id}"><td class="l"><b>${esc(s.nome)}</b>${s.descricao?`<br><span class="muted">${esc(s.descricao)}</span>`:''}</td><td>${CTCOB[s.cobranca]||''}</td><td>${s.valor_padrao!=null?fm(s.valor_padrao):'—'}</td><td>${vig.filter(c=>(c.servicos||[]).some(x=>x.id===s.id)).length}</td><td>${s.ativo?'<span class="chip c-ok">Ativo</span>':'<span class="chip c-none">Inativo</span>'}</td></tr>`).join(''),
+      CTL.serv.length?'Nenhum serviço com estes filtros.':'Nenhum serviço ainda. Ex.: BPO financeiro, Folha de pagamento, Consultoria.');
+    $('ctNote').textContent='Os serviços aparecem para marcar dentro de cada contrato.';
+  }else if(VIEW==='ctldocs'){
+    const l=CTL.docs.filter(d=>(!sit||d.tipo===sit)&&tem(d.nome,d.obs,ctCli(d.cliente_id)?.nome,d.nome_arquivo));
+    $('ctConteudo').innerHTML=tab('<th class="l">Documento</th><th class="l">Cliente</th><th class="l">Contrato</th><th>Tipo</th><th>Validade</th><th>Arquivo</th><th>Enviado em</th>',
+      l.map(d=>`<tr data-ctdoc="${d.id}"><td class="l"><b>${esc(d.nome)}</b></td><td class="l">${esc(ctCli(d.cliente_id)?.nome||'')}</td><td class="l">${esc(CTL.cont.find(c=>c.id===d.contrato_id)?.titulo||'')}</td><td>${esc(CTDOC[d.tipo]||d.tipo)}</td><td>${d.validade?(ctDocVence(d)?`<span class="chip ${ctDias(d.validade)<0?'c-bad':'c-warn'}">${dBR(d.validade)}</span>`:dBR(d.validade)):'—'}</td><td>${d.caminho?`<a href="#" data-ctbaixa="${d.id}">📎 ${esc(d.nome_arquivo||'abrir')}</a>`:'<span class="muted">sem arquivo</span>'}</td><td>${dtBR(d.criado_em)}</td></tr>`).join(''),
+      CTL.docs.length?'Nenhum documento com estes filtros.':'Nenhum documento ainda. Use “+ Novo documento” ou anexe dentro do cliente ou do contrato.');
+    $('ctNote').textContent='Os arquivos ficam guardados numa área separada, que só você acessa.';
+  }
+}
+$('ctBusca').oninput=ctDesenha;$('ctSit').onchange=ctDesenha;$('ctMes').onchange=ctDesenha;$('ctTipo').onchange=ctDesenha;
+$('tabsCtl').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&b.dataset.tab!==VIEW)go(b.dataset.tab)});
+$('ctAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-ctnovo]');if(!b)return;const t=b.dataset.ctnovo;
+  if(t==='gerar')return ctGera(b);if(t==='receita'||t==='despesa')return ctAbreLanc(null,t);
+  if(t==='cli')ctAbreCli(null);else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
+async function ctBaixa(id){const d=CTL.docs.find(x=>x.id===id);if(!d?.caminho)return;
+  const {data,error}=await sb.storage.from('controlacs').createSignedUrl(d.caminho,3600);if(error)return fail(error,'Não foi possível abrir o arquivo');window.open(data.signedUrl,'_blank','noopener')}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#viewCtl,#dlgCtl'))return;
+  const bx=e.target.closest('[data-ctbaixa]');if(bx){e.preventDefault();e.stopPropagation();return ctBaixa(bx.dataset.ctbaixa)}
+  const bxl=e.target.closest('[data-ctbx]');if(bxl){e.stopPropagation();return ctBaixaHoje(bxl)}
+  const rj=e.target.closest('[data-ctreaj]');if(rj){e.stopPropagation();return ctAbreCont(CTL.cont.find(c=>c.id===rj.dataset.ctreaj),true)}
+  if(e.target.closest('#ctdFoot'))return;
+  const lc=e.target.closest('[data-ctlanc]');if(lc&&!e.target.closest('button,a'))return ctAbreLanc(CTL.lanc.find(x=>x.id===lc.dataset.ctlanc));
+  const r=e.target.closest('[data-ctcli],[data-ctcont],[data-ctserv],[data-ctdoc]');if(!r||e.target.closest('input,select,textarea,button:not([data-ctcli]):not([data-ctcont]):not([data-ctdoc])'))return;
+  if(r.tagName==='A')e.preventDefault();
+  if(r.dataset.ctcli)ctAbreCli(ctCli(r.dataset.ctcli));else if(r.dataset.ctcont)ctAbreCont(CTL.cont.find(c=>c.id===r.dataset.ctcont));
+  else if(r.dataset.ctserv)ctAbreServ(CTL.serv.find(s=>s.id===r.dataset.ctserv));else if(r.dataset.ctdoc)ctAbreDoc(CTL.docs.find(d=>d.id===r.dataset.ctdoc));
+});
+// ---- janela única (cliente, contrato, serviço ou documento) ----
+const dlgCtl=$('dlgCtl');
+const ctErr=x=>{const el=$('ctdErr');el.textContent=x;el.hidden=false};
+const ctV=id=>{const el=$(id);return el?(el.value??'').trim():''};
+const ctNull=id=>ctV(id)||null;
+const ctBtn=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-ctact="${act}">${txt}</button>`;
+function ctMostra(tipo,obj,titulo,chip,corpo,foot){
+  CTL.dlg={tipo,obj};$('ctdTitle').textContent=titulo;$('ctdChip').innerHTML=chip||'';
+  $('ctdBody').innerHTML=corpo+'<p class="err" id="ctdErr" hidden></p>';
+  $('ctdFoot').innerHTML=foot;if(!dlgCtl.open)dlgCtl.showModal();
+}
+const ctDocsLista=l=>l.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Documento</th><th>Tipo</th><th>Validade</th><th>Arquivo</th></tr></thead><tbody>${l.map(d=>`<tr data-ctdoc="${d.id}"><td class="l">${esc(d.nome)}</td><td>${esc(CTDOC[d.tipo]||d.tipo)}</td><td>${d.validade?dBR(d.validade):'—'}</td><td>${d.caminho?`<a href="#" data-ctbaixa="${d.id}">📎 ${esc(d.nome_arquivo||'abrir')}</a>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum documento.</p>';
+function ctAbreCli(c){
+  const cs=c?CTL.cont.filter(x=>x.cliente_id===c.id):[],ds=c?CTL.docs.filter(d=>d.cliente_id===c.id):[];
+  ctMostra('cli',c,c?c.nome:'Novo cliente',c?ctChip('ctlcli',c.situacao):'',
+    `<div class="fields"><label class="f wide">Nome (como você chama o cliente) *<input id="ct_nome" maxlength="160" value="${esc(c?.nome||'')}"></label>
+    <label class="f">Razão social<input id="ct_razao" value="${esc(c?.razao_social||'')}"></label>
+    <label class="f">CNPJ/CPF<input id="ct_doc" value="${esc(c?.cnpj_cpf||'')}"></label>
+    <label class="f">Situação<select id="ct_sit">${ctOpts(CTSIT.ctlcli,c?.situacao||'ativo')}</select></label>
+    <label class="f">Cliente desde<input type="date" id="ct_desde" value="${c?.cliente_desde||''}"></label>
+    <label class="f">Contato (pessoa)<input id="ct_contato" value="${esc(c?.contato||'')}"></label>
+    <label class="f">Telefone<input id="ct_tel" value="${esc(c?.telefone||'')}"></label>
+    <label class="f">E-mail<input type="email" id="ct_email" value="${esc(c?.email||'')}"></label>
+    <label class="f">Empresa no portal<select id="ct_emp"><option value="">Nenhuma</option>${CLIENTES.map(x=>`<option value="${x.id}"${x.id===c?.empresa_id?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
+    <label class="f wide">Endereço<input id="ct_end" value="${esc(c?.endereco||'')}"></label>
+    <label class="f wide">Anotações<textarea id="ct_obs" rows="3">${esc(c?.obs||'')}</textarea></label></div>
+    ${c?`<div class="f wide" style="margin-top:14px"><span>Contratos</span>${cs.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Contrato</th><th>Situação</th><th>Valor mensal</th><th>Próximo reajuste</th></tr></thead><tbody>${cs.map(x=>`<tr data-ctcont="${x.id}"><td class="l">${esc(x.titulo)}</td><td>${ctChip('ctlcont',x.situacao)}</td><td>${fm(x.valor_mensal)}</td><td>${ctReajChip(x)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum contrato.</p>'}
+      <div><button type="button" class="btn small" data-ctact="novocont">+ Novo contrato</button></div></div>
+    <div class="f wide" style="margin-top:14px"><span>Documentos</span>${ctDocsLista(ds)}<div><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button></div></div>`:''}`,
+    (c?ctBtn('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
+  if(!c)$('ct_nome').focus();
+}
+function ctServLinhas(c){
+  const sel=new Map((c?.servicos||[]).map(x=>[x.id,x]));
+  const l=CTL.serv.filter(s=>s.ativo||sel.has(s.id));
+  return l.length?l.map(s=>`<div class="ctsv"><label><input type="checkbox" data-ctsv="${s.id}"${sel.has(s.id)?' checked':''}><span>${esc(s.nome)} <span class="muted">${CTCOB[s.cobranca]||''}</span></span></label><input class="money" inputmode="decimal" data-ctsvv="${s.id}" placeholder="Valor" aria-label="Valor de ${esc(s.nome)}" value="${showMoney(sel.get(s.id)?.valor??(sel.has(s.id)?'':s.valor_padrao))}"></div>`).join('')
+    :'<p class="note" style="margin:0">Nenhum serviço cadastrado. Cadastre na aba Serviços.</p>';
+}
+function ctAbreCont(c,reaj,cliId){
+  const hist=c?CTL.reaj.filter(r=>r.contrato_id===c.id):[],ds=c?CTL.docs.filter(d=>d.contrato_id===c.id):[];
+  const prox=c?.data_reajuste||'';
+  ctMostra('cont',c,c?c.titulo:'Novo contrato',c?ctChip('ctlcont',c.situacao):'',
+    `<div class="fields"><label class="f wide">Contrato (nome) *<input id="ct_titulo" maxlength="160" value="${esc(c?.titulo||'')}" placeholder="Ex.: BPO financeiro e folha"></label>
+    <label class="f">Cliente *<select id="ct_cli"><option value="">Escolha</option>${CTL.cli.map(x=>`<option value="${x.id}"${x.id===(c?.cliente_id||cliId)?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
+    <label class="f">Número<input id="ct_num" value="${esc(c?.numero||'')}"></label>
+    <label class="f">Situação<select id="ct_sit">${ctOpts(CTSIT.ctlcont,c?.situacao||'vigente')}</select></label>
+    <label class="f">Início<input type="date" id="ct_ini" value="${c?.inicio||''}"></label>
+    <label class="f">Fim (vazio = indeterminado)<input type="date" id="ct_fim" value="${c?.fim||''}"></label>
+    <label class="f">Renovação<select id="ct_renova"><option value="1"${c?.renovacao_automatica!==false?' selected':''}>Automática</option><option value="0"${c?.renovacao_automatica===false?' selected':''}>Precisa renovar</option></select></label>
+    <label class="f">Valor mensal<input class="money" inputmode="decimal" id="ct_valor" value="${showMoney(c?.valor_mensal)}"></label>
+    <label class="f">Dia do vencimento<input type="number" min="1" max="31" id="ct_dia" value="${c?.dia_vencimento||''}"></label>
+    <div class="f wide"><span>Serviços do contrato</span><div id="ct_servs" style="display:grid;gap:6px">${ctServLinhas(c)}</div></div>
+    <label class="f">Índice de reajuste<select id="ct_ind">${ctOpts(CTIND,c?.indice_reajuste||'IPCA')}</select></label>
+    <label class="f">Percentual do reajuste (%)<input inputmode="decimal" id="ct_pct" value="${c?.percentual_reajuste!=null?String(c.percentual_reajuste).replace('.',','):''}" placeholder="Ex.: 4,5"></label>
+    <label class="f">Próximo reajuste<input type="date" id="ct_reaj" value="${prox}"></label>
+    <label class="f">Reajusta a cada (meses)<input type="number" min="1" max="60" id="ct_per" value="${c?.periodicidade_meses||12}"></label>
+    <label class="f">Avisar com quantos dias<input type="number" min="0" max="365" id="ct_aviso" value="${c?.aviso_dias??30}"></label>
+    <label class="f wide">Anotações (cláusulas importantes, multa, condições)<textarea id="ct_obs" rows="3">${esc(c?.obs||'')}</textarea></label></div>
+    ${c?`<div class="pjdec" id="ct_reajBox"${reaj?'':' hidden'}><b>Aplicar reajuste</b>
+      <div class="fields"><label class="f">Data<input type="date" id="rj_data" value="${prox||TODAY}"></label>
+      <label class="f">Índice<select id="rj_ind">${ctOpts(CTIND,c.indice_reajuste||'IPCA')}</select></label>
+      <label class="f">Percentual (%)<input inputmode="decimal" id="rj_pct" value="${c.percentual_reajuste!=null?String(c.percentual_reajuste).replace('.',','):''}"></label>
+      <label class="f">Valor atual<input class="money" id="rj_ant" value="${showMoney(c.valor_mensal)}" disabled></label>
+      <label class="f">Valor novo<input class="money" inputmode="decimal" id="rj_novo" value="${c.percentual_reajuste!=null?showMoney(ctNovoValor(c.valor_mensal,c.percentual_reajuste)):''}"></label>
+      <label class="f wide">Observação<input id="rj_obs" placeholder="Ex.: IPCA acumulado de 12 meses, comunicado por e-mail"></label></div>
+      <p class="note" style="margin:0">Ao confirmar, o valor mensal passa a ser o valor novo e o próximo reajuste vai para ${'<span id="rj_prox"></span>'}.</p>
+      <div class="row"><span class="spacer"></span><button type="button" class="btn primary small" data-ctact="aplicar">Confirmar reajuste</button></div></div>
+    <div class="f wide" style="margin-top:14px"><span>Histórico de reajustes</span>${hist.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th>Data</th><th>Índice</th><th>Percentual</th><th>De</th><th>Para</th><th class="l">Observação</th><th></th></tr></thead><tbody>${hist.map(r=>`<tr><td>${dBR(r.data)}</td><td>${esc(r.indice||'')}</td><td>${ctPct(r.percentual)}</td><td>${fm(r.valor_anterior)}</td><td>${fm(r.valor_novo)}</td><td class="l">${esc(r.obs||'')}</td><td><button type="button" class="btn ghost small" data-ctact="apagareaj" data-id="${r.id}" title="Apaga só o registro do histórico; o valor do contrato não muda">✕</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum reajuste aplicado ainda.</p>'}</div>
+    <div class="f wide" style="margin-top:14px"><span>Documentos do contrato</span>${ctDocsLista(ds)}<div><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button></div></div>`:''}`,
+    (c?ctBtn('excluir','Excluir','ghost')+ctBtn('reajuste','Aplicar reajuste','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
+  if(c){ctRjProx();if(reaj)$('ct_reajBox').scrollIntoView({block:'nearest'})}else $('ct_titulo').focus();
+}
+function ctRjProx(){const el=$('rj_prox');if(!el)return;const d=$('rj_data').value,p=Number($('ct_per')?.value)||12;el.textContent=d?dBR(ctMeses(d,p)):'—'}
+function ctAbreServ(s){
+  ctMostra('serv',s,s?s.nome:'Novo serviço','',
+    `<div class="fields"><label class="f wide">Serviço *<input id="ct_nome" maxlength="160" value="${esc(s?.nome||'')}" placeholder="Ex.: BPO financeiro"></label>
+    <label class="f">Cobrança<select id="ct_cob">${ctOpts(CTCOB,s?.cobranca||'mensal')}</select></label>
+    <label class="f">Valor padrão<input class="money" inputmode="decimal" id="ct_valor" value="${showMoney(s?.valor_padrao)}"></label>
+    <label class="f">Situação<select id="ct_ativo"><option value="1"${s?.ativo!==false?' selected':''}>Ativo</option><option value="0"${s?.ativo===false?' selected':''}>Inativo</option></select></label>
+    <label class="f wide">O que está incluído<textarea id="ct_obs" rows="4">${esc(s?.descricao||'')}</textarea></label></div>`,
+    (s?ctBtn('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
+  if(!s)$('ct_nome').focus();
+}
+function ctAbreDoc(d,pre){
+  pre=pre||{};const cli=d?.cliente_id||pre.cliente_id||'',cont=d?.contrato_id||pre.contrato_id||'';
+  ctMostra('doc',d,d?d.nome:'Novo documento','',
+    `<div class="fields"><label class="f wide">Nome do documento *<input id="ct_nome" maxlength="200" value="${esc(d?.nome||'')}" placeholder="Ex.: Contrato assinado 2026"></label>
+    <label class="f">Tipo<select id="ct_tipo">${ctOpts(CTDOC,d?.tipo||'contrato')}</select></label>
+    <label class="f">Cliente<select id="ct_cli"><option value="">Nenhum (da Controlacs)</option>${CTL.cli.map(x=>`<option value="${x.id}"${x.id===cli?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
+    <label class="f">Contrato<select id="ct_cont"><option value="">Nenhum</option>${CTL.cont.map(x=>`<option value="${x.id}" data-cli="${x.cliente_id}"${x.id===cont?' selected':''}>${esc(x.titulo)} · ${esc(ctCli(x.cliente_id)?.nome||'')}</option>`).join('')}</select></label>
+    <label class="f">Validade (opcional)<input type="date" id="ct_val" value="${d?.validade||''}"></label>
+    <label class="f wide">${d?.caminho?`Arquivo atual: <a href="#" data-ctbaixa="${d.id}">📎 ${esc(d.nome_arquivo||'abrir')}</a> · trocar por outro`:'Arquivo (PDF, Word, Excel ou foto, até 20 MB)'}<input type="file" id="ct_file"></label>
+    <label class="f wide">Observação<textarea id="ct_obs" rows="2">${esc(d?.obs||'')}</textarea></label></div>`,
+    (d?ctBtn('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
+  if(!d)$('ct_nome').focus();
+}
+const ctLSit=l=>l.pago_em?'pago':l.vencimento<TODAY?'atrasado':'aberto';
+const CTFORMA=['Pix','Boleto','Transferência','Dinheiro','Cartão','Débito automático','Outro'];
+async function ctBaixaHoje(bt){const x=CTL.lanc.find(l=>l.id===bt.dataset.ctbx);if(!x)return;bt.disabled=true;
+  const {error}=await sb.from('ctl_lancamentos').update({pago_em:TODAY,valor_pago:x.valor}).eq('id',x.id);bt.disabled=false;if(error)return fail(error);
+  x.pago_em=TODAY;x.valor_pago=x.valor;toast(x.tipo==='receita'?'Recebimento registrado':'Pagamento registrado');ctDesenha();ctBadgeCalc()}
+// mensalidade do mês para cada contrato vigente com valor (não repete a que já existe)
+async function ctGera(bt){
+  const mes=$('ctMes').value||TODAY.slice(0,7),[a,m]=mes.split('-').map(Number),ult=new Date(a,m,0).getDate(),ini=mes+'-01',fim=mes+'-'+pad(ult);
+  const l=CTL.cont.filter(c=>c.situacao==='vigente'&&Number(c.valor_mensal)>0&&(!c.inicio||c.inicio<=fim)&&(!c.fim||c.fim>=ini)&&!CTL.lanc.some(x=>x.contrato_id===c.id&&x.competencia===ini));
+  if(!l.length)return toast('Nenhuma mensalidade nova para '+pad(m)+'/'+a+': os contratos vigentes já têm a deste mês.');
+  if(!confirm(`Gerar ${l.length} ${l.length===1?'mensalidade':'mensalidades'} de ${pad(m)}/${a}, somando ${fm(l.reduce((s,c)=>s+Number(c.valor_mensal),0))}?`))return;
+  bt.disabled=true;
+  const rows=l.map(c=>({tipo:'receita',cliente_id:c.cliente_id,contrato_id:c.id,descricao:'Mensalidade '+pad(m)+'/'+a+' · '+c.titulo,categoria:'Mensalidade',competencia:ini,vencimento:mes+'-'+pad(Math.min(c.dia_vencimento||10,ult)),valor:c.valor_mensal}));
+  const {error}=await sb.from('ctl_lancamentos').insert(rows);bt.disabled=false;
+  if(error){if(/ctl_lancamentos|schema cache|does not exist/i.test(error.message||''))return toast('Rode a atualização v104 do banco para usar o financeiro.');return fail(error)}
+  toast(rows.length+(rows.length===1?' mensalidade gerada':' mensalidades geradas'));await ctCarrega().catch(()=>{});ctDesenha();ctBadgeCalc();
+}
+function ctAbreLanc(x,tipo){
+  tipo=x?.tipo||tipo||'receita';const cats=[...new Set(CTL.lanc.map(l=>l.categoria).filter(Boolean).concat(tipo==='receita'?['Mensalidade','Serviço avulso','Consultoria']:['Impostos','Salários e pró-labore','Sistemas e softwares','Aluguel','Contador','Marketing','Tarifas bancárias']))].sort();
+  const mes=$('ctMes').value||TODAY.slice(0,7);
+  ctMostra('lanc',x,x?x.descricao:tipo==='receita'?'Nova receita':'Nova despesa',x?`<span class="chip ${x.tipo==='receita'?'c-ok':'c-none'}">${x.tipo==='receita'?'Receita':'Despesa'}</span>`:'',
+    `<input type="hidden" id="ct_ltipo" value="${tipo}"><div class="fields"><label class="f wide">Descrição *<input id="ct_nome" maxlength="200" value="${esc(x?.descricao||'')}" placeholder="${tipo==='receita'?'Ex.: Consultoria avulsa':'Ex.: Mensalidade do sistema de folha'}"></label>
+    <label class="f">Categoria<input id="ct_cat" list="ct_cats" value="${esc(x?.categoria||'')}"><datalist id="ct_cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+    <label class="f">${tipo==='receita'?'Cliente':'Cliente (se for de um cliente)'}<select id="ct_cli"><option value="">Nenhum</option>${CTL.cli.map(c=>`<option value="${c.id}"${c.id===x?.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>
+    <label class="f">Vencimento *<input type="date" id="ct_venc" value="${x?.vencimento||(mes===TODAY.slice(0,7)?TODAY:mes+'-10')}"></label>
+    <label class="f">Valor *<input class="money" inputmode="decimal" id="ct_valor" value="${showMoney(x?.valor)}"></label>
+    <label class="f">${tipo==='receita'?'Recebido em':'Pago em'} (vazio = em aberto)<input type="date" id="ct_pago" value="${x?.pago_em||''}"></label>
+    <label class="f">Valor ${tipo==='receita'?'recebido':'pago'} (com juros ou desconto)<input class="money" inputmode="decimal" id="ct_vpago" value="${showMoney(x?.valor_pago)}"></label>
+    <label class="f">Forma<select id="ct_forma"><option value="">—</option>${ctOpts(CTFORMA,x?.forma||'')}</select></label>
+    <label class="f wide">Observação<textarea id="ct_obs" rows="2">${esc(x?.obs||'')}</textarea></label></div>
+    ${x?.contrato_id?`<p class="note" style="margin:0">Mensalidade do contrato <a href="#" data-ctcont="${x.contrato_id}">${esc(CTL.cont.find(c=>c.id===x.contrato_id)?.titulo||'')}</a>.</p>`:''}`,
+    (x?ctBtn('excluir','Excluir','ghost'):'')+(x?.pago_em?ctBtn('estornar','Estornar a baixa','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
+  if(!x)$('ct_nome').focus();
+}
+// valor do contrato = soma dos serviços marcados (dá para mudar à mão depois)
+$('ctdBody').addEventListener('input',e=>{
+  if(CTL.dlg?.tipo!=='cont')return;
+  if(e.target.matches('[data-ctsv],[data-ctsvv]')){const box=e.target.closest('.ctsv');if(e.target.matches('[data-ctsvv]')&&e.target.value.trim())box.querySelector('[data-ctsv]').checked=true;
+    let s=0,tem=false;$('ct_servs').querySelectorAll('[data-ctsv]:checked').forEach(c=>{const v=parseMoney($('ct_servs').querySelector(`[data-ctsvv="${c.dataset.ctsv}"]`).value);if(v){s+=v;tem=true}});if(tem)$('ct_valor').value=showMoney(r2(s))}
+  if(e.target.id==='rj_pct'){const p=numBR(e.target.value.trim()||'x');const a=CTL.dlg.obj?.valor_mensal;if(!isNaN(p))$('rj_novo').value=showMoney(ctNovoValor(a,p))}
+  if(e.target.id==='rj_data'||e.target.id==='ct_per')ctRjProx();
+});
+$('ctdBody').addEventListener('change',e=>{if(e.target.id==='ct_cont'&&CTL.dlg?.tipo==='doc'){const c=e.target.selectedOptions[0]?.dataset.cli;if(c)$('ct_cli').value=c}
+});
+async function ctUpload(f){
+  if(f.size>20*1024*1024)throw new Error('Arquivo maior que 20 MB.');
+  const safe=(f.name||'arquivo').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.-]+/g,'_');
+  const caminho=`documentos/${crypto.randomUUID()}-${safe}`;
+  const {error}=await sb.storage.from('controlacs').upload(caminho,f,{contentType:f.type||'application/octet-stream'});
+  if(error)throw new Error('Falha ao enviar o arquivo.');
+  return {caminho,nome_arquivo:f.name||safe};
+}
+async function ctAcao(act,bt){
+  const {tipo,obj}=CTL.dlg||{};
+  if(act==='fechar')return dlgCtl.close();
+  if(act==='novocont')return ctAbreCont(null,false,obj.id);
+  if(act==='novodoc')return ctAbreDoc(null,tipo==='cli'?{cliente_id:obj.id}:{cliente_id:obj.cliente_id,contrato_id:obj.id});
+  if(act==='reajuste'){$('ct_reajBox').hidden=false;$('ct_reajBox').scrollIntoView({block:'nearest',behavior:'smooth'});return $('rj_pct').focus()}
+  if(act==='apagareaj'){if(!confirm('Apagar este registro do histórico? O valor do contrato não muda.'))return;
+    const {error}=await sb.from('ctl_reajustes').delete().eq('id',bt.dataset.id);if(error)return fail(error,'Não foi possível apagar');
+    CTL.reaj=CTL.reaj.filter(r=>r.id!==bt.dataset.id);return ctAbreCont(obj)}
+  if(act==='aplicar'){
+    const data=$('rj_data').value,pct=numBR($('rj_pct').value.trim()||'x'),novo=parseMoney($('rj_novo').value);
+    if(!data)return ctErr('Informe a data do reajuste.');if(novo==null||isNaN(novo))return ctErr('Informe o percentual ou o valor novo.');
+    const per=Number(obj.periodicidade_meses)||12,prox=ctMeses(data,per);
+    if(!confirm(`Reajustar “${obj.titulo}” de ${fm(obj.valor_mensal)} para ${fm(novo)}? O próximo reajuste fica para ${dBR(prox)}.`))return;
+    bt.disabled=true;
+    const r={contrato_id:obj.id,data,indice:$('rj_ind').value,percentual:isNaN(pct)?null:pct,valor_anterior:obj.valor_mensal,valor_novo:novo,obs:ctNull('rj_obs')};
+    const a=await sb.from('ctl_reajustes').insert(r);
+    if(a.error){bt.disabled=false;return fail(a.error)}
+    const {data:c,error}=await sb.from('ctl_contratos').update({valor_mensal:novo,data_reajuste:prox,indice_reajuste:r.indice,percentual_reajuste:r.percentual,atualizado_em:new Date().toISOString()}).eq('id',obj.id).select().single();
+    bt.disabled=false;if(error)return fail(error);
+    toast('Reajuste aplicado');await ctCarrega().catch(()=>{});ctDesenha();ctBadgeCalc();return ctAbreCont(CTL.cont.find(x=>x.id===c.id)||c)}
+  const T={cli:'ctl_clientes',cont:'ctl_contratos',serv:'ctl_servicos',doc:'ctl_documentos',lanc:'ctl_lancamentos'}[tipo];
+  if(act==='estornar'){const {error}=await sb.from(T).update({pago_em:null,valor_pago:null}).eq('id',obj.id);if(error)return fail(error);
+    obj.pago_em=null;obj.valor_pago=null;toast('Baixa estornada');ctDesenha();ctBadgeCalc();return ctAbreLanc(obj)}
+  if(act==='excluir'){
+    const nome=obj.nome||obj.titulo||obj.descricao;
+    const extra=tipo==='cli'?' Os contratos e os documentos dele também serão apagados.':tipo==='cont'?' O histórico de reajustes também será apagado; os documentos continuam no cliente.':'';
+    if(!confirm(`Excluir “${nome}”?${extra} Não dá para desfazer.`))return;
+    const arqs=(tipo==='cli'?CTL.docs.filter(d=>d.cliente_id===obj.id):tipo==='doc'?[obj]:[]).map(d=>d.caminho).filter(Boolean);
+    const {error}=await sb.from(T).delete().eq('id',obj.id);if(error)return fail(error,'Não foi possível excluir');
+    if(arqs.length)await sb.storage.from('controlacs').remove(arqs).catch(()=>{});
+    toast('Excluído');dlgCtl.close();return renderCtl()}
+  if(act!=='salvar')return;
+  let row;
+  if(tipo==='cli'){
+    if(!ctV('ct_nome'))return ctErr('Informe o nome do cliente.');
+    row={nome:ctV('ct_nome'),razao_social:ctNull('ct_razao'),cnpj_cpf:ctNull('ct_doc'),situacao:$('ct_sit').value,cliente_desde:ctNull('ct_desde'),contato:ctNull('ct_contato'),telefone:ctNull('ct_tel'),email:ctNull('ct_email'),empresa_id:ctNull('ct_emp'),endereco:ctNull('ct_end'),obs:ctNull('ct_obs'),atualizado_em:new Date().toISOString()};
+  }else if(tipo==='cont'){
+    if(!ctV('ct_titulo'))return ctErr('Dê um nome ao contrato.');if(!ctV('ct_cli'))return ctErr('Escolha o cliente.');
+    const pct=ctV('ct_pct')?numBR(ctV('ct_pct')):null;if(pct!=null&&isNaN(pct))return ctErr('Percentual do reajuste inválido.');
+    const valor=parseMoney(ctV('ct_valor'));if(valor!=null&&isNaN(valor))return ctErr('Valor mensal inválido.');
+    const ini=ctNull('ct_ini'),fim=ctNull('ct_fim');if(ini&&fim&&fim<ini)return ctErr('O fim não pode ser antes do início.');
+    const servicos=[...$('ct_servs').querySelectorAll('[data-ctsv]:checked')].map(c=>{const s=CTL.serv.find(x=>x.id===c.dataset.ctsv),v=parseMoney($('ct_servs').querySelector(`[data-ctsvv="${c.dataset.ctsv}"]`).value);return {id:s.id,nome:s.nome,valor:v==null||isNaN(v)?null:v}});
+    // sem data do próximo reajuste: sugere 12 meses depois do início
+    let reaj=ctNull('ct_reaj');const per=Math.min(60,Math.max(1,Number(ctV('ct_per'))||12));if(!reaj&&ini&&!obj)reaj=ctMeses(ini,per);
+    const dia=Number(ctV('ct_dia'))||null;
+    row={titulo:ctV('ct_titulo'),cliente_id:ctV('ct_cli'),numero:ctNull('ct_num'),situacao:$('ct_sit').value,inicio:ini,fim,renovacao_automatica:$('ct_renova').value==='1',valor_mensal:valor,dia_vencimento:dia&&dia>=1&&dia<=31?dia:null,servicos,
+      indice_reajuste:$('ct_ind').value,percentual_reajuste:pct,data_reajuste:reaj,periodicidade_meses:per,aviso_dias:Math.min(365,Math.max(0,Number(ctV('ct_aviso'))||0)),obs:ctNull('ct_obs'),atualizado_em:new Date().toISOString()};
+  }else if(tipo==='lanc'){
+    if(!ctV('ct_nome'))return ctErr('Informe a descrição.');if(!ctV('ct_venc'))return ctErr('Informe o vencimento.');
+    const v=parseMoney(ctV('ct_valor'));if(v==null||isNaN(v)||v<=0)return ctErr('Informe o valor.');
+    const pago=ctNull('ct_pago'),vp=parseMoney(ctV('ct_vpago'));if(vp!=null&&isNaN(vp))return ctErr('Valor pago inválido.');
+    row={tipo:$('ct_ltipo').value,descricao:ctV('ct_nome'),categoria:ctNull('ct_cat'),cliente_id:ctNull('ct_cli'),vencimento:ctV('ct_venc'),valor:v,pago_em:pago,valor_pago:pago?(vp??v):null,forma:ctNull('ct_forma'),obs:ctNull('ct_obs')};
+    if(!obj)row.competencia=row.vencimento.slice(0,8)+'01';
+  }else if(tipo==='serv'){
+    if(!ctV('ct_nome'))return ctErr('Informe o nome do serviço.');
+    const v=parseMoney(ctV('ct_valor'));if(v!=null&&isNaN(v))return ctErr('Valor inválido.');
+    row={nome:ctV('ct_nome'),cobranca:$('ct_cob').value,valor_padrao:v,ativo:$('ct_ativo').value==='1',descricao:ctNull('ct_obs')};
+  }else{
+    if(!ctV('ct_nome'))return ctErr('Informe o nome do documento.');
+    const f=$('ct_file').files[0];if(!obj&&!f)return ctErr('Escolha o arquivo.');
+    row={nome:ctV('ct_nome'),tipo:$('ct_tipo').value,cliente_id:ctNull('ct_cli'),contrato_id:ctNull('ct_cont'),validade:ctNull('ct_val'),obs:ctNull('ct_obs')};
+    if(f){bt.disabled=true;try{Object.assign(row,await ctUpload(f))}catch(x){bt.disabled=false;return ctErr(x.message)}}
+  }
+  bt.disabled=true;
+  const q=obj?sb.from(T).update(row).eq('id',obj.id):sb.from(T).insert(row);
+  const {data,error}=await q.select().single();bt.disabled=false;
+  if(error){if(tipo==='doc'&&row.caminho)sb.storage.from('controlacs').remove([row.caminho]).catch(()=>{});return fail(error)}
+  if(tipo==='doc'&&obj?.caminho&&row.caminho)sb.storage.from('controlacs').remove([obj.caminho]).catch(()=>{});
+  toast('Salvo');await ctCarrega().catch(()=>{});ctDesenha();ctBadgeCalc();
+  // contrato novo: abre para anexar o documento; cliente novo: abre para criar o contrato
+  if(!obj&&tipo==='cli')return ctAbreCli(ctCli(data.id)||data);
+  if(!obj&&tipo==='cont')return ctAbreCont(CTL.cont.find(x=>x.id===data.id)||data);
+  dlgCtl.close();
+}
+$('ctdFoot').addEventListener('click',e=>{const b=e.target.closest('[data-ctact]');if(b)ctAcao(b.dataset.ctact,b)});
+$('ctdBody').addEventListener('click',e=>{const b=e.target.closest('[data-ctact]');if(b){e.stopPropagation();ctAcao(b.dataset.ctact,b)}});
 const MANUAL=[
   {g:'Primeiros passos',itens:[
     {k:'_inicio',t:'Como navegar no portal',img:'menu.png',
@@ -10493,6 +10903,40 @@ const MANUAL=[
 <li>Clique em <b>+ Novo pedido</b>, escolha se é criação ou melhoria e explique o que precisa e por quê. Dá para anexar um arquivo.</li>
 <li>Acompanhe a situação: Aguardando validação, Precisa de ajuste, Aprovado, Em andamento, Concluído ou Recusado. As respostas aparecem no pedido.</li>
 </ol>`}]},
+  {g:'Gestão da Controlacs (só a Master)',itens:[
+    {k:'ctlpainel',t:'Painel e avisos de reajuste',img:'ctlpainel.png',
+      txt:`<p>A área de gestão da própria Controlacs: os seus clientes, os serviços que você presta, os contratos, os reajustes e os documentos. <b>Só a Master vê</b> esta área; a equipe e os clientes não têm acesso, nem aos arquivos.</p>
+<ul>
+<li>No alto: clientes ativos, contratos vigentes, receita mensal contratada (soma dos contratos vigentes) e reajustes nos próximos 60 dias.</li>
+<li><b>Reajustes atrasados ou chegando:</b> os contratos com reajuste vencido (vermelho) ou dentro do prazo de aviso do contrato (amarelo), com o valor reajustado calculado. Clique em <b>Aplicar reajuste</b> para registrar.</li>
+<li><b>Contratos terminando</b> e <b>Documentos vencendo</b> (validade nos próximos 30 dias).</li>
+<li>O número vermelho no menu <b>Controlacs</b> soma esses avisos.</li>
+</ul>`},
+    {k:'ctlcont',t:'Contratos e reajustes',
+      txt:`<ol>
+<li>Clique em <b>+ Novo contrato</b>: escolha o cliente, dê um nome, informe o início, o fim (vazio = indeterminado), o valor mensal e o dia do vencimento.</li>
+<li>Marque os <b>serviços do contrato</b> e o valor de cada um: o valor mensal vira a soma (dá para mudar à mão).</li>
+<li>Reajuste: escolha o <b>índice</b> (IPCA, IGP-M, INPC, salário mínimo, percentual fixo ou outro), o <b>percentual</b>, a data do <b>próximo reajuste</b>, de quantos em quantos meses reajusta (padrão 12) e com quantos dias de antecedência quer ser avisada (padrão 30). Sem data, o portal sugere 12 meses depois do início.</li>
+<li><b>Aplicar reajuste:</b> confira a data, o índice, o percentual e o valor novo e clique em <b>Confirmar reajuste</b>. O valor mensal muda, o próximo reajuste avança e tudo fica no <b>Histórico de reajustes</b> do contrato.</li>
+<li>Dentro do contrato use <b>+ Anexar documento</b> para guardar o contrato assinado, aditivos e propostas.</li>
+</ol>`},
+    {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
+      txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
+<ol>
+<li>Escolha o <b>Mês</b> no alto e clique em <b>Gerar mensalidades do mês</b>: o portal cria a mensalidade de cada contrato vigente, com o valor mensal e o dia do vencimento do contrato. Não repete as que já existem, então pode clicar de novo depois de criar um contrato.</li>
+<li>Quando o cliente pagar, clique em <b>Recebido hoje</b>. Para outra data, ou valor com juros ou desconto, abra o lançamento e preencha <b>Recebido em</b> e o valor.</li>
+<li>Use <b>+ Receita</b> para uma receita avulsa (ex.: consultoria) e <b>+ Despesa</b> para as despesas da Controlacs (sistemas, contador, impostos…). Para pagar, <b>Pago hoje</b> ou abra o lançamento.</li>
+<li>No alto aparecem as receitas e as despesas do mês, quanto já foi recebido e pago, o resultado previsto e o realizado. As receitas atrasadas de outros meses aparecem em vermelho; escolha a situação <b>Atrasados</b> para ver todas.</li>
+<li>Baixa feita por engano: abra o lançamento e clique em <b>Estornar a baixa</b>.</li>
+</ol>`},
+    {k:'ctlcli',t:'Clientes',
+      txt:`<p>O cadastro dos clientes da Controlacs: nome, razão social, CNPJ/CPF, contato, telefone, e-mail, endereço, desde quando é cliente e anotações. A <b>Situação</b> pode ser Prospecto, Ativo, Suspenso ou Encerrado. Em <b>Empresa no portal</b> dá para ligar ao cadastro da empresa que já usa o portal.</p>
+<p>Ao abrir o cliente aparecem os contratos e os documentos dele, com os botões para criar um contrato ou anexar um documento.</p>`},
+    {k:'ctlserv',t:'Serviços',
+      txt:`<p>A lista dos serviços que você presta (ex.: BPO financeiro, folha de pagamento, consultoria), com a forma de cobrança (mensal, avulso, anual ou por hora), o valor padrão e o que está incluído. Os serviços ativos aparecem para marcar em cada contrato. Serviço que não é mais oferecido: marque como Inativo.</p>`},
+    {k:'ctldocs',t:'Documentos e contratos assinados',
+      txt:`<p>Todos os documentos guardados: contratos, aditivos, propostas, procurações, distratos e outros, com o cliente, o contrato e a validade. Clique no nome do arquivo para abrir. Os arquivos ficam numa área separada, que só a Master acessa.</p>
+<p>Use <b>+ Novo documento</b> para enviar (PDF, Word, Excel ou foto, até 20 MB). Com validade preenchida, o documento aparece no Painel 30 dias antes de vencer.</p>`}]},
   {g:'Configurações',itens:[
     {k:'manual',t:'Manual do sistema',
       txt:`<p>Este manual. Ele é atualizado a cada melhoria do portal. Use a busca no alto para achar um assunto, e clique numa imagem para abri-la em tamanho maior.</p>`}]},
@@ -10674,6 +11118,11 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05ctl',data:'2026-11-05',t:'Nova área: Gestão da Controlacs',itens:[
+    {x:'Novo módulo Controlacs no menu, só para a Master: clientes da Controlacs, serviços prestados, contratos, documentos (contrato assinado, aditivos, propostas) e reajustes.',para:'master'},
+    {x:'Cada contrato tem o índice, o percentual e a data do próximo reajuste. O Painel avisa quando o reajuste está chegando ou atrasado, e o botão “Aplicar reajuste” atualiza o valor e guarda o histórico.',para:'master'},
+    {x:'Financeiro da Controlacs: gere as mensalidades do mês a partir dos contratos, dê baixa quando o cliente pagar, lance as despesas e veja o resultado do mês. Separado das contas das empresas.',para:'master'},
+    {x:'Os arquivos ficam numa área separada, que nem a equipe nem os clientes acessam.',para:'master'}]},
   {k:'2026-11-05altconta',data:'2026-11-05',t:'Alteração de conta do parceiro: conferir e desfazer',itens:[
     {x:'A janela do parceiro ganhou o botão “✕ Fechar” no alto, e os botões de baixo (Fechar, Salvar...) ficam sempre à vista, mesmo com a janela cheia.',mods:['repasse','gfrepasse']},
     {x:'Depois de clicar em “Aplicar a conta nova”, o aviso não some mais: no Repasse de parceiros o parceiro continua em vermelho (“Conta alterada, confira antes de pagar”), com a conta anterior, e aparece no “Atenção antes de pagar” ao importar o relatório, até alguém clicar em “Conferido”.',para:'esc'},
@@ -10828,7 +11277,7 @@ const NOVIDADES=[
     {x:'Gestão financeira › Controle de notas fiscais: os parceiros de cada empresa com a situação de NF e as notas de cada mês, no lugar da planilha. Lançar nota passa o parceiro a “Emite NF” também no Repasse de parceiros.',para:'esc'},
     {x:'Configurações › Acessos: cada módulo marcado tem o seu nível (Lançamento ou Consulta), e o nível de um acesso já liberado muda direto na tabela.',para:'esc'}]}
 ];
-const nvItens=n=>n.itens.filter(i=>(i.para!=='esc'||ehEsc())&&(!i.mods||ehEsc()||i.mods.some(m=>NAV.some(x=>x.k===m&&x.ok()&&eqPode(m)))));
+const nvItens=n=>n.itens.filter(i=>(i.para!=='esc'||ehEsc())&&(i.para!=='master'||ehAdm())&&(!i.mods||ehEsc()||i.mods.some(m=>NAV.some(x=>x.k===m&&x.ok()&&eqPode(m)))));
 const NVK='portal_novidades_vistas';
 let NVVISTAS=null;
 async function nvVistas(){
