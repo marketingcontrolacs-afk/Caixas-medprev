@@ -177,6 +177,7 @@ dialog[open]#dlgBCI{display:flex;flex-direction:column}#dlgBCI .db{flex:1;min-he
 .alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
 .alerta b{color:var(--warn)}
 .alerta.bad{border-color:var(--bad);background:var(--bad-soft)}.alerta.bad b{color:var(--bad)}
+.gcfil th{padding-top:0}.gcfil input{font-size:13px;padding:4px 8px;min-width:0;width:100%;box-sizing:border-box}
 .tcres{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:8px}.tcres ul{margin:0;padding-left:20px;display:grid;gap:6px}
 .rat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:10px}
 .rat .opts{display:flex;gap:14px;flex-wrap:wrap;font-weight:600;font-size:14px}.rat .opts label{display:flex;gap:6px;align-items:center}.rat .opts input{width:auto}
@@ -770,7 +771,7 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
   <!-- GESTÃO FINANCEIRA › CONCILIAÇÃO BANCÁRIA (escritório) -->
   <section id="viewGC" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Conciliação bancária</h1><p class="sub">Importe o OFX do banco e ligue cada linha a um lançamento do sistema. O que o sistema reconhece chega como sugestão, só para aprovar.</p></div>
+      <div><h1>Conciliação bancária</h1><p class="sub">Importe o OFX do banco e ligue cada linha a um lançamento do sistema. O que o sistema reconhece chega como sugestão, só para aprovar. O que não for validado fica aqui como pendente até você validar ou ignorar.</p></div>
       <div class="row" style="align-items:flex-end"><button class="btn" id="gcAprovaTodas" hidden></button><span class="btn primary fotobtn" id="gcImp" hidden>Importar OFX<input type="file" id="gcArq" accept=".ofx,.OFX,application/x-ofx,text/plain" aria-label="Importar arquivo OFX"></span></div>
     </div>
     <div class="toolbar">
@@ -780,9 +781,14 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
       <label class="f">Mostrar<select id="gcFiltro"><option value="pend">Pendentes</option><option value="sug">Com sugestão</option><option value="sem">Sem lançamento</option><option value="conc">Conciliadas</option><option value="ign">Ignoradas</option><option value="todas">Todas</option></select></label>
       <input id="gcBusca" placeholder="Buscar no histórico ou valor" style="max-width:240px">
     </div>
+    <div class="alerta" id="gcPendAviso" hidden style="margin:0 0 14px"></div>
+    <details class="card" id="gcArqBox" hidden style="padding:10px 14px;margin-bottom:14px"><summary style="cursor:pointer"><b>Extratos importados desta conta</b> <span class="muted" id="gcArqRes"></span></summary>
+      <div class="tablebox" style="margin-top:8px;max-height:300px;overflow:auto"><table><thead><tr><th class="l">Arquivo</th><th>Período do extrato</th><th>Saldo do banco</th><th>Linhas</th><th>Importado em</th><th class="l">Situação hoje</th><th></th></tr></thead><tbody id="gcArqBody"></tbody></table></div>
+    </details>
     <div class="tiles" id="gcTiles"></div>
     <div class="alerta" id="gcBulk" hidden><span id="gcBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small primary" data-gb="lanca">Lançar juntas</button><button type="button" class="btn small" data-gb="aprova">Aprovar sugestões</button><button type="button" class="btn small" data-gb="ignora">Ignorar</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
-    <div class="card tablebox"><table><thead id="gcHead"></thead><tbody id="gcBody"></tbody></table></div>
+    <div class="card tablebox"><table><thead id="gcHead" hidden><tr><th style="width:28px"><input type="checkbox" id="gcTodas" style="width:auto" title="Selecionar todas as linhas do filtro" aria-label="Selecionar todas as linhas do filtro"></th><th>Data</th><th class="l">Histórico do banco</th><th>Valor</th><th class="l">Lançamento no sistema</th><th></th></tr>
+      <tr class="gcfil"><th></th><th><input id="gcfData" placeholder="Filtrar" aria-label="Filtrar pela data" style="width:84px"></th><th class="l"><input id="gcfHist" placeholder="Filtrar histórico" aria-label="Filtrar pelo histórico do banco"></th><th><input id="gcfValor" placeholder="Filtrar" aria-label="Filtrar pelo valor" style="width:96px"></th><th class="l"><input id="gcfLanc" placeholder="Filtrar lançamento" aria-label="Filtrar pelo lançamento no sistema"></th><th><button type="button" class="btn small ghost" id="gcfLimpa" title="Limpar os filtros das colunas">Limpar</button></th></tr></thead><tbody id="gcBody"></tbody></table></div>
     <p class="note" id="gcNote"></p>
   </section>
 
@@ -1686,7 +1692,7 @@ escCli.onchange=()=>{guardaEmp();openView()};
 const SECK='portal_secao';
 // filtros e buscas das telas voltam ao padrão ao trocar de tela: o nome de fornecedor digitado não fica lá esquecido (Carol, 04/11)
 // o F5 continua na mesma tela; trocar só a empresa mantém os filtros; o período das outras telas (extrato, conciliação, relatórios) não muda
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -8594,7 +8600,21 @@ $('bciOk').onclick=async()=>{
 // Cada linha do extrato do banco (fin_ofx) é ligada a um lançamento do sistema (fin_movimentos.ofx_id).
 // Sugestões, nesta ordem: lançamento já feito com o mesmo valor (até 3 dias), conta a pagar/receber em aberto
 // com o mesmo valor (até 10 dias do vencimento) e as regras aprendidas pelo texto do banco (fin_conc_regras).
-const GC={conta:null,linhas:[],movs:[],tits:[],pago:{},regras:[],sug:{},conc:{},sel:new Set(),aviso:''};
+const GC={conta:null,linhas:[],movs:[],tits:[],pago:{},regras:[],sug:{},conc:{},sel:new Set(),aviso:'',pend:{},arqs:[],auto:false};
+// v98: linha do extrato somada (qtd, itens) e registro dos arquivos importados (fin_ofx_arquivos)
+const v98=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||e.code==='PGRST204')&&/qtd|itens|fin_ofx_arquivos/.test(e.message||'');
+const v98Msg='A importação nova (lançamentos do dia somados) precisa da atualização v98 do banco. Rode o SQL no Supabase.';
+// banco do arquivo OFX (BANKID): para não importar o extrato de um banco na conta de outro (Carol, 04/11: PagBank entrou no Inter)
+const OFXBANCOS={'1':['Banco do Brasil','banco do brasil','bb '],'33':['Santander','santander'],'77':['Inter','inter'],'104':['Caixa','caixa economica','cef'],'237':['Bradesco','bradesco'],
+  '341':['Itaú','itau'],'748':['Sicredi','sicredi'],'756':['Sicoob','sicoob'],'260':['Nubank','nubank','nu pagamentos'],'290':['PagBank','pagbank','pagseguro','pag bank'],'336':['C6','c6'],
+  '323':['Mercado Pago','mercado pago','mercadopago'],'380':['PicPay','picpay'],'403':['Cora','cora'],'197':['Stone','stone'],'208':['BTG','btg'],'422':['Safra','safra'],'85':['Ailos','ailos'],
+  '136':['Unicred','unicred'],'212':['Original','original'],'41':['Banrisul','banrisul'],'70':['BRB','brb'],'655':['Votorantim','votorantim','bv '],'121':['Agibank','agibank'],'318':['BMG','bmg']};
+const ofxBanco=cod=>OFXBANCOS[String(cod||'').replace(/\D/g,'').replace(/^0+/,'')]||null;
+const contaDoBanco=(c,cod)=>{const b=ofxBanco(cod);if(!b)return null;const t=' '+chave([c.nome,c.banco,c.conta_bc].filter(Boolean).join(' '))+' ';
+  return b.slice(1).some(k=>t.includes(k.endsWith(' ')?' '+k:k))||String(c.banco||'').replace(/\D/g,'').replace(/^0+/,'')===String(cod).replace(/\D/g,'').replace(/^0+/,'')};
+// linhas do mesmo dia, mesmo sentido e mesmo histórico viram uma linha só, com a soma (Carol, 04/11: "Vendas - Disponível PIX")
+const gcBase=(data,v,h)=>['G',data,v>0?'+':'-',chave(h)].join('|');
+const gcQtdTxt=l=>l.qtd>1?`${l.qtd} lançamentos somados`:'';
 let GCDLG=null;
 const v47=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||e.code==='42703'||e.code==='PGRST204'||/fin_ofx|fin_conc_regras|ofx_id|ofx_conta|ofx_banco/.test(e.message||''));
 const v47Msg='Esta tela precisa da atualização v47 do banco. Rode o SQL no Supabase.';
@@ -8613,21 +8633,27 @@ function lerOFX(txt){
   return {banco:tag(txt,'BANKID'),conta:tag(txt,'ACCTID'),ini:dt(tag(txt,'DTSTART')),fim:dt(tag(txt,'DTEND')),
     saldo:lb?num(tag(lb,'BALAMT')):null,saldoEm:lb?dt(tag(lb,'DTASOF')):null,linhas};
 }
-function gcVazio(t,cl){$('gcHead').innerHTML='';$('gcTiles').innerHTML='';$('gcBulk').hidden=true;$('gcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gcNote').textContent=''}
+function gcVazio(t,cl){$('gcHead').hidden=true;$('gcTiles').innerHTML='';$('gcPendAviso').hidden=true;$('gcArqBox').hidden=true;$('gcBulk').hidden=true;$('gcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gcNote').textContent=''}
 async function renderGC(recarrega=true){
   const cli=cliAtual();$('gcImp').hidden=true;
   if(!cli)return gcVazio('Escolha uma empresa.');
-  if(!$('gcIni').value){$('gcIni').value=TODAY.slice(0,8)+'01';$('gcFim').value=fimMes(TODAY)}
+  if(!$('gcIni').value){$('gcIni').value=TODAY.slice(0,8)+'01';$('gcFim').value=fimMes(TODAY);GC.auto=true}
   let contas;try{contas=await gfContasDe(cli.id,true)}catch(e){console.error(e);return gcVazio('Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  if(recarrega)await gcPendCarrega(cli).catch(console.error);
   const sel=$('gcConta'),cur=sel.value,vis=contas.filter(c=>c.ativo!==false);
-  sel.innerHTML=vis.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma conta</option>';
+  sel.innerHTML=vis.map(c=>`<option value="${c.id}">${esc(c.nome)}${(GC.pend[c.id]||[]).length?` (${GC.pend[c.id].length} pendentes)`:''}</option>`).join('')||'<option value="">Nenhuma conta</option>';
   if(vis.some(c=>c.id===cur))sel.value=cur;
+  else{const p=vis.find(c=>(GC.pend[c.id]||[]).length);if(p)sel.value=p.id}   // ao abrir, vai para a conta que tem linhas pendentes
   const c=vis.find(x=>x.id===sel.value);GC.conta=c||null;
   if(!c)return gcVazio('Nenhuma conta bancária cadastrada nesta empresa. Cadastre em Gestão financeira › Contas bancárias.');
   $('gcImp').hidden=false;
+  // o período que abre sozinho (mês atual) também pega as linhas que ficaram pendentes antes: nada some ao atualizar a página
+  if(GC.auto){GC.auto=false;const p=(GC.pend[c.id]||[]).map(x=>x.data).sort();
+    if(p.length&&p[0]<$('gcIni').value)$('gcIni').value=p[0];if(p.length&&p[p.length-1]>$('gcFim').value)$('gcFim').value=p[p.length-1]}
   const ini=$('gcIni').value,fim=$('gcFim').value;if(!ini||!fim||fim<ini)return gcVazio('Escolha o período.');
   if(recarrega){
     gcVazio('Carregando…');
+    const ra=await sb.from('fin_ofx_arquivos').select('*').eq('conta_id',c.id).order('importado_em',{ascending:false}).limit(40);GC.arqs=ra.error?[]:ra.data||[];
     const de=isoLocal(new Date(dObj(ini).getTime()-60*864e5)),ate=isoLocal(new Date(dObj(fim).getTime()+60*864e5));
     try{
       const [l,m,t,mt,rg]=await Promise.all([
@@ -8642,6 +8668,32 @@ async function renderGC(recarrega=true){
   }
   gcSugestoes();gcDesenha();
 }
+// linhas do extrato ainda não validadas, de todas as contas e de qualquer data: ficam pendentes até validar ou ignorar (Carol, 04/11)
+async function gcPendCarrega(cli){
+  const [ls,ms]=await Promise.all([todas(()=>sb.from('fin_ofx').select('id,conta_id,data,ignorado').eq('cliente_id',cli.id)),
+    todas(()=>sb.from('fin_movimentos').select('ofx_id').eq('cliente_id',cli.id).not('ofx_id','is',null))]);
+  const conc=new Set(ms.map(m=>m.ofx_id));GC.pend={};GC.concIds=conc;GC.todasL=ls;
+  ls.forEach(l=>{if(!l.ignorado&&!conc.has(l.id))(GC.pend[l.conta_id]||=[]).push(l)});
+}
+// aviso das pendentes fora do período ou em outra conta, e a lista dos extratos importados
+function gcAvisos(){
+  const c=GC.conta,ini=$('gcIni').value,fim=$('gcFim').value,box=$('gcPendAviso');if(!c){box.hidden=true;$('gcArqBox').hidden=true;return}
+  const fora=(GC.pend[c.id]||[]).filter(l=>l.data<ini||l.data>fim),outras=GFC.lista.filter(x=>x.id!==c.id&&x.ativo!==false&&(GC.pend[x.id]||[]).length),pl=n=>n===1?'linha pendente':'linhas pendentes',partes=[];
+  if(fora.length){const ds=fora.map(l=>l.data).sort();partes.push(`<b>${fora.length} ${pl(fora.length)} de validação nesta conta fora do período</b> (de ${dBR(ds[0])} a ${dBR(ds[ds.length-1])}). <button type="button" class="btn small primary" data-gp="per">Mostrar as pendentes</button>`)}
+  outras.forEach(x=>partes.push(`<b>${esc(x.nome)}</b>: ${GC.pend[x.id].length} ${pl(GC.pend[x.id].length)} de validação. <button type="button" class="btn small" data-gp="conta" data-id="${x.id}">Abrir esta conta</button>`));
+  box.hidden=!partes.length;box.innerHTML=partes.map(p=>`<span>${p}</span>`).join('');
+  const A=GC.arqs||[];$('gcArqBox').hidden=!A.length;if(!A.length)return;
+  const daConta=(GC.todasL||[]).filter(l=>l.conta_id===c.id),pend=new Set((GC.pend[c.id]||[]).map(l=>l.id));
+  $('gcArqRes').textContent=`(${A.length}${A.length>=40?'+':''}) · último em ${dtHr(A[0].importado_em)}`;
+  $('gcArqBody').innerHTML=A.map(a=>{const ls=daConta.filter(l=>a.ini&&a.fim&&l.data>=a.ini&&l.data<=a.fim),np=ls.filter(l=>pend.has(l.id)).length,ni=ls.filter(l=>l.ignorado).length,nc=ls.length-np-ni;
+    return `<tr><td class="l">${esc(a.arquivo||'')}${a.banco?`<br><span class="muted">${esc(ofxBanco(a.banco)?.[0]||'Banco '+a.banco)} · conta ${esc(a.conta||'')}</span>`:''}</td><td>${a.ini?dBR(a.ini)+' a '+dBR(a.fim):'—'}</td><td>${a.saldo!=null?fm(a.saldo)+(a.saldo_em?`<br><span class="muted">em ${dBR(a.saldo_em)}</span>`:''):'—'}</td><td>${a.linhas??'—'}${a.novas!=null?`<br><span class="muted">${a.novas} novas</span>`:''}</td><td>${dtHr(a.importado_em)}</td>
+      <td class="l">${np?`<span class="chip c-warn">${np} ${np===1?'pendente':'pendentes'}</span> `:''}${nc?`<span class="chip c-ok">${nc} ${nc===1?'conciliada':'conciliadas'}</span> `:''}${ni?`<span class="chip c-none">${ni} ${ni===1?'ignorada':'ignoradas'}</span>`:''}${!ls.length?'<span class="muted">—</span>':''}</td><td>${a.ini?`<button type="button" class="btn small" data-gp="arq" data-ini="${a.ini}" data-fim="${a.fim}">Ver</button>`:''}</td></tr>`}).join('');
+}
+$('gcPendAviso').addEventListener('click',e=>{const b=e.target.closest('[data-gp]');if(b)gcVerPend(b.dataset.gp==='conta'?b.dataset.id:GC.conta.id)});
+$('gcArqBody').addEventListener('click',e=>{const b=e.target.closest('[data-gp="arq"]');if(!b)return;$('gcIni').value=b.dataset.ini;$('gcFim').value=b.dataset.fim;$('gcFiltro').value='todas';GC.aviso='';renderGC()});
+function gcVerPend(cid){const ds=(GC.pend[cid]||[]).map(l=>l.data).sort();if(!ds.length)return;
+  $('gcConta').value=cid;if(cid!==GC.conta?.id||ds[0]<$('gcIni').value)$('gcIni').value=ds[0];if(cid!==GC.conta?.id||ds[ds.length-1]>$('gcFim').value)$('gcFim').value=ds[ds.length-1];
+  $('gcFiltro').value='pend';GC.aviso='';renderGC()}
 // uma passada só, para duas linhas não ficarem com o mesmo lançamento ou a mesma conta
 function gcSugestoes(){
   GC.conc={};GC.movs.forEach(m=>{if(m.ofx_id)GC.conc[m.ofx_id]=m});GC.sug={};
@@ -8657,36 +8709,47 @@ function gcSugestoes(){
   }
 }
 const gcSit=l=>GC.conc[l.id]?'conc':l.ignorado?'ign':GC.sug[l.id]?'sug':'sem';
+// texto da coluna "Lançamento no sistema", para o filtro da coluna
+const gcLancTxt=l=>{const s=gcSit(l),m=GC.conc[l.id],g=GC.sug[l.id];
+  return s==='conc'?['Conciliada',m.descricao,m.pessoa_nome,m.categoria].filter(Boolean).join(' '):s==='ign'?'Ignorada':s==='sug'?'Sugestão '+g.txt:'Sem lançamento'};
+const soDigV=t=>String(t||'').replace(/[^\d]/g,'');
 function gcFiltradas(){
-  const f=$('gcFiltro').value,q=chave($('gcBusca').value);
+  const f=$('gcFiltro').value,q=chave($('gcBusca').value),fd=$('gcfData').value.trim(),fh=chave($('gcfHist').value),fv=soDigV($('gcfValor').value),fl=chave($('gcfLanc').value);
   return GC.linhas.filter(l=>{const s=gcSit(l);
     if(f==='pend'&&(s==='conc'||s==='ign')||f!=='pend'&&f!=='todas'&&s!==f)return false;
+    if(fd&&!dBR(l.data).includes(fd)&&!l.data.includes(fd))return false;
+    if(fh&&!chave(histDe(l)+' '+gcQtdTxt(l)).includes(fh))return false;
+    if(fv&&!soDigV(Math.abs(l.valor).toFixed(2)).includes(fv)&&!soDigV(Math.abs(l.valor)).includes(fv))return false;
+    if(fl&&!chave(gcLancTxt(l)).includes(fl))return false;
     return !q||chave(histDe(l)).includes(q)||String(Math.abs(l.valor)).includes(q.replace(',','.'))});
 }
 function gcDesenha(){
   const rows=gcFiltradas(),MAX=300,mu=t=>`<span class="muted">${t}</span>`;
   const ok=a=>`<button type="button" class="btn small" data-gc="${a}">`;
-  $('gcHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="gcTodas" style="width:auto" title="Selecionar todas as linhas do filtro"${rows.length&&rows.every(l=>GC.sel.has(l.id))?' checked':''}></th><th>Data</th><th class="l">Histórico do banco</th><th>Valor</th><th class="l">Lançamento no sistema</th><th></th></tr>`;
+  $('gcHead').hidden=false;$('gcTodas').checked=!!rows.length&&rows.every(l=>GC.sel.has(l.id));
   $('gcBody').innerHTML=rows.slice(0,MAX).map(l=>{const s=gcSit(l),m=GC.conc[l.id],g=GC.sug[l.id];
     const cel=s==='conc'?`<span class="chip c-ok">✓ Conciliada</span> ${esc(m.descricao||m.pessoa_nome||'')}${m.categoria?' '+mu('· '+esc(m.categoria)):''}`
       :s==='ign'?'<span class="chip c-none">Ignorada</span>'
       :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
       :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> ${ok('ignora')}Ignorar</button>`;
-    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
+    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
     ||`<tr><td></td><td class="l muted" colspan="5">${GC.linhas.length?'Nada neste filtro.':'Nenhuma linha do banco neste período. Use “Importar OFX”.'}</td></tr>`;
   const n=s=>GC.linhas.filter(l=>gcSit(l)===s).length,E=r2(GC.linhas.filter(l=>l.valor>0).reduce((x,l)=>x+(+l.valor),0)),S=r2(GC.linhas.filter(l=>l.valor<0).reduce((x,l)=>x-l.valor,0));
   const ini=$('gcIni').value,fim=$('gcFim').value,sis=r2(GC.movs.filter(m=>m.data>=ini&&m.data<=fim).reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)),dif=r2(E-S-sis);
   $('gcTiles').innerHTML=[['Linhas do banco',String(GC.linhas.length),`entradas ${fm(E)} · saídas ${fm(S)}`],['Conciliadas',String(n('conc')),n('ign')?n('ign')+' ignoradas':'ligadas a um lançamento'],
     ['Com sugestão',String(n('sug')),'é só aprovar'],['Sem lançamento',String(n('sem')),'lance ou ignore'],['Banco × sistema',fm(dif),n('sug')+n('sem')?`ainda faltam ${n('sug')+n('sem')} linhas`:Math.abs(dif)<0.005?'o período bate':'diferença no período']]
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===4&&Math.abs(dif)>=0.005&&!(n('sug')+n('sem'))||i===3&&n('sem')?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  gcAvisos();
   $('gcAprovaTodas').hidden=!n('sug');$('gcAprovaTodas').textContent=`Aprovar todas as sugestões (${n('sug')})`;
   const ns=GC.sel.size;$('gcBulk').hidden=!ns;$('gcBulkTxt').textContent=`${ns} ${ns===1?'linha selecionada':'linhas selecionadas'}`;
   $('gcNote').innerHTML=(GC.aviso?`<b>${esc(GC.aviso)}</b><br>`:'')+(rows.length>MAX?`Mostrando ${MAX} de ${rows.length}. Use a busca ou selecione todas pela caixa do cabeçalho. `:'')
-    +'Ao lançar uma linha, marque “Lembrar”: as próximas linhas com o mesmo texto do banco já chegam com o lançamento sugerido. A diferença “banco × sistema” compara o extrato do banco com o Extrato da conta no mesmo período.';
+    +'Linhas do mesmo dia com o mesmo histórico do banco (ex.: vendas no Pix) entram somadas numa linha só. Ao lançar uma linha, marque “Lembrar”: as próximas linhas com o mesmo texto do banco já chegam com o lançamento sugerido. A diferença “banco × sistema” compara o extrato do banco com o Extrato da conta no mesmo período.';
 }
 ['gcConta','gcIni','gcFim'].forEach(id=>$(id).onchange=()=>{GC.aviso='';renderGC()});
-$('gcFiltro').onchange=()=>gcDesenha();$('gcBusca').oninput=()=>{clearTimeout(gcDesenha.t);gcDesenha.t=setTimeout(gcDesenha,200)};
+$('gcFiltro').onchange=()=>gcDesenha();
+['gcfData','gcfHist','gcfValor','gcfLanc'].forEach(id=>$(id).oninput=()=>{clearTimeout(gcDesenha.t);gcDesenha.t=setTimeout(gcDesenha,200)});
+$('gcfLimpa').onclick=()=>{['gcfData','gcfHist','gcfValor','gcfLanc'].forEach(id=>$(id).value='');gcDesenha()};$('gcBusca').oninput=()=>{clearTimeout(gcDesenha.t);gcDesenha.t=setTimeout(gcDesenha,200)};
 $('gcHead').addEventListener('change',e=>{if(e.target.id!=='gcTodas')return;const rows=gcFiltradas().filter(l=>gcSit(l)!=='conc');rows.forEach(l=>e.target.checked?GC.sel.add(l.id):GC.sel.delete(l.id));gcDesenha()});
 $('gcBody').addEventListener('change',e=>{if(!e.target.classList.contains('gcck'))return;const id=e.target.closest('tr').dataset.id;e.target.checked?GC.sel.add(id):GC.sel.delete(id);gcDesenha()});
 $('gcBody').addEventListener('click',async e=>{const b=e.target.closest('[data-gc]');if(!b)return;const l=GC.linhas.find(x=>x.id===b.closest('tr').dataset.id),a=b.dataset.gc;
@@ -8710,8 +8773,22 @@ $('gcBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-g
   }catch(err){fail(err,'Não foi possível salvar')}
   b.disabled=false;renderGC()});
 // movimento criado a partir de uma linha do banco
-function gcMov(l,f){const c=GC.conta;return {cliente_id:c.cliente_id,conta_id:c.id,data:l.data,tipo:l.valor>0?'entrada':'saida',valor:Math.abs(l.valor),ofx_id:l.id,conciliado:true,...f}}
-async function gcInserir(rows){for(let i=0;i<rows.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(rows.slice(i,i+500));if(error)throw error}}
+function gcMov(l,f){const c=GC.conta,m={cliente_id:c.cliente_id,conta_id:c.id,data:l.data,tipo:l.valor>0?'entrada':'saida',valor:Math.abs(l.valor),ofx_id:l.id,conciliado:true,...f};
+  if(l.qtd>1&&m.descricao&&!/lançamentos\)$/.test(m.descricao))m.descricao+=` (${l.qtd} lançamentos)`;   // observação: o valor é a soma do dia
+  return m}
+// o lançamento novo feito pela conciliação vira também uma conta a pagar ou a receber já baixada, para aparecer
+// nas Contas a pagar, nas Contas a receber, na Movimentação e no Extrato da conta (Carol, 04/11). Transferência não.
+async function gcInserir(rows){
+  const tits=[],pes=await gfPessoasTodas(rows[0]?.cliente_id).catch(()=>[]);
+  for(const m of rows){if(m.titulo_id||m.transf_id||!m.ofx_id)continue;const id=crypto.randomUUID(),pk=pessoaChave(m.pessoa_nome),p=pk&&pes.find(x=>pessoaChave(x.nome)===pk||pessoaChave(x.fantasia)===pk);
+    tits.push({id,cliente_id:m.cliente_id,tipo:m.tipo==='entrada'?'receber':'pagar',pessoa_id:p?.id||null,pessoa_nome:m.pessoa_nome||null,descricao:m.descricao||null,documento:m.documento||null,categoria:m.categoria||null,
+      competencia:m.data,vencimento:m.data,valor:m.valor,parcela:1,parcelas:1,conta_id:m.conta_id,origem:'ofx'});m.titulo_id=id}
+  const feitos=[];
+  try{for(let i=0;i<tits.length;i+=500){const pt=tits.slice(i,i+500),{error}=await sb.from('fin_titulos').insert(pt);if(error)throw error;feitos.push(...pt.map(t=>t.id))}}
+  catch(e){console.error(e);if(feitos.length)await sb.from('fin_titulos').delete().in('id',feitos);const ids=new Set(tits.map(t=>t.id));rows.forEach(m=>{if(ids.has(m.titulo_id))m.titulo_id=null});feitos.length=0}   // sem a conta, o lançamento fica avulso
+  try{for(let i=0;i<rows.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(rows.slice(i,i+500));if(error)throw error}}
+  catch(e){if(feitos.length)await sb.from('fin_titulos').delete().in('id',feitos).then(()=>{},console.error);throw e}
+}
 async function gcAprovar(ls){
   const novos=[],usos={};let n=0;await contasGrupo(cliAtual()).catch(console.error);
   for(const l of ls){const g=GC.sug[l.id];if(!g)continue;
@@ -8730,6 +8807,12 @@ async function gcAprovar(ls){
 }
 async function gcDesfazer(l){
   const m=GC.conc[l.id];if(!m)return;
+  if(m.titulo_id){const {data:t}=await sb.from('fin_titulos').select('id,origem').eq('id',m.titulo_id).maybeSingle();
+    if(t?.origem==='ofx'){   // conta a pagar/receber que a própria conciliação criou
+      if(confirm('Apagar o lançamento ligado a esta linha? Ele sai também das contas a '+(m.tipo==='saida'?'pagar':'receber')+', da Movimentação e do Extrato da conta.\n\nOK = apagar\nCancelar = só desfazer a ligação (o lançamento continua)')){
+        const {error}=await sb.from('fin_titulos').delete().eq('id',t.id);if(error)throw error;GC.movs=GC.movs.filter(x=>x.id!==m.id)}
+      else{const {error}=await sb.from('fin_movimentos').update({ofx_id:null,conciliado:false}).eq('id',m.id);if(error)throw error;m.ofx_id=null}
+      return}}
   const apaga=!m.titulo_id?confirm('Apagar também o lançamento ligado a esta linha?\n\nOK = apagar o lançamento\nCancelar = só desfazer a ligação (o lançamento continua no extrato da conta)'):confirm('Desfazer a baixa da conta a '+(m.tipo==='saida'?'pagar':'receber')+' feita por esta linha? A conta volta a ficar em aberto.');
   if(apaga){const {error}=m.transf_id?await sb.from('fin_movimentos').delete().eq('transf_id',m.transf_id):await sb.from('fin_movimentos').delete().eq('id',m.id);if(error)throw error;
     GC.movs=GC.movs.filter(x=>x.id!==m.id&&!(m.transf_id&&x.transf_id===m.transf_id));
@@ -8739,24 +8822,67 @@ async function gcDesfazer(l){
   else return;
 }
 // importar o arquivo OFX
+// - confere o banco do arquivo com a conta (o extrato do PagBank não entra mais no Inter)
+// - soma as linhas do mesmo dia com o mesmo histórico numa linha só, com a quantidade
+// - avisa quando o extrato já foi importado (e quantas linhas já estão validadas); só entra o que é novo
 $('gcArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!GC.conta)return;
   const buf=await f.arrayBuffer();let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch{txt=new TextDecoder('windows-1252').decode(buf)}
   const o=lerOFX(txt);if(!o.linhas.length)return toast('Não achei lançamentos neste arquivo. Confira se é um OFX.');
-  const cli=cliAtual();let c=GFC.lista.find(x=>x.ofx_conta&&x.ofx_conta===o.conta);
+  const cli=cliAtual(),bco=ofxBanco(o.banco),bNome=bco?bco[0]:o.banco?'banco '+o.banco:'banco não informado',contasEmp=GFC.lista.filter(x=>x.ativo!==false&&x.cliente_id===cli.id);
+  let c=contasEmp.find(x=>x.ofx_conta&&x.ofx_conta===o.conta&&(!x.ofx_banco||!o.banco||ofxBanco(x.ofx_banco)===bco));
   if(!c){c=GC.conta;
-    if(c.ofx_conta&&!confirm(`Este arquivo é da conta ${o.conta} (banco ${o.banco}), mas ${c.nome} recebe o OFX da conta ${c.ofx_conta}. Importar mesmo assim em ${c.nome}?`))return;
-    if(!c.ofx_conta){if(!confirm(`Importar o extrato da conta ${o.conta} (banco ${o.banco}) em “${c.nome}”? Daqui em diante, os arquivos desta conta vão direto para ela.`))return;
-      const {error}=await sb.from('fin_contas').update({ofx_banco:o.banco||null,ofx_conta:o.conta||null}).eq('id',c.id);if(error){console.error(error);return toast(v47(error)?v47Msg:'Não foi possível salvar.')}c.ofx_conta=o.conta}
+    const certas=bco?contasEmp.filter(x=>contaDoBanco(x,o.banco)):[],errada=bco&&contaDoBanco(c,o.banco)===false;
+    if(errada&&certas.length===1&&!certas[0].ofx_conta){
+      if(confirm(`Este arquivo é do ${bNome} (conta ${o.conta}), mas a conta escolhida é “${c.nome}”.\n\nImportar em “${certas[0].nome}”?\n\nOK = importar em ${certas[0].nome}\nCancelar = não importar agora`))c=certas[0];
+      else return toast('Nada foi importado. Escolha a conta certa em “Conta” e importe de novo.')}
+    else if(errada&&!confirm(`Atenção: este arquivo é do ${bNome} (conta ${o.conta}), e a conta escolhida é “${c.nome}”, que não parece ser do ${bNome}.\n\nImportar mesmo assim em ${c.nome}?`))return;
+    if(c.ofx_conta&&c.ofx_conta!==o.conta&&!confirm(`Este arquivo é da conta ${o.conta} (${bNome}), mas ${c.nome} recebe o OFX da conta ${c.ofx_conta}. Importar mesmo assim em ${c.nome}?`))return;
+    if(!c.ofx_conta){if(!confirm(`Importar o extrato do ${bNome}, conta ${o.conta}, em “${c.nome}”? Daqui em diante, os arquivos desta conta vão direto para ela.`))return;
+      const {error}=await sb.from('fin_contas').update({ofx_banco:o.banco||null,ofx_conta:o.conta||null}).eq('id',c.id);if(error){console.error(error);return toast(v47(error)?v47Msg:'Não foi possível salvar.')}c.ofx_banco=o.banco||null;c.ofx_conta=o.conta}
   }
-  const cont={},rows=o.linhas.map(l=>{const h=histDe(l),base=[l.data,l.valor.toFixed(2),chave(h)].join('|');cont[base]=(cont[base]||0)+1;
-    return {cliente_id:cli.id,conta_id:c.id,chave:base+'|'+cont[base],fitid:l.fitid||null,data:l.data,valor:l.valor,memo:l.memo||null,nome:l.nome||null,
-      documento:(h.match(/(?<!\d)(\d{14}|\d{11})(?!\d)/)||[])[1]||null,padrao:padraoDe(h)}});
-  toast('Importando…');let novas=0;
-  try{for(let i=0;i<rows.length;i+=500){const {data,error}=await sb.from('fin_ofx').upsert(rows.slice(i,i+500),{onConflict:'conta_id,chave',ignoreDuplicates:true}).select('id');if(error)throw error;novas+=(data||[]).length}}
-  catch(err){console.error(err);return toast(v47(err)?v47Msg:'Não foi possível importar. Verifique a internet e tente de novo.')}
-  const ds=o.linhas.map(l=>l.data).sort();
-  GC.aviso=`${f.name}: ${novas} ${novas===1?'linha nova':'linhas novas'} de ${rows.length}${rows.length>novas?' (as outras já tinham sido importadas)':''}.`+(o.saldo!=null&&o.saldo!==0?` Saldo informado pelo banco${o.saldoEm?' em '+dBR(o.saldoEm):''}: ${fm(o.saldo)}.`:'');
-  $('gcConta').value=c.id;$('gcIni').value=o.ini&&o.ini<=ds[0]?o.ini:ds[0];$('gcFim').value=o.fim&&o.fim>=ds[ds.length-1]?o.fim:ds[ds.length-1];$('gcFiltro').value='pend';
+  // soma por dia + sentido + histórico
+  const grp=new Map();
+  for(const l of o.linhas){const h=histDe(l),k=gcBase(l.data,l.valor,h);let g=grp.get(k);
+    if(!g){g={k,data:l.data,memo:l.memo||null,nome:l.nome||null,h,itens:[]};grp.set(k,g)}g.itens.push({v:l.valor,fitid:l.fitid||null})}
+  const ds=o.linhas.map(l=>l.data).sort(),d0=ds[0],d1=ds[ds.length-1];
+  toast('Conferindo o que já foi importado…');
+  let exist=[],conc=new Set(),arqAnt=null;
+  try{exist=await todas(()=>sb.from('fin_ofx').select('id,chave,valor,qtd,itens,fitid,ignorado').eq('conta_id',c.id).gte('data',d0).lte('data',d1));
+    const ids=exist.map(x=>x.id);for(let i=0;i<ids.length;i+=200){const {data,error}=await sb.from('fin_movimentos').select('ofx_id').in('ofx_id',ids.slice(i,i+200));if(error)throw error;(data||[]).forEach(m=>conc.add(m.ofx_id))}
+    const ra=await sb.from('fin_ofx_arquivos').select('*').eq('conta_id',c.id).lte('ini',d1).gte('fim',d0).order('importado_em',{ascending:false}).limit(1);if(!ra.error)arqAnt=(ra.data||[])[0]||null;
+  }catch(err){console.error(err);return toast(v47(err)?v47Msg:'Não foi possível conferir o extrato. Verifique a internet e tente de novo.')}
+  const docDe=h=>(h.match(/(?<!\d)(\d{14}|\d{11})(?!\d)/)||[])[1]||null;
+  const novas=[],soma=[],mudouConc=[];let iguais=0,iguaisConc=0;
+  for(const g of grp.values()){
+    const ja=exist.filter(x=>x.chave===g.k||x.chave.startsWith(g.k+'|')),jaIt=ja.flatMap(x=>x.itens&&x.itens.length?x.itens:[{v:+x.valor,fitid:x.fitid}]);
+    // o que deste dia ainda não está no sistema (pelo FITID do banco; sem FITID, pelo valor)
+    const usados=new Set(),falta=g.itens.filter(it=>{const i=jaIt.findIndex((x,j)=>!usados.has(j)&&(it.fitid&&x.fitid?x.fitid===it.fitid:Math.abs(+x.v-it.v)<0.005));if(i>=0){usados.add(i);return false}return true});
+    if(!falta.length){iguais++;if(ja.length&&ja.every(x=>conc.has(x.id)||x.ignorado))iguaisConc++;continue}
+    const aberta=ja.find(x=>!conc.has(x.id)&&!x.ignorado);
+    if(aberta){const it=[...(aberta.itens&&aberta.itens.length?aberta.itens:[{v:+aberta.valor,fitid:aberta.fitid}]),...falta];soma.push({id:aberta.id,valor:r2(it.reduce((a,x)=>a+(+x.v),0)),qtd:it.length,itens:it});continue}
+    if(ja.length)mudouConc.push(g.data);
+    const v=r2(falta.reduce((a,x)=>a+x.v,0));
+    novas.push({cliente_id:cli.id,conta_id:c.id,chave:ja.length?g.k+'|'+(ja.length+1):g.k,fitid:falta.length===1?falta[0].fitid:null,data:g.data,valor:v,memo:g.memo,nome:g.nome,
+      documento:docDe(g.h),padrao:padraoDe(g.h),qtd:falta.length,itens:falta});
+  }
+  const tot=grp.size;
+  if(!novas.length&&!soma.length){
+    alert(`Este extrato já foi importado${arqAnt?` em ${dtHr(arqAnt.importado_em)}${arqAnt.arquivo?` (${arqAnt.arquivo})`:''}`:''}.\n\nTodas as ${tot} linhas já estão no sistema: ${iguaisConc?`${iguaisConc} já ${iguaisConc===1?'validada':'validadas'}`:'nenhuma validada ainda'}${tot-iguaisConc?` e ${tot-iguaisConc} ainda ${tot-iguaisConc===1?'pendente':'pendentes'} aqui na conciliação`:''}.\n\nNada foi importado de novo.`);
+  }else{
+    if(iguais&&!confirm(`Parte deste extrato já foi importada${arqAnt?` em ${dtHr(arqAnt.importado_em)}`:''}: ${iguais} ${iguais===1?'linha já está':'linhas já estão'} no sistema (${iguaisConc} já ${iguaisConc===1?'validada':'validadas'}).\n\nImportar só o que é novo (${novas.length} ${novas.length===1?'linha':'linhas'}${soma.length?` e ${soma.length} ${soma.length===1?'dia pendente que ganhou lançamentos':'dias pendentes que ganharam lançamentos'}`:''})?`))return;
+    toast('Importando…');
+    try{for(let i=0;i<novas.length;i+=500){const {error}=await sb.from('fin_ofx').insert(novas.slice(i,i+500));if(error)throw error}
+      for(const x of soma){const {error}=await sb.from('fin_ofx').update({valor:x.valor,qtd:x.qtd,itens:x.itens}).eq('id',x.id);if(error)throw error}}
+    catch(err){console.error(err);return toast(v98(err)?v98Msg:v47(err)?v47Msg:'Não foi possível importar. Verifique a internet e tente de novo.')}
+  }
+  await sb.from('fin_ofx_arquivos').insert({cliente_id:cli.id,conta_id:c.id,arquivo:f.name,banco:o.banco||null,conta:o.conta||null,ini:o.ini&&o.ini<=d0?o.ini:d0,fim:o.fim&&o.fim>=d1?o.fim:d1,
+    saldo:o.saldo,saldo_em:o.saldoEm,linhas:o.linhas.length,novas:novas.reduce((a,x)=>a+x.qtd,0)}).then(r=>r.error&&console.error(r.error));
+  const somadas=[...grp.values()].filter(g=>g.itens.length>1).length;
+  GC.aviso=`${f.name} (${bNome}, conta ${o.conta||'—'}): ${o.linhas.length} lançamentos do banco em ${tot} linhas${somadas?` (${somadas} ${somadas===1?'dia com lançamentos iguais somados':'linhas com lançamentos iguais do mesmo dia somados'})`:''}. `
+    +(novas.length||soma.length?`${novas.length} ${novas.length===1?'linha nova':'linhas novas'}${soma.length?`, ${soma.length} ${soma.length===1?'linha atualizada':'linhas atualizadas'}`:''}${iguais?`, ${iguais} já estavam no sistema`:''}.`:'Nada novo: o extrato já tinha sido importado.')
+    +(mudouConc.length?` Atenção: ${[...new Set(mudouConc)].map(dBR).join(', ')} já ${mudouConc.length===1?'estava validado':'estavam validados'} e o banco trouxe mais lançamentos; eles entraram numa linha separada.`:'')
+    +(o.saldo!=null&&o.saldo!==0?` Saldo informado pelo banco${o.saldoEm?' em '+dBR(o.saldoEm):''}: ${fm(o.saldo)}.`:'');
+  $('gcConta').value=c.id;$('gcIni').value=o.ini&&o.ini<=d0?o.ini:d0;$('gcFim').value=o.fim&&o.fim>=d1?o.fim:d1;$('gcFiltro').value=novas.length||soma.length?'pend':'todas';
   renderGC();
 };
 // lançar uma ou várias linhas: lançamento novo, transferência entre contas ou baixa de uma conta em aberto
@@ -9489,6 +9615,23 @@ const MANUAL=[
 <li>Anexe a nota fiscal da compra e salve.</li>
 </ol>
 <p>Os quadros mostram as compras do período, o que falta conferir com a fatura e as compras sem nota anexada (essas precisam ser cobradas). O escritório marca cada compra como conferida com a fatura.</p>`}]},
+  {g:'Gestão financeira',itens:[
+    {k:'gfconc',t:'Conciliação bancária (extrato OFX)',img:'gfconc.png',
+      txt:`<p>Aqui o extrato do banco (arquivo OFX) é ligado aos lançamentos do sistema, linha por linha.</p>
+<ol>
+<li>Escolha a <b>Conta</b> e clique em <b>Importar OFX</b>. O portal confere o banco do arquivo: se o extrato for de outro banco (ex.: um arquivo do PagBank com a conta Inter escolhida), ele avisa e oferece a conta certa.</li>
+<li>Os lançamentos do <b>mesmo dia</b> com o <b>mesmo histórico</b> do banco (ex.: <i>Vendas - Disponível PIX</i>, vendas no cartão) entram somados numa linha só, com a observação “R$ 10.000,00 = 10 lançamentos somados”. Passe o mouse na observação para ver os valores.</li>
+<li>Para cada linha: <b>Aprovar</b> a sugestão, <b>Lançar</b> (lançamento novo, transferência ou baixa de uma conta em aberto) ou <b>Ignorar</b>. Marque várias linhas para lançar ou aprovar de uma vez.</li>
+<li>O que você validar aparece também nas <b>Contas a receber</b> (entradas) ou nas <b>Contas a pagar</b> (saídas), já baixado, na <b>Movimentação financeira</b> e no <b>Extrato da conta</b>, onde dá para corrigir e conferir o saldo com o banco.</li>
+</ol>
+<ul>
+<li><b>Pendentes:</b> as linhas que você ainda não validou ficam guardadas. Ao abrir a tela (ou atualizar a página), o portal vai para a conta que tem pendências e o período já mostra essas linhas. Se houver pendentes fora do período ou em outra conta, aparece um aviso com o botão para abrir.</li>
+<li><b>Filtros:</b> embaixo do nome de cada coluna (Data, Histórico do banco, Valor e Lançamento no sistema) há um campo para filtrar. <b>Limpar</b> tira os filtros.</li>
+<li><b>Extratos importados desta conta:</b> clique para ver cada arquivo importado, o período, o saldo informado pelo banco e quantas linhas estão pendentes, conciliadas ou ignoradas. <b>Ver</b> abre o período daquele extrato.</li>
+<li><b>Extrato repetido:</b> se o arquivo já foi importado, o portal avisa quando foi e quantas linhas já estão validadas, e não importa de novo. Se o banco trouxe lançamentos novos, só eles entram.</li>
+<li><b>Desfazer</b> numa linha conciliada pergunta se apaga o lançamento (ele sai também das contas a pagar ou a receber e do extrato) ou se só desfaz a ligação.</li>
+</ul>
+<div class="mndica"><b>Dica:</b> ao lançar, marque <b>Lembrar</b>. As próximas linhas com o mesmo texto do banco já chegam com a sugestão, e é só usar <b>Aprovar todas as sugestões</b>.</div>`}]},
   {g:'Comunicação',itens:[
     {k:'tarefas',t:'Tarefas e recados',img:'tarefas.png',
       txt:`<p>Um quadro com as tarefas da equipe e os recados trocados com os clientes, em quatro colunas: <b>A fazer</b>, <b>Em andamento</b>, <b>Aguardando terceiros</b> e <b>Concluída</b>.</p>
@@ -9700,6 +9843,12 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05ofx',data:'2026-11-05',t:'Conciliação bancária: pendentes guardadas, filtros e vendas do dia somadas',itens:[
+    {x:'Gestão financeira › Conciliação bancária: as linhas do extrato que ainda não foram validadas ficam pendentes até você validar ou ignorar. Ao abrir a tela ou atualizar a página, o portal vai para a conta com pendências e mostra essas linhas; não precisa importar o OFX de novo.',mods:['gfconc']},
+    {x:'Lançamentos do mesmo dia com o mesmo histórico do banco (ex.: “Vendas - Disponível PIX”, cartão) entram somados numa linha só, com a observação de quantos lançamentos formam o total.',mods:['gfconc']},
+    {x:'Filtros em cada coluna: data, histórico, valor e lançamento no sistema. E a lista “Extratos importados desta conta”, com o período, o saldo do banco e o que falta validar de cada arquivo.',mods:['gfconc']},
+    {x:'Importar um extrato que já foi importado avisa quando foi e quantas linhas já estão validadas, e não duplica nada. O portal também confere o banco do arquivo e avisa se a conta escolhida é de outro banco.',mods:['gfconc']},
+    {x:'O que for validado na conciliação aparece também nas Contas a receber ou a pagar (já baixado), na Movimentação financeira e no Extrato da conta. O extrato do PagBank da MPA Palmas, que tinha entrado na conta Inter, foi passado para a conta PagBank.',mods:['gfconc','gfmov','gfrec','gfpagar','gfext']}]},
   {k:'2026-11-04cel',data:'2026-11-04',t:'Portal ajustado para o celular',itens:[
     {x:'No celular, a janela de novidades e as outras janelas cabem na tela: o texto rola e o botão “Visualizei” (e os botões Salvar e Cancelar) ficam sempre à vista embaixo.'},
     {x:'No celular, o alto da tela ficou menor: logo, nome e Sair numa linha, a empresa logo abaixo e os módulos numa faixa mais fina. No computador nada mudou.'}]},
