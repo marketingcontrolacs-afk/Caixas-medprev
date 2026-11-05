@@ -189,6 +189,12 @@ dialog[open]#dlgBCI{display:flex;flex-direction:column}#dlgBCI .db{flex:1;min-he
 .rat .opts{display:flex;gap:14px;flex-wrap:wrap;font-weight:600;font-size:14px}.rat .opts label{display:flex;gap:6px;align-items:center}.rat .opts input{width:auto}
 .rat table td{padding:5px 8px}.rat table input{max-width:140px;text-align:right}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+/* ícones de pago ($) e conciliado (elo), como no Bom Controle (Carol, 05/11) */
+.stic{display:inline-flex;gap:13px;align-items:center;margin-right:10px;vertical-align:middle}
+.stic b{position:relative;font-weight:800;font-size:15px;line-height:1;color:var(--muted);opacity:.35}
+.stic b.on{opacity:1;color:var(--ink)}
+.stic b.on::after{content:'✓';position:absolute;top:-6px;right:-10px;background:var(--ok);color:#fff;border-radius:50%;font-size:9px;width:13px;height:13px;display:grid;place-items:center}
+.stic svg{width:15px;height:15px;display:block}
 .cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.cmp>div{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 #dlgFer{width:min(860px,calc(100vw - 32px))} #dlgFer .db>*{min-width:0} #dlgFer td,#dlgFer th{white-space:nowrap} .fparc{display:grid;grid-template-columns:160px 90px 1fr auto auto;gap:8px;align-items:end} .fparc .pSolL{display:flex;gap:6px;align-items:center;font-size:13px;align-self:center;white-space:nowrap} .fparc .pSolL input{width:auto} .fparc .pDel{color:var(--bad);font-size:15px;align-self:center} .fparc .pCont{align-self:center;font-size:12.5px} @media(max-width:560px){.fparc{grid-template-columns:1fr 80px auto auto}.fparc .pCont{grid-column:1/-1;order:9}}
 .df{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
@@ -6622,6 +6628,10 @@ function optContas(ls,cli){
     +Object.entries(por).map(([id,cs])=>`<optgroup label="${esc(CLIENTES.find(x=>x.id===id)?.nome||'Outra empresa')}">${cs.map(op).join('')}</optgroup>`).join('');
 }
 const somaMes=(iso,n)=>{const [y,m,d]=iso.split('-').map(Number),u=new Date(y,m-1+n+1,0).getDate();return isoLocal(new Date(y,m-1+n,Math.min(d,u),12))};
+// ícones de pago e conciliado nas listas (Carol, 05/11)
+const stIc=(pg,cc,P=true)=>`<span class="stic"><b class="${pg?'on':''}" title="${pg?(P?'Pago':'Recebido'):(P?'Não pago':'Não recebido')}">$</b><b class="${cc?'on':''}" title="${cc?'Conciliado com o extrato do banco':'Não conciliado'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></b></span>`;
+const movConc=m=>!!(m.ofx_id||m.conciliado);
+const gtConc=t=>{const ms=GT.movs[t.id]||[];return ms.length>0&&ms.every(movConc)};
 function gtSit(t){const pg=GT.pago[t.id]||0,sd=r2(t.valor-pg);
   if(sd<=0.004)return ['c-done',t.tipo==='pagar'?'✓ Pago':'✓ Recebido','baixada'];
   if(t.vencimento<TODAY)return ['c-bad','Vencido'+(pg?' · parcial':''),'vencida'];
@@ -6818,7 +6828,7 @@ function gtDesenha(){
 function gtTabela(rows,vazio){
   const MV=GT.tipo==='mov',P=gtP(),mu=t=>`<span class="muted">${t}</span>`;
   $('gtHead').innerHTML=`<tr><th>Vencimento</th>${MV?'<th class="l">Tipo</th>':''}<th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Descrição</th><th class="l">Documento</th><th>Parcela</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b>${GT.todasE?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:''}</td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${faClip(t.id)}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.map(t=>{const s=gtSit(t);return `<tr class="click" data-id="${t.id}" tabindex="0"><td>${dBR(t.vencimento)}</td>${MV?`<td class="l"><span class="${t.tipo==='pagar'?'neg':'pos'}">${t.tipo==='pagar'?'A pagar':'A receber'}</span></td>`:''}<td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b>${GT.todasE?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:''}</td><td class="l">${esc(t.descricao||'')||mu('—')}${t.categoria?`<br>${mu(esc(t.categoria))}`:''}</td><td class="l">${esc(t.documento||'')||mu('—')}${faClip(t.id)}${t.origem==='boleto_cliente'?`<br>${mu('enviado pelo cliente')}`:''}</td><td>${t.parcelas>1?t.parcela+'/'+t.parcelas:mu('—')}</td><td>${fm(t.valor)}</td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l">${stIc(s[2]==='baixada',gtConc(t),t.tipo==='pagar')}<span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="${MV?10:9}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l">${rows.length} ${rows.length===1?'conta':'contas'}</td><td></td><td></td><td></td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td></td></tr>`
@@ -6868,7 +6878,7 @@ function mvDesenha(){
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${faClip(x.k==='t'?x.id:x.ref?.titulo_id||x.id)}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${faClip(x.k==='t'?x.id:x.ref?.titulo_id||x.id)}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l">${stIc(x.k==='m',x.k==='m'&&x.st==='conciliado',x.tipo!=='entrada')}<span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
     +(rows.length>MV.lim?`<tr><td></td><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
     ||`<tr><td></td><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
   const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
@@ -7143,7 +7153,7 @@ async function abrirGT(t,tipo,pre){
   <div class="fields">
     <label class="f wide">${P?'Fornecedor':'Cliente'} *<input id="gt_pessoa" list="gtPesList" value="${v('pessoa_nome')}" placeholder="Digite para buscar no cadastro" autocomplete="off" data-pesnova>${PESNOVA}</label>
     <label class="f wide">Descrição<input id="gt_descricao" value="${v('descricao')}" placeholder="${P?'Ex.: aluguel da sala':'Ex.: convênio Unimed, setembro'}"></label>
-    <label class="f">Documento<input id="gt_documento" value="${v('documento')}" placeholder="Nº da NF ou boleto"></label>
+    <label class="f">Documento<input id="gt_documento" value="${v('documento')}" placeholder="Nº da NF ou boleto" autocomplete="off"></label>
     <label class="f">Categoria<select id="gt_categoria" data-catnova="${P?'Despesa':'Receita'}">${opt(cats,(t||pre)?.categoria||'')}${catNovaOpt}</select></label>
     <label class="f">Competência<input type="month" id="gt_competencia" value="${((t||pre)?.competencia||'').slice(0,7)}"></label>
     <label class="f">Vencimento *<input type="date" id="gt_vencimento" value="${v('vencimento')}"></label>
@@ -7156,7 +7166,18 @@ async function abrirGT(t,tipo,pre){
     ${P?`<label class="f">Chave Pix<input id="gt_pix_chave" value="${v('pix_chave')}"></label>`:''}
     <label class="f wide">Observação<textarea id="gt_obs" rows="2">${v('obs')}</textarea></label>
   </div>`;
+  // já pago ou recebido: "Salvar quitado" lança e quita na hora, como o "Criar quitado" do Bom Controle (Carol, 05/11)
+  if(!t)h+=`<div style="background:var(--sunk);padding:12px;border-radius:10px">
+    <p style="margin:0"><b>Já está ${P?'pago':'recebido'}?</b> <span class="note">Confira a data e a conta e clique em <b>Salvar quitado</b>. O lançamento entra quitado, sem precisar dar baixa depois. A conciliação continua na importação do OFX.</span></p>
+    <div class="fields" id="gtJaBox" style="margin-top:10px">
+      <label class="f">Data do ${P?'pagamento':'recebimento'} *<input type="date" id="gj_data"></label>
+      <label class="f">Conta do ${P?'pagamento':'recebimento'} *<select id="gj_conta">${opt(ativas,(t||pre)?.conta_id||(ativas.length===1?ativas[0][0]:''),ativas.length?'':'Cadastre em Contas bancárias')}</select></label>
+      <label class="f" id="gjParcBox" hidden>Quais parcelas<select id="gj_parc"><option value="1">Só a 1ª parcela</option><option value="todas">Todas as parcelas</option></select></label>
+    </div></div>`;
   if(t?.parcelas>1)h+=`<p class="note" style="margin:0">Parcela ${t.parcela} de ${t.parcelas}. A correção vale só para esta parcela.</p>`;
+  // depois de pago (ou conciliado), só edita estornando o pagamento, como no Bom Controle (Carol, 05/11)
+  const revCat=t&&(t.cat_revisar||movs.some(m=>m.cat_revisar)),trava=!!(t&&movs.length);
+  if(trava)h+=`<div class="alerta" style="margin:0;display:block"><b>🔒 ${movs.some(movConc)?(P?'Pago e conciliado':'Recebido e conciliado'):(P?'Pago':'Recebido')}: para editar, estorne ${movs.length>1?(P?'os pagamentos':'os recebimentos'):(P?'o pagamento':'o recebimento')}.</b> Use <b>Estornar</b> em ${P?'Pagamentos':'Recebimentos'}, embaixo.${movs.some(movConc)?' A conciliação com o extrato do banco também é desfeita.':''}${revCat?' A categoria pode ser corrigida, porque está marcada para revisar.':''}</div>`;
   if(t?.previsto)h+=`<label class="alerta" style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="gt_prevok" style="width:auto"> <span><b>Conta prevista pelo histórico.</b> ${esc(t.obs||'')} Marque quando o boleto ou a nota chegar e o valor estiver conferido (colar a linha digitável também tira o alerta).</span></label>`;
   if(t?.origem_id)h+=`<div id="gtDocs" class="note" style="margin:0">Documentos enviados pelo cliente: carregando…</div>`;
   // todas as parcelas do lançamento, como no Bom Controle (Carol, 04/11)
@@ -7164,7 +7185,7 @@ async function abrirGT(t,tipo,pre){
   if(irmasP.length>1)h+=`<details><summary style="cursor:pointer"><b>Parcelas deste lançamento (${irmasP.length})</b></summary><div class="tablebox" style="margin:6px 0 0;max-height:260px"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor</th><th class="l">Situação</th></tr></thead><tbody>${irmasP.map(x=>{const s=gtSit(x);return `<tr${x.id===t.id?' style="font-weight:700"':''}><td>${x.parcela}/${x.parcelas}</td><td>${dBR(x.vencimento)}</td><td>${fm(x.valor)}</td><td class="l"><span class="chip ${s[0]}">${s[1]}</span></td></tr>`}).join('')}</tbody></table></div></details>`;
   h+=faHTML(t?irmasP.length>1:true);
   if(t){
-    h+=`<h3 style="margin:8px 0 0">${P?'Pagamentos':'Recebimentos'}</h3>`+(movs.length?`<div class="tablebox" style="margin:0"><table><thead><tr><th>Data</th><th class="l">Conta</th><th>Valor</th><th>Juros/multa</th><th>Desconto</th><th></th></tr></thead><tbody>${movs.map(m=>`<tr><td>${dBR(m.data)}</td><td class="l">${esc(contaNome(m.conta_id))}</td><td>${fm(m.valor)}</td><td>${+m.juros?fm(m.juros):mu('—')}</td><td>${+m.desconto?fm(m.desconto):mu('—')}</td><td><button type="button" class="btn small ghost" data-act="desfaz" data-id="${m.id}">Desfazer</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">Nenhum ${P?'pagamento':'recebimento'} registrado.</p>`);
+    h+=`<h3 style="margin:8px 0 0">${P?'Pagamentos':'Recebimentos'}</h3>`+(movs.length?`<div class="tablebox" style="margin:0"><table><thead><tr><th>Data</th><th class="l">Conta</th><th>Valor</th><th>Juros/multa</th><th>Desconto</th><th></th></tr></thead><tbody>${movs.map(m=>`<tr><td>${dBR(m.data)}</td><td class="l">${esc(contaNome(m.conta_id))}</td><td>${fm(m.valor)}</td><td>${+m.juros?fm(m.juros):mu('—')}</td><td>${+m.desconto?fm(m.desconto):mu('—')}</td><td>${movConc(m)?'<span class="chip c-ok" title="Conciliado com o extrato do banco">✓ Conciliado</span> ':''}<button type="button" class="btn small ghost" data-act="desfaz" data-id="${m.id}" title="Estorna ${P?'o pagamento':'o recebimento'}: a conta volta a ficar em aberto${movConc(m)?' e a conciliação é desfeita':''}">Estornar</button></td></tr>`).join('')}</tbody></table></div>`:`<p class="note" style="margin:0">Nenhum ${P?'pagamento':'recebimento'} registrado.</p>`);
     if(falta>0.004)h+=`<div class="fields" style="background:var(--sunk);padding:12px;border-radius:10px">
       <label class="f">Data *<input type="date" id="gb_data" value="${TODAY}"></label>
       <label class="f">Conta *<select id="gb_conta">${opt(ativas,t.conta_id||(ativas.length===1?ativas[0][0]:''))}</select></label>
@@ -7176,7 +7197,9 @@ async function abrirGT(t,tipo,pre){
   }
   h+=`<p class="err" id="gtErr" hidden></p>`;
   $('gtdBody').innerHTML=h;
-  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`;
+  if(trava){$('gtdBody').querySelectorAll('[id^="gt_"]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true});
+    $('gtdBody').querySelectorAll('[data-pesnova],[data-pesnova-btn],[data-catnova]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true})}
+  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
   // colar a linha digitável preenche o vencimento e o valor que estiverem vazios
   $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
     if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
@@ -7187,6 +7210,12 @@ async function abrirGT(t,tipo,pre){
   $('gt_tipo')?.addEventListener('change',e=>{const g=k=>($('gt_'+k)?.value||'').trim()||null;
     abrirGT(null,e.target.value,{pessoa_nome:g('pessoa'),descricao:g('descricao'),documento:g('documento'),competencia:g('competencia'),vencimento:g('vencimento'),valor:parseMoney($('gt_valor').value),
       linha_digitavel:g('linha_digitavel'),pix_chave:g('pix_chave'),obs:g('obs'),forma:g('forma'),conta_id:g('conta_id')})});
+  if($('gj_data')){let dMan=false,cMan=false;
+    const jp=()=>{const vc=$('gt_vencimento').value;if(!dMan)$('gj_data').value=vc&&vc<=TODAY?vc:TODAY;
+      if(!cMan&&$('gt_conta_id').value)$('gj_conta').value=$('gt_conta_id').value;
+      $('gjParcBox').hidden=!((parseInt($('gt_parcelas').value)||1)>1)};
+    $('gj_data').addEventListener('change',()=>dMan=true);$('gj_conta').addEventListener('change',()=>cMan=true);
+    ['gt_vencimento','gt_conta_id','gt_parcelas'].forEach(k=>{$(k).addEventListener('change',jp);$(k).addEventListener('input',jp)});jp()}
   if(!dlgGT.open)dlgGT.showModal();if(!t)$('gt_pessoa').focus();
   faInit(cli,t?[t.id]:null,t?.grupo_id?GT.lista.filter(x=>x.grupo_id===t.grupo_id).map(x=>x.id):[]);
   if(t?.origem_id){
@@ -7222,7 +7251,7 @@ async function gtAcao(a,b){
       competencia:val('competencia')?val('competencia')+'-01':null,vencimento:val('vencimento'),conta_id:val('conta_id'),forma:val('forma'),
       linha_digitavel:P?(val('linha_digitavel')||'').replace(/\D/g,'')||null:null,pix_chave:P?val('pix_chave')||p?.pix_chave||null:null,obs:val('obs')};
     if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
-    let error;
+    let error,jaPago=false,jaErr=false;
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
       const rev=t.cat_revisar||(GT.movs[t.id]||[]).some(m=>m.cat_revisar);if(rev)row.cat_revisar=false;
       ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id));
@@ -7235,9 +7264,19 @@ async function gtAcao(a,b){
       const rows=[...Array(n).keys()].map(i=>({...row,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
         vencimento:somaMes(row.vencimento,i),competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
       if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
+      jaPago=b?.dataset.quit==='1';const jData=$('gj_data')?.value,jConta=$('gj_conta')?.value,jTodas=n>1&&$('gj_parc')?.value==='todas';
+      if(jaPago&&!jData)return gtErr(`Informe a data do ${P?'pagamento':'recebimento'}.`);
+      if(jaPago&&!jConta)return gtErr(`Escolha a conta do ${P?'pagamento':'recebimento'}. Se não houver, cadastre em Gestão financeira › Contas bancárias.`);
       const gb=GTBOL;if(gb){rows[0].origem='boleto_cliente';rows[0].origem_id=gb.bol.id}
-      let novos;({data:novos,error}=await sb.from('fin_titulos').insert(rows).select('id,parcela'));
+      let novos;({data:novos,error}=await sb.from('fin_titulos').insert(rows).select('id,parcela,parcelas,valor'));
       if(!error)await faLiga((novos||[]).sort((a,b)=>a.parcela-b.parcela).map(x=>x.id));
+      // já pago ou recebido: a baixa entra junto, igual ao "Registrar pagamento"
+      if(!error&&jaPago){const qu=(novos||[]).filter(x=>jTodas||x.parcela===1);
+        const {error:e4}=await sb.from('fin_movimentos').insert(qu.map(x=>({cliente_id:cli.id,conta_id:jConta,data:jData,tipo:GT.dlg==='pagar'?'saida':'entrada',valor:r2(x.valor),juros:0,desconto:0,titulo_id:x.id,
+          descricao:row.descricao||(GT.dlg==='pagar'?'Pagamento':'Recebimento')+(x.parcelas>1?` ${x.parcela}/${x.parcelas}`:''),pessoa_nome:row.pessoa_nome,documento:row.documento,categoria:row.categoria,forma:row.forma||null})));
+        if(e4){console.error(e4);jaErr=true}
+        else if(gb){const c=GFC.lista.find(x=>x.id===jConta);
+          const {error:e5}=await sb.from('contas_pagar').update({conferido:true,pago_em:jData,banco:c?.conta_bc||c?.nome||null}).eq('id',gb.bol.id);if(e5)console.error(e5)}}
       // lançamento feito a partir do documento do cliente: os anexos dele vão para o lançamento e o envio dele fica completo
       if(!error&&gb){const id=(novos||[]).find(x=>x.parcela===1)?.id;
         if(id&&gb.docs?.length){const {error:e2}=await sb.from('documentos').insert(gb.docs.map(d=>({cliente_id:cli.id,modulo:'financeiro',registro_id:id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e2)console.error(e2)}
@@ -7246,7 +7285,9 @@ async function gtAcao(a,b){
         GTBOL=null;if(dlgBol.open)dlgBol.close()}
     }
     if(error){console.error(error);return gtErr(v45(error)?v45Msg:error.message||'Não foi possível salvar.')}
-    toast(t?'Correção salva':'Conta lançada');dlgGT.close();GT.key='';renderGT();
+    const qual=GT.dlg==='pagar'?'pagamento':'recebimento';
+    if(jaErr)alert(`A conta foi lançada, mas o ${qual} não foi registrado. Abra a conta e use “Registrar ${qual}”.`);
+    toast(t?'Correção salva':jaPago&&!jaErr?(GT.dlg==='pagar'?'Conta lançada e paga':'Conta lançada e recebida'):'Conta lançada');dlgGT.close();GT.key='';renderGT();
   }else if(a==='baixa'){
     const data=$('gb_data').value,conta=$('gb_conta').value,valor=parseMoney($('gb_valor').value),juros=parseMoney($('gb_juros').value)||0,desconto=parseMoney($('gb_desconto').value)||0;
     if(!data)return gtErr('Informe a data.');if(!conta)return gtErr('Escolha a conta. Se não houver, cadastre em Gestão financeira › Contas bancárias.');
@@ -7262,11 +7303,11 @@ async function gtAcao(a,b){
       const {error:e2}=await sb.from('contas_pagar').update({conferido:true,pago_em:data,banco:c?.conta_bc||c?.nome||null}).eq('id',t.origem_id);if(e2)console.error(e2)}
     toast(P?'Pagamento registrado':'Recebimento registrado');dlgGT.close();GT.key='';renderGT();
   }else if(a==='desfaz'){
-    if(!confirm('Desfazer este '+(P?'pagamento':'recebimento')+'? Ele sai também do extrato da conta.'))return;
-    const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);   // pagamento de fatura: sai também a entrada no cartão
+    const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);
+    if(!confirm('Confirmar o estorno '+(P?'do pagamento':'do recebimento')+'?\n\nO saldo da conta muda e o lançamento volta a ficar em aberto. Ele sai também do extrato da conta.'+(mv&&movConc(mv)?'\nA conciliação com o extrato do banco também será desfeita (a linha volta a ficar pendente na Conciliação bancária).':'')))return;   // pagamento de fatura: sai também a entrada no cartão
     const {error}=mv?.transf_id?await sb.from('fin_movimentos').delete().eq('transf_id',mv.transf_id):await sb.from('fin_movimentos').delete().eq('id',b.dataset.id);if(error)return fail(error,'Não foi possível desfazer');
     if(t.origem_id){const {error:e2}=await sb.from('contas_pagar').update({conferido:false,pago_em:null}).eq('id',t.origem_id);if(e2)console.error(e2)}
-    toast('Desfeito');dlgGT.close();GT.key='';renderGT();
+    toast('Estornado');dlgGT.close();GT.key='';renderGT();
   }else if(a==='apagar'){
     if((GT.movs[t.id]||[]).length)return gtErr(`Desfaça ${P?'os pagamentos':'os recebimentos'} antes de apagar.`);
     const irmas=t.grupo_id?GT.lista.filter(x=>x.grupo_id===t.grupo_id&&x.id!==t.id&&!(GT.movs[x.id]||[]).length):[];
@@ -10221,6 +10262,19 @@ const MANUAL=[
 </ol>
 <p>Os quadros mostram as compras do período, o que falta conferir com a fatura e as compras sem nota anexada (essas precisam ser cobradas). O escritório marca cada compra como conferida com a fatura.</p>`}]},
   {g:'Gestão financeira',itens:[
+    {k:'gfpagar',t:'Contas a pagar e a receber',
+      txt:`<p>As contas da empresa: o que tem para pagar aos fornecedores e o que tem para receber dos clientes.</p>
+<ol>
+<li>Clique em <b>+ Nova conta a pagar</b> (ou <b>+ Nova conta a receber</b>). Preencha o fornecedor (ou cliente), a descrição, a categoria, o vencimento e o valor. Para dividir em parcelas mensais, informe o número de parcelas.</li>
+<li>Quando a conta for paga, abra a conta e use <b>Registrar pagamento</b> (ou <b>Registrar recebimento</b>) com a data, a conta bancária e, se houver, juros ou desconto.</li>
+</ol>
+<ul>
+<li><b>Conta que já foi paga ou recebida:</b> ao lançar, confira a <b>data</b> e a <b>conta</b> do pagamento (vêm preenchidas com o vencimento e a conta prevista) e clique em <b>$ Salvar quitado</b>, ao lado do Salvar, como o “Criar quitado” do Bom Controle. A conta já entra quitada (não conciliada: a conciliação continua na importação do OFX), sem precisar dar baixa depois, e aparece na Movimentação financeira, no Extrato da conta e nos relatórios. Com parcelas, escolha se quita só a 1ª ou todas. </li>
+<li><b>Ícones na Situação:</b> o <b>$</b> mostra se a conta está paga (ou recebida) e o <b>elo</b> se está conciliada com o extrato do banco. Com o ✓ verde, já está feito.</li>
+<li><b>Para editar uma conta paga ou conciliada:</b> ela fica travada. Abra a conta e use <b>Estornar</b> no pagamento: a conta volta a ficar em aberto, sai do extrato e, se estava conciliada, a conciliação também é desfeita (a linha do banco volta a ficar pendente na Conciliação bancária). Depois corrija e registre o pagamento de novo.</li>
+</ul>`},
+    {k:'gfrec',t:'Contas a receber',
+      txt:`<p>Funciona como as Contas a pagar, para o que os clientes vão pagar à empresa: <b>+ Nova conta a receber</b> para lançar e <b>Registrar recebimento</b> para dar baixa. Se o dinheiro já entrou, use <b>$ Salvar quitado</b> ao lançar, com a data e a conta do recebimento, e a conta já entra quitada.</p>`},
     {k:'gfconc',t:'Conciliação bancária (extrato OFX)',img:'gfconc.png',
       txt:`<p>Aqui o extrato do banco (arquivo OFX) é ligado aos lançamentos do sistema, linha por linha.</p>
 <ol>
@@ -10461,6 +10515,11 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05pago',data:'2026-11-05',t:'Lançar uma conta que já foi paga ou recebida',itens:[
+    {x:'Nova conta a pagar e Nova conta a receber: o botão “$ Salvar quitado”, ao lado do Salvar, lança a conta já paga ou recebida, na data e na conta informadas (como o “Criar quitado” do Bom Controle). Não precisa abrir de novo para dar baixa, e a conciliação continua na importação do OFX.',mods:['gfpagar','gfrec','gfmov']},
+    {x:'A baixa aparece como as outras: na Movimentação financeira, no Extrato da conta e nos relatórios. Com parcelas, escolha se quita só a 1ª ou todas.',mods:['gfpagar','gfrec','gfmov']},
+    {x:'Na coluna Situação das contas a pagar, das contas a receber e da Movimentação aparecem os ícones $ (pago ou recebido) e o elo (conciliado com o extrato do banco), com ✓ verde quando já está feito.',mods:['gfpagar','gfrec','gfmov']},
+    {x:'Conta paga, recebida ou conciliada fica travada: para editar, abra a conta e use “Estornar” no pagamento. O estorno volta a conta para em aberto e desfaz também a conciliação (a linha do banco volta a ficar pendente na Conciliação bancária).',mods:['gfpagar','gfrec','gfmov']}]},
   {k:'2026-11-05cod',data:'2026-11-05',t:'Digite o nome ou o código nos campos dos cadastros',itens:[
     {x:'Em todo campo que puxa de um cadastro (categoria, fornecedor, cliente, conta, colaborador e outros) agora dá para digitar, também no celular: escreva parte do nome ou o código e escolha na lista.'},
     {x:'As categorias aparecem com o código do plano de contas na frente do nome (ex.: 2.01 · Aluguel). Digite só o código para achar mais rápido.'},
