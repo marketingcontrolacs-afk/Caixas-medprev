@@ -515,6 +515,18 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
   .modbtn{gap:6px;padding:6px 9px;font-size:13px}.modbtn svg{width:17px;height:17px}
   .megapop{max-height:calc(100vh - 140px);max-height:calc(100dvh - 140px)}
 }
+/* campos com busca nos cadastros (05/11): o select fica escondido por baixo do campo de digitar */
+select.bxesc{position:absolute!important;opacity:0!important;pointer-events:none!important;width:1px!important;height:1px!important;min-width:0!important;padding:0!important;border:0!important;margin:0!important}
+input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%238A9A9E' stroke-width='1.6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px;text-overflow:ellipsis}
+.bxpop{position:fixed;z-index:90;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh2);overflow:auto;overscroll-behavior:contain;padding:4px;font:500 14px var(--body);margin:0}
+.bxit{display:flex;gap:8px;align-items:baseline;padding:9px 10px;border-radius:7px;cursor:pointer;line-height:1.3}
+.bxit.on,.bxit:hover{background:var(--brand-soft)}
+.bxit small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.bxcod{font-weight:700;color:var(--brand);min-width:3.4em;flex:none}
+.bxg{padding:8px 10px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.bxvazio{padding:10px;color:var(--muted);font-size:13px}
+.bxnova{color:var(--brand);font-weight:600}
+.bxcodtag{justify-self:start;font-size:12px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:6px;padding:1px 7px}
 </style>
 </head>
 <body>
@@ -917,7 +929,7 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
       <div><h1 id="gfH1">Cadastros</h1><p class="sub" id="gfSub"></p></div>
       <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gfFbc" hidden title="Planilha de fornecedores exportada do Bom Controle. Os que faltarem entram aqui, valendo para todas as empresas, e a exportação para o Bom Controle usa o nome e o CNPJ/CPF como estão lá.">Importar fornecedores do Bom Controle<input type="file" id="fbcFile" accept=".xls,.xlsx,.csv" aria-label="Importar fornecedores do Bom Controle"></span><button class="btn primary" id="gfNovo"></button></div>
     </div>
-    <div class="toolbar"><input id="gfBusca" placeholder="Buscar por nome, CNPJ/CPF ou cidade" style="max-width:300px"><label class="f" id="gfPapelBox">É<select id="gfPapel"><option value="">Clientes e fornecedores</option><option value="cliente">Clientes</option><option value="fornecedor">Fornecedores</option></select></label><label class="f">Mostrar<select id="gfFiltro"><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></label></div>
+    <div class="toolbar"><input id="gfBusca" placeholder="Buscar por código, nome, CNPJ/CPF ou cidade" style="max-width:300px"><label class="f" id="gfPapelBox">É<select id="gfPapel"><option value="">Clientes e fornecedores</option><option value="cliente">Clientes</option><option value="fornecedor">Fornecedores</option></select></label><label class="f">Mostrar<select id="gfFiltro"><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></label></div>
     <div class="card tablebox"><table><thead id="gfHead"></thead><tbody id="gfBody"></tbody></table></div>
     <p class="note" id="gfNote"></p>
   </section>
@@ -6427,7 +6439,7 @@ function gfVazio(t,cl){$('gfHead').innerHTML='';$('gfBody').innerHTML=`<tr><td c
 function gfDesenha(){
   const contas=gfTab==='contas',f=$('gfFiltro').value,q=$('gfBusca').value.trim().toLowerCase(),qd=gfDig(q),pp=contas?'':$('gfPapel').value;
   const rows=GFL.filter(r=>(f==='todos'||(f==='ativos')===(r.ativo!==false))&&(!pp||r.papel===pp||r.papel==='ambos')
-    &&(!q||[r.nome,r.fantasia,r.banco,r.conta_bc,r.grupo,r.cidade].some(x=>(x||'').toLowerCase().includes(q))||qd.length>=3&&gfDig(r.documento||r.conta).includes(qd)));
+    &&(!q||[r.nome,r.fantasia,r.banco,r.conta_bc,r.grupo,r.cidade].some(x=>(x||'').toLowerCase().includes(q))||/^\d+$/.test(q)&&r.codigo!=null&&String(r.codigo)===q||qd.length>=3&&gfDig(r.documento||r.conta).includes(qd)));
   const MAX=300,vis=rows.slice(0,MAX),mu=t=>`<span class="muted">${t}</span>`;
   const sit=r=>r.ativo===false?'<span class="chip">Inativo</span>':'<span class="chip c-ok">Ativo</span>';
   if(contas){
@@ -6436,8 +6448,8 @@ function gfDesenha(){
       ||`<tr><td class="l muted" colspan="6">${GFL.length?'Nenhuma conta neste filtro.':'Nenhuma conta cadastrada. Use “Nova conta” para começar.'}</td></tr>`;
   }else{
     const rf=r=>r.situacao_receita?`<br><span class="chip ${/ATIVA/i.test(r.situacao_receita)?'c-ok':'c-bad'}" title="Consultado na Receita${r.situacao_em?' em '+dBR(r.situacao_em):''}">${esc(r.situacao_receita)}</span>`:'';
-    $('gfHead').innerHTML=`<tr><th class="l">Nome</th><th class="l">CNPJ/CPF</th><th class="l">É</th><th class="l">Cidade</th><th class="l">Contato</th><th class="l">Vale para</th><th class="l">Situação</th></tr>`;
-    $('gfBody').innerHTML=vis.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td class="l"><b>${esc(r.nome)}</b>${r.fantasia&&r.fantasia!==r.nome?`<br>${mu(esc(r.fantasia))}`:''}</td><td class="l">${esc(r.documento||'')||mu('—')}${rf(r)}</td><td class="l">${PAPEL[r.papel]||''}${r.grupo?`<br>${mu(esc(r.grupo))}`:''}</td><td class="l">${esc([r.cidade,r.uf].filter(Boolean).join('/'))||mu('—')}</td><td class="l">${[r.telefone,r.email].filter(Boolean).map(esc).join('<br>')||mu('—')}</td><td class="l">${r.cliente_id?'Esta empresa':'Todas as empresas'}${r.fornecedor_bc?`<br>${mu('Bom Controle')}`:''}</td><td class="l">${sit(r)}</td></tr>`).join('')
+    $('gfHead').innerHTML=`<tr><th class="l">Código · Nome</th><th class="l">CNPJ/CPF</th><th class="l">É</th><th class="l">Cidade</th><th class="l">Contato</th><th class="l">Vale para</th><th class="l">Situação</th></tr>`;
+    $('gfBody').innerHTML=vis.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td class="l">${r.codigo!=null?`<b class="bxcod" title="Código do cadastro: digite este número nos lançamentos para achar">${r.codigo}</b> `:''}<b>${esc(r.nome)}</b>${r.fantasia&&r.fantasia!==r.nome?`<br>${mu(esc(r.fantasia))}`:''}</td><td class="l">${esc(r.documento||'')||mu('—')}${rf(r)}</td><td class="l">${PAPEL[r.papel]||''}${r.grupo?`<br>${mu(esc(r.grupo))}`:''}</td><td class="l">${esc([r.cidade,r.uf].filter(Boolean).join('/'))||mu('—')}</td><td class="l">${[r.telefone,r.email].filter(Boolean).map(esc).join('<br>')||mu('—')}</td><td class="l">${r.cliente_id?'Esta empresa':'Todas as empresas'}${r.fornecedor_bc?`<br>${mu('Bom Controle')}`:''}</td><td class="l">${sit(r)}</td></tr>`).join('')
       ||`<tr><td class="l muted" colspan="7">${GFL.length?'Ninguém neste filtro.':'Nenhum cliente ou fornecedor cadastrado. Use “Novo cadastro” para começar.'}</td></tr>`;
   }
   $('gfNote').textContent=(rows.length>MAX?`Mostrando ${MAX} de ${rows.length}. Use a busca para achar os outros. `:rows.length?`${rows.length} ${rows.length===1?'cadastro':'cadastros'}. `:'')+'Clique numa linha para ver ou editar.';
@@ -8125,7 +8137,7 @@ const cnpjOk=c=>{if(!/^[0-9A-Z]{12}[0-9]{2}$/.test(c)||/^(\d)\1+$/.test(c))retur
   const dv=n=>{let s=0,w=2;for(let i=n-1;i>=0;i--){s+=(c.charCodeAt(i)-48)*w;w=w===9?2:w+1}const r=s%11;return r<2?0:11-r};return dv(12)===+c[12]&&dv(13)===+c[13]};
 const pnFmt=c=>c.length===14?c.replace(/^(..)(...)(...)(....)(..)$/,'$1.$2.$3/$4-$5'):c.replace(/^(...)(...)(...)(..)$/,'$1.$2.$3-$4');
 const pnPapelDe=inp=>/cliente/i.test(inp.closest('label')?.textContent||'')?'cliente':'fornecedor';
-const pnTem=inp=>{const v=chave(inp.value);return !!v&&[...(inp.list?.options||[])].some(o=>chave(o.value)===v||chave(o.label)===v)};
+const pnTem=inp=>{const v=chave(inp.value);return !!v&&[...(lstDe(inp)?.options||[])].some(o=>chave(o.value)===v||chave(o.label)===v)};
 function pnBtn(inp){const b=inp.parentElement?.querySelector('[data-pesnova-btn]');if(!b)return;
   const v=inp.value.trim(),falta=v&&!pnTem(inp);
   b.textContent=falta?`+ Cadastrar “${v.length>40?v.slice(0,40)+'…':v}”`:'+ Cadastrar novo';
@@ -8137,8 +8149,226 @@ document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-pe
   const v=inp.value.trim(),soNum=/^[\d.\-\/\s]+$/.test(v);
   const p=await pesNova(cliAtual(),pnPapelDe(inp),v&&!pnTem(inp)&&!soNum?v:'',soNum?v:inp.dataset.pesdoc||'');if(!p)return;
   const nome=pesNome(p);
-  if(inp.list&&![...inp.list.options].some(o=>o.value===nome)){const o=document.createElement('option');o.value=nome;inp.list.appendChild(o)}
+  const dl=lstDe(inp);if(dl&&![...dl.options].some(o=>o.value===nome)){const o=document.createElement('option');o.value=nome;dl.appendChild(o)}
   inp.value=nome;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));pnBtn(inp)});
+// ---------- Campos com busca (Carol, 05/11): em todo campo que puxa de um cadastro dá para DIGITAR (também no celular)
+// e buscar pelo nome ou pelo código. Categorias mostram o código do plano de contas (1.1.01); clientes e fornecedores,
+// o código do cadastro (v102). Vale para todas as telas e empresas, inclusive as futuras: os campos são ligados sozinhos.
+// · <select> de categoria (data-catnova, data-bccat, id com "cat") e listas de cadastro com 8 itens ou mais: ganham um campo
+//   de texto por cima; o select continua no lugar (escondido) com o mesmo valor e os mesmos eventos, então nada muda no resto.
+// · <input list="..."> (datalist): a lista nativa (que no celular quase não aparece) vira a mesma lista com busca.
+// Para deixar um select como era: data-nobusca.
+const BXN=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const BXD=s=>String(s??'').replace(/\D/g,'');
+const lstDe=inp=>inp.list||(inp.dataset.lista?document.getElementById(inp.dataset.lista):null);
+const BX_PES=/^(gtPesList|ftPesList|tePes|gaPes|gcPesList|bolPesList|mvPesList|rPesLista)$/;
+const BX_SEMBUSCA=/^(escCli|lay_|usTipo$)|(Mes|Ano|Sem|mes|ano)$/,BX_SEMBUSCA_CX='.ctxbar,.acm,[data-nobusca]';
+const SELV=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value'),SELI=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'selectedIndex');
+// códigos de clientes e fornecedores (coluna codigo da v102; sem a v102 os nomes aparecem sem código)
+let PESCOD=null;
+function pesCodAdd(p){if(!PESCOD||!p||p.codigo==null||!p.nome)return;const k=chave(p.nome);PESCOD.m.set(k,p.codigo);const f=chave(p.fantasia);if(f&&!PESCOD.m.has(f))PESCOD.m.set(f,p.codigo)}
+function pesCodigos(){
+  if(PESCOD&&Date.now()-PESCOD.t<300000)return;
+  const novo={t:Date.now(),m:PESCOD?.m||new Map()};PESCOD=novo;
+  pesLista().then(ls=>{(ls||[]).forEach(pesCodAdd);bxRedesenha()}).catch(console.error);
+}
+const pesCod=nome=>{pesCodigos();return PESCOD.m.get(chave(nome))??''};
+// código da categoria: plano próprio da empresa escolhida, senão o plano padrão
+const BXCATLD=new Set();
+function catCod(nome){
+  const k=chave(nome);if(!k||nome===CATNOVA)return '';
+  const cli=cliAtual();
+  if(!PCAT.ok&&!BXCATLD.has('*')){BXCATLD.add('*');loadCats().then(bxRedesenha).catch(console.error)}
+  if(cli?.plano_proprio&&!PLANOS[cli.id]&&!BXCATLD.has(cli.id)){BXCATLD.add(cli.id);planoDe(cli).then(bxRedesenha).catch(console.error)}
+  const pl=cli?.plano_proprio?PLANOS[cli.id]||[]:[];
+  return (pl.find(c=>chave(c.categoria)===k)||PCAT.plano.find(c=>chave(c.categoria)===k))?.codigo||'';
+}
+const bxEhCat=s=>s.matches('[data-catnova],[data-bccat]')||/cat/i.test(s.id||'');
+function bxSelQuer(s){
+  if(s.dataset.bx||s.multiple||s.size>1||BX_SEMBUSCA.test(s.id||'')||s.classList.contains('nfsit')||s.closest(BX_SEMBUSCA_CX))return false;
+  return bxEhCat(s)||s.options.length>=8;
+}
+// itens da lista
+function bxItens(el){
+  const it=[];
+  if(el.tagName==='SELECT'){
+    const cat=bxEhCat(el);
+    for(const o of el.options){if(o.disabled&&!o.value)continue;
+      const g=o.parentElement?.tagName==='OPTGROUP'?o.parentElement.label:'';
+      it.push({v:o.value,t:o.textContent.trim(),c:cat&&o.value!==CATNOVA?catCod(o.value||o.textContent):'',g,o})}
+  }else{
+    const dl=lstDe(el);if(!dl)return it;
+    const id=dl.id||'',pes=el.hasAttribute('data-pesnova')||BX_PES.test(id),cat=/^catsList/.test(id);
+    for(const o of dl.options){const v=o.value;if(!v)continue;const lab=(o.label&&o.label!==v?o.label:o.textContent||'').trim();
+      const c=cat?catCod(v):pes?pesCod(v):'';
+      it.push({v,t:v,c,s:cat&&c&&lab.includes(v)?'':lab})}
+  }
+  return it;
+}
+const bxRot=x=>(x.c?x.c+' · ':'')+x.t;
+function bxFiltra(itens,q){
+  q=BXN(q);if(!q)return itens;
+  const tk=q.split(' '),qd=BXD(q),num=/^[\d.\s]+$/.test(q);
+  const r=[];
+  for(const x of itens){if(x.v===CATNOVA){r.push([9,x]);continue}
+    const cn=BXN(x.c),h=cn+' '+BXN(x.t)+' '+BXN(x.s)+' '+BXN(x.g)+' '+BXD(x.c);
+    if(!tk.every(t=>h.includes(t)))continue;
+    const cd=BXD(x.c);
+    const rk=cn===q||(num&&cd&&cd===qd)?0:cn.startsWith(q)||(num&&cd&&qd&&cd.startsWith(qd))?1:BXN(x.t).startsWith(q)?2:3;
+    r.push([rk,x])}
+  return r.sort((a,b)=>a[0]-b[0]).map(a=>a[1]);
+}
+// a lista aberta (uma só por vez)
+const BX={el:null,inp:null,lista:[],i:-1,pop:null};
+function bxPop(){
+  if(!BX.pop){const p=document.createElement('div');p.className='bxpop';p.setAttribute('role','listbox');
+    p.addEventListener('mousedown',e=>e.preventDefault());
+    p.addEventListener('click',e=>{const d=e.target.closest('[data-bxi]');if(d)bxEscolhe(BX.lista[+d.dataset.bxi])});
+    BX.pop=p}
+  return BX.pop;
+}
+function bxPosiciona(){
+  const p=BX.pop,inp=BX.inp;if(!p||!inp||!p.isConnected)return;
+  const r=inp.getBoundingClientRect(),vv=window.visualViewport,vh=vv?vv.height+vv.offsetTop:innerHeight;
+  if(r.bottom<0||r.top>vh){bxFecha();return}
+  const baixo=vh-r.bottom-8,cima=r.top-8,emCima=baixo<180&&cima>baixo;
+  p.style.left=Math.max(8,Math.min(r.left,innerWidth-Math.max(r.width,260)-8))+'px';
+  p.style.width=Math.min(Math.max(r.width,260),innerWidth-16)+'px';
+  p.style.maxHeight=Math.max(120,Math.min(320,emCima?cima:baixo))+'px';
+  if(emCima){p.style.top='';p.style.bottom=(innerHeight-r.top+4)+'px'}else{p.style.bottom='';p.style.top=(r.bottom+4)+'px'}
+}
+function bxAbre(el,inp,q){
+  BX.el=el;BX.inp=inp;
+  const p=bxPop(),casa=inp.closest('dialog')||document.body;if(p.parentElement!==casa)casa.appendChild(p);
+  bxDesenha(q);p.hidden=false;bxPosiciona();inp.setAttribute('aria-expanded','true');
+}
+function bxDesenha(q){
+  const el=BX.el;if(!el)return;
+  const todos=bxItens(el),f=bxFiltra(todos,q),MAX=80;
+  BX.lista=f.slice(0,MAX);
+  const atual=el.tagName==='SELECT'?SELV.get.call(el):BX.inp.value;
+  BX.i=q?(BX.lista.length?0:-1):BX.lista.findIndex(x=>x.v===atual);
+  let g=null,h='';
+  BX.lista.forEach((x,i)=>{
+    if(x.g!==undefined&&x.g!==g&&!q){g=x.g;if(g)h+=`<div class="bxg">${esc(g)}</div>`}
+    h+=`<div class="bxit${i===BX.i?' on':''}${x.v===CATNOVA?' bxnova':''}" data-bxi="${i}" role="option">${x.c?`<b class="bxcod">${esc(x.c)}</b>`:''}<span>${x.t?esc(x.t):'<span class="muted">(em branco)</span>'}${x.s?`<small>${esc(x.s)}</small>`:''}</span></div>`});
+  if(!BX.lista.length)h='<div class="bxvazio">Nada encontrado. Confira o nome ou o código.</div>';
+  else if(f.length>MAX)h+=`<div class="bxvazio">Mostrando ${MAX} de ${f.length}. Continue digitando para achar.</div>`;
+  BX.pop.innerHTML=h;
+  BX.pop.querySelector('.bxit.on')?.scrollIntoView({block:'nearest'});
+}
+function bxRedesenha(){if(BX.el&&BX.pop&&!BX.pop.hidden)bxDesenha(BX.el.tagName==='SELECT'?BX.inp.dataset.bxq||'':BX.inp.value);document.querySelectorAll('select[data-bx]').forEach(bxMostra)}
+function bxFecha(){if(BX.pop)BX.pop.hidden=true;BX.inp?.setAttribute('aria-expanded','false');BX.el=null;BX.inp=null}
+function bxEscolhe(x,el=BX.el,inp=BX.inp){
+  if(!el||!inp||!x)return;inp._bxok=true;const minha=BX.inp===inp;
+  if(el.tagName==='SELECT'){
+    const antes=SELV.get.call(el);
+    if(el.matches('[data-catnova]')&&antes!==CATNOVA)el.dataset.prev=antes;
+    delete inp.dataset.bxq;
+    SELV.set.call(el,x.v);bxMostra(el);if(minha)bxFecha();
+    if(antes!==x.v){el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))}
+  }else{
+    inp.value=x.v;if(minha)bxFecha();bxCodigo(inp);
+    inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+}
+// select: o campo de texto mostra a opção escolhida (com o código)
+function bxMostra(s){
+  const inp=s._bx;if(!inp)return;
+  if(document.activeElement===inp&&inp.dataset.bxq!==undefined)return;
+  const o=s.options[SELI.get.call(s)];
+  inp.value=o&&o.value!==CATNOVA&&o.textContent.trim()?bxRot({t:o.textContent.trim(),c:bxEhCat(s)?catCod(o.value||o.textContent):''}):'';
+  inp.disabled=s.disabled;inp.hidden=s.hidden;inp.title=s.title||'';
+}
+// input com datalist de clientes e fornecedores: mostra o código ao lado do nome
+function bxCodigo(inp){
+  const b=inp._bxcod;if(!b)return;const c=inp.value.trim()?pesCod(inp.value):'';b.textContent=c?'Cód. '+c:'';b.hidden=!c;
+}
+function bxLigaSel(s){
+  if(!bxSelQuer(s))return;
+  s.dataset.bx='1';
+  const inp=document.createElement('input');inp.type='text';inp.className='bxin bxsel '+(s.className||'');inp.autocomplete='off';inp.spellcheck=false;
+  inp.setAttribute('role','combobox');inp.setAttribute('aria-expanded','false');inp.setAttribute('autocapitalize','off');
+  if(s.getAttribute('style'))inp.setAttribute('style',s.getAttribute('style'));
+  const cs=getComputedStyle(s);if(/px$/.test(cs.minWidth)&&cs.minWidth!=='0px')inp.style.minWidth=cs.minWidth;if(/px$/.test(cs.maxWidth))inp.style.maxWidth=cs.maxWidth;
+  const al=s.getAttribute('aria-label');if(al)inp.setAttribute('aria-label',al);
+  inp.placeholder=bxEhCat(s)?'Digite o código ou o nome':'Digite para buscar';
+  inp._sel=s;s._bx=inp;s.classList.add('bxesc');s.tabIndex=-1;
+  s.parentNode.insertBefore(inp,s);
+  Object.defineProperty(s,'value',{configurable:true,get(){return SELV.get.call(this)},set(v){SELV.set.call(this,v);bxMostra(this)}});
+  Object.defineProperty(s,'selectedIndex',{configurable:true,get(){return SELI.get.call(this)},set(v){SELI.set.call(this,v);bxMostra(this)}});
+  s.focus=()=>inp.focus();
+  s.addEventListener('change',()=>bxMostra(s));
+  bxMostra(s);
+}
+function bxLigaInp(inp){
+  if(inp._bxl||inp.hasAttribute('data-nobusca'))return;
+  const t=(inp.getAttribute('type')||'text').toLowerCase();if(!['text','search',''].includes(t))return;
+  const id=inp.getAttribute('list');if(!id)return;
+  inp._bxl=1;inp.dataset.lista=id;inp.removeAttribute('list');inp.autocomplete='off';inp.classList.add('bxin');
+  inp.setAttribute('role','combobox');inp.setAttribute('aria-expanded','false');
+  if(!inp._bxcod&&(inp.hasAttribute('data-pesnova')||BX_PES.test(id))){
+    const b=document.createElement('span');b.className='bxcodtag';b.hidden=true;inp._bxcod=b;inp.after(b);
+    setTimeout(()=>bxCodigo(inp),0);inp.addEventListener('change',()=>bxCodigo(inp));
+  }
+}
+// liga sozinho: telas novas, listas recriadas e campos que ganham uma lista depois (MutationObserver)
+function bxVarre(raiz){
+  if(!raiz.querySelectorAll)return;
+  if(raiz.matches?.('select'))bxLigaSel(raiz);else if(raiz.matches?.('input[list]'))bxLigaInp(raiz);
+  raiz.querySelectorAll('select:not([data-bx])').forEach(bxLigaSel);
+  raiz.querySelectorAll('input[list]').forEach(bxLigaInp);
+}
+let BXFILA=new Set(),BXT=0;
+new MutationObserver(ms=>{
+  for(const m of ms){
+    if(m.type==='attributes'){const t=m.target;if(t.tagName==='INPUT'&&t.hasAttribute('list')){t._bxl=0;BXFILA.add(t)}else if(t.tagName==='SELECT'&&t._bx)bxMostra(t);continue}
+    if(BX.pop&&BX.pop.contains(m.target))continue;
+    const s=m.target.closest?.('select');if(s){BXFILA.add(s);continue}
+    m.addedNodes.forEach(n=>{if(n.nodeType===1&&n!==BX.pop&&!n.classList?.contains('bxpop'))BXFILA.add(n)});
+  }
+  if(BXFILA.size&&!BXT)BXT=requestAnimationFrame(()=>{BXT=0;const f=[...BXFILA];BXFILA.clear();
+    f.forEach(n=>{if(!n.isConnected)return;if(n.tagName==='SELECT'&&n._bx)bxMostra(n);else bxVarre(n)});
+    document.querySelectorAll('input.bxsel').forEach(i=>{if(!i._sel.isConnected||i._sel.parentNode!==i.parentNode)i.remove()})});
+}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['list','disabled','hidden']});
+bxVarre(document.body);
+// digitação, teclado e toque
+const bxAlvo=e=>{const i=e.target;if(!(i instanceof HTMLInputElement)||!i.classList.contains('bxin'))return null;return {inp:i,el:i._sel||i}};
+document.addEventListener('focusin',e=>{const a=bxAlvo(e);if(!a)return;
+  if(a.inp._sel){delete a.inp.dataset.bxq;setTimeout(()=>{if(document.activeElement===a.inp)a.inp.select()},0);bxAbre(a.el,a.inp,'')}
+  else bxAbre(a.el,a.inp,a.inp.value)});
+document.addEventListener('input',e=>{const a=bxAlvo(e);if(!a||!e.isTrusted)return;
+  a.inp._bxok=false;if(a.inp._sel)a.inp.dataset.bxq=a.inp.value;
+  if(BX.inp!==a.inp)bxAbre(a.el,a.inp,a.inp.value);else{bxDesenha(a.inp.value);bxPosiciona()}});
+document.addEventListener('click',e=>{const a=bxAlvo(e);if(a&&(BX.inp!==a.inp||BX.pop.hidden))bxAbre(a.el,a.inp,a.inp._sel?'':a.inp.value)});
+document.addEventListener('keydown',e=>{const a=bxAlvo(e);if(!a)return;
+  if(BX.inp!==a.inp||BX.pop.hidden){if(e.key==='ArrowDown'||e.key==='F4'){e.preventDefault();bxAbre(a.el,a.inp,'')}return}
+  const n=BX.lista.length;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(!n)return;BX.i=(BX.i+(e.key==='ArrowDown'?1:-1)+n)%n;
+    BX.pop.querySelectorAll('.bxit').forEach((d,i)=>d.classList.toggle('on',i===BX.i));BX.pop.querySelector('.bxit.on')?.scrollIntoView({block:'nearest'})}
+  else if(e.key==='Enter'){if(BX.i>=0&&BX.lista[BX.i]){e.preventDefault();e.stopPropagation();bxEscolhe(BX.lista[BX.i])}}
+  else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();const s=a.inp._sel;bxFecha();if(s){delete a.inp.dataset.bxq;bxMostra(s)}}
+},true);
+document.addEventListener('focusout',e=>{const a=bxAlvo(e);if(!a)return;
+  setTimeout(()=>{if(document.activeElement===a.inp)return;
+    const q=a.inp.value.trim(),s=a.inp._sel;
+    if(!a.inp._bxok){
+      if(s&&a.inp.dataset.bxq!==undefined){
+        // digitou e saiu sem escolher: fica com o único resultado ou com o código exato; vazio = em branco
+        const f=bxFiltra(bxItens(s),q).filter(x=>x.v!==CATNOVA),qd=BXD(q);
+        const ex=f.find(x=>x.c&&(BXN(x.c)===BXN(q)||/^[\d.\s]+$/.test(q)&&BXD(x.c)===qd))||f.find(x=>BXN(x.t)===BXN(q))||(f.length===1?f[0]:null);
+        const vazio=!q&&[...s.options].some(o=>o.value==='');
+        if(ex||vazio)bxEscolhe(ex||{v:''},s,a.inp);
+      }else if(!s&&/^\d+$/.test(q)){
+        // fornecedor ou cliente: o código digitado vira o nome
+        const x=bxItens(a.inp).find(i=>String(i.c)===q);if(x)bxEscolhe(x,a.inp,a.inp);
+      }
+    }
+    if(BX.inp===a.inp)bxFecha();
+    if(s){delete a.inp.dataset.bxq;bxMostra(s)}else bxCodigo(a.inp);
+  },200)});
+addEventListener('scroll',e=>{if(BX.pop&&!BX.pop.hidden&&e.target!==BX.pop&&!BX.pop.contains(e.target))bxPosiciona()},true);
+addEventListener('resize',()=>bxPosiciona());window.visualViewport?.addEventListener('resize',()=>bxPosiciona());
 let PNREC=null;
 async function pnReceita(manual){
   const c=pnAlnum($('pn_documento').value),nota=$('pnRecNote');
@@ -8210,7 +8440,7 @@ function pesNova(cli,papel,nome,doc){
 function pnCache(cli,p){
   if(GFP.key.startsWith(cli.id+'|')&&!GFP.lista.some(x=>x.id===p.id))GFP.lista.push(p);
   if(GFPT.cid===cli.id&&!GFPT.lista.some(x=>x.id===p.id))GFPT.lista.push(p);
-  GFKEY='';PESLISTA=null;
+  GFKEY='';PESLISTA=null;if(PESCOD){PESCOD.t=0;pesCodAdd(p)}
 }
 const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
 function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
@@ -9932,6 +10162,7 @@ const MANUAL=[
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
 <li><b>No celular:</b> o alto da tela fica mais compacto (logo, nome e Sair numa linha e a empresa logo abaixo). Os módulos ficam numa faixa que corre para o lado com o dedo. Nas janelas, o texto rola e os botões (como <b>Visualizei</b>, Salvar e Cancelar) ficam sempre fixos embaixo.</li>
+<li><b>Campos que puxam de um cadastro</b> (categoria, fornecedor, cliente, conta, colaborador e outros): clique e <b>digite</b> parte do nome ou o <b>código</b>. A lista mostra só o que combina; toque ou use as setas e Enter para escolher. Funciona igual no computador e no celular. As categorias aparecem com o código do plano de contas (ex.: <i>2.01 · Aluguel</i>) e os clientes e fornecedores com o código do cadastro.</li>
 <li><b>Atalho na tela de início:</b> para abrir o portal como um aplicativo, com o ícone do C da Controlacs, no iPhone use Safari › Compartilhar › <b>Adicionar à Tela de Início</b>; no Android, Chrome › menu ⋮ › <b>Adicionar à tela inicial</b>. Se o atalho antigo mostra outro ícone, apague-o e salve de novo.</li>
 </ol>
 <div class="mndica"><b>Dicas:</b> atualizar a página (F5) mantém a tela aberta. Ao trocar de tela, os filtros e as buscas voltam ao padrão. Quando houver uma atualização do portal, aparece uma janela com as novidades ao entrar: leia e clique em <b>Visualizei</b>. Se aparecer a faixa <b>Somente visualização</b>, você pode ver e baixar, mas não lançar nem alterar nada naquela tela.</div>`}]},
@@ -10012,6 +10243,7 @@ const MANUAL=[
 <ol>
 <li>Clique em <b>+ Novo cadastro</b>, digite o CNPJ ou o CPF e saia do campo. Com o CNPJ, o nome, o endereço e a situação vêm da Receita.</li>
 <li>Escolha se é cliente, fornecedor ou os dois, complete o que faltar (telefone, Pix, banco) e salve.</li>
+<li>Cada cadastro recebe um <b>código</b> (número) na frente do nome, dado pelo sistema. Nos lançamentos, digite o código no campo do fornecedor ou do cliente e o nome aparece; na busca desta tela também dá para procurar pelo código.</li>
 </ol>
 <ul>
 <li><b>Sem repetidos:</b> o mesmo CNPJ/CPF não entra duas vezes, e o mesmo nome só entra de novo com outro CNPJ.</li>
@@ -10229,6 +10461,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05cod',data:'2026-11-05',t:'Digite o nome ou o código nos campos dos cadastros',itens:[
+    {x:'Em todo campo que puxa de um cadastro (categoria, fornecedor, cliente, conta, colaborador e outros) agora dá para digitar, também no celular: escreva parte do nome ou o código e escolha na lista.'},
+    {x:'As categorias aparecem com o código do plano de contas na frente do nome (ex.: 2.01 · Aluguel). Digite só o código para achar mais rápido.'},
+    {x:'Clientes e fornecedores ganharam um código (número) na frente do nome. Nos lançamentos, digite o código e o nome aparece. Em Gestão financeira › Clientes e fornecedores dá para buscar pelo código.'}]},
   {k:'2026-11-05pes2',data:'2026-11-05',t:'Clientes e fornecedores valem para todas as empresas',itens:[
     {x:'O cadastro de clientes e fornecedores é um só e vale para todas as empresas, inclusive as que forem cadastradas depois. Cadastrou uma empresa nova? Ela já usa o mesmo cadastro, sem precisar copiar nada.'},
     {x:'Boletos e notas a pagar, Cartão de crédito e Tesouraria: ao digitar o fornecedor, aparecem os nomes do cadastro para escolher (só o nome e o CNPJ/CPF).',mods:['pagar','cartao','tesouraria']}]},
