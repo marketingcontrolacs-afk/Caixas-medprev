@@ -862,12 +862,14 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <div class="row" style="align-items:flex-end"><button class="btn" id="rnCfg" hidden>Empresas do grupo</button><span class="btn fotobtn" id="rnCtrl" hidden>Importar controle de NF<input type="file" id="rnCtrlArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF dos parceiros"></span><button class="btn" id="rnXls" hidden>Baixar Excel</button><span class="btn primary fotobtn" id="rnImp" hidden>Importar relatório de repasses<input type="file" id="rnArq" accept=".xls,.xlsx" aria-label="Importar o relatório de restituições"></span></div>
     </div>
     <div class="toolbar" id="rnBar" hidden>
+      <label class="f">Relatórios de<input type="date" id="rnDe" title="Mostra na lista só os relatórios a partir desta data"></label>
+      <label class="f">até<input type="date" id="rnAte" title="Mostra na lista só os relatórios até esta data"></label>
       <label class="f">Relatório<select id="rnLote"></select></label>
-      <label class="f">Pagamento em<input type="date" id="rnVenc"></label>
-      <label class="f">Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option></select></label>
-      <label class="f">Situação<select id="rnSitF"><option value="">Todas</option><option value="falta">Falta pagar</option><option value="sem">Sem empresa (sem conta a pagar)</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="pago">Pagos</option><option value="conciliado">Conciliados</option></select></label>
-      <label class="f">Empresa<select id="rnEmpF"></select></label>
-      <input id="rnBusca" placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
+      <label class="f" data-rnf>Pagamento em<input type="date" id="rnVenc"></label>
+      <label class="f" data-rnf>Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option></select></label>
+      <label class="f" data-rnf>Situação<select id="rnSitF"><option value="">Todas</option><option value="falta">Falta pagar</option><option value="sem">Sem empresa (sem conta a pagar)</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="pago">Pagos</option><option value="conciliado">Conciliados</option></select></label>
+      <label class="f" data-rnf>Empresa<select id="rnEmpF"></select></label>
+      <input id="rnBusca" data-rnf placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
     </div>
     <div class="tiles" id="rnTiles"></div>
     <div class="alerta" id="rnBulk" hidden><span id="rnBulkTxt"></span><span class="row" style="gap:8px;flex-wrap:wrap" id="rnBulkBtns"></span></div>
@@ -1776,7 +1778,7 @@ escCli.onchange=()=>{guardaEmp();openView()};
 const SECK='portal_secao';
 // filtros e buscas das telas voltam ao padrão ao trocar de tela: o nome de fornecedor digitado não fica lá esquecido (Carol, 04/11)
 // o F5 continua na mesma tela; trocar só a empresa mantém os filtros; o período das outras telas (extrato, conciliação, relatórios) não muda
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -10974,6 +10976,7 @@ const MANUAL=[
 <li><b>Conta com parcelas ou recorrência:</b> ao corrigir uma parcela, use <b>Salvar só esta</b> ou <b>Salvar esta e as próximas</b>. Na segunda opção, o que você mudou (valor, vencimento, categoria, conta, descrição ou outro campo) vai também para as próximas parcelas em aberto, e o vencimento segue o mesmo dia, mês a mês. Parcelas já pagas não mudam.</li>
 <li><b>Conciliar sem enviar o extrato de novo:</b> abra a conta e use <b>🔗 Conciliar</b> no pagamento (por exemplo, depois de estornar para corrigir a categoria e registrar o pagamento de novo). O portal liga à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias); se não achar, pergunta se marca como conciliado mesmo assim. <b>Desconciliar</b> tira só a ligação com o extrato. Na conta nova, <b>🔗 Salvar quitado e conciliado</b> já lança paga e conciliada.</li>
 <li><b>Pagamento em mais de uma conta:</b> quando parte sai de uma conta e parte de outra (por exemplo, parte da <b>Tesouraria</b> e parte do banco), clique em <b>+ Pagar parte em outra conta</b>, escolha a outra conta e o valor dessa parte. O restante sai da conta escolhida no campo <b>Conta</b>. Cada parte entra no extrato da sua conta. Funciona no <b>Registrar pagamento</b>, no <b>$ Salvar quitado</b> (uma parcela por vez) e no <b>Marcar como pago</b> do Repasse de parceiros.</li>
+<li><b>Repasse da semana:</b> a tela abre em branco. Escolha em <b>Relatório</b> qual relatório quer ver (os totais e os parceiros são só dele). Para achar um relatório antigo, use o período em <b>Relatórios de</b> e <b>até</b>. O relatório importado agora já abre escolhido.</li>
 <li><b>Repasse de parceiros com o mesmo parceiro repetido:</b> ao importar o relatório, as linhas do mesmo parceiro (mesmo nome) são somadas numa linha só, com os protocolos juntos, para fazer um pagamento único. O aviso da importação lista quem foi somado.</li>
 <li><b>Várias contas de uma vez:</b> marque as contas na caixinha da esquerda (a do título marca todas do filtro). Na barra que aparece: <b>$ Quitar</b> (data: o vencimento de cada conta, ou hoje se ainda não venceu, ou uma data só; conta: a prevista de cada uma ou outra), <b>Estornar</b> (volta para em aberto e desfaz a conciliação), <b>🔗 Conciliar</b>, <b>Desconciliar</b> (continua pago, só tira a ligação com o extrato do banco) e <b>Excluir</b> (conta paga não é excluída: estorne antes).</li>
 </ul>`},
@@ -11275,6 +11278,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05rnrel',data:'2026-11-05',t:'Repasse da semana abre sem relatório',itens:[
+    {x:'O Repasse da semana abre em branco, sem os totais do relatório anterior. Escolha em “Relatório” qual relatório quer ver: os totais, os parceiros e os filtros aparecem só para ele. Para achar um relatório antigo, use o período em “Relatórios de” e “até”. Ao importar um relatório novo, ele já abre escolhido.',mods:['gfrepasse']}]},
   {k:'2026-11-05contas',data:'2026-11-05',t:'Pagamento em mais de uma conta e parceiros repetidos somados',itens:[
     {x:'Dá para pagar uma conta em mais de uma conta, por exemplo parte na Tesouraria e parte no banco: use “+ Pagar parte em outra conta” no Registrar pagamento, no $ Salvar quitado e no Marcar como pago do Repasse de parceiros. Cada parte sai no extrato da sua conta.',mods:['gfpagar','gfrec','gfrepasse']},
     {x:'Repasse de parceiros: ao importar o relatório de restituições, o mesmo parceiro repetido vira uma linha só, com os valores somados, para fazer um único pagamento.',mods:['gfrepasse']}]},
@@ -11997,10 +12002,17 @@ async function renderRN(recarrega=true){
         (al||[]).filter(a=>a.status==='Pendente').forEach(a=>RN.alt[a.parceiro_id]=a);(al||[]).filter(a=>altRecente(a)&&!RN.alt[a.parceiro_id]).forEach(a=>RN.alt[a.parceiro_id]=a)}
     }catch(e){console.error(e);return rnVazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   }
-  const sel=$('rnLote'),cur=sel.value;
-  sel.innerHTML=RN.lotes.map(l=>`<option value="${l.id}">${dBR(l.data_relatorio)}${l.arquivo?' · '+esc(l.arquivo):''}${l.status==='finalizado'?' · finalizado':''}</option>`).join('')||'<option value="">Nenhum relatório importado</option>';
-  if(RN.lotes.some(l=>l.id===cur))sel.value=cur;
+  // a tela abre sem relatório: só aparece o que a pessoa escolher em "Relatório"; o período filtra a lista dos já importados (Carol, 05/11)
+  const sel=$('rnLote'),cur=sel.value,de=$('rnDe').value,ate=$('rnAte').value;
+  const lsL=RN.lotes.filter(l=>(!de||l.data_relatorio>=de)&&(!ate||l.data_relatorio<=ate));
+  sel.innerHTML=(RN.lotes.length?`<option value="">${lsL.length?'Escolha o relatório':'Nenhum relatório neste período'}</option>`:'<option value="">Nenhum relatório importado</option>')
+    +lsL.map(l=>`<option value="${l.id}">${dBR(l.data_relatorio)}${l.arquivo?' · '+esc(l.arquivo):''}${l.status==='finalizado'?' · finalizado':''}</option>`).join('');
+  sel.value=lsL.some(l=>l.id===cur)?cur:'';
   RN.lote=RN.lotes.find(l=>l.id===sel.value)||null;
+  document.querySelectorAll('#rnBar [data-rnf]').forEach(x=>x.hidden=!RN.lote);
+  if(!RN.lote&&RN.lotes.length){RN.itens=[];RN.sel.clear();$('rnRem').innerHTML='';
+    rnVazio(`Escolha em <b>Relatório</b> qual relatório quer ver. Para achar um relatório antigo, use o período em <b>Relatórios de</b> e <b>até</b>. Para um relatório novo, use <b>Importar relatório de repasses</b>.`);
+    $('rnBar').hidden=false;return}
   if(!RN.lote){rnVazio(`Nenhum relatório importado no grupo ${esc(RN.grupo.nome)}. Use “Importar relatório de repasses” com o relatório de restituições (.xls).`+(RN.nf.length?'':' Importe também o controle de NF dos parceiros, para o sistema saber quem emite nota.'));return}
   if(recarrega||RN.itens[0]?.lote_id!==RN.lote.id){
     try{RN.itens=await todas(()=>sb.from('repasse_itens').select('*').eq('lote_id',RN.lote.id).order('nome'));
@@ -12067,7 +12079,7 @@ function rnDesenha(){
     +'Para separar, marque os repasses e clique em “Pagar em” da empresa: a coluna “Pagar em” é preenchida e a conta a pagar já é criada nessa empresa (se o repasse estava em outra empresa e ainda não foi pago, a conta a pagar muda para a nova). Use o filtro Situação “Falta pagar” para ver só o que ainda não foi pago. Parceiro com alteração de conta fica em vermelho e com desconto a fazer fica em amarelo; ao importar o relatório, aparece um aviso com os dois. '
     +'Pagou pelo internet banking? Marque os repasses e use “Marcar como pago”: escolha a data e a conta de cada empresa, e o pagamento entra nas Contas a pagar e no extrato da conta. Depois de gerar as contas a pagar, use “Remessa” de cada empresa para gerar o arquivo de pagamento do banco só com estes repasses (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
 }
-['rnLote'].forEach(id=>$(id).onchange=()=>renderRN(false));
+['rnLote','rnDe','rnAte'].forEach(id=>$(id).onchange=()=>renderRN(false));
 $('rnRem').addEventListener('click',e=>{const b=e.target.closest('[data-rem]');if(!b)return;const id=b.dataset.rem;
   const ids=new Set(RN.itens.filter(i=>i.empresa_id===id&&i.titulo_id).map(i=>i.titulo_id));
   RM.so={cli:id,ids,data:RN.lote.vencimento||proxQuinta(),txt:`os repasses de parceiros do relatório de ${dBR(RN.lote.data_relatorio)}`};
@@ -12241,7 +12253,7 @@ $('rnArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f|
     const {data:lote,error}=await sb.from('repasse_lotes').insert({grupo_id:RN.grupo.id,data_relatorio:rel.data||TODAY,arquivo:f.name,vencimento:proxQuinta()}).select().single();if(error)throw error;
     const rows=novos.map(i=>{const [nf,via]=rnAcha(i.nome,RN.nf,rnNfNomes);return {...i,lote_id:lote.id,grupo_id:RN.grupo.id,parceiro_nf_id:nf?.id||null,nf_via:nf?via:null}});
     for(let i=0;i<rows.length;i+=200){const {error:e2}=await sb.from('repasse_itens').insert(rows.slice(i,i+200));if(e2)throw e2}
-    toast(`${rows.length} repasses importados`);$('rnLote').innerHTML=`<option value="${lote.id}"></option>`;$('rnLote').value=lote.id;$('rnFiltro').value='todos';$('rnEmpF').value='';$('rnSitF').value='';await renderRN();rnAvisos(true);
+    toast(`${rows.length} repasses importados`);$('rnDe').value='';$('rnAte').value='';$('rnLote').innerHTML=`<option value="${lote.id}"></option>`;$('rnLote').value=lote.id;$('rnFiltro').value='todos';$('rnEmpF').value='';$('rnSitF').value='';await renderRN();rnAvisos(true);
   }catch(err){console.error(err);alert(v75(err)?v75Msg:'Não foi possível importar: '+(err.message||err))}
 };
 // planilha de controle de NF (aba "Controle NF"): Situação, Parceiro, Nome global, CPF/CNPJ, Nome na planilha de NFs
