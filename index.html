@@ -7252,7 +7252,9 @@ async function abrirGT(t,tipo,pre){
       <label class="f">Conta do ${P?'pagamento':'recebimento'} *<select id="gj_conta">${opt(ativas,(t||pre)?.conta_id||(ativas.length===1?ativas[0][0]:''),ativas.length?'':'Cadastre em Contas bancárias')}</select></label>
       <label class="f" id="gjParcBox" hidden>Quais parcelas<select id="gj_parc"><option value="1">Só a 1ª parcela</option><option value="todas">Todas as parcelas</option></select></label>
     </div></div>`;
-  if(t?.parcelas>1)h+=`<p class="note" style="margin:0">Parcela ${t.parcela} de ${t.parcelas}. A correção vale só para esta parcela.</p>`;
+  // lançamento com parcelas ou recorrência: a correção vale só para esta ou também para as próximas em aberto (Carol, 05/11)
+  const proxN=t?.grupo_id?GT.lista.filter(x=>x.grupo_id===t.grupo_id&&x.parcela>t.parcela&&!(GT.movs[x.id]||[]).length).length:0;
+  if(t?.parcelas>1)h+=`<p class="note" style="margin:0">Parcela ${t.parcela} de ${t.parcelas}. ${proxN?`Ao salvar, escolha se a correção vale <b>só para esta</b> ou também para as <b>próximas ${proxN}</b> em aberto (valor, vencimento, categoria ou qualquer outro campo).`:'A correção vale só para esta parcela.'}</p>`;
   // depois de pago (ou conciliado), só edita estornando o pagamento, como no Bom Controle (Carol, 05/11)
   const revCat=t&&(t.cat_revisar||movs.some(m=>m.cat_revisar)),trava=!!(t&&movs.length);
   if(trava)h+=`<div class="alerta" style="margin:0;display:block"><b>🔒 ${movs.some(movConc)?(P?'Pago e conciliado':'Recebido e conciliado'):(P?'Pago':'Recebido')}: para editar, estorne ${movs.length>1?(P?'os pagamentos':'os recebimentos'):(P?'o pagamento':'o recebimento')}.</b> Use <b>Estornar</b> em ${P?'Pagamentos':'Recebimentos'}, embaixo.${movs.some(movConc)?' A conciliação com o extrato do banco também é desfeita.':''}${revCat?' A categoria pode ser corrigida, porque está marcada para revisar.':''}</div>`;
@@ -7277,7 +7279,7 @@ async function abrirGT(t,tipo,pre){
   $('gtdBody').innerHTML=h;
   if(trava){$('gtdBody').querySelectorAll('[id^="gt_"]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true});
     $('gtdBody').querySelectorAll('[data-pesnova],[data-pesnova-btn],[data-catnova]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true})}
-  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
+  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':proxN?`<button type="button" class="btn${falta>0.004?'':' primary'}" data-act="salvar" title="A correção vale só para esta parcela">Salvar só esta</button><button type="button" class="btn" data-act="salvar" data-prox="1" title="A mesma correção vale também para as próximas parcelas em aberto">Salvar esta e as próximas (${proxN})</button>`:`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
   // colar a linha digitável preenche o vencimento e o valor que estiverem vazios
   $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
     if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
@@ -7334,6 +7336,17 @@ async function gtAcao(a,b){
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
       const rev=t.cat_revisar||(GT.movs[t.id]||[]).some(m=>m.cat_revisar);if(rev)row.cat_revisar=false;
       ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id));
+      // esta e as próximas: o que mudou vai também para as próximas parcelas em aberto (datas andam mês a mês)
+      if(!error&&b?.dataset.prox==='1'&&t.grupo_id){
+        const nv={...row,valor:r2(valor)},ch={},muda=k=>(nv[k]??null)!==(k==='valor'?r2(+t.valor):(k==='competencia'?(t.competencia||null):(t[k]??null)));
+        ['pessoa_id','pessoa_nome','descricao','documento','categoria','conta_id','forma','pix_chave','obs','valor'].forEach(k=>{if(muda(k))ch[k]=nv[k]});
+        const mVenc=muda('vencimento'),mComp=muda('competencia');
+        const prox=GT.lista.filter(x=>x.grupo_id===t.grupo_id&&x.parcela>t.parcela&&!(GT.movs[x.id]||[]).length);
+        for(const x of prox){const k=x.parcela-t.parcela,u={...ch};
+          if(mVenc)u.vencimento=somaMes(row.vencimento,k);if(mComp)u.competencia=row.competencia?somaMes(row.competencia,k):null;
+          if(!Object.keys(u).length)break;
+          ({error}=await sb.from('fin_titulos').update(u).eq('id',x.id));if(error)break}
+        if(!error)GT.proxOk=prox.length}
       // a categoria corrigida vale também para os pagamentos já feitos (é deles que saem os relatórios)
       if(!error&&(row.categoria!==t.categoria||rev)){const q=sb.from('fin_movimentos').update(rev?{categoria:row.categoria,cat_revisar:false}:{categoria:row.categoria}).eq('titulo_id',t.id);
         ({error}=await (t.categoria?q.eq('categoria',t.categoria):q.is('categoria',null)))}}
@@ -7366,6 +7379,7 @@ async function gtAcao(a,b){
     if(error){console.error(error);return gtErr(v45(error)?v45Msg:error.message||'Não foi possível salvar.')}
     const qual=GT.dlg==='pagar'?'pagamento':'recebimento';
     if(jaErr)alert(`A conta foi lançada, mas o ${qual} não foi registrado. Abra a conta e use “Registrar ${qual}”.`);
+    if(t&&GT.proxOk){toast(`Correção salva nesta e nas próximas ${GT.proxOk} parcelas`);GT.proxOk=0;dlgGT.close();GT.key='';return renderGT()}
     toast(t?'Correção salva':jaPago&&!jaErr?(GT.dlg==='pagar'?'Conta lançada e paga':'Conta lançada e recebida'):'Conta lançada');dlgGT.close();GT.key='';renderGT();
   }else if(a==='baixa'){
     const data=$('gb_data').value,conta=$('gb_conta').value,valor=parseMoney($('gb_valor').value),juros=parseMoney($('gb_juros').value)||0,desconto=parseMoney($('gb_desconto').value)||0;
@@ -10351,6 +10365,7 @@ const MANUAL=[
 <li><b>Conta que já foi paga ou recebida:</b> ao lançar, confira a <b>data</b> e a <b>conta</b> do pagamento (vêm preenchidas com o vencimento e a conta prevista) e clique em <b>$ Salvar quitado</b>, ao lado do Salvar, como o “Criar quitado” do Bom Controle. A conta já entra quitada (não conciliada: a conciliação continua na importação do OFX), sem precisar dar baixa depois, e aparece na Movimentação financeira, no Extrato da conta e nos relatórios. Com parcelas, escolha se quita só a 1ª ou todas. </li>
 <li><b>Ícones na Situação:</b> o <b>$</b> mostra se a conta está paga (ou recebida) e o <b>elo</b> se está conciliada com o extrato do banco. Com o ✓ verde, já está feito.</li>
 <li><b>Para editar uma conta paga ou conciliada:</b> ela fica travada. Abra a conta e use <b>Estornar</b> no pagamento: a conta volta a ficar em aberto, sai do extrato e, se estava conciliada, a conciliação também é desfeita (a linha do banco volta a ficar pendente na Conciliação bancária). Depois corrija e registre o pagamento de novo.</li>
+<li><b>Conta com parcelas ou recorrência:</b> ao corrigir uma parcela, use <b>Salvar só esta</b> ou <b>Salvar esta e as próximas</b>. Na segunda opção, o que você mudou (valor, vencimento, categoria, conta, descrição ou outro campo) vai também para as próximas parcelas em aberto, e o vencimento segue o mesmo dia, mês a mês. Parcelas já pagas não mudam.</li>
 <li><b>Várias contas de uma vez:</b> marque as contas na caixinha da esquerda (a do título marca todas do filtro). Na barra que aparece: <b>$ Quitar</b> (data: o vencimento de cada conta, ou hoje se ainda não venceu, ou uma data só; conta: a prevista de cada uma ou outra), <b>Estornar</b> (volta para em aberto e desfaz a conciliação), <b>Desconciliar</b> (continua pago, só tira a ligação com o extrato do banco) e <b>Excluir</b> (conta paga não é excluída: estorne antes).</li>
 </ul>`},
     {k:'gfrec',t:'Contas a receber',
@@ -10595,6 +10610,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05prox',data:'2026-11-05',t:'Corrigir só esta parcela ou também as próximas',itens:[
+    {x:'Contas a pagar e a receber com parcelas ou recorrência: ao corrigir uma parcela (valor, vencimento, categoria ou qualquer outro campo), escolha “Salvar só esta” ou “Salvar esta e as próximas”. As próximas parcelas em aberto recebem a mesma mudança; o vencimento segue o mesmo dia, mês a mês. Parcelas já pagas não mudam.',mods:['gfpagar','gfrec','gfmov']}]},
   {k:'2026-11-05lote',data:'2026-11-05',t:'Contas a pagar e a receber: selecionar várias e alterar de uma vez',itens:[
     {x:'Marque as contas na caixinha da esquerda (ou a do título, para todas do filtro). Aparece a barra com Quitar, Estornar, Desconciliar e Excluir, como no rodapé do Bom Controle.',mods:['gfpagar','gfrec']},
     {x:'Quitar: escolha a data (o vencimento de cada conta ou uma data só) e a conta (a prevista de cada uma ou outra). Estornar volta as contas para em aberto e desfaz a conciliação. Desconciliar só tira a ligação com o extrato do banco. Excluir não apaga conta paga: estorne antes.',mods:['gfpagar','gfrec']}]},
