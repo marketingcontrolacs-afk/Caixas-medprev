@@ -9798,12 +9798,12 @@ async function abrirParceiro(p,modo){
   }else{
     if(alt)h+=`<div class="alerta" style="margin:0"><b>Alteração de conta pedida em ${dBR(alt.solicitado_em.slice(0,10))}</b>${alt.motivo?`<span>${esc(alt.motivo)}</span>`:''}
       <div class="cmp" style="margin-top:6px">${cmpBox('Conta atual',p)}${cmpBox('Conta nova',alt)}</div>
-      ${e?`<label class="f">Nota (opcional)<input id="pa_nota" placeholder="Ex.: confirmado por telefone com o parceiro"></label>`:''}
-      <div class="row" style="gap:8px">${e?'<button class="btn small primary" data-act="aplicar">Aplicar a conta nova</button><button class="btn small ghost" data-act="recusar">Recusar</button>':''}${!e&&pode?'<button class="btn small ghost" data-act="cancAlt">Cancelar pedido</button>':''}<button class="btn small ghost" data-act="copNova">Copiar conta nova</button></div></div>`;
+      ${e?`<p class="note" style="margin:0">A conta nova é aplicada só pela Master, no Gestão financeira › Repasse de parceiros, na hora de importar o relatório. Até lá, o repasse continua na conta atual. Aqui não tem botão para aplicar, para ninguém trocar a conta por engano.</p>`:''}
+      <div class="row" style="gap:8px">${!e&&pode?'<button class="btn small ghost" data-act="cancAlt">Cancelar pedido</button>':''}<button class="btn small ghost" data-act="copNova">Copiar conta nova</button></div></div>`;
     if(altA)h+=`<div class="alerta" style="margin:0"><b>Conta alterada em ${dBR(String(altA.resolvido_em||altA.solicitado_em).slice(0,10))}. Confira antes de pagar o repasse.</b>${altA.motivo?`<span>${esc(altA.motivo)}</span>`:''}
       <div class="cmp" style="margin-top:6px">${cmpBox('Conta anterior',altA.anterior||{})}${cmpBox('Conta nova (em uso)',p)}</div>
-      ${e?`<div class="row" style="gap:8px"><button class="btn small primary" data-act="altConf">Conferido</button>${altA.anterior?'<button class="btn small ghost" data-act="altDesfaz">Desfazer (voltar para a conta anterior)</button>':''}</div>
-      <p class="note" style="margin:0">O aviso continua no Repasse de parceiros até alguém marcar “Conferido”.</p>`:'<p class="note" style="margin:0">O escritório confere a conta nova antes do próximo repasse.</p>'}</div>`;
+      ${ehAdm()?`<div class="row" style="gap:8px"><button class="btn small primary" data-act="altConf">Conferido</button>${altA.anterior?'<button class="btn small ghost" data-act="altDesfaz">Desfazer (voltar para a conta anterior)</button>':''}</div>`:''}
+      <p class="note" style="margin:0">${e?'O aviso continua no Repasse de parceiros até a Master marcar “Conferido”.':'O escritório confere a conta nova antes do próximo repasse.'}</p></div>`;
     if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
       ${e?'<p class="note" style="margin:6px 0 0">“Copiar” leva o texto do desconto para colar no comprovante.</p>':''}</div>`;
     h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
@@ -9888,6 +9888,7 @@ async function rpAcao(act,el){
       const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:PARC.find(x=>x.id===parc)?.cliente_id||pEmp(),valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
       PMODO=null;PVOLTA=false;if(!p)PARCDLG=null;return recarregar('Desconto lançado');
     }
+    if(['aplicar','recusar','altConf','altDesfaz'].includes(act)&&!ehAdm())return rpErr('Só a Master aplica, confere ou desfaz a alteração de conta.');
     if(act==='aplicar'){const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:PALT[p.id].id,nota:$('pa_nota')?.value.trim()||null});if(error)throw error;return recarregar('Conta do parceiro atualizada. O aviso continua no repasse até marcar “Conferido”.')}
     if(act==='altConf'){const {error}=await sb.from('parceiro_alteracoes').update({conferida_em:new Date().toISOString(),conferida_por:await me()}).eq('id',PALTA[p.id].id);if(error)return v103(error)?rpErr(v103Msg):fail(error);return recarregar('Conta nova conferida')}
     if(act==='altDesfaz'){if(!confirm('Desfazer a alteração e voltar o parceiro para a conta anterior?'))return;
@@ -10676,7 +10677,8 @@ const NOVIDADES=[
   {k:'2026-11-05altconta',data:'2026-11-05',t:'Alteração de conta do parceiro: conferir e desfazer',itens:[
     {x:'A janela do parceiro ganhou o botão “✕ Fechar” no alto, e os botões de baixo (Fechar, Salvar...) ficam sempre à vista, mesmo com a janela cheia.',mods:['repasse','gfrepasse']},
     {x:'Depois de clicar em “Aplicar a conta nova”, o aviso não some mais: no Repasse de parceiros o parceiro continua em vermelho (“Conta alterada, confira antes de pagar”), com a conta anterior, e aparece no “Atenção antes de pagar” ao importar o relatório, até alguém clicar em “Conferido”.',para:'esc'},
-    {x:'Se a conta foi aplicada por engano, o botão “Desfazer” volta o parceiro para a conta anterior. Fica no repasse e na janela do parceiro (Parceiros).',para:'esc'}]},
+    {x:'Se a conta foi aplicada por engano, o botão “Desfazer” volta o parceiro para a conta anterior. Fica no repasse e na janela do parceiro (Parceiros).',para:'esc'},
+    {x:'Os botões “Aplicar a conta nova”, “Recusar”, “Conferido” e “Desfazer” agora são só da Master e ficam no Repasse de parceiros. A janela do parceiro não tem mais o botão de aplicar: a conta nova é aplicada, na hora de importar o relatório. A operadora continua registrando o pedido de alteração normalmente.',para:'esc'}]},
   {k:'2026-11-05conc',data:'2026-11-05',t:'Conciliar sem reenviar o extrato e extrato só com os conciliados',itens:[
     {x:'Contas a pagar e a receber: em cada pagamento ou recebimento da conta há os botões “🔗 Conciliar” e “Desconciliar”. O Conciliar liga de novo à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias), sem precisar enviar o OFX outra vez. Útil depois de estornar para corrigir algo. Se não achar a linha, pergunta se marca como conciliado mesmo assim.',mods:['gfpagar','gfrec','gfmov']},
     {x:'Na conta nova há também “🔗 Salvar quitado e conciliado”, e na seleção de várias contas o botão “🔗 Conciliar”.',mods:['gfpagar','gfrec']},
@@ -11470,6 +11472,10 @@ $('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-r
   if(b.dataset.rn==='descFeito'){const d=RN.desc.find(x=>x.id===b.dataset.desc);if(!d||!confirm(`Marcar o desconto de ${fm(d.valor)} como feito?`))return;b.disabled=true;
     const {error}=await sb.from('repasse_descontos').update({status:'Descontado',descontado_em:TODAY,resolvido_por:ME.user_id}).eq('id',d.id);b.disabled=false;if(error)return fail(error);
     RN.desc=RN.desc.filter(x=>x.id!==d.id);toast('Desconto marcado como feito');parcPendentes();rnDesenha()}
+  if(['altAplica','altRecusa','altConf','altDesfaz'].includes(b.dataset.rn)&&!ehAdm())return toast('Só a Master aplica, confere ou desfaz a alteração de conta.');
+  if(b.dataset.rn==='altRecusa'){const a=Object.values(RN.alt).find(x=>x.id===b.dataset.alt);if(!a||!confirm('Recusar a alteração? O parceiro continua na conta atual.'))return;b.disabled=true;
+    const {error}=await sb.from('parceiro_alteracoes').update({status:'Recusada',resolvido_em:new Date().toISOString(),resolvido_por:ME.user_id,nota_escritorio:'Recusada pelo Repasse de parceiros'}).eq('id',a.id);b.disabled=false;if(error)return fail(error);
+    delete RN.alt[a.parceiro_id];toast('Alteração recusada');parcPendentes();rnDesenha()}
   if(b.dataset.rn==='altAplica'){const a=Object.values(RN.alt).find(x=>x.id===b.dataset.alt);if(!a||!confirm('Aplicar a conta nova no cadastro do parceiro?'))return;b.disabled=true;
     const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:a.id,nota:'Aplicada pelo Repasse de parceiros'});b.disabled=false;if(error)return fail(error);
     const px=RN.parc.find(x=>x.id===a.parceiro_id);if(px){a.anterior=Object.fromEntries(CONTAK.map(k=>[k,px[k]??null]));CONTAK.forEach(k=>px[k]=a[k]??null)}
@@ -11483,9 +11489,9 @@ $('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-r
     const px=RN.parc.find(x=>x.id===a.parceiro_id);if(px&&a.anterior)CONTAK.forEach(k=>px[k]=a.anterior[k]??null);delete RN.alt[a.parceiro_id];toast('Alteração desfeita. O parceiro voltou para a conta anterior.');rnDesenha()}});
 // caixa vermelha da alteração de conta no repasse: pendente (aplicar) ou já aplicada e ainda não conferida (conferir ou desfazer)
 function rnAltBox(alt){
-  if(alt.status!=='Aplicada')return `<div class="rnaltbox">⚠ <b>Alteração de conta pendente</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}<br><button type="button" class="btn small primary" data-rn="altAplica" data-alt="${alt.id}">Aplicar a conta nova</button></div>`;
+  if(alt.status!=='Aplicada')return `<div class="rnaltbox">⚠ <b>Alteração de conta pendente</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}<br>${ehAdm()?`<button type="button" class="btn small primary" data-rn="altAplica" data-alt="${alt.id}">Aplicar a conta nova</button> <button type="button" class="btn small ghost" data-rn="altRecusa" data-alt="${alt.id}">Recusar</button>`:'<span class="muted">Só a Master aplica a conta nova.</span>'}</div>`;
   return `<div class="rnaltbox">⚠ <b>Conta alterada em ${dBR(String(alt.resolvido_em).slice(0,10))}, confira antes de pagar</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}${alt.anterior?`<br>Conta anterior: ${contaTxt(alt.anterior).map(esc).join(' · ')}`:''}
-    <br><button type="button" class="btn small primary" data-rn="altConf" data-alt="${alt.id}">Conferido</button>${alt.anterior?` <button type="button" class="btn small ghost" data-rn="altDesfaz" data-alt="${alt.id}">Desfazer</button>`:''}</div>`;
+    <br>${ehAdm()?`<button type="button" class="btn small primary" data-rn="altConf" data-alt="${alt.id}">Conferido</button>${alt.anterior?` <button type="button" class="btn small ghost" data-rn="altDesfaz" data-alt="${alt.id}">Desfazer</button>`:''}`:'<span class="muted">A Master confere antes de pagar.</span>'}</div>`;
 }
 // editar a conta e o Pix do parceiro aqui mesmo; grava no cadastro (Parceiros) — Carol, 30/10
 function rnAbreConta(it){
