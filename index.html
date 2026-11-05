@@ -10395,7 +10395,7 @@ async function agCarrega(){
 // Os prints usam empresas e pessoas fictícias. Feito por partes: as telas que ainda não têm explicação ficam listadas no fim.
 // ---------- Gestão da Controlacs (v104): clientes, serviços, contratos, reajustes e documentos da própria Controlacs ----------
 // só a Master vê e grava (RLS eh_admin nas tabelas ctl_* e no bucket "controlacs"). Carol, 05/11: "uma coisa à parte que só eu tivesse acesso"
-const CTL={cli:[],serv:[],cont:[],reaj:[],docs:[],lanc:[],dlg:null};
+const CTL={cli:[],serv:[],cont:[],reaj:[],docs:[],lanc:[],ass:[],assOk:false,assVer:0,dlg:null};
 const CTSIT={
   ctlcli:{prospecto:['c-none','Prospecto'],ativo:['c-ok','Ativo'],suspenso:['c-warn','Suspenso'],encerrado:['c-none','Encerrado']},
   ctlcont:{proposta:['c-none','Proposta'],vigente:['c-ok','Vigente'],suspenso:['c-warn','Suspenso'],encerrado:['c-none','Encerrado']}};
@@ -10421,6 +10421,8 @@ async function ctCarrega(){
   const r=await Promise.all([q('ctl_clientes').order('nome'),q('ctl_servicos').order('nome'),q('ctl_contratos').order('titulo'),q('ctl_reajustes').order('data',{ascending:false}),q('ctl_documentos').order('criado_em',{ascending:false}),q('ctl_lancamentos').order('vencimento')]);
   const e=r.find(x=>x.error)?.error;if(e)throw e;
   [CTL.cli,CTL.serv,CTL.cont,CTL.reaj,CTL.docs,CTL.lanc]=r.map(x=>x.data||[]);
+  // assinaturas pela Autentique (v105); sem a v105 o resto do módulo continua funcionando
+  const a=await sb.from('ctl_assinaturas').select('*').order('criado_em',{ascending:false});CTL.assOk=!a.error;CTL.ass=a.data||[];
 }
 // número vermelho no menu: reajustes atrasados ou próximos, contratos terminando e documentos vencendo
 async function ctlBadge(){
@@ -10444,6 +10446,7 @@ async function renderCtl(){
   $('ctConteudo').innerHTML='<p class="note">Carregando…</p>';
   try{await ctCarrega()}catch(e){console.error(e);$('ctConteudo').innerHTML=`<div class="alerta bad"><b>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Esta área precisa da atualização v104 do banco.':'Erro ao carregar.'}</b><span>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Rode o SQL “v104 - Gestao da Controlacs” no Supabase e atualize a página.':'Verifique a internet e tente de novo.'}</span></div>`;return}
   ctDesenha();ctBadgeCalc();
+  if(CTL.assOk&&CTL.ass.some(a=>a.status==='enviado')&&Date.now()-CTL.assVer>6e5){CTL.assVer=Date.now();ctAssAtualiza(null,true)}
 }
 function ctDesenha(){
   const b=$('ctBusca').value.trim().toLowerCase(),sit=$('ctSit').value,tem=(...x)=>!b||x.some(v=>String(v||'').toLowerCase().includes(b));
@@ -10468,6 +10471,9 @@ function ctDesenha(){
       ${tab('<th class="l">Contrato</th><th class="l">Cliente</th><th>Fim</th><th>Renovação</th><th>Valor mensal</th>',
         fim.map(c=>`<tr data-ctcont="${c.id}"><td class="l"><b>${esc(c.titulo)}</b></td><td class="l">${esc(ctCli(c.cliente_id)?.nome||'')}</td><td><span class="chip ${ctDias(c.fim)<0?'c-bad':'c-warn'}">${dBR(c.fim)}</span></td><td>${c.renovacao_automatica?'Automática':'<b>Precisa renovar</b>'}</td><td>${fm(c.valor_mensal)}</td></tr>`).join(''),
         'Nenhum contrato terminando dentro do prazo de aviso.')}
+      ${CTL.ass.some(a=>a.status==='enviado')?`<h2 style="margin-top:22px">Contratos aguardando assinatura</h2>
+      ${tab('<th class="l">Documento</th><th class="l">Cliente</th><th>Enviado em</th><th>Situação</th><th></th>',
+        CTL.ass.filter(a=>a.status==='enviado').map(a=>`<tr${a.contrato_id?` data-ctcont="${a.contrato_id}"`:''}><td class="l"><b>${esc(a.nome)}</b></td><td class="l">${esc(ctCli(a.cliente_id)?.nome||'')}</td><td>${dtBR(a.criado_em)}</td><td>${ctAssChip(a)}</td><td><button type="button" class="btn small" data-ctassat="1">Atualizar situação</button></td></tr>`).join(''),'')}`:''}
       <h2 style="margin-top:22px">Documentos vencendo (30 dias)</h2>
       ${tab('<th class="l">Documento</th><th class="l">Cliente</th><th>Tipo</th><th>Validade</th>',
         docs.map(d=>`<tr data-ctdoc="${d.id}"><td class="l"><b>${esc(d.nome)}</b></td><td class="l">${esc(ctCli(d.cliente_id)?.nome||'')}</td><td>${esc(CTDOC[d.tipo]||d.tipo)}</td><td><span class="chip ${ctDias(d.validade)<0?'c-bad':'c-warn'}">${dBR(d.validade)}</span></td></tr>`).join(''),
@@ -10532,6 +10538,7 @@ async function ctBaixa(id){const d=CTL.docs.find(x=>x.id===id);if(!d?.caminho)re
 document.addEventListener('click',e=>{
   if(!e.target.closest('#viewCtl,#dlgCtl'))return;
   const bx=e.target.closest('[data-ctbaixa]');if(bx){e.preventDefault();e.stopPropagation();return ctBaixa(bx.dataset.ctbaixa)}
+  if(e.target.closest('[data-ctassat]')){e.stopPropagation();return ctAssAtualiza(e.target.closest('[data-ctassat]'))}
   const bxl=e.target.closest('[data-ctbx]');if(bxl){e.stopPropagation();return ctBaixaHoje(bxl)}
   const rj=e.target.closest('[data-ctreaj]');if(rj){e.stopPropagation();return ctAbreCont(CTL.cont.find(c=>c.id===rj.dataset.ctreaj),true)}
   if(e.target.closest('#ctdFoot'))return;
@@ -10609,7 +10616,9 @@ function ctAbreCont(c,reaj,cliId){
       <p class="note" style="margin:0">Ao confirmar, o valor mensal passa a ser o valor novo e o próximo reajuste vai para ${'<span id="rj_prox"></span>'}.</p>
       <div class="row"><span class="spacer"></span><button type="button" class="btn primary small" data-ctact="aplicar">Confirmar reajuste</button></div></div>
     <div class="f wide" style="margin-top:14px"><span>Histórico de reajustes</span>${hist.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th>Data</th><th>Índice</th><th>Percentual</th><th>De</th><th>Para</th><th class="l">Observação</th><th></th></tr></thead><tbody>${hist.map(r=>`<tr><td>${dBR(r.data)}</td><td>${esc(r.indice||'')}</td><td>${ctPct(r.percentual)}</td><td>${fm(r.valor_anterior)}</td><td>${fm(r.valor_novo)}</td><td class="l">${esc(r.obs||'')}</td><td><button type="button" class="btn ghost small" data-ctact="apagareaj" data-id="${r.id}" title="Apaga só o registro do histórico; o valor do contrato não muda">✕</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum reajuste aplicado ainda.</p>'}</div>
-    <div class="f wide" style="margin-top:14px"><span>Documentos do contrato</span>${ctDocsLista(ds)}<div><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button></div></div>`:''}`,
+    <div class="f wide" style="margin-top:14px"><span>Documentos do contrato</span>${ctDocsLista(ds)}<div><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button></div></div>
+    <div class="f wide" style="margin-top:14px"><span>Assinatura eletrônica (Autentique)</span>${ctAssLista(CTL.ass.filter(a=>a.contrato_id===c.id))}
+      <div class="row" style="gap:8px"><button type="button" class="btn small primary" data-ctact="assenvia">✍ Enviar para assinatura</button>${CTL.ass.some(a=>a.contrato_id===c.id&&a.status==='enviado')?'<button type="button" class="btn small" data-ctact="assatualiza">Atualizar situação</button>':''}</div></div>`:''}`,
     (c?ctBtn('excluir','Excluir','ghost')+ctBtn('reajuste','Aplicar reajuste','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
   if(c){ctRjProx();if(reaj)$('ct_reajBox').scrollIntoView({block:'nearest'})}else $('ct_titulo').focus();
 }
@@ -10671,6 +10680,61 @@ function ctAbreLanc(x,tipo){
     (x?ctBtn('excluir','Excluir','ghost'):'')+(x?.pago_em?ctBtn('estornar','Estornar a baixa','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
   if(!x)$('ct_nome').focus();
 }
+// ---- assinatura eletrônica pela Autentique (função "autentique" no Supabase; a chave fica só no servidor) ----
+const CTASSIT={pendente:['c-none','Ainda não abriu'],visualizou:['c-warn','Abriu, falta assinar'],assinou:['c-ok','Assinou'],recusou:['c-bad','Recusou']};
+function ctAssChip(a){const l=a.signatarios||[],n=l.filter(x=>x.situacao==='assinou').length;
+  return a.status==='assinado'?'<span class="chip c-ok">Assinado por todos</span>':a.status==='recusado'?'<span class="chip c-bad">Recusado</span>':a.status==='cancelado'?'<span class="chip c-none">Cancelado</span>':`<span class="chip c-warn">Aguardando: ${n} de ${l.length} assinaram</span>`}
+function ctAssLista(l){
+  if(!CTL.assOk)return '<p class="note" style="margin:4px 0 0">Para usar a assinatura eletrônica, rode a atualização v105 do banco no Supabase.</p>';
+  return l.length?l.map(a=>`<div class="card" style="padding:10px 12px;margin-top:6px;display:grid;gap:6px"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(a.nome)}</b>${ctAssChip(a)}<span class="muted" style="font-size:12px">enviado ${dtBR(a.criado_em)}${a.verificado_em?' · conferido '+dtBR(a.verificado_em):''}</span>${a.assinado_doc_id&&CTL.docs.some(d=>d.id===a.assinado_doc_id)?`<a href="#" data-ctbaixa="${a.assinado_doc_id}">📎 PDF assinado</a>`:''}</div>
+    ${(a.signatarios||[]).map(x=>`<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;font-size:13px"><span class="chip ${CTASSIT[x.situacao]?.[0]||'c-none'}">${CTASSIT[x.situacao]?.[1]||esc(x.situacao||'')}</span>${esc(x.nome||'')} <span class="muted">${esc(x.email||'')}</span>${x.assinado_em?`<span class="muted">· ${dtBR(x.assinado_em)}</span>`:''}${x.motivo?`<span class="muted">· motivo: ${esc(x.motivo)}</span>`:''}${x.link&&x.situacao!=='assinou'?`<a href="${esc(x.link)}" target="_blank" rel="noopener">link de assinatura</a>`:''}</div>`).join('')}</div>`).join('')
+    :'<p class="note" style="margin:4px 0 0">Nenhum envio para assinatura ainda.</p>';
+}
+const CTSEMTOKEN=`<div class="alerta"><b>Falta ligar a sua conta da Autentique (só uma vez).</b><span>1) Na Autentique, entre em <a href="https://painel.autentique.com.br/perfil/api" target="_blank" rel="noopener">Perfil › Chaves de API</a> e gere uma chave. 2) No Supabase, abra <a href="https://supabase.com/dashboard/project/qlopcclhswtbgrupfhyy/functions/secrets" target="_blank" rel="noopener">Edge Functions › Secrets</a>, clique em “Add new secret”, nome <b>AUTENTIQUE_TOKEN</b> e valor a chave copiada. Salve e tente de novo. A chave fica só no servidor, nunca no portal.</span></div>`;
+async function ctAut(body){
+  const {data,error}=await sb.functions.invoke('autentique',{body});
+  if(error){let m=null;try{m=(await error.context.json()).erro}catch(e){}throw new Error(m||error.message||'Falha na comunicação')}
+  return data;
+}
+// confere na Autentique quem já assinou; quando todos assinam, o PDF assinado entra nos Documentos
+async function ctAssAtualiza(bt,silencioso){
+  if(bt)bt.disabled=true;
+  try{await ctAut({acao:'atualizar'});CTL.assVer=Date.now();await ctCarrega();if(!silencioso)toast('Situação das assinaturas atualizada')}
+  catch(e){if(!silencioso)toast(e.message==='sem_token'?'Falta ligar a conta da Autentique (abra Enviar para assinatura para ver como).':'Não consegui consultar a Autentique: '+e.message)}
+  finally{if(bt)bt.disabled=false}
+  if(VIEW?.startsWith('ctl'))ctDesenha();
+  if(dlgCtl.open&&CTL.dlg?.tipo==='cont'&&CTL.dlg.obj){const c=CTL.cont.find(x=>x.id===CTL.dlg.obj.id);if(c)ctAbreCont(c)}
+}
+function ctAbreAss(c){
+  const pdfs=CTL.docs.filter(d=>d.caminho&&/\.pdf$/i.test(d.nome_arquivo||d.caminho)&&(d.contrato_id===c.id||d.cliente_id===c.cliente_id)&&!/\(assinado\)$/.test(d.nome));
+  const cli=ctCli(c.cliente_id);
+  ctMostra('ass',c,'Enviar para assinatura','<span class="chip c-done">Autentique</span>',
+    `<div id="ct_assTok"></div><p class="note" style="margin:0">A Autentique envia um e-mail para cada pessoa assinar. Quando todos assinarem, o PDF assinado, com a página de autenticação, fica guardado nos documentos do cliente. Plano gratuito: PDF de até 5 MB e o limite de documentos por mês da sua conta.</p>
+    <div class="fields"><label class="f wide">Contrato em PDF *<select id="as_doc">${pdfs.map(d=>`<option value="${d.id}">${esc(d.nome)} · ${esc(d.nome_arquivo||'')}</option>`).join('')}<option value="">Enviar outro PDF agora…</option></select></label>
+    <label class="f wide" id="as_fileBox"${pdfs.length?' hidden':''}>Arquivo PDF<input type="file" id="as_file" accept="application/pdf"></label>
+    <label class="f wide">Nome do documento na Autentique<input id="as_nome" maxlength="180" value="${esc('Contrato '+c.titulo+(cli?' · '+cli.nome:''))}"></label>
+    <label class="f wide">Mensagem no e-mail (opcional)<textarea id="as_msg" rows="2" placeholder="Ex.: Segue o contrato de prestação de serviços para assinatura."></textarea></label>
+    <div class="f wide"><span>Quem assina</span><div id="as_sig" style="display:grid;gap:6px">${ctAssSigLinha(cli?.contato||'',cli?.email||'')}${ctAssSigLinha(ME.nome||'Controlacs',ME.email||'')}</div><div><button type="button" class="btn small" data-ctact="assmais">+ Pessoa</button></div></div></div>`,
+    ctBtn('voltacont','Voltar ao contrato','ghost')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('assmanda','Enviar para assinatura','primary'));
+  ctAut({acao:'status'}).then(r=>{if(r&&!r.token&&$('ct_assTok'))$('ct_assTok').innerHTML=CTSEMTOKEN}).catch(()=>{});
+}
+const ctAssSigLinha=(n,e)=>`<div class="ctsv"><input placeholder="Nome" value="${esc(n)}" data-asn style="flex:1"><input type="email" placeholder="E-mail" value="${esc(e)}" data-ase style="flex:1.3"><button type="button" class="btn ghost small" data-ctact="assmenos" title="Tirar esta pessoa">✕</button></div>`;
+async function ctAssEnvia(bt){
+  const c=CTL.dlg.obj,sig=[...$('as_sig').querySelectorAll('.ctsv')].map(r=>({nome:r.querySelector('[data-asn]').value.trim(),email:r.querySelector('[data-ase]').value.trim()})).filter(x=>x.email);
+  if(!sig.length)return ctErr('Informe o e-mail de pelo menos uma pessoa.');
+  if(sig.some(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email)))return ctErr('Confira os e-mails: algum está incompleto.');
+  if(!confirm(`Enviar “${$('as_nome').value.trim()||c.titulo}” para ${sig.length} ${sig.length===1?'pessoa':'pessoas'} assinar? Isso usa 1 documento do seu limite na Autentique.`))return;
+  bt.disabled=true;
+  try{
+    let docId=$('as_doc').value;
+    if(!docId){const f=$('as_file').files[0];if(!f){bt.disabled=false;return ctErr('Escolha o PDF do contrato.')}
+      if(!/\.pdf$/i.test(f.name)||f.type&&f.type!=='application/pdf'){bt.disabled=false;return ctErr('O contrato precisa estar em PDF.')}
+      if(f.size>5*1024*1024){bt.disabled=false;return ctErr('O PDF passa de 5 MB, o limite do plano gratuito da Autentique.')}
+      const up=await ctUpload(f);const {data,error}=await sb.from('ctl_documentos').insert({nome:c.titulo,tipo:'contrato',cliente_id:c.cliente_id,contrato_id:c.id,...up}).select().single();if(error)throw error;docId=data.id}
+    await ctAut({acao:'enviar',documento_id:docId,contrato_id:c.id,nome:$('as_nome').value.trim()||c.titulo,mensagem:$('as_msg').value.trim()||null,signatarios:sig});
+    toast('Enviado! A Autentique mandou o e-mail para cada pessoa assinar.');await ctCarrega().catch(()=>{});ctDesenha();ctAbreCont(CTL.cont.find(x=>x.id===c.id)||c);
+  }catch(e){bt.disabled=false;if(e.message==='sem_token'){$('ct_assTok').innerHTML=CTSEMTOKEN;$('ctdBody').scrollTop=0;return}ctErr('Não foi possível enviar. '+e.message)}
+}
 // valor do contrato = soma dos serviços marcados (dá para mudar à mão depois)
 $('ctdBody').addEventListener('input',e=>{
   if(CTL.dlg?.tipo!=='cont')return;
@@ -10679,7 +10743,7 @@ $('ctdBody').addEventListener('input',e=>{
   if(e.target.id==='rj_pct'){const p=numBR(e.target.value.trim()||'x');const a=CTL.dlg.obj?.valor_mensal;if(!isNaN(p))$('rj_novo').value=showMoney(ctNovoValor(a,p))}
   if(e.target.id==='rj_data'||e.target.id==='ct_per')ctRjProx();
 });
-$('ctdBody').addEventListener('change',e=>{if(e.target.id==='ct_cont'&&CTL.dlg?.tipo==='doc'){const c=e.target.selectedOptions[0]?.dataset.cli;if(c)$('ct_cli').value=c}
+$('ctdBody').addEventListener('change',e=>{if(e.target.id==='as_doc')$('as_fileBox').hidden=!!e.target.value;if(e.target.id==='ct_cont'&&CTL.dlg?.tipo==='doc'){const c=e.target.selectedOptions[0]?.dataset.cli;if(c)$('ct_cli').value=c}
 });
 async function ctUpload(f){
   if(f.size>20*1024*1024)throw new Error('Arquivo maior que 20 MB.');
@@ -10694,6 +10758,12 @@ async function ctAcao(act,bt){
   if(act==='fechar')return dlgCtl.close();
   if(act==='novocont')return ctAbreCont(null,false,obj.id);
   if(act==='novodoc')return ctAbreDoc(null,tipo==='cli'?{cliente_id:obj.id}:{cliente_id:obj.cliente_id,contrato_id:obj.id});
+  if(act==='assenvia')return ctAbreAss(obj);
+  if(act==='voltacont')return ctAbreCont(obj);
+  if(act==='assatualiza')return ctAssAtualiza(bt);
+  if(act==='assmanda')return ctAssEnvia(bt);
+  if(act==='assmais'){$('as_sig').insertAdjacentHTML('beforeend',ctAssSigLinha('',''));return $('as_sig').lastElementChild.querySelector('input').focus()}
+  if(act==='assmenos')return bt.closest('.ctsv').remove();
   if(act==='reajuste'){$('ct_reajBox').hidden=false;$('ct_reajBox').scrollIntoView({block:'nearest',behavior:'smooth'});return $('rj_pct').focus()}
   if(act==='apagareaj'){if(!confirm('Apagar este registro do histórico? O valor do contrato não muda.'))return;
     const {error}=await sb.from('ctl_reajustes').delete().eq('id',bt.dataset.id);if(error)return fail(error,'Não foi possível apagar');
@@ -10940,6 +11010,14 @@ const MANUAL=[
 <li>Reajuste: escolha o <b>índice</b> (IPCA, IGP-M, INPC, salário mínimo, percentual fixo ou outro), o <b>percentual</b>, a data do <b>próximo reajuste</b>, de quantos em quantos meses reajusta (padrão 12) e com quantos dias de antecedência quer ser avisada (padrão 30). Sem data, o portal sugere 12 meses depois do início.</li>
 <li><b>Aplicar reajuste:</b> confira a data, o índice, o percentual e o valor novo e clique em <b>Confirmar reajuste</b>. O valor mensal muda, o próximo reajuste avança e tudo fica no <b>Histórico de reajustes</b> do contrato.</li>
 <li>Dentro do contrato use <b>+ Anexar documento</b> para guardar o contrato assinado, aditivos e propostas.</li>
+</ol>
+<h3>Assinatura eletrônica (Autentique)</h3>
+<ol>
+<li>Dentro do contrato, clique em <b>✍ Enviar para assinatura</b>. Escolha o PDF do contrato (ou envie um agora), confira o nome e diga quem assina: nome e e-mail de cada pessoa (o cliente e você já vêm preenchidos; use <b>+ Pessoa</b> para incluir testemunhas ou sócios).</li>
+<li>A Autentique manda um e-mail para cada pessoa assinar. No contrato aparece a situação de cada um: <i>Ainda não abriu</i>, <i>Abriu, falta assinar</i>, <i>Assinou</i> ou <i>Recusou</i>. O Painel mostra os contratos aguardando assinatura.</li>
+<li>O portal confere a Autentique ao abrir o módulo (no máximo a cada 10 minutos) e quando você clica em <b>Atualizar situação</b>. Quando todos assinarem, o <b>PDF assinado</b>, com a página de autenticação, entra sozinho nos Documentos do cliente.</li>
+<li>Plano gratuito da Autentique: PDF de até 5 MB e o limite de documentos por mês da sua conta. Cada envio usa 1 documento.</li>
+<li>Primeira vez: o portal mostra como ligar a sua conta (gerar a chave em Perfil › Chaves de API da Autentique e colar no Supabase como <b>AUTENTIQUE_TOKEN</b>). A chave fica só no servidor.</li>
 </ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
@@ -11141,6 +11219,9 @@ async function agBadge(){
 const NOVIDADES=[
   {k:'2026-11-05mvlote',data:'2026-11-05',t:'Movimentação financeira: quitar várias contas de uma vez',itens:[
     {x:'Na Movimentação financeira, ao marcar lançamentos, a barra agora tem também $ Quitar (para as contas em aberto: escolha a data e a conta, por exemplo a Tesouraria), Estornar, 🔗 Conciliar e Desconciliar, como nas Contas a pagar e a receber.',mods:['gfmov']}]},
+  {k:'2026-11-05assina',data:'2026-11-05',t:'Contratos da Controlacs: assinatura eletrônica pela Autentique',itens:[
+    {x:'No contrato (Controlacs › Contratos e reajustes), o botão “✍ Enviar para assinatura” manda o PDF para a Autentique, que envia o e-mail para cada pessoa assinar.',para:'master'},
+    {x:'O contrato e o Painel mostram quem já assinou. Quando todos assinarem, o PDF assinado com a autenticação fica guardado nos Documentos do cliente.',para:'master'}]},
   {k:'2026-11-05ctl',data:'2026-11-05',t:'Nova área: Gestão da Controlacs',itens:[
     {x:'Novo módulo Controlacs no menu, só para a Master: clientes da Controlacs, serviços prestados, contratos, documentos (contrato assinado, aditivos, propostas) e reajustes.',para:'master'},
     {x:'Cada contrato tem o índice, o percentual e a data do próximo reajuste. O Painel avisa quando o reajuste está chegando ou atrasado, e o botão “Aplicar reajuste” atualiza o valor e guarda o histórico.',para:'master'},
