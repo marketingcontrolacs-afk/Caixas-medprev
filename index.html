@@ -1335,6 +1335,26 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
     <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="cnClose">Cancelar</button><button type="submit" class="btn primary" id="cnSave">Cadastrar</button></div>
   </form>
 </dialog>
+<dialog id="dlgPesNova" style="max-width:560px">
+  <form id="pnForm" novalidate>
+    <div class="dh"><h2 id="pnTitle">Novo fornecedor</h2></div>
+    <div class="db"><div class="fields">
+      <label class="f">CNPJ ou CPF *<input id="pn_documento" inputmode="numeric" placeholder="digite e saia do campo" autocomplete="off"></label>
+      <div class="f" style="align-self:end"><button type="button" class="btn" id="pnReceita">Buscar na Receita</button></div>
+      <p class="note wide" id="pnRecNote" style="margin:0"></p>
+      <label class="f wide">Nome ou razão social *<input id="pn_nome" autocomplete="off"></label>
+      <label class="f wide">Nome fantasia<input id="pn_fantasia" autocomplete="off"></label>
+      <label class="f">É<select id="pn_papel"><option value="fornecedor">Fornecedor</option><option value="cliente">Cliente</option><option value="ambos">Cliente e fornecedor</option></select></label>
+      <label class="f">Vale para<select id="pn_vale"><option value="esta">Só esta empresa</option><option value="todas">Todas as empresas</option></select></label>
+      <label class="f">Telefone<input id="pn_telefone"></label>
+      <label class="f">E-mail<input id="pn_email"></label>
+      <label class="f">Tipo da chave Pix<select id="pn_pix_tipo"><option value=""></option><option>CPF</option><option>CNPJ</option><option>E-mail</option><option>Telefone</option><option>Aleatória</option></select></label>
+      <label class="f">Chave Pix<input id="pn_pix_chave"></label>
+      <p class="note wide" id="pnNota" style="margin:0">O cadastro vai para Gestão financeira › Clientes e fornecedores. Endereço, banco e os outros dados podem ser completados lá depois.</p>
+    </div><p class="err" id="pnErr" hidden></p><div class="row" id="pnUsarBox" hidden><button type="button" class="btn small" id="pnUsar">Usar o cadastro que já existe</button></div></div>
+    <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="pnClose">Cancelar</button><button type="submit" class="btn primary" id="pnSave">Cadastrar</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -6987,7 +7007,7 @@ async function abrirGT(t,tipo){
   $('gtdChip').innerHTML=t?(s=>`<span class="chip ${s[0]}">${s[1]}</span>`)(gtSit(t)):'';
   let h=`<datalist id="gtPesList">${pes.map(p=>`<option value="${esc(pesNome(p))}">${pesRot(p)}</option>`).join('')}</datalist>
   <div class="fields">
-    <label class="f wide">${P?'Fornecedor':'Cliente'} *<input id="gt_pessoa" list="gtPesList" value="${v('pessoa_nome')}" placeholder="Digite para buscar no cadastro" autocomplete="off"></label>
+    <label class="f wide">${P?'Fornecedor':'Cliente'} *<input id="gt_pessoa" list="gtPesList" value="${v('pessoa_nome')}" placeholder="Digite para buscar no cadastro" autocomplete="off" data-pesnova>${PESNOVA}</label>
     <label class="f wide">Descrição<input id="gt_descricao" value="${v('descricao')}" placeholder="${P?'Ex.: aluguel da sala':'Ex.: convênio Unimed, setembro'}"></label>
     <label class="f">Documento<input id="gt_documento" value="${v('documento')}" placeholder="Nº da NF ou boleto"></label>
     <label class="f">Categoria<select id="gt_categoria" data-catnova="${P?'Despesa':'Receita'}">${opt(cats,t?.categoria||'')}${catNovaOpt}</select></label>
@@ -7822,7 +7842,7 @@ async function abrirFT(m){
     <label class="f">Valor${m?'':' total'} *<input id="fc_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     ${m?'':`<label class="f">Parcelas<input id="fc_parcelas" type="number" min="1" max="36" value="1"></label>`}
     <label class="f">${m?'Fatura':'Fatura (1ª parcela)'}<input type="month" id="fc_fatura" value="${(m?m.fatura:FT.mes).slice(0,7)}"></label>
-    <label class="f wide">Fornecedor *<input id="fc_pessoa" list="ftPesList" value="${v('pessoa_nome')}" autocomplete="off" placeholder="Onde foi a compra"></label>
+    <label class="f wide">Fornecedor *<input id="fc_pessoa" list="ftPesList" value="${v('pessoa_nome')}" autocomplete="off" placeholder="Onde foi a compra" data-pesnova>${PESNOVA}</label>
     <label class="f wide">Descrição<input id="fc_descricao" value="${v('descricao')}" placeholder="Ex.: material de escritório"></label>
     <label class="f">Categoria<select id="fc_categoria" data-catnova="Despesa"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f">Documento<input id="fc_documento" value="${v('documento')}" placeholder="Nº da NF"></label>
@@ -7962,6 +7982,103 @@ document.addEventListener('change',async e=>{
 document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-catnova-input]');if(!b)return;e.preventDefault();
   const inp=b.dataset.catnovaInput&&$(b.dataset.catnovaInput),nova=await catNova(null,'Despesa',inp&&!PCAT.plano.some(c=>c.categoria===inp.value.trim())?inp.value.trim():'');
   if(nova&&inp){inp.value=nova;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))}});
+// ---------- cadastrar fornecedor ou cliente na hora (Carol, 04/11): contas a pagar e a receber, conciliação, movimentação, tesouraria e cartão ----------
+// inputs marcados com data-pesnova: botão ao lado; se o nome digitado não está no cadastro, o botão oferece cadastrar esse nome.
+// Mesmas regras do cadastro (v58): CNPJ/CPF obrigatório e válido, o mesmo CNPJ/CPF nunca, o mesmo nome só com outro CNPJ.
+const PESNOVA='<button type="button" class="btn small ghost" data-pesnova-btn style="justify-self:start;margin-top:4px">+ Cadastrar novo</button>';
+const pnAlnum=s=>String(s||'').toUpperCase().replace(/[^0-9A-Z]/g,'');
+// CNPJ numérico ou alfanumérico (novo formato da Receita): os dígitos verificadores são sempre números
+const cnpjOk=c=>{if(!/^[0-9A-Z]{12}[0-9]{2}$/.test(c)||/^(\d)\1+$/.test(c))return false;
+  const dv=n=>{let s=0,w=2;for(let i=n-1;i>=0;i--){s+=(c.charCodeAt(i)-48)*w;w=w===9?2:w+1}const r=s%11;return r<2?0:11-r};return dv(12)===+c[12]&&dv(13)===+c[13]};
+const pnFmt=c=>c.length===14?c.replace(/^(..)(...)(...)(....)(..)$/,'$1.$2.$3/$4-$5'):c.replace(/^(...)(...)(...)(..)$/,'$1.$2.$3-$4');
+const pnPapelDe=inp=>/cliente/i.test(inp.closest('label')?.textContent||'')?'cliente':'fornecedor';
+const pnTem=inp=>{const v=chave(inp.value);return !!v&&[...(inp.list?.options||[])].some(o=>chave(o.value)===v||chave(o.label)===v)};
+function pnBtn(inp){const b=inp.parentElement?.querySelector('[data-pesnova-btn]');if(!b)return;
+  const v=inp.value.trim(),falta=v&&!pnTem(inp);
+  b.textContent=falta?`+ Cadastrar “${v.length>40?v.slice(0,40)+'…':v}”`:'+ Cadastrar novo';
+  b.classList.toggle('ghost',!falta);b.title=falta?'Esse nome não está no cadastro de clientes e fornecedores. Clique para cadastrar agora.':'Cadastrar um cliente ou fornecedor que ainda não existe'}
+document.addEventListener('input',e=>{const i=e.target.closest?.('input[data-pesnova]');if(i)pnBtn(i)});
+document.addEventListener('focusout',e=>{const i=e.target.closest?.('input[data-pesnova]');if(i)setTimeout(()=>pnBtn(i),150)});
+document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-pesnova-btn]');if(!b)return;e.preventDefault();
+  const inp=b.parentElement.querySelector('input[data-pesnova]');if(!inp)return;
+  const v=inp.value.trim(),soNum=/^[\d.\-\/\s]+$/.test(v);
+  const p=await pesNova(cliAtual(),pnPapelDe(inp),v&&!pnTem(inp)&&!soNum?v:'',soNum?v:inp.dataset.pesdoc||'');if(!p)return;
+  const nome=pesNome(p);
+  if(inp.list&&![...inp.list.options].some(o=>o.value===nome)){const o=document.createElement('option');o.value=nome;inp.list.appendChild(o)}
+  inp.value=nome;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));pnBtn(inp)});
+let PNREC=null;
+async function pnReceita(manual){
+  const c=pnAlnum($('pn_documento').value),nota=$('pnRecNote');
+  if(c.length!==14){if(manual)nota.innerHTML='<span class="muted">A consulta na Receita é só para CNPJ (14 caracteres). Para CPF, preencha o nome à mão.</span>';return}
+  if(!cnpjOk(c)){nota.innerHTML='<span class="neg">CNPJ inválido: confira os números.</span>';return}
+  $('pn_documento').value=pnFmt(c);
+  if(/[A-Z]/.test(c)){if(manual)nota.innerHTML='<span class="muted">CNPJ no formato novo (com letras): preencha os dados à mão.</span>';return}
+  nota.innerHTML='<span class="muted">Consultando a Receita…</span>';
+  try{
+    const r=await fetch('https://brasilapi.com.br/api/cnpj/v1/'+c);
+    if(r.status===404||r.status===400){nota.innerHTML='<span class="neg">CNPJ não encontrado na Receita. Confira os números.</span>';return}
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const x=await r.json(),sit=(x.descricao_situacao_cadastral||'').toUpperCase(),tel=x.ddd_telefone_1?String(x.ddd_telefone_1).replace(/^(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3'):'';
+    const poe=(k,v)=>{const el=$('pn_'+k);if(el&&v&&!el.value.trim())el.value=v};
+    poe('nome',x.razao_social);poe('fantasia',x.nome_fantasia);poe('telefone',tel);poe('email',(x.email||'').toLowerCase());
+    PNREC={situacao_receita:sit||null,situacao_em:TODAY,cep:x.cep?String(x.cep).replace(/^(\d{5})(\d{3})$/,'$1-$2'):null,endereco:[x.descricao_tipo_de_logradouro,x.logradouro].filter(Boolean).join(' ')||null,
+      numero:x.numero||null,complemento:x.complemento||null,bairro:x.bairro||null,cidade:x.municipio||null,uf:x.uf||null};
+    const ok=sit==='ATIVA';
+    nota.innerHTML=`Situação na Receita: <b class="${ok?'pos':'neg'}">${esc(sit||'não informada')}</b>. ${ok?'Os campos vazios foram preenchidos com os dados da Receita.':'<span class="neg">Atenção: a empresa não está ativa.</span>'}`;
+  }catch(e){console.error(e);nota.innerHTML='<span class="neg">Não consegui consultar a Receita agora. Preencha à mão ou tente de novo daqui a pouco.</span>'}
+}
+$('pnReceita').onclick=()=>pnReceita(true);$('pn_documento').addEventListener('change',()=>pnReceita(false));
+function pesNova(cli,papel,nome,doc){
+  return new Promise(res=>{
+    const d=$('dlgPesNova');if(!cli){toast('Escolha uma empresa no topo.');return res(null)}
+    PNREC=null;$('pnTitle').textContent=(papel==='cliente'?'Novo cliente':'Novo fornecedor')+' · '+cli.nome;
+    $('pn_nome').value=nome||'';$('pn_documento').value=doc||'';['fantasia','telefone','email','pix_chave'].forEach(k=>$('pn_'+k).value='');$('pn_pix_tipo').value='';
+    $('pn_papel').value=papel==='cliente'?'cliente':'fornecedor';$('pn_vale').value='esta';$('pn_vale').options[0].textContent='Só '+cli.nome;
+    $('pnErr').hidden=true;$('pnUsarBox').hidden=true;$('pnRecNote').innerHTML='';
+    let feito=null;const fim=()=>{d.removeEventListener('close',fim);res(feito)};d.addEventListener('close',fim);
+    const escolhe=async(p,msg)=>{
+      // já existe: usa esse cadastro (e passa a valer para o outro papel, se for o caso)
+      const muda={};if(p.ativo===false)muda.ativo=true;const pp=$('pn_papel').value;if(p.papel!=='ambos'&&p.papel!==pp)muda.papel='ambos';
+      if(Object.keys(muda).length){const {error}=await sb.from('fin_pessoas').update(muda).eq('id',p.id);if(error)console.error(error);else Object.assign(p,muda)}
+      pnCache(cli,p);feito=p;toast(msg);d.close()};
+    $('pnClose').onclick=()=>d.close();
+    $('pnForm').onsubmit=async e=>{e.preventDefault();
+      const err=(t,ja)=>{$('pnErr').textContent=t;$('pnErr').hidden=false;$('pnUsarBox').hidden=!ja;if(ja)$('pnUsar').onclick=()=>escolhe(ja,'Cadastro existente escolhido')};
+      $('pnErr').hidden=true;$('pnUsarBox').hidden=true;
+      const c=pnAlnum($('pn_documento').value),nm=$('pn_nome').value.trim().replace(/\s+/g,' ');
+      if(!c)return err('Informe o CNPJ ou o CPF. Sem ele o cadastro pode ficar repetido.');
+      if(c.length===11?!cpfOk(c):c.length===14?!cnpjOk(c):true)return err(c.length===11?'CPF inválido: confira os números.':c.length===14?'CNPJ inválido: confira os números.':'O CNPJ tem 14 números e o CPF tem 11.');
+      if(!nm)return err('Informe o nome ou a razão social.');
+      if(nm.length<3)return err('O nome está muito curto. Escreva o nome completo ou a razão social.');
+      const email=$('pn_email').value.trim();if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return err('E-mail inválido.');
+      $('pnSave').disabled=true;
+      try{
+        // confere em todos os cadastros da empresa e nos que valem para todas, ativos ou não
+        const ls=await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,papel,ativo,cliente_id,parceiro_id,pix_chave,pix_tipo,fornecedor_bc').or(`cliente_id.eq.${cli.id},cliente_id.is.null`));
+        const mesmoDoc=ls.find(x=>pnAlnum(x.documento)===c);
+        if(mesmoDoc)return err(`Esse ${c.length===11?'CPF':'CNPJ'} já está cadastrado: ${mesmoDoc.nome}${mesmoDoc.ativo===false?' (inativo)':''}.`,mesmoDoc);
+        const k=pessoaChave(nm),igual=ls.find(x=>pessoaChave(x.nome)===k&&!(c.length===14&&pnAlnum(x.documento).length===14));
+        if(igual)return err(`Já existe “${igual.nome}” no cadastro${igual.documento?' ('+igual.documento+')':' sem CNPJ/CPF'}${igual.ativo===false?', inativo':''}. O mesmo nome só pode ser cadastrado de novo com outro CNPJ; pessoa física nunca.`,igual);
+        const row={nome:nm,fantasia:$('pn_fantasia').value.trim()||null,documento:pnFmt(c),papel:$('pn_papel').value,telefone:$('pn_telefone').value.trim()||null,email:email||null,
+          pix_tipo:$('pn_pix_tipo').value||null,pix_chave:$('pn_pix_chave').value.trim()||null,ativo:true,cliente_id:$('pn_vale').value==='todas'?null:cli.id,...(PNREC||{})};
+        let {data,error}=await sb.from('fin_pessoas').insert(row).select().single();
+        // sem a v49 (endereço e situação na Receita) grava só o básico
+        if(error&&PNREC&&/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')){const {cep,endereco,numero,complemento,bairro,uf,situacao_receita,situacao_em,...b}=row;({data,error}=await sb.from('fin_pessoas').insert(b).select().single())}
+        if(error){console.error(error);return err(error.code==='42501'?'Você não tem permissão para cadastrar clientes e fornecedores nesta empresa.':error.message||'Não foi possível cadastrar.')}
+        if(Array.isArray(data))data=data[0];
+        pnCache(cli,data);feito=data;toast((data.papel==='cliente'?'Cliente':data.papel==='ambos'?'Cadastro':'Fornecedor')+' cadastrado');d.close();
+      }catch(x){console.error(x);err('Não foi possível conferir o cadastro. Verifique a internet e tente de novo.')}
+      finally{$('pnSave').disabled=false}};
+    d.showModal();($('pn_documento').value?$('pn_nome'):$('pn_documento')).focus();
+    if(doc)pnReceita(false);
+  });
+}
+// o cadastro novo já vale nas listas abertas e nas próximas telas
+function pnCache(cli,p){
+  if(GFP.key.startsWith(cli.id+'|')&&!GFP.lista.some(x=>x.id===p.id))GFP.lista.push(p);
+  if(GFPT.cid===cli.id&&!GFPT.lista.some(x=>x.id===p.id))GFPT.lista.push(p);
+  GFKEY='';
+}
 const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
 function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
 let PC_GS=[];
@@ -8166,7 +8283,7 @@ async function gteAbrir(m){
     <label class="f">Data *<input type="date" id="te_data" value="${m.data}"></label>
     <label class="f">Valor *<input id="te_valor" class="money" inputmode="decimal" value="${showMoney(m.valor)}"></label>
     <label class="f wide">Descrição *<input id="te_descricao" value="${v('descricao')}"></label>
-    <label class="f" data-pag>${ent?'Cliente':'Fornecedor'}<input id="te_pessoa" list="tePes" value="${v('pessoa_nome')}"><datalist id="tePes">${pesOpts(pes,ent)}</datalist></label>
+    <label class="f" data-pag>${ent?'Cliente':'Fornecedor'}<input id="te_pessoa" list="tePes" value="${v('pessoa_nome')}" autocomplete="off" data-pesnova>${PESNOVA}<datalist id="tePes">${pesOpts(pes,ent)}</datalist></label>
     <label class="f">Documento<input id="te_documento" value="${v('documento')}"></label>
     <label class="f wide" data-pag>Categoria<select id="te_categoria" data-catnova="${ent?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
   </div>${tr?'<p class="note" style="margin:0">Transferência: a data e o valor valem também para a entrada na conta de destino.</p>':''}
@@ -8295,7 +8412,7 @@ async function abrirAvulso(m){
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
     ${soloTxt}<label class="f" id="ga_catBox"${tipo==='transf'?' hidden':''}>Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
-    <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}"><datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
+    <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}" autocomplete="off" data-pesnova>${PESNOVA}<datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
   </div>${deParaTxt}${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
   $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf';$('ga_catBox').hidden=t==='transf'};
@@ -9023,7 +9140,7 @@ async function abrirGC(ls){
       <label class="f" id="gc_destBox" hidden>Outra conta<select id="gc_dest">${optContas(outras,cli)}</select></label>
       <label class="f wide" id="gc_descBox">Descrição *<input id="gc_desc" value="${esc(um?(l.nome||l.memo||''):'')}"></label>
       <label class="f" data-novo>Categoria<select id="gc_cat" data-catnova="${tipo==='saida'?'Despesa':'Receita'}"><option value=""></option>${cats.map(x=>`<option${sugerirCat(l.nome||'',l.memo)===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
-      <label class="f" data-novo>${tipo==='saida'?'Fornecedor':'Cliente'}<input id="gc_pes" list="gcPesList" value="${esc(doc?.nome||'')}"></label>
+      <label class="f" data-novo>${tipo==='saida'?'Fornecedor':'Cliente'}<input id="gc_pes" list="gcPesList" value="${esc(doc?.nome||'')}" autocomplete="off" data-pesnova data-pesdoc="${esc(um&&!doc?l.documento||'':'')}">${PESNOVA}</label>
       <label class="wide" id="gc_lembraBox" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="gc_lembra" style="width:auto"${comum?' checked':''}> Lembrar: as próximas linhas do banco com o texto</label>
       <label class="f wide" id="gc_padBox">Texto que identifica (pode encurtar)<input id="gc_pad" value="${esc(comum)}"></label>
     </div><p class="err" id="gtErr" hidden></p>`;
@@ -9748,6 +9865,7 @@ const MANUAL=[
 <li><b>Filtros:</b> embaixo do nome de cada coluna (Data, Histórico do banco, Valor e Lançamento no sistema) há um campo para filtrar. <b>Limpar</b> tira os filtros.</li>
 <li><b>Extratos importados desta conta:</b> clique para ver cada arquivo importado, o período, o saldo informado pelo banco e quantas linhas estão pendentes, conciliadas ou ignoradas. <b>Ver</b> abre o período daquele extrato.</li>
 <li><b>Extrato repetido:</b> se o arquivo já foi importado, o portal avisa quando foi e quantas linhas já estão validadas, e não importa de novo. Se o banco trouxe lançamentos novos, só eles entram.</li>
+<li><b>Fornecedor ou cliente que não está cadastrado:</b> no <b>Lançar</b>, use <b>+ Cadastrar</b> embaixo do campo Fornecedor (ou Cliente). Informe o CNPJ ou o CPF (obrigatório; com o CNPJ os dados vêm da Receita). Se o CNPJ/CPF ou o nome já existirem, o portal mostra o cadastro e oferece usar o que já existe, sem repetir. O mesmo botão está nas Contas a pagar, nas Contas a receber e na Movimentação financeira.</li>
 <li><b>Desfazer</b> numa linha conciliada pergunta se apaga o lançamento (ele sai também das contas a pagar ou a receber e do extrato) ou se só desfaz a ligação.</li>
 </ul>
 <div class="mndica"><b>Dica:</b> ao lançar, marque <b>Lembrar</b>. As próximas linhas com o mesmo texto do banco já chegam com a sugestão, e é só usar <b>Aprovar todas as sugestões</b>.</div>`}]},
@@ -9962,6 +10080,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05pes',data:'2026-11-05',t:'Cadastrar fornecedor ou cliente na hora',itens:[
+    {x:'Contas a pagar, Contas a receber, Conciliação bancária e Movimentação financeira: se o fornecedor ou o cliente ainda não está no cadastro, use o botão “+ Cadastrar” embaixo do campo, como já acontece com a categoria. Ao digitar um nome que não existe, o botão já oferece cadastrar esse nome.',mods:['gfpagar','gfrec','gfconc','gfmov']},
+    {x:'O cadastro na hora pede o CNPJ ou o CPF e confere se os números são válidos. Com o CNPJ, os dados vêm da Receita. Não deixa repetir: se o CNPJ/CPF ou o nome já estiverem cadastrados (mesmo inativos), o portal mostra o cadastro e oferece usar o que já existe.',mods:['gfpagar','gfrec','gfconc','gfmov']},
+    {x:'O mesmo botão aparece na revisão da Tesouraria e nas compras da Fatura do cartão de crédito.',mods:['gffatura']}]},
   {k:'2026-11-05tr',data:'2026-11-05',t:'Transferências: conta de origem na importação e ligação com a tesouraria',itens:[
     {x:'Importar do Bom Controle: a transferência que vem com uma conta só ganhou o campo para escolher de onde veio (ou para onde foi) e mostra a conta do arquivo para conferir. Vale também para as transferências já importadas que ficaram “a validar”: importe o mesmo arquivo de novo.',para:'esc'},
     {x:'Se a outra conta for a Tesouraria, o lançamento da tesouraria (mesmo valor, até 3 dias) é conciliado sozinho, sem duplicar. Se não estiver lançado na tesouraria, o portal avisa e cria o lançamento lá (Depósito bancário ou Suprimento), que aparece também na Rotina diária.',para:'esc'},
