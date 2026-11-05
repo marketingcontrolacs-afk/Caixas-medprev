@@ -362,6 +362,8 @@ dialog::backdrop{background:rgba(6,22,24,.5);backdrop-filter:blur(3px)}
 #rnBody tr.rnalt td{background:var(--bad-soft)}#rnBody tr.rnalt td:first-child{box-shadow:inset 4px 0 0 var(--bad)}
 .rnaltbox{margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--bad);color:var(--bad);background:var(--surface);font-size:13px;line-height:1.5}
 .rnaltbox .btn{margin-top:6px}
+/* janela do parceiro: o rodapé (Fechar, Salvar...) fica sempre à vista, o meio é que rola (Carol, 05/11) */
+dialog[open]#dlgRep{display:flex;flex-direction:column}#dlgRep .db{flex:1 1 auto;min-height:0}#dlgRep .dh,#dlgRep .df{flex:none}
 #rnBody tr.rndesc td{background:var(--warn-soft)}#rnBody tr.rndesc td:first-child{box-shadow:inset 4px 0 0 var(--warn)}
 .rndescbox{margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--warn);color:var(--warn);background:var(--surface);font-size:13px;line-height:1.5}
 #mvBulk b.pos{color:var(--ok)}#mvBulk b.neg{color:var(--bad)}#mvBulk b.tot{font-size:16px}
@@ -1257,7 +1259,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <div class="df"><button type="button" class="btn ghost" id="ccFechar">Fechar</button><button type="button" class="btn ghost" id="ccDel">Excluir lançamento</button><span class="spacer"></span><button type="button" class="btn" id="ccPular">Pular</button><button type="button" class="btn primary" id="ccOk">Confirmar e ir para o próximo</button></div>
 </dialog>
 <dialog id="dlgRep">
-  <div class="dh"><h2 id="rpTitle"></h2><span class="spacer"></span><span id="rpChip" class="chips"></span></div>
+  <div class="dh"><h2 id="rpTitle"></h2><span class="spacer"></span><span id="rpChip" class="chips"></span><button type="button" class="btn small ghost" data-act="fechar" title="Fechar esta janela" aria-label="Fechar">✕ Fechar</button></div>
   <div class="db" id="rpBody"></div>
   <div class="df" id="rpFoot"></div>
 </dialog>
@@ -6395,13 +6397,19 @@ $('dcHist').addEventListener('click',ev=>{const b=ev.target.closest('[data-dh]')
 // =====================================================================
 // Dados bancários dos parceiros para os repasses que a Controlacs paga às quintas.
 // O cliente cadastra, pede alteração de conta e lança descontos; o escritório confere e paga.
-let PARC=[], PALT={}, PDESC={}, PARCDLG=null, PMODO=null, PVOLTA=false;
+let PARC=[], PALT={}, PALTA={}, PDESC={}, PARCDLG=null, PMODO=null, PVOLTA=false;
 const PIXTIPOS=['CPF','CNPJ','E-mail','Telefone','Aleatória'], TIPOSCONTA=['Corrente','Poupança','Pagamento'];
 const CONTAK=['pix_tipo','pix_chave','banco','agencia','conta','tipo_conta','titular','cpf_cnpj'];
 const proxQuinta=()=>{const d=dObj(TODAY);d.setDate(d.getDate()+(4-d.getDay()+7)%7);return isoLocal(d)};
 const contaTxt=p=>[p.pix_chave?`Pix (${p.pix_tipo||'chave'}): ${p.pix_chave}`:'',p.banco||p.conta?`${p.banco||'Banco'} · Ag. ${p.agencia||'—'} · ${p.tipo_conta?p.tipo_conta+' ':''}${p.conta||'—'}`:'',p.titular||p.cpf_cnpj?`Titular: ${[p.titular,p.cpf_cnpj].filter(Boolean).join(' · ')}`:''].filter(Boolean);
 const descTxt=d=>`Desconto de ${fm(d.valor)} referente a ${d.motivo}${d.referencia?' ('+d.referencia+')':''}`;
-const pAlertas=p=>{const a=[];if(PALT[p.id])a.push(['c-bad','Alteração de conta']);if(!p.conferido)a.push(['c-warn','Novo, conferir dados']);
+// alteração de conta já aplicada e ainda não conferida no repasse (Carol, 05/11): o aviso continua até marcar "Conferido".
+// Sem a v103 (sem a coluna conferida_em) vale para as aplicadas nos últimos 15 dias.
+const altRecente=a=>!!a&&a.status==='Aplicada'&&!a.conferida_em&&(a.conferida_em!==undefined||!!a.resolvido_em&&Date.now()-new Date(a.resolvido_em)<15*864e5);
+const altDesde=()=>new Date(Date.now()-120*864e5).toISOString();
+const v103Msg='Para isso funcionar, rode a atualização v103 no Supabase (pasta para-rodar).';
+const v103=e=>/conferida|desfazer_alteracao|Desfeita|status_check|42703|PGRST202/.test((e?.message||'')+(e?.code||''));
+const pAlertas=p=>{const a=[];if(PALT[p.id])a.push(['c-bad','Alteração de conta']);else if(PALTA[p.id])a.push(['c-bad','Conta alterada, conferir']);if(!p.conferido)a.push(['c-warn','Novo, conferir dados']);
   const ds=PDESC[p.id]||[];if(ds.length)a.push(['c-warn',`Desconto ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}`]);
   if(!p.pix_chave&&!(p.banco&&p.conta))a.push(['c-bad','Sem dados bancários']);return a};
 function copiar(t,msg){navigator.clipboard.writeText(t).then(()=>toast(msg||'Copiado'),()=>toast('Não deu para copiar.'))}
@@ -9713,12 +9721,13 @@ async function renderRep(){
     :'Cadastre os parceiros, avise quando um parceiro trocar de conta e informe os descontos a fazer no repasse.';
   $('pNovo').hidden=!pLancaEm().length;
   if(!ids.length){vazio('Nenhuma empresa liberada para repasses.');return}
-  const [r1,r2_,r3]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
+  const [r1,r2_,r3,r4]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
     sb.from('parceiro_alteracoes').select('*').eq('status','Pendente'),
-    sb.from('repasse_descontos').select('*').in('cliente_id',ids).eq('status','Pendente').order('criado_em')]);
+    sb.from('repasse_descontos').select('*').in('cliente_id',ids).eq('status','Pendente').order('criado_em'),
+    sb.from('parceiro_alteracoes').select('*').eq('status','Aplicada').gte('resolvido_em',altDesde()).order('resolvido_em')]);
   const err=r1.error||r2_.error||r3.error;
   if(err){console.error(err);vazio(err.code==='42P01'||/parceir|repasse/.test(err.message||'')?'Este módulo precisa da atualização v7 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
-  PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
+  PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PALTA={};(r4.data||[]).filter(altRecente).forEach(a=>PALTA[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
   const nomeCli=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Todas as empresas';
   const f=$('pFiltro').value,q=$('pBusca').value.trim().toLowerCase();
   const rows=PARC.filter(p=>(f==='inativos'?!p.ativo:p.ativo)&&(f!=='alerta'||pAlertas(p).length)&&(!q||[p.nome,p.nome_global,...(p.nomes_locais||[])].some(n=>(n||'').toLowerCase().includes(q))))
@@ -9726,9 +9735,9 @@ async function renderRep(){
   $('pHead').innerHTML=`<tr><th class="l">Parceiro</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Pix</th><th class="l">Banco · agência · conta</th><th class="l">Titular</th><th class="l">Alertas</th></tr>`;
   $('pBody').innerHTML=rows.map(p=>{const al=pAlertas(p);return `<tr class="click" data-id="${p.id}" tabindex="0"><td class="l"><b>${esc(p.nome)}</b>${p.nome_global&&p.nome_global!==p.nome?`<br><span class="muted">${esc(p.nome_global)}</span>`:''}</td>${todas?`<td class="l">${esc(nomeCli(p.cliente_id))}</td>`:''}<td class="l">${p.pix_chave?esc(p.pix_chave)+`<br><span class="muted">${esc(p.pix_tipo||'')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${p.banco||p.conta?`${esc(p.banco||'')}<br><span class="muted">Ag. ${esc(p.agencia||'—')} · ${esc(p.conta||'—')}</span>`:'<span class="muted">—</span>'}</td><td class="l">${esc(p.titular||'')}${p.cpf_cnpj?`<br><span class="muted">${esc(p.cpf_cnpj)}</span>`:''}</td><td class="l"><div class="chips">${al.map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'}</div></td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="6">${f==='alerta'?'Nenhum parceiro com alerta.':PARC.length?'Nenhum parceiro neste filtro.':'Nenhum parceiro cadastrado.'+($('pNovo').hidden?'':' Use “Novo cadastro ou alteração” para começar.')}</td></tr>`;
-  const ativos=PARC.filter(p=>p.ativo),nAlt=Object.keys(PALT).length,nNovo=ativos.filter(p=>!p.conferido).length;
+  const ativos=PARC.filter(p=>p.ativo),nAlt=Object.keys(PALT).length+Object.keys(PALTA).filter(k=>!PALT[k]).length,nNovo=ativos.filter(p=>!p.conferido).length;
   const descs=Object.values(PDESC).flat(),vDesc=r2(descs.reduce((x,d)=>x+(+d.valor),0)),semConta=ativos.filter(p=>!p.pix_chave&&!(p.banco&&p.conta)).length;
-  $('pTiles').innerHTML=[['Parceiros ativos',ativos.length,todas?'em todas as empresas':'nesta empresa'],['Alterações de conta',nAlt,e?'aplique antes de pagar':'aguardando o escritório'],
+  $('pTiles').innerHTML=[['Parceiros ativos',ativos.length,todas?'em todas as empresas':'nesta empresa'],['Alterações de conta',nAlt,e?'aplique e confira antes de pagar':'aguardando o escritório'],
     ['Parceiros novos',nNovo,e?'conferir os dados':'aguardando o escritório'],['Descontos a fazer',fm(vDesc),descs.length+(descs.length===1?' desconto':' descontos')+' no próximo repasse']]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   const av=[nAlt?`<b>${nAlt} ${nAlt===1?'parceiro trocou':'parceiros trocaram'} de conta</b>`:'',descs.length?`<b>${descs.length} ${descs.length===1?'desconto':'descontos'} (${fm(vDesc)})</b>`:'',nNovo?`<b>${nNovo} ${nNovo===1?'parceiro novo':'parceiros novos'} para conferir</b>`:'',semConta?`<b>${semConta} sem dados bancários</b>`:''].filter(Boolean);
@@ -9757,13 +9766,13 @@ const temConta=o=>o.pix_chave||(o.banco&&o.agencia&&o.conta);
 async function abrirParceiro(p,modo){
   PARCDLG=p;PMODO=modo||null;const e=ehEsc();
   const pode=p?pPode(p):true,editaCad=!p||e||(pode&&!p.conferido);
-  const alt=p&&PALT[p.id],descs=p?PDESC[p.id]||[]:[];
+  const alt=p&&PALT[p.id],altA=p&&!alt&&PALTA[p.id],descs=p?PDESC[p.id]||[]:[];
   $('rpTitle').textContent=p?p.nome:modo==='novo'?'Novo cadastro ou alteração':modo==='desc'?'Desconto de valores':modo==='alt'?'Alteração de conta':'Novo parceiro';
   $('rpChip').innerHTML=p?(pAlertas(p).map(a=>`<span class="chip ${a[0]}">${a[1]}</span>`).join('')||'<span class="chip c-ok">✔ OK</span>'):'';
   let hist=[];
   if(p){const [{data:ha},{data:hd}]=await Promise.all([sb.from('parceiro_alteracoes').select('*').eq('parceiro_id',p.id).neq('status','Pendente').order('solicitado_em',{ascending:false}).limit(10),
     sb.from('repasse_descontos').select('*').eq('parceiro_id',p.id).neq('status','Pendente').order('criado_em',{ascending:false}).limit(10)]);
-    hist=[...(ha||[]).map(a=>[a.resolvido_em||a.solicitado_em,`Alteração de conta ${a.status==='Aplicada'?'aplicada':'recusada'}${a.motivo?' · '+a.motivo:''}${a.anterior&&a.status==='Aplicada'?' · conta anterior: '+contaTxt(a.anterior).join(' · '):''}${a.nota_escritorio?' · '+a.nota_escritorio:''}`]),
+    hist=[...(ha||[]).map(a=>[a.resolvido_em||a.solicitado_em,`Alteração de conta ${a.status==='Aplicada'?'aplicada':a.status==='Desfeita'?'desfeita (voltou para a conta anterior)':'recusada'}${a.motivo?' · '+a.motivo:''}${a.anterior&&a.status==='Aplicada'?' · conta anterior: '+contaTxt(a.anterior).join(' · '):''}${a.nota_escritorio?' · '+a.nota_escritorio:''}`]),
       ...(hd||[]).map(d=>[d.descontado_em||d.criado_em,`${d.status==='Descontado'?'Descontado':'Cancelado'}: ${descTxt(d)}`])].sort((a,b)=>String(b[0]).localeCompare(String(a[0])));}
   const cmpBox=(t,o)=>`<div><b>${t}</b><br>${contaTxt(o).map(esc).join('<br>')||'<span class="muted">sem dados</span>'}</div>`;
   let h='';
@@ -9791,6 +9800,10 @@ async function abrirParceiro(p,modo){
       <div class="cmp" style="margin-top:6px">${cmpBox('Conta atual',p)}${cmpBox('Conta nova',alt)}</div>
       ${e?`<label class="f">Nota (opcional)<input id="pa_nota" placeholder="Ex.: confirmado por telefone com o parceiro"></label>`:''}
       <div class="row" style="gap:8px">${e?'<button class="btn small primary" data-act="aplicar">Aplicar a conta nova</button><button class="btn small ghost" data-act="recusar">Recusar</button>':''}${!e&&pode?'<button class="btn small ghost" data-act="cancAlt">Cancelar pedido</button>':''}<button class="btn small ghost" data-act="copNova">Copiar conta nova</button></div></div>`;
+    if(altA)h+=`<div class="alerta" style="margin:0"><b>Conta alterada em ${dBR(String(altA.resolvido_em||altA.solicitado_em).slice(0,10))}. Confira antes de pagar o repasse.</b>${altA.motivo?`<span>${esc(altA.motivo)}</span>`:''}
+      <div class="cmp" style="margin-top:6px">${cmpBox('Conta anterior',altA.anterior||{})}${cmpBox('Conta nova (em uso)',p)}</div>
+      ${e?`<div class="row" style="gap:8px"><button class="btn small primary" data-act="altConf">Conferido</button>${altA.anterior?'<button class="btn small ghost" data-act="altDesfaz">Desfazer (voltar para a conta anterior)</button>':''}</div>
+      <p class="note" style="margin:0">O aviso continua no Repasse de parceiros até alguém marcar “Conferido”.</p>`:'<p class="note" style="margin:0">O escritório confere a conta nova antes do próximo repasse.</p>'}</div>`;
     if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
       ${e?'<p class="note" style="margin:6px 0 0">“Copiar” leva o texto do desconto para colar no comprovante.</p>':''}</div>`;
     h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
@@ -9875,7 +9888,10 @@ async function rpAcao(act,el){
       const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:PARC.find(x=>x.id===parc)?.cliente_id||pEmp(),valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
       PMODO=null;PVOLTA=false;if(!p)PARCDLG=null;return recarregar('Desconto lançado');
     }
-    if(act==='aplicar'){const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:PALT[p.id].id,nota:$('pa_nota')?.value.trim()||null});if(error)throw error;return recarregar('Conta do parceiro atualizada')}
+    if(act==='aplicar'){const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:PALT[p.id].id,nota:$('pa_nota')?.value.trim()||null});if(error)throw error;return recarregar('Conta do parceiro atualizada. O aviso continua no repasse até marcar “Conferido”.')}
+    if(act==='altConf'){const {error}=await sb.from('parceiro_alteracoes').update({conferida_em:new Date().toISOString(),conferida_por:await me()}).eq('id',PALTA[p.id].id);if(error)return v103(error)?rpErr(v103Msg):fail(error);return recarregar('Conta nova conferida')}
+    if(act==='altDesfaz'){if(!confirm('Desfazer a alteração e voltar o parceiro para a conta anterior?'))return;
+      const {error}=await sb.rpc('desfazer_alteracao_conta',{alt:PALTA[p.id].id,nota:null});if(error)return v103(error)?rpErr(v103Msg):fail(error);return recarregar('Alteração desfeita. O parceiro voltou para a conta anterior.')}
     if(act==='recusar'){const {error}=await sb.from('parceiro_alteracoes').update({status:'Recusada',resolvido_em:new Date().toISOString(),resolvido_por:await me(),nota_escritorio:$('pa_nota')?.value.trim()||null}).eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Alteração recusada')}
     if(act==='cancAlt'){if(!confirm('Cancelar o pedido de alteração de conta?'))return;const {error}=await sb.from('parceiro_alteracoes').delete().eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Pedido cancelado')}
     if(act==='descontado'){const {error}=await sb.from('repasse_descontos').update({status:'Descontado',descontado_em:TODAY,resolvido_por:await me()}).eq('id',d.id);if(error)throw error;return recarregar('Desconto marcado como feito')}
@@ -10657,6 +10673,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05altconta',data:'2026-11-05',t:'Alteração de conta do parceiro: conferir e desfazer',itens:[
+    {x:'A janela do parceiro ganhou o botão “✕ Fechar” no alto, e os botões de baixo (Fechar, Salvar...) ficam sempre à vista, mesmo com a janela cheia.',mods:['repasse','gfrepasse']},
+    {x:'Depois de clicar em “Aplicar a conta nova”, o aviso não some mais: no Repasse de parceiros o parceiro continua em vermelho (“Conta alterada, confira antes de pagar”), com a conta anterior, e aparece no “Atenção antes de pagar” ao importar o relatório, até alguém clicar em “Conferido”.',para:'esc'},
+    {x:'Se a conta foi aplicada por engano, o botão “Desfazer” volta o parceiro para a conta anterior. Fica no repasse e na janela do parceiro (Parceiros).',para:'esc'}]},
   {k:'2026-11-05conc',data:'2026-11-05',t:'Conciliar sem reenviar o extrato e extrato só com os conciliados',itens:[
     {x:'Contas a pagar e a receber: em cada pagamento ou recebimento da conta há os botões “🔗 Conciliar” e “Desconciliar”. O Conciliar liga de novo à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias), sem precisar enviar o OFX outra vez. Útil depois de estornar para corrigir algo. Se não achar a linha, pergunta se marca como conciliado mesmo assim.',mods:['gfpagar','gfrec','gfmov']},
     {x:'Na conta nova há também “🔗 Salvar quitado e conciliado”, e na seleção de várias contas o botão “🔗 Conciliar”.',mods:['gfpagar','gfrec']},
@@ -11354,7 +11374,9 @@ async function renderRN(recarrega=true){
       Object.assign(RN,{lotes:l,nf,parc:pa,pes:pe,desc:de,contas:ct});
       // alterações de conta pedidas e ainda não aplicadas: aparecem em vermelho no repasse (Carol, 30/10)
       RN.alt={};const ids=pa.map(x=>x.id);
-      for(let i=0;i<ids.length;i+=200){const {data:al}=await sb.from('parceiro_alteracoes').select('*').in('parceiro_id',ids.slice(i,i+200)).eq('status','Pendente');(al||[]).forEach(a=>RN.alt[a.parceiro_id]=a)}
+      // e as já aplicadas que ainda não foram conferidas continuam no aviso até marcar "Conferido" (Carol, 05/11)
+      for(let i=0;i<ids.length;i+=200){const {data:al}=await sb.from('parceiro_alteracoes').select('*').in('parceiro_id',ids.slice(i,i+200)).in('status',['Pendente','Aplicada']);
+        (al||[]).filter(a=>a.status==='Pendente').forEach(a=>RN.alt[a.parceiro_id]=a);(al||[]).filter(a=>altRecente(a)&&!RN.alt[a.parceiro_id]).forEach(a=>RN.alt[a.parceiro_id]=a)}
     }catch(e){console.error(e);return rnVazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   }
   const sel=$('rnLote'),cur=sel.value;
@@ -11398,7 +11420,7 @@ function rnDesenha(){
     return `<tr data-id="${it.id}"${alt?' class="rnalt"':dsx?' class="rndesc"':''}><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
       <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}${dsx?`<div class="rndescbox">⚠ <b>Desconto a fazer neste repasse</b>${ds.map(d=>`<br>${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''} <button type="button" class="btn small ghost" data-rn="descFeito" data-desc="${d.id}">Desconto feito</button>`).join('')}<br><b>Pagar ${fm(r2(+it.valor-ds.reduce((x,d)=>x+(+d.valor),0)))}</b></div>`:''}</td>
       <td>${it.guias??''}</td><td><b>${fm(it.valor)}</b></td><td class="l">${opSit(it)}</td>
-      <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${alt?`<div class="rnaltbox">⚠ <b>Alteração de conta pendente</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}<br><button type="button" class="btn small primary" data-rn="altAplica" data-alt="${alt.id}">Aplicar a conta nova</button></div>`:''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
+      <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${alt?rnAltBox(alt):''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
       <td>${opEmp(it)}</td><td class="l">${ct}</td><td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td></tr>`};
   $('rnHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="rnTodas" style="width:auto" title="Selecionar todos do filtro"${rows.length&&rows.filter(i=>!rnPago(i)).every(i=>RN.sel.has(i.id))?' checked':''}></th><th class="l">Parceiro</th><th>Guias</th><th>Valor</th><th class="l">Nota fiscal</th><th class="l">Conta e Pix</th><th>Pagar em</th><th class="l">Situação</th><th class="l">Protocolo</th></tr>`;
   const blocos=[['emite','Emitem nota fiscal'],['nao','Não emitem nota fiscal'],['sem','Não encontrados no controle de NF']];
@@ -11446,11 +11468,25 @@ $('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-r
   if(b.dataset.rn==='desfaz'){b.disabled=true;await rnDesfaz(it);b.disabled=false}
   if(b.dataset.rn==='conta')rnAbreConta(it);
   if(b.dataset.rn==='descFeito'){const d=RN.desc.find(x=>x.id===b.dataset.desc);if(!d||!confirm(`Marcar o desconto de ${fm(d.valor)} como feito?`))return;b.disabled=true;
-    const {error}=await sb.from('repasse_descontos').update({status:'Descontado',descontado_em:TODAY,resolvido_por:await me()}).eq('id',d.id);b.disabled=false;if(error)return fail(error);
+    const {error}=await sb.from('repasse_descontos').update({status:'Descontado',descontado_em:TODAY,resolvido_por:ME.user_id}).eq('id',d.id);b.disabled=false;if(error)return fail(error);
     RN.desc=RN.desc.filter(x=>x.id!==d.id);toast('Desconto marcado como feito');parcPendentes();rnDesenha()}
   if(b.dataset.rn==='altAplica'){const a=Object.values(RN.alt).find(x=>x.id===b.dataset.alt);if(!a||!confirm('Aplicar a conta nova no cadastro do parceiro?'))return;b.disabled=true;
     const {error}=await sb.rpc('aplicar_alteracao_conta',{alt:a.id,nota:'Aplicada pelo Repasse de parceiros'});b.disabled=false;if(error)return fail(error);
-    const px=RN.parc.find(x=>x.id===a.parceiro_id);if(px)CONTAK.forEach(k=>px[k]=a[k]??null);delete RN.alt[a.parceiro_id];toast('Conta do parceiro atualizada');parcPendentes();rnDesenha()}});
+    const px=RN.parc.find(x=>x.id===a.parceiro_id);if(px){a.anterior=Object.fromEntries(CONTAK.map(k=>[k,px[k]??null]));CONTAK.forEach(k=>px[k]=a[k]??null)}
+    // continua avisando (agora como conta aplicada) até alguém marcar "Conferido"
+    Object.assign(a,{status:'Aplicada',resolvido_em:new Date().toISOString(),conferida_em:a.conferida_em===undefined?undefined:null});toast('Conta do parceiro atualizada. Confira e marque “Conferido”.');parcPendentes();rnDesenha()}
+  if(b.dataset.rn==='altConf'){const a=Object.values(RN.alt).find(x=>x.id===b.dataset.alt);if(!a)return;b.disabled=true;
+    const {error}=await sb.from('parceiro_alteracoes').update({conferida_em:new Date().toISOString(),conferida_por:ME.user_id}).eq('id',a.id);b.disabled=false;if(error)return v103(error)?toast(v103Msg):fail(error);
+    delete RN.alt[a.parceiro_id];toast('Conta nova conferida');rnDesenha()}
+  if(b.dataset.rn==='altDesfaz'){const a=Object.values(RN.alt).find(x=>x.id===b.dataset.alt);if(!a||!confirm('Desfazer a alteração e voltar o parceiro para a conta anterior?'))return;b.disabled=true;
+    const {error}=await sb.rpc('desfazer_alteracao_conta',{alt:a.id,nota:'Desfeita pelo Repasse de parceiros'});b.disabled=false;if(error)return v103(error)?toast(v103Msg):fail(error);
+    const px=RN.parc.find(x=>x.id===a.parceiro_id);if(px&&a.anterior)CONTAK.forEach(k=>px[k]=a.anterior[k]??null);delete RN.alt[a.parceiro_id];toast('Alteração desfeita. O parceiro voltou para a conta anterior.');rnDesenha()}});
+// caixa vermelha da alteração de conta no repasse: pendente (aplicar) ou já aplicada e ainda não conferida (conferir ou desfazer)
+function rnAltBox(alt){
+  if(alt.status!=='Aplicada')return `<div class="rnaltbox">⚠ <b>Alteração de conta pendente</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}<br><button type="button" class="btn small primary" data-rn="altAplica" data-alt="${alt.id}">Aplicar a conta nova</button></div>`;
+  return `<div class="rnaltbox">⚠ <b>Conta alterada em ${dBR(String(alt.resolvido_em).slice(0,10))}, confira antes de pagar</b>${alt.motivo?` · ${esc(alt.motivo)}`:''}${alt.anterior?`<br>Conta anterior: ${contaTxt(alt.anterior).map(esc).join(' · ')}`:''}
+    <br><button type="button" class="btn small primary" data-rn="altConf" data-alt="${alt.id}">Conferido</button>${alt.anterior?` <button type="button" class="btn small ghost" data-rn="altDesfaz" data-alt="${alt.id}">Desfazer</button>`:''}</div>`;
+}
 // editar a conta e o Pix do parceiro aqui mesmo; grava no cadastro (Parceiros) — Carol, 30/10
 function rnAbreConta(it){
   const p=rnParc(it,it.empresa_id),nf=rnNf(it),emps=RN.grupo.empresas||[];
@@ -11509,8 +11545,8 @@ function rnAvisos(importou){
   const l=RN.itens.filter(i=>!rnPago(i)).map(it=>{const p=rnParc(it,it.empresa_id);return {it,alt:rnAlt(it),ds:rnDescPend(p)}}).filter(x=>x.alt||x.ds.length);
   if(!l.length)return;
   RN.dlg={modo:'aviso'};$('rnDTit').textContent='Atenção antes de pagar';$('rnDFoot').querySelector('[data-act="salvar"]').textContent='Entendi';
-  $('rnDBody').innerHTML=`<p class="note" style="margin:0">${importou?'No relatório importado, ':''}${l.length} ${l.length===1?'parceiro tem':'parceiros têm'} alteração de conta ou desconto a fazer. Eles ficam marcados na lista (vermelho: alteração de conta; amarelo: desconto).</p>
-    <div style="display:grid;gap:8px">${l.map(({it,alt,ds})=>`<div class="${alt?'rnaltbox':'rndescbox'}" style="margin:0"><b>${esc(it.nome.trim())}</b> · ${fm(it.valor)}${alt?`<br>⚠ Alteração de conta pendente${alt.motivo?' · '+esc(alt.motivo):''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}`:''}${ds.map(d=>`<br>⚠ Desconto ${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''}`).join('')}</div>`).join('')}</div>`;
+  $('rnDBody').innerHTML=`<p class="note" style="margin:0">${importou?'No relatório importado, ':''}${l.length} ${l.length===1?'parceiro tem':'parceiros têm'} alteração de conta ou desconto a fazer. Eles ficam marcados na lista (vermelho: alteração de conta, pendente ou aplicada e ainda não conferida; amarelo: desconto).</p>
+    <div style="display:grid;gap:8px">${l.map(({it,alt,ds})=>`<div class="${alt?'rnaltbox':'rndescbox'}" style="margin:0"><b>${esc(it.nome.trim())}</b> · ${fm(it.valor)}${alt?(alt.status==='Aplicada'?`<br>⚠ Conta alterada em ${dBR(String(alt.resolvido_em).slice(0,10))}, ainda não conferida${alt.motivo?' · '+esc(alt.motivo):''}<br>Conta nova (em uso): ${contaTxt(alt).map(esc).join(' · ')}${alt.anterior?`<br>Conta anterior: ${contaTxt(alt.anterior).map(esc).join(' · ')}`:''}`:`<br>⚠ Alteração de conta pendente${alt.motivo?' · '+esc(alt.motivo):''}<br>Conta nova: ${contaTxt(alt).map(esc).join(' · ')}`):''}${ds.map(d=>`<br>⚠ Desconto ${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''}`).join('')}</div>`).join('')}</div>`;
   dlgRN.showModal();
 }
 async function rnEmpresa(ls,emp){
