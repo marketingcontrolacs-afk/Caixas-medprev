@@ -651,6 +651,7 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
     </div>
     <div class="tiles" id="mTiles"></div>
     <div id="mConf"></div>
+    <div id="mPagMes"></div>
     <div class="card tablebox"><table><thead id="mHead"></thead><tbody id="mBody"></tbody><tfoot id="mFoot"></tfoot></table></div>
     <p class="note" id="mNote"></p>
   </section>
@@ -3030,7 +3031,7 @@ function initMod(m){
   const cfg=MODCFG[m],cli=cliOuTodas();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
-    mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option>':'';
+    mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option><option value="todos">Tudo o que foi enviado</option>':'';
     $('mFiltroBox').hidden=m!=='pagar';$('mTipo').value='';$('mTipoBox').hidden=m!=='tesouraria';
     mFiltro.value=m==='pagar'?'aberto':'';[$('mIni').value,$('mFim').value]=monthRange(TODAY.slice(0,7));
   }
@@ -3049,7 +3050,7 @@ async function renderMod(){
   let q=tod?sb.from(cfg.tabela).select('*').in('cliente_id',empresasDe(MOD).map(c=>c.id)):sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
   const f=MOD==='pagar'?mFiltro.value:'per',per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
   const [pIni,pFim]=[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31'];
-  if(f==='aberto')q=q.eq('conferido',false);else q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
+  if(f==='aberto')q=q.eq('conferido',false);else if(f!=='todos')q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
   REGS=data||[];DOCS={};
@@ -3065,6 +3066,8 @@ async function renderMod(){
     }
     ANT=r2(ANT);
   }
+  // boletos e notas: contas do mês da Controlacs e situação do que foi enviado (Carol, 05/11)
+  if(MOD==='pagar'&&!tod)await pagCarrega(cli);else PST={tits:[],por:{},cli:null};
   if(REGS.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',REGS.map(r=>r.id));(dd||[]).forEach(d=>(DOCS[d.registro_id]=DOCS[d.registro_id]||[]).push(d))}
   const nd=r=>(DOCS[r.id]||[]).length, clip=r=>nd(r)?`<span class="muted" title="Documentos">📎${nd(r)}</span>`:'<span class="neg">sem documento</span>';
   const sum=a=>r2(a.reduce((x,r)=>x+(+r.valor),0));
@@ -3072,12 +3075,14 @@ async function renderMod(){
   const empC=r=>tod?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===r.cliente_id)?.nome||'')}</span>`:'';
   let head,body,foot='',tiles;
   if(MOD==='pagar'){
+    const lan=r=>{if(r.conferido||PST.erro||!PST.cli)return '';const t=(PST.por[r.id]||[])[0];
+      return t?` <span class="chip c-ok" title="${esc('Lançado: '+(t.pessoa_nome||'')+' · vencimento '+dBR(t.vencimento)+' · '+fm(t.valor))}">✓ Lançado pela Controlacs</span>`:r.vencimento?' <span class="chip c-none">Aguardando a Controlacs</span>':''};
     const st=r=>{if(!r.conferido&&!r.vencimento)return '<span class="chip c-warn" title="A Controlacs confere e completa o vencimento e o valor">Enviado · a Controlacs completa</span>';if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
       return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBRv(r.vencimento)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBRv(r.vencimento)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${lan(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
-    tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
+    tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':f==='todos'?'de tudo o que foi enviado':'no mês']];
   }else if(MOD==='cartao'){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
     body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
@@ -3096,9 +3101,38 @@ async function renderMod(){
   $('mBody').innerHTML=body||`<tr><td class="l muted" colspan="9">Nada lançado ${f==='aberto'?'em aberto':'neste período'}.${$('mNovo').hidden?'':' Use “'+cfg.novo+'” para começar.'}</td></tr>`;
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   if(MOD==='tesouraria'&&!tod)renderTC(cli);else $('mConf').innerHTML='';
+  pagMesDesenha();
   $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
 }
 $('mNovo').onclick=()=>openReg(null);
+// ---------- Contas do mês (checklist do cliente) ----------
+// O cliente vê tudo o que a Controlacs tem para pagar no mês (lançado na Gestão financeira, inclusive o que chegou por e-mail),
+// o que falta enviar o boleto e o que já foi pago. Só consulta: não lança nada aqui (Carol, 05/11). Lido pela função v100.
+let PST={tits:[],por:{},cli:null},PMES=null;
+async function pagCarrega(cli){
+  PMES=PMES||TODAY.slice(0,7);const [i,f]=monthRange(PMES);
+  const {data,error}=await sb.rpc('pagar_contas_cliente',{cli:cli.id,ini:i,fim:f});
+  if(error){console.error(error);PST={tits:[],por:{},cli:cli.id,erro:true};return}
+  const por={};(data||[]).forEach(t=>{if(t.origem_id)(por[t.origem_id]||=[]).push(t)});
+  PST={tits:(data||[]).filter(t=>t.vencimento>=i&&t.vencimento<=f).sort((a,b)=>a.vencimento<b.vencimento?-1:a.vencimento>b.vencimento?1:0),por,cli:cli.id};
+}
+const pagSt=t=>+t.pago>=+t.valor-0.005?['c-done','✓ Paga','pago']:t.origem_id||+t.anexos>0||!t.previsto?['c-ok','Boleto recebido','ok']:+t.pago>0?['c-warn','Paga em parte','ok']:['c-bad','Falta enviar o boleto','falta'];
+function pagMesDesenha(){
+  const box=$('mPagMes');if(!box)return;
+  if(MOD!=='pagar'||!PST.cli){box.innerHTML='';return}
+  if(PST.erro){box.innerHTML=ehEsc()?'<p class="note">Para o cliente ver as contas do mês aqui, rode a atualização v100 do banco.</p>':'';return}
+  const ls=PST.tits,st=ls.map(pagSt),n=k=>st.filter(x=>x[2]===k).length,pode=podeLancar(PST.cli,'pagar'),mesAt=PMES===TODAY.slice(0,7);
+  box.innerHTML=`<div class="card" style="margin:14px 0"><div class="row" style="justify-content:space-between;align-items:center;gap:8px">
+    <div><h2 style="margin:0">Contas do mês</h2><p class="sub" style="margin:2px 0 0">Tudo o que a Controlacs tem para pagar em ${mesTxt(PMES)}, inclusive o que chegou por e-mail. Conforme os pagamentos são feitos, a conta aparece como paga.</p></div>
+    <div class="row" style="gap:6px;align-items:center"><button type="button" class="btn small ghost" data-pm="-1" aria-label="Mês anterior">‹</button><b>${mesTxt(PMES)}</b><button type="button" class="btn small ghost" data-pm="1" aria-label="Próximo mês">›</button>${mesAt?'':'<button type="button" class="btn small ghost" data-pm="0">Mês atual</button>'}</div></div>
+    ${ls.length?`<p class="note" style="margin:8px 0">${[n('falta')?`<span class="chip c-bad">${n('falta')} falta${n('falta')>1?'m':''} enviar o boleto</span>`:'',n('ok')?`<span class="chip c-ok">${n('ok')} com boleto recebido</span>`:'',n('pago')?`<span class="chip c-done">${n('pago')} paga${n('pago')>1?'s':''}</span>`:''].filter(Boolean).join(' ')}</p>
+    <div class="tablebox" style="margin:0"><table><thead><tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Situação</th><th></th></tr></thead><tbody>${ls.map((t,i)=>`<tr${st[i][2]==='falta'?' class="pend"':''}><td>${dBR(t.vencimento)}</td><td class="l">${esc(t.pessoa_nome||'—')}</td><td class="l">${esc(t.descricao||t.categoria||'')}${t.parcelas>1?` <span class="muted">${t.parcela}/${t.parcelas}</span>`:''}</td><td>${fm(t.valor)}</td><td class="l"><span class="chip ${st[i][0]}">${st[i][1]}</span></td><td>${st[i][2]==='falta'&&pode?`<button type="button" class="btn small" data-pmenv="${i}">📎 Enviar boleto</button>`:''}</td></tr>`).join('')}</tbody></table></div>`
+    :`<p class="note" style="margin:8px 0 0">Nenhuma conta a pagar lançada pela Controlacs em ${mesTxt(PMES)}.</p>`}</div>`;
+}
+$('mPagMes').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.pm!==undefined){const k=+b.dataset.pm,[y,m]=PMES.split('-').map(Number),d=new Date(y,m-1+k,1);PMES=k===0?TODAY.slice(0,7):isoLocal(d).slice(0,7);renderMod();return}
+  if(b.dataset.pmenv!==undefined){const t=PST.tits[+b.dataset.pmenv];if(!t)return;
+    openReg(null,{sobre:[t.descricao||t.categoria,t.pessoa_nome,t.parcelas>1?`parcela ${t.parcela}/${t.parcelas}`:'','vencimento '+dBR(t.vencimento)].filter(Boolean).join(' · '),fornecedor:t.pessoa_nome||null,vencimento:t.vencimento,valor:t.valor})}});
 $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openReg(REGS.find(r=>r.id===tr.dataset.id))});
 $('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
 const dlgReg=$('dlgReg');
@@ -3110,12 +3144,12 @@ function ajustaDeposito(){
   $('rFields').querySelectorAll('[data-dep]').forEach(el=>el.hidden=!dep);
   const d=$('rFields').querySelector('[data-k="descricao"]');if(d)d.closest('label').hidden=dep;
 }
-async function openReg(r){
+async function openReg(r,pre){
   if(escCli.value==='*')CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null;
   if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
   const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
   const ed=regEditavel(),dis=ed?'':' disabled';
-  const v=k=>r?r[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
+  const v=k=>r?r[k]:pre&&pre[k]!=null?pre[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
   $('rTitle').textContent=r?(MOD==='pagar'?r.fornecedor||r.sobre||'Boleto ou nota enviado':MOD==='tesouraria'?r.descricao:r.fornecedor):cfg.novo;
   const simp=pagSimples();
   $('rChip').innerHTML=r?(r.conferido?`<span class="chip c-done">✓ ${cfg.okTxt}</span>`:'<span class="chip c-none">Aberto</span>'):'';
@@ -6663,6 +6697,7 @@ function bolDesenha(){
     return `<tr><td><input type="checkbox" data-bolok="${i}"${x.ok?' checked':''} aria-label="Trazer este"></td><td>${vc}</td><td class="l">${fo}</td><td class="l">${esc(b.sobre||'')||'<span class="muted">—</span>'}${b.fornecedor||b.valor?'':'<br><span class="chip c-warn">Envio simples: só anexo e descrição</span>'}</td><td class="l">${esc(b.documento||'')||'<span class="muted">—</span>'}</td><td>${vl}</td>
       <td class="l">${(BOL.docs[b.id]||[]).map(d=>`<a href="${BOL.urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria||'Anexo')}</a>`).join('<br>')||'<span class="neg">sem anexo</span>'}</td>
       <td class="l"><select data-boldest="${i}" aria-label="Lançar como" style="max-width:340px"><option value="nova">Conta nova</option>${mesmo.length?`<optgroup label="Contas lançadas deste fornecedor">${mesmo.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}${outras.length?`<optgroup label="Outras contas em aberto perto do vencimento">${outras.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}</select>
+      <br><button type="button" class="btn small" data-bolcria="${i}" title="Abre a tela completa do lançamento (pagar ou receber), com categoria, parcelas e nº da nota, já com os dados e os anexos deste documento">✚ Criar lançamento</button>
       ${t?`<br><span class="chip c-done">Vai para a conta já lançada${x.como&&x.dest===x.sug?' (achei '+x.como+')':''}</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`:''}`:x.sug?'':`<br><span class="chip c-bad" title="Não achei conta em aberto parecida: confira se é algo novo e cadastre o fornecedor se precisar">Novo: não achei conta lançada</span>`}</td></tr>`}).join('')}</tbody></table></div>
   <datalist id="bolPesList">${(BOL.pes||[]).map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist>`;
   BOL.it.forEach((x,i)=>{const s=document.querySelector(`[data-boldest="${i}"]`);if(s)s.value=x.dest||'nova'});
@@ -6690,6 +6725,11 @@ dlgBol.addEventListener('change',ev=>{const d=ev.target.dataset;
   if(d.bolv!==undefined)BOL.it[+d.bolv].venc=ev.target.value||null;
   if(d.bolval!==undefined){const n=parseMoney(ev.target.value);BOL.it[+d.bolval].val=n>0?r2(n):null;if(n>0)ev.target.value=showMoney(n)}
   if(d.bolf!==undefined)BOL.it[+d.bolf].forn=ev.target.value.trim()||null});
+// criar o lançamento completo a partir do documento do cliente
+dlgBol.addEventListener('click',ev=>{const b=ev.target.closest('[data-bolcria]');if(!b||!BOL)return;const x=BOL.it[+b.dataset.bolcria];if(!x)return;
+  const r=x.row,bo=x.bol;GTBOL={bol:bo,docs:BOL.docs[bo.id]||[],urls:BOL.urls||{}};
+  abrirGT(null,'pagar',{pessoa_nome:r.pessoa_nome||x.forn||'',descricao:bo.sobre||'',documento:bo.documento||'',categoria:r.categoria||'',vencimento:r.vencimento||x.venc||'',valor:r.valor||x.val||null,
+    linha_digitavel:bo.linha_digitavel||'',pix_chave:r.pix_chave||'',forma:'Boleto',obs:bo.obs||''})});
 dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]')?.dataset.act;if(!a)return;
   if(a==='fechar')return dlgBol.close();
   if(a!=='trazer'||!BOL)return;
@@ -7051,11 +7091,14 @@ async function faLiga(ids){
 }
 const faClip=id=>GT.anx?.has(id)?' <span title="Tem anexo">📎</span>':'';
 const dlgGT=$('dlgGT');
-async function abrirGT(t,tipo){
+// GTBOL: lançamento criado a partir de um boleto ou nota que o cliente enviou (Carol, 05/11)
+let GTBOL=null;
+async function abrirGT(t,tipo,pre){
+  if(t||!pre)GTBOL=null;
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
   let pes=[],contas=GFC.lista;
   let plano=[];try{[pes,contas,plano]=await Promise.all([gfPessoasDe(cli.id,P?'fornecedor':'cliente'),gfContasDe(cli.id),planoDe(cli)])}catch(e){console.error(e)}
-  const v=k=>esc(t?.[k]??''),mu=x=>`<span class="muted">${x}</span>`;
+  const v=k=>esc((t||pre)?.[k]??''),mu=x=>`<span class="muted">${x}</span>`;
   const opt=(ls,cur,vazio)=>`<option value="">${vazio||''}</option>`+ls.map(o=>{const [val,txt]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}"${cur===val?' selected':''}>${esc(txt)}</option>`}).join('');
   // a categoria vale para entrada e saída (como uma conta contábil): o estorno usa a mesma categoria da venda.
   // As do tipo da conta (despesa para pagar, receita para receber) vêm primeiro.
@@ -7065,19 +7108,22 @@ async function abrirGT(t,tipo){
   const movs=t?GT.movs[t.id]||[]:[],pago=t?GT.pago[t.id]||0:0,falta=t?Math.max(0,r2(t.valor-pago)):0;
   $('gtdTitle').textContent=t?(t.pessoa_nome||(P?'Conta a pagar':'Conta a receber')):(P?'Nova conta a pagar':'Nova conta a receber')+' · '+cli.nome;
   $('gtdChip').innerHTML=t?(s=>`<span class="chip ${s[0]}">${s[1]}</span>`)(gtSit(t)):'';
-  let h=`<datalist id="gtPesList">${pes.map(p=>`<option value="${esc(pesNome(p))}">${pesRot(p)}</option>`).join('')}</datalist>
+  let h=GTBOL?`<div class="alerta" style="margin:0 0 4px;display:block"><b>Lançamento a partir do documento enviado pelo cliente.</b> ${esc(GTBOL.bol.sobre||'')}<br>${(GTBOL.docs||[]).map(d=>`<a href="${GTBOL.urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria||'Anexo')}: ${esc(d.nome_arquivo||'')}</a>`).join(' · ')||'<span class="muted">O cliente não anexou documento.</span>'}
+    <div class="fields" style="margin-top:8px"><label class="f">Tipo do lançamento<select id="gt_tipo"><option value="pagar"${P?' selected':''}>Conta a pagar</option><option value="receber"${P?'':' selected'}>Conta a receber</option></select></label></div>
+    <p class="note" style="margin:4px 0 0">Preencha tudo com base no documento: categoria, parcelas, nº da nota… Ao salvar, os anexos do cliente vão junto para o lançamento.</p></div>`:'';
+  h+=`<datalist id="gtPesList">${pes.map(p=>`<option value="${esc(pesNome(p))}">${pesRot(p)}</option>`).join('')}</datalist>
   <div class="fields">
     <label class="f wide">${P?'Fornecedor':'Cliente'} *<input id="gt_pessoa" list="gtPesList" value="${v('pessoa_nome')}" placeholder="Digite para buscar no cadastro" autocomplete="off" data-pesnova>${PESNOVA}</label>
     <label class="f wide">Descrição<input id="gt_descricao" value="${v('descricao')}" placeholder="${P?'Ex.: aluguel da sala':'Ex.: convênio Unimed, setembro'}"></label>
     <label class="f">Documento<input id="gt_documento" value="${v('documento')}" placeholder="Nº da NF ou boleto"></label>
-    <label class="f">Categoria<select id="gt_categoria" data-catnova="${P?'Despesa':'Receita'}">${opt(cats,t?.categoria||'')}${catNovaOpt}</select></label>
-    <label class="f">Competência<input type="month" id="gt_competencia" value="${(t?.competencia||'').slice(0,7)}"></label>
+    <label class="f">Categoria<select id="gt_categoria" data-catnova="${P?'Despesa':'Receita'}">${opt(cats,(t||pre)?.categoria||'')}${catNovaOpt}</select></label>
+    <label class="f">Competência<input type="month" id="gt_competencia" value="${((t||pre)?.competencia||'').slice(0,7)}"></label>
     <label class="f">Vencimento *<input type="date" id="gt_vencimento" value="${v('vencimento')}"></label>
-    <label class="f">Valor *<input id="gt_valor" class="money" inputmode="decimal" value="${t?showMoney(t.valor):''}" placeholder="0,00"></label>
+    <label class="f">Valor *<input id="gt_valor" class="money" inputmode="decimal" value="${(t||pre)?.valor?showMoney((t||pre).valor):''}" placeholder="0,00"></label>
     ${t?'':`<label class="f">Parcelas (mensais)<input id="gt_parcelas" type="number" min="1" max="120" value="1"></label>
     <label class="f">O valor digitado é<select id="gt_vparc"><option value="total">O total (divide nas parcelas)</option><option value="parcela">O de cada parcela</option></select></label>`}
-    <label class="f">Conta prevista<select id="gt_conta_id">${opt(ativas,t?.conta_id||'',ativas.length?'':'Cadastre em Contas bancárias')}</select></label>
-    <label class="f">Forma de ${P?'pagamento':'recebimento'}<select id="gt_forma">${opt(GTFORMAS,t?.forma||'')}</select></label>
+    <label class="f">Conta prevista<select id="gt_conta_id">${opt(ativas,(t||pre)?.conta_id||'',ativas.length?'':'Cadastre em Contas bancárias')}</select></label>
+    <label class="f">Forma de ${P?'pagamento':'recebimento'}<select id="gt_forma">${opt(GTFORMAS,(t||pre)?.forma||'')}</select></label>
     ${P?`<label class="f wide">Linha digitável do boleto<input id="gt_linha_digitavel" value="${v('linha_digitavel')}" inputmode="numeric"></label>`:''}
     ${P?`<label class="f">Chave Pix<input id="gt_pix_chave" value="${v('pix_chave')}"></label>`:''}
     <label class="f wide">Observação<textarea id="gt_obs" rows="2">${v('obs')}</textarea></label>
@@ -7109,7 +7155,11 @@ async function abrirGT(t,tipo){
     if(P&&!$('gt_forma').value)$('gt_forma').value='Boleto';
     // o mesmo boleto já lançado em outra conta, de qualquer empresa (v72)
     boletoRepetido(b,t?.origem_id||t?.id||null).then(rp=>{if(rp.length)alert('ATENÇÃO: este boleto já está lançado em outra conta: '+repetidoTxt(rp)+'.')})});
-  dlgGT.showModal();if(!t)$('gt_pessoa').focus();
+  // trocar entre conta a pagar e a receber sem perder o que já foi digitado
+  $('gt_tipo')?.addEventListener('change',e=>{const g=k=>($('gt_'+k)?.value||'').trim()||null;
+    abrirGT(null,e.target.value,{pessoa_nome:g('pessoa'),descricao:g('descricao'),documento:g('documento'),competencia:g('competencia'),vencimento:g('vencimento'),valor:parseMoney($('gt_valor').value),
+      linha_digitavel:g('linha_digitavel'),pix_chave:g('pix_chave'),obs:g('obs'),forma:g('forma'),conta_id:g('conta_id')})});
+  if(!dlgGT.open)dlgGT.showModal();if(!t)$('gt_pessoa').focus();
   faInit(cli,t?[t.id]:null,t?.grupo_id?GT.lista.filter(x=>x.grupo_id===t.grupo_id).map(x=>x.id):[]);
   if(t?.origem_id){
     const {data}=await sb.from('documentos').select('*').eq('registro_id',t.origem_id);const urls=await signed((data||[]).map(d=>d.caminho));
@@ -7157,8 +7207,15 @@ async function gtAcao(a,b){
       const rows=[...Array(n).keys()].map(i=>({...row,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
         vencimento:somaMes(row.vencimento,i),competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
       if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
+      const gb=GTBOL;if(gb){rows[0].origem='boleto_cliente';rows[0].origem_id=gb.bol.id}
       let novos;({data:novos,error}=await sb.from('fin_titulos').insert(rows).select('id,parcela'));
       if(!error)await faLiga((novos||[]).sort((a,b)=>a.parcela-b.parcela).map(x=>x.id));
+      // lançamento feito a partir do documento do cliente: os anexos dele vão para o lançamento e o envio dele fica completo
+      if(!error&&gb){const id=(novos||[]).find(x=>x.parcela===1)?.id;
+        if(id&&gb.docs?.length){const {error:e2}=await sb.from('documentos').insert(gb.docs.map(d=>({cliente_id:cli.id,modulo:'financeiro',registro_id:id,categoria:d.categoria,nome_arquivo:d.nome_arquivo,caminho:d.caminho})));if(e2)console.error(e2)}
+        const b0=gb.bol,cp={};if(!b0.vencimento)cp.vencimento=row.vencimento;if(!(b0.valor>0))cp.valor=r2(valor);if(!b0.fornecedor)cp.fornecedor=row.pessoa_nome;if(!b0.documento&&row.documento)cp.documento=row.documento;
+        if(Object.keys(cp).length){const {error:e3}=await sb.from('contas_pagar').update(cp).eq('id',b0.id);if(e3)console.error(e3)}
+        GTBOL=null;if(dlgBol.open)dlgBol.close()}
     }
     if(error){console.error(error);return gtErr(v45(error)?v45Msg:error.message||'Não foi possível salvar.')}
     toast(t?'Correção salva':'Conta lançada');dlgGT.close();GT.key='';renderGT();
@@ -9886,7 +9943,7 @@ const MANUAL=[
 <li>Clique em <b>Enviar fechamento</b>.</li>
 </ol>
 <p>O quadro <b>Últimos dias</b> mostra a situação dos dias anteriores. Dias sem lançamento ou com diferença sem explicação aparecem marcados para você resolver.</p>`},
-    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar-envio.png',
+    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar.png',
       txt:`<p>O cliente envia o boleto e a nota fiscal de cada conta, e a Controlacs faz o pagamento. O envio é simples: só o anexo e a descrição.</p>
 <ol>
 <li>Clique em <b>+ Nova conta</b>.</li>
@@ -9894,8 +9951,10 @@ const MANUAL=[
 <li>Anexe o boleto e/ou a nota fiscal. Dá para anexar mais de um documento no mesmo lançamento e escolher vários arquivos de uma vez. Quando o boleto é PDF, o portal já lê o valor e o vencimento sozinho.</li>
 <li>Salve. Não precisa preencher mais nada.</li>
 </ol>
+<p><b>Contas do mês:</b> logo acima da lista aparece tudo o que a Controlacs tem para pagar no mês (inclusive o que chegou por e-mail), com a situação de cada conta: <span class="chip c-bad">Falta enviar o boleto</span>, <span class="chip c-ok">Boleto recebido</span> ou <span class="chip c-done">✓ Paga</span>. Use ‹ e › para trocar o mês. Na conta que falta, o botão <b>📎 Enviar boleto</b> já abre o envio com a descrição preenchida. Essa lista é só para consultar: quem lança é a Controlacs.</p>
+<p><b>O que eu enviei:</b> em <b>Mostrar</b>, escolha <i>Tudo o que foi enviado</i> para ver todos os boletos e notas que já mandou. Cada um mostra <span class="chip c-none">Aguardando a Controlacs</span> ou <span class="chip c-ok">✓ Lançado pela Controlacs</span> e, depois do pagamento, <span class="chip c-done">✓ Paga</span>.</p>
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
-<p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha. O escritório continua vendo e editando todos os campos do lançamento.</p>
+<p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
 <p>Os quadros mostram o total a pagar, o que vence em 7 dias, o que está vencido e o que já foi pago. Em <b>Mostrar</b> escolha <i>Em aberto</i> ou um período. Contas sem anexo aparecem com <span style="color:var(--bad)">sem documento</span>. Clique numa linha para ver os documentos; o escritório marca a conta como paga.</p>`},
     {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',
       txt:`<p>O controle do dinheiro guardado na empresa: o que entra do caixa, as despesas pagas em dinheiro e os depósitos no banco.</p>
@@ -10143,6 +10202,11 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05pmes',data:'2026-11-05',t:'Boletos e notas: contas do mês e o que você já enviou',itens:[
+    {x:'Rotina diária › Boletos e notas fiscais a pagar: o quadro “Contas do mês” mostra tudo o que a Controlacs tem para pagar no mês, inclusive o que chegou por e-mail, e o que falta enviar o boleto. Conforme os pagamentos são feitos, a conta aparece como paga. É só para consultar.',mods:['pagar']},
+    {x:'Na conta que falta o boleto, o botão “📎 Enviar boleto” já abre o envio com a descrição preenchida.',mods:['pagar']},
+    {x:'Em “Mostrar”, a opção “Tudo o que foi enviado” lista todos os boletos e notas que você mandou, com “Aguardando a Controlacs”, “Lançado pela Controlacs” ou “Paga”.',mods:['pagar']},
+    {x:'Contas a pagar › Boletos e notas do cliente para validar: o botão “✚ Criar lançamento” em cada documento abre a tela completa do lançamento (conta a pagar ou a receber), com categoria, parcelas, nº da nota e os anexos do cliente. Ao salvar, o documento fica ligado ao lançamento e some da lista de validar.',para:'esc'}]},
   {k:'2026-11-05icone',data:'2026-11-05',t:'Ícone do C da Controlacs no celular',itens:[
     {x:'Ao salvar o portal na tela de início do celular, o atalho agora mostra o C da Controlacs (antes aparecia uma letra P). A aba do navegador também mostra o C.'},
     {x:'Se você já tinha salvo o atalho antes, apague o atalho antigo e salve de novo: no iPhone, Safari › Compartilhar › Adicionar à Tela de Início; no Android, Chrome › menu ⋮ › Adicionar à tela inicial.'}]},
