@@ -7297,6 +7297,39 @@ async function faLiga(ids){
   FA.pend=[];
 }
 const faClip=id=>GT.anx?.has(id)?' <span title="Tem anexo">📎</span>':'';
+// ---------- pagamento dividido em mais de uma conta (Carol, 05/11) ----------
+// Ex.: o repasse de uma clínica sai parte da Tesouraria e parte da conta do banco. A conta escolhida no campo
+// principal fica com o restante; cada parte vira um pagamento (fin_movimentos) no extrato da sua conta. Vale para todas as empresas.
+const DV={contas:{},tot:{}};
+function dvHTML(id,contas,P,tot){DV.contas[id]=contas;DV.tot[id]=tot;
+  return `<div class="dv wide" id="${id}" data-dv><div data-dvrows></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button type="button" class="btn small ghost" data-dvadd title="Divide o valor: uma parte nesta outra conta e o restante na conta escolhida">+ ${P===false?'Receber':'Pagar'} parte em outra conta</button><span class="note" data-dvresto></span></div></div>`}
+function dvLinha(id){const cs=DV.contas[id]||[];
+  return `<div class="dvrow" style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><select data-dvconta style="flex:1;min-width:0"><option value="">Escolha a outra conta</option>${cs.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('')}</select><input class="money" data-dvvalor inputmode="decimal" placeholder="0,00" style="max-width:130px" aria-label="Valor nesta conta"><button type="button" class="btn small ghost" data-dvdel title="Tirar esta parte" aria-label="Tirar esta parte">✕</button></div>`}
+function dvResto(box){if(!box)return;const id=box.id,r=box.querySelector('[data-dvresto]'),n=box.querySelectorAll('.dvrow').length;if(!r)return;
+  if(!n){r.textContent='';return}
+  const tot=+(typeof DV.tot[id]==='function'?DV.tot[id]():DV.tot[id])||0,soma=r2([...box.querySelectorAll('[data-dvvalor]')].reduce((x,i)=>x+(parseMoney(i.value)||0),0)),fica=r2(tot-soma);
+  r.innerHTML=fica<-0.004?`<span class="neg">As partes (${fm(soma)}) passam do total (${fm(tot)}).</span>`:`Na conta principal fica ${fm(Math.max(0,fica))}.`}
+// lê as partes; devolve {partes:[{conta,valor}],soma} ou {erro}
+function dvLe(id){const box=$(id);if(!box)return {partes:[],soma:0};const partes=[];
+  for(const row of box.querySelectorAll('.dvrow')){const conta=row.querySelector('[data-dvconta]').value,valor=parseMoney(row.querySelector('[data-dvvalor]').value);
+    if(!conta&&!valor)continue;
+    if(!conta)return {erro:'Escolha a outra conta de cada parte (ou tire a parte no ✕).'};
+    if(!(valor>0))return {erro:'Informe o valor de cada parte em outra conta.'};
+    partes.push({conta,valor:r2(valor)})}
+  return {partes,soma:r2(partes.reduce((x,p)=>x+p.valor,0))}}
+// divide o valor: a conta principal fica com o restante (se sobrar) e cada parte vai para a sua conta
+function dvDivide(principal,total,dv){const resto=r2(total-dv.soma);
+  return [...(resto>0.004?[{conta:principal,valor:resto}]:[]),...dv.partes]}
+document.addEventListener('click',e=>{const add=e.target.closest('[data-dvadd]'),del=e.target.closest('[data-dvdel]');
+  if(add){const box=add.closest('[data-dv]');box.querySelector('[data-dvrows]').insertAdjacentHTML('beforeend',dvLinha(box.id));
+    const rows=box.querySelectorAll('.dvrow'),inp=rows[rows.length-1].querySelector('[data-dvconta]');
+    dvResto(box);inp.focus()}
+  if(del){const box=del.closest('[data-dv]');del.closest('.dvrow').remove();dvResto(box)}});
+document.addEventListener('input',()=>document.querySelectorAll('[data-dv]').forEach(b=>{if(b.querySelector('.dvrow'))dvResto(b)}));
+document.addEventListener('focusout',e=>{if(e.target.matches?.('[data-dvvalor]')){const n=parseMoney(e.target.value);if(n!=null&&!isNaN(n)&&e.target.value.trim())e.target.value=showMoney(n)}});
+// valor da 1ª parcela da conta nova (para dividir o "Salvar quitado" em mais de uma conta)
+function gtValor1(){const v=parseMoney($('gt_valor')?.value)||0,n=Math.max(1,Math.min(120,parseInt($('gt_parcelas')?.value)||1));
+  return n>1&&$('gt_vparc')?.value==='total'?Math.floor(v/n*100)/100:v}
 const dlgGT=$('dlgGT');
 // GTBOL: lançamento criado a partir de um boleto ou nota que o cliente enviou (Carol, 05/11)
 let GTBOL=null;
@@ -7342,6 +7375,7 @@ async function abrirGT(t,tipo,pre){
       <label class="f">Data do ${P?'pagamento':'recebimento'} *<input type="date" id="gj_data"></label>
       <label class="f">Conta do ${P?'pagamento':'recebimento'} *<select id="gj_conta">${opt(ativas,(t||pre)?.conta_id||(ativas.length===1?ativas[0][0]:''),ativas.length?'':'Cadastre em Contas bancárias')}</select></label>
       <label class="f" id="gjParcBox" hidden>Quais parcelas<select id="gj_parc"><option value="1">Só a 1ª parcela</option><option value="todas">Todas as parcelas</option></select></label>
+      ${dvHTML('gjDv',ativas,P,gtValor1)}
     </div></div>`;
   // lançamento com parcelas ou recorrência: a correção vale só para esta ou também para as próximas em aberto (Carol, 05/11)
   const proxN=t?.grupo_id?GT.lista.filter(x=>x.grupo_id===t.grupo_id&&x.parcela>t.parcela&&!(GT.movs[x.id]||[]).length).length:0;
@@ -7364,7 +7398,8 @@ async function abrirGT(t,tipo,pre){
       <label class="f">Juros e multa<input id="gb_juros" class="money" inputmode="decimal" placeholder="0,00"></label>
       <label class="f">Desconto<input id="gb_desconto" class="money" inputmode="decimal" placeholder="0,00"></label>
       <div class="f" style="align-self:end"><button type="button" class="btn primary" data-act="baixa">Registrar ${P?'pagamento':'recebimento'}</button></div>
-      <p class="note wide" style="margin:0">Falta ${fm(falta)}. Se pagar com juros ou desconto, informe ao lado: o valor ${P?'pago':'recebido'} é o que ${P?'saiu da':'entrou na'} conta.</p></div>`;
+      <p class="note wide" style="margin:0">Falta ${fm(falta)}. Se pagar com juros ou desconto, informe ao lado: o valor ${P?'pago':'recebido'} é o que ${P?'saiu da':'entrou na'} conta.</p>
+      ${dvHTML('gbDv',ativas,P,()=>parseMoney($('gb_valor')?.value)||0)}</div>`;
   }
   h+=`<p class="err" id="gtErr" hidden></p>`;
   $('gtdBody').innerHTML=h;
@@ -7450,13 +7485,17 @@ async function gtAcao(a,b){
       jaPago=b?.dataset.quit==='1';const jData=$('gj_data')?.value,jConta=$('gj_conta')?.value,jTodas=n>1&&$('gj_parc')?.value==='todas';
       if(jaPago&&!jData)return gtErr(`Informe a data do ${P?'pagamento':'recebimento'}.`);
       if(jaPago&&!jConta)return gtErr(`Escolha a conta do ${P?'pagamento':'recebimento'}. Se não houver, cadastre em Gestão financeira › Contas bancárias.`);
+      // parte em outra conta (ex.: parte na Tesouraria e parte no banco): só para uma parcela por vez
+      const jDv=jaPago?dvLe('gjDv'):{partes:[],soma:0};if(jDv.erro)return gtErr(jDv.erro);
+      if(jDv.partes.length&&jTodas)return gtErr(`Para dividir em mais de uma conta, quite só a 1ª parcela. As outras você ${P?'paga':'recebe'} depois, cada uma na sua conta.`);
+      if(jDv.partes.length&&jDv.soma>rows[0].valor+0.004)return gtErr(`As partes em outra conta (${fm(jDv.soma)}) passam do valor da parcela (${fm(rows[0].valor)}).`);
       const gb=GTBOL;if(gb){rows[0].origem='boleto_cliente';rows[0].origem_id=gb.bol.id}
       let novos;({data:novos,error}=await sb.from('fin_titulos').insert(rows).select('id,parcela,parcelas,valor'));
       if(!error)await faLiga((novos||[]).sort((a,b)=>a.parcela-b.parcela).map(x=>x.id));
       // já pago ou recebido: a baixa entra junto, igual ao "Registrar pagamento"
       if(!error&&jaPago){const qu=(novos||[]).filter(x=>jTodas||x.parcela===1);
-        const {data:mvs,error:e4}=await sb.from('fin_movimentos').insert(qu.map(x=>({cliente_id:cli.id,conta_id:jConta,data:jData,tipo:GT.dlg==='pagar'?'saida':'entrada',valor:r2(x.valor),juros:0,desconto:0,titulo_id:x.id,
-          descricao:row.descricao||(GT.dlg==='pagar'?'Pagamento':'Recebimento')+(x.parcelas>1?` ${x.parcela}/${x.parcelas}`:''),pessoa_nome:row.pessoa_nome,documento:row.documento,categoria:row.categoria,forma:row.forma||null}))).select('*');
+        const {data:mvs,error:e4}=await sb.from('fin_movimentos').insert(qu.flatMap(x=>dvDivide(jConta,r2(x.valor),jDv).map(pt=>({cliente_id:cli.id,conta_id:pt.conta,data:jData,tipo:GT.dlg==='pagar'?'saida':'entrada',valor:r2(pt.valor),juros:0,desconto:0,titulo_id:x.id,
+          descricao:row.descricao||(GT.dlg==='pagar'?'Pagamento':'Recebimento')+(x.parcelas>1?` ${x.parcela}/${x.parcelas}`:''),pessoa_nome:row.pessoa_nome,documento:row.documento,categoria:row.categoria,forma:row.forma||null})))).select('*');
         if(e4){console.error(e4);jaErr=true}
         else if(b?.dataset.conc==='1'){try{GT.concR=await concLigar(mvs||[])}catch(e){console.error(e);GT.concR={lig:0,man:0}}}
         else if(gb){const c=GFC.lista.find(x=>x.id===jConta);
@@ -7480,13 +7519,19 @@ async function gtAcao(a,b){
     const falta=r2(t.valor-(GT.pago[t.id]||0)),ab=r2(valor-juros+desconto);
     if(ab>falta+0.004)return gtErr(`Com esses valores, a baixa (${fm(ab)}) passa do que falta (${fm(falta)}). Se teve juros ou multa, informe no campo ao lado.`);
     if(ab<=0)return gtErr('O desconto e os juros não fecham com o valor.');
-    let error;try{({error}=await sb.from('fin_movimentos').insert(await pernasFatura(t,{cliente_id:cli.id,conta_id:conta,data,tipo:P?'saida':'entrada',valor:r2(valor),juros:r2(juros),desconto:r2(desconto),titulo_id:t.id,
-      descricao:t.descricao||(P?'Pagamento':'Recebimento')+(t.parcelas>1?` ${t.parcela}/${t.parcelas}`:''),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:t.forma||null})))}catch(e){error=e}
+    // parte em outra conta (ex.: parte na Tesouraria e parte no banco): cada parte é um pagamento na sua conta;
+    // juros e desconto ficam na primeira parte
+    const dv=dvLe('gbDv');if(dv.erro)return gtErr(dv.erro);
+    if(dv.soma>r2(valor)+0.004)return gtErr(`As partes em outra conta (${fm(dv.soma)}) passam do valor ${P?'pago':'recebido'} (${fm(valor)}).`);
+    const pts=dvDivide(conta,r2(valor),dv);
+    let error;try{const rows=[];for(const [i,pt] of pts.entries())rows.push(...await pernasFatura(t,{cliente_id:cli.id,conta_id:pt.conta,data,tipo:P?'saida':'entrada',valor:r2(pt.valor),juros:i?0:r2(juros),desconto:i?0:r2(desconto),titulo_id:t.id,
+      descricao:t.descricao||(P?'Pagamento':'Recebimento')+(t.parcelas>1?` ${t.parcela}/${t.parcelas}`:''),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:t.forma||null}));
+      ({error}=await sb.from('fin_movimentos').insert(rows))}catch(e){error=e}
     if(error){console.error(error);return gtErr(error.message||'Não foi possível registrar.')}
     // o boleto enviado pelo cliente também fica como pago (vale para a Exportação do Bom Controle)
     if(t.origem_id&&ab>=falta-0.004){const c=GFC.lista.find(x=>x.id===conta);
       const {error:e2}=await sb.from('contas_pagar').update({conferido:true,pago_em:data,banco:c?.conta_bc||c?.nome||null}).eq('id',t.origem_id);if(e2)console.error(e2)}
-    toast(P?'Pagamento registrado':'Recebimento registrado');dlgGT.close();GT.key='';renderGT();
+    toast((P?'Pagamento registrado':'Recebimento registrado')+(pts.length>1?` em ${pts.length} contas`:''));dlgGT.close();GT.key='';renderGT();
   }else if(a==='conc'||a==='desconc'){
     const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);if(!mv)return;
     if(a==='desconc'){if(!confirm('Desconciliar este '+(P?'pagamento':'recebimento')+'? Continua '+(P?'pago':'recebido')+'; só a ligação com o extrato do banco é desfeita.'))return;
@@ -10928,6 +10973,8 @@ const MANUAL=[
 <li><b>Para editar uma conta paga ou conciliada:</b> ela fica travada. Abra a conta e use <b>Estornar</b> no pagamento: a conta volta a ficar em aberto, sai do extrato e, se estava conciliada, a conciliação também é desfeita (a linha do banco volta a ficar pendente na Conciliação bancária). Depois corrija e registre o pagamento de novo.</li>
 <li><b>Conta com parcelas ou recorrência:</b> ao corrigir uma parcela, use <b>Salvar só esta</b> ou <b>Salvar esta e as próximas</b>. Na segunda opção, o que você mudou (valor, vencimento, categoria, conta, descrição ou outro campo) vai também para as próximas parcelas em aberto, e o vencimento segue o mesmo dia, mês a mês. Parcelas já pagas não mudam.</li>
 <li><b>Conciliar sem enviar o extrato de novo:</b> abra a conta e use <b>🔗 Conciliar</b> no pagamento (por exemplo, depois de estornar para corrigir a categoria e registrar o pagamento de novo). O portal liga à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias); se não achar, pergunta se marca como conciliado mesmo assim. <b>Desconciliar</b> tira só a ligação com o extrato. Na conta nova, <b>🔗 Salvar quitado e conciliado</b> já lança paga e conciliada.</li>
+<li><b>Pagamento em mais de uma conta:</b> quando parte sai de uma conta e parte de outra (por exemplo, parte da <b>Tesouraria</b> e parte do banco), clique em <b>+ Pagar parte em outra conta</b>, escolha a outra conta e o valor dessa parte. O restante sai da conta escolhida no campo <b>Conta</b>. Cada parte entra no extrato da sua conta. Funciona no <b>Registrar pagamento</b>, no <b>$ Salvar quitado</b> (uma parcela por vez) e no <b>Marcar como pago</b> do Repasse de parceiros.</li>
+<li><b>Repasse de parceiros com o mesmo parceiro repetido:</b> ao importar o relatório, as linhas do mesmo parceiro (mesmo nome) são somadas numa linha só, com os protocolos juntos, para fazer um pagamento único. O aviso da importação lista quem foi somado.</li>
 <li><b>Várias contas de uma vez:</b> marque as contas na caixinha da esquerda (a do título marca todas do filtro). Na barra que aparece: <b>$ Quitar</b> (data: o vencimento de cada conta, ou hoje se ainda não venceu, ou uma data só; conta: a prevista de cada uma ou outra), <b>Estornar</b> (volta para em aberto e desfaz a conciliação), <b>🔗 Conciliar</b>, <b>Desconciliar</b> (continua pago, só tira a ligação com o extrato do banco) e <b>Excluir</b> (conta paga não é excluída: estorne antes).</li>
 </ul>`},
     {k:'gfmov',t:'Movimentação financeira',
@@ -11228,6 +11275,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05contas',data:'2026-11-05',t:'Pagamento em mais de uma conta e parceiros repetidos somados',itens:[
+    {x:'Dá para pagar uma conta em mais de uma conta, por exemplo parte na Tesouraria e parte no banco: use “+ Pagar parte em outra conta” no Registrar pagamento, no $ Salvar quitado e no Marcar como pago do Repasse de parceiros. Cada parte sai no extrato da sua conta.',mods:['gfpagar','gfrec','gfrepasse']},
+    {x:'Repasse de parceiros: ao importar o relatório de restituições, o mesmo parceiro repetido vira uma linha só, com os valores somados, para fazer um único pagamento.',mods:['gfrepasse']}]},
   {k:'2026-11-05rapido',data:'2026-11-05',t:'Gestão financeira mais rápida',itens:[
     {x:'A Movimentação financeira, as Contas a pagar e a receber e as outras telas da Gestão financeira carregam bem mais rápido, principalmente nas empresas com muitos lançamentos (como a MPA Palmas) e em “Todas as empresas”. Nada mudou no que cada pessoa vê.',mods:['gfmov','gfpagar','gfrec']}]},
   {k:'2026-11-05mvlote',data:'2026-11-05',t:'Movimentação financeira: quitar várias contas de uma vez',itens:[
@@ -11956,7 +12006,7 @@ async function renderRN(recarrega=true){
     try{RN.itens=await todas(()=>sb.from('repasse_itens').select('*').eq('lote_id',RN.lote.id).order('nome'));
       const ids=RN.itens.map(i=>i.titulo_id).filter(Boolean);RN.tits={};
       for(let i=0;i<ids.length;i+=200){const [t,m]=await Promise.all([sb.from('fin_titulos').select('*').in('id',ids.slice(i,i+200)),sb.from('fin_movimentos').select('titulo_id,valor,juros,desconto,conta_id,data,conciliado').in('titulo_id',ids.slice(i,i+200))]);
-        if(t.error)throw t.error;t.data.forEach(x=>RN.tits[x.id]={...x,pago:0});(m.data||[]).forEach(x=>{const tt=RN.tits[x.titulo_id];if(tt){tt.pago=r2(tt.pago+abat(x));tt.conta_id=x.conta_id;tt.data=x.data;tt.conc=(tt.conc??true)&&!!x.conciliado}})}
+        if(t.error)throw t.error;t.data.forEach(x=>RN.tits[x.id]={...x,pago:0});(m.data||[]).forEach(x=>{const tt=RN.tits[x.titulo_id];if(tt){tt.pago=r2(tt.pago+abat(x));tt.conta_id=x.conta_id;tt.contas=[...new Set([...(tt.contas||[]),x.conta_id])];tt.data=x.data;tt.conc=(tt.conc??true)&&!!x.conciliado}})}
     }catch(e){console.error(e);return rnVazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
     RN.sel.clear();
   }
@@ -11983,7 +12033,7 @@ function rnDesenha(){
   const opEmp=it=>it.empresa_id?`<b style="white-space:nowrap">${esc(rnEmpNome(it.empresa_id))}</b>`:mu('—');
   const opSit=it=>{const s=rnSitDe(it);return `<select class="rnsit ${RNSIT[s][1]}" style="min-width:150px;padding:6px 8px;font-weight:600" title="Situação no controle de NF. Ao trocar, o controle guarda para os próximos relatórios.">${(s==='sem'?['sem']:[]).concat(['emite','nao_emitido','nao_emitir']).map(k=>`<option value="${k}"${k===s?' selected':''}>${RNSIT[k][0]}</option>`).join('')}</select>`};
   const linha=it=>{const s=rnSitDe(it),nf=rnNf(it),p=rnParc(it,it.empresa_id),t=it.titulo_id&&RN.tits[it.titulo_id],ds=rnDescPend(p);
-    const st=rnStatus(it),ct=it.titulo_id?(t?(st==='pago'||st==='conciliado'?`<span class="chip ${RNST[st][1]}">✓ ${RNST[st][0]}</span>${t.data?`<br><span class="muted">${dBR(t.data)}${t.conta_id?' · '+esc(RN.contas.find(c=>c.id===t.conta_id)?.nome||''):''}</span>`:''}`:`<span class="chip ${RNST[st][1]}">${RNST[st][0]}</span> <span class="muted">venc. ${dBR(t.vencimento)}</span><br><button type="button" class="btn small ghost" data-rn="desfaz">Desfazer</button>`):'<span class="chip c-none">conta excluída</span>'):`<span class="chip c-none">${it.empresa_id?'Sem conta a pagar':'Falta escolher a empresa'}</span>`;
+    const st=rnStatus(it),ct=it.titulo_id?(t?(st==='pago'||st==='conciliado'?`<span class="chip ${RNST[st][1]}">✓ ${RNST[st][0]}</span>${t.data?`<br><span class="muted">${dBR(t.data)}${t.contas?.length>1?' · '+esc(t.contas.map(id=>RN.contas.find(c=>c.id===id)?.nome||'').filter(Boolean).join(' + ')):t.conta_id?' · '+esc(RN.contas.find(c=>c.id===t.conta_id)?.nome||''):''}</span>`:''}`:`<span class="chip ${RNST[st][1]}">${RNST[st][0]}</span> <span class="muted">venc. ${dBR(t.vencimento)}</span><br><button type="button" class="btn small ghost" data-rn="desfaz">Desfazer</button>`):'<span class="chip c-none">conta excluída</span>'):`<span class="chip c-none">${it.empresa_id?'Sem conta a pagar':'Falta escolher a empresa'}</span>`;
     const alt=!rnPago(it)&&rnAlt(it),dsx=!rnPago(it)&&ds.length;
     return `<tr data-id="${it.id}"${alt?' class="rnalt"':dsx?' class="rndesc"':''}><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
       <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}${dsx?`<div class="rndescbox">⚠ <b>Desconto a fazer neste repasse</b>${ds.map(d=>`<br>${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''} <button type="button" class="btn small ghost" data-rn="descFeito" data-desc="${d.id}">Desconto feito</button>`).join('')}<br><b>Pagar ${fm(r2(+it.valor-ds.reduce((x,d)=>x+(+d.valor),0)))}</b></div>`:''}</td>
@@ -12163,16 +12213,30 @@ function rnLeRelatorio(wb){
   }
   return {data,itens:out};
 }
+// parceiro repetido no relatório (mesmo nome): soma numa linha só, para pagar uma vez (Carol, 05/11).
+// Os protocolos ficam juntos ("W1 / W2"), para o próximo relatório saber que todos já entraram.
+function rnJunta(ls){const por=new Map();
+  for(const i of ls){const k=chave(i.nome.trim()),j=por.get(k);
+    if(!j){por.set(k,{...i,_n:1,_prots:i.protocolo?[i.protocolo]:[]});continue}
+    j._n++;j.valor=r2(j.valor+i.valor);j.guias=j.guias==null&&i.guias==null?null:(j.guias||0)+(i.guias||0);
+    if(i.protocolo)j._prots.push(i.protocolo);if(i.alterado_em&&(!j.alterado_em||String(i.alterado_em)>String(j.alterado_em)))j.alterado_em=i.alterado_em}
+  const out=[...por.values()],rep=out.filter(j=>j._n>1);
+  return {itens:out.map(({_n,_prots,...j})=>_n>1?{...j,protocolo:_prots.join(' / ')||null}:j),rep:rep.map(j=>({nome:j.nome.trim(),n:j._n,valor:j.valor}))}}
 $('rnArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!RN.grupo)return;
   let rel;try{rel=rnLeRelatorio(XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}))}catch(err){console.error(err);return alert(err.message||'Não foi possível ler o arquivo.')}
   if(!rel.itens.length)return alert('O arquivo não tem repasses.');
   // o relatório traz os pendentes: o que já veio num relatório anterior não entra de novo
   const prots=rel.itens.map(i=>i.protocolo).filter(Boolean),ja=new Set();
-  try{for(let i=0;i<prots.length;i+=200){const {data,error}=await sb.from('repasse_itens').select('protocolo').eq('grupo_id',RN.grupo.id).in('protocolo',prots.slice(i,i+200));if(error)throw error;data.forEach(x=>ja.add(x.protocolo))}}
+  try{for(let i=0;i<prots.length;i+=200){const {data,error}=await sb.from('repasse_itens').select('protocolo').eq('grupo_id',RN.grupo.id).in('protocolo',prots.slice(i,i+200));if(error)throw error;data.forEach(x=>ja.add(x.protocolo))}
+    // repasses somados em relatórios anteriores guardam os protocolos juntos ("W1 / W2")
+    if(prots.length){const jt=await todas(()=>sb.from('repasse_itens').select('protocolo').eq('grupo_id',RN.grupo.id).like('protocolo','% / %'));
+      const pr=new Set(prots);jt.forEach(x=>String(x.protocolo).split(' / ').forEach(p=>{if(pr.has(p.trim()))ja.add(p.trim())}))}}
   catch(err){return alert(v75(err)?v75Msg:'Erro ao conferir o relatório. Verifique a internet.')}
-  const novos=rel.itens.filter(i=>!i.protocolo||!ja.has(i.protocolo)),tot=r2(rel.itens.reduce((x,i)=>x+i.valor,0));
-  if(!novos.length)return alert(`Todos os ${rel.itens.length} repasses deste relatório já foram importados.`);
-  if(!confirm(`Relatório de ${rel.data?dBR(rel.data):'data não informada'}: ${rel.itens.length} repasses, ${fm(tot)}.`+(ja.size?`\n${ja.size} já estavam num relatório anterior e não entram de novo.`:'')+`\n\nImportar ${novos.length} repasses?`))return;
+  const novos0=rel.itens.filter(i=>!i.protocolo||!ja.has(i.protocolo)),tot=r2(rel.itens.reduce((x,i)=>x+i.valor,0));
+  if(!novos0.length)return alert(`Todos os ${rel.itens.length} repasses deste relatório já foram importados.`);
+  const jn=rnJunta(novos0),novos=jn.itens,jaN=rel.itens.length-novos0.length;
+  const repTxt=jn.rep.length?`\n\nParceiros repetidos somados numa linha só (um pagamento para cada):\n`+jn.rep.slice(0,15).map(r=>`• ${r.nome}: ${r.n} linhas · ${fm(r.valor)}`).join('\n')+(jn.rep.length>15?`\n… e mais ${jn.rep.length-15}`:''):'';
+  if(!confirm(`Relatório de ${rel.data?dBR(rel.data):'data não informada'}: ${rel.itens.length} repasses, ${fm(tot)}.`+(jaN?`\n${jaN} já estavam num relatório anterior e não entram de novo.`:'')+repTxt+`\n\nImportar ${novos.length} repasses?`))return;
   try{
     const {data:lote,error}=await sb.from('repasse_lotes').insert({grupo_id:RN.grupo.id,data_relatorio:rel.data||TODAY,arquivo:f.name,vencimento:proxQuinta()}).select().single();if(error)throw error;
     const rows=novos.map(i=>{const [nf,via]=rnAcha(i.nome,RN.nf,rnNfNomes);return {...i,lote_id:lote.id,grupo_id:RN.grupo.id,parceiro_nf_id:nf?.id||null,nf_via:nf?via:null}});
@@ -12248,9 +12312,16 @@ function rnAbrePago(ls){
   $('rnDBody').innerHTML=`<p class="note" style="margin:0">O pagamento entra nas Contas a pagar como pago e sai no extrato da conta escolhida. Quem ainda não tem conta a pagar ganha uma agora.</p>
     <label class="f" style="max-width:220px">Data do pagamento<input type="date" id="rnPData" value="${TODAY}"></label>
     ${emps.map(id=>{const l=ls.filter(i=>i.empresa_id===id),cs=RN.contas.filter(c=>c.cliente_id===id);
-      return `<label class="f"><span><b>${esc(rnEmpNome(id))}</b> · ${l.length} ${l.length===1?'repasse':'repasses'} · ${fm(r2(l.reduce((x,i)=>x+(+i.valor),0)))}</span><select data-emp="${id}">${cs.length?cs.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join(''):'<option value="">Nenhuma conta cadastrada nesta empresa</option>'}</select></label>`}).join('')}
+      return `<label class="f"><span><b>${esc(rnEmpNome(id))}</b> · ${l.length} ${l.length===1?'repasse':'repasses'} · ${fm(r2(l.reduce((x,i)=>x+(+i.valor),0)))}</span><select data-emp="${id}">${cs.length?cs.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join(''):'<option value="">Nenhuma conta cadastrada nesta empresa</option>'}</select></label>`
+        // repasse pago em mais de uma conta: ex. parte na Tesouraria e parte no banco (Carol, 05/11)
+        +(cs.length>1?`<details style="margin:-4px 0 4px"><summary style="cursor:pointer" class="note">Pagou algum repasse de ${esc(rnEmpNome(id))} em mais de uma conta? Clique aqui para dividir</summary>
+          ${l.length>8?`<input type="search" placeholder="Buscar o parceiro" data-rndvq style="margin:6px 0">`:''}
+          <div style="max-height:300px;overflow:auto">${l.map(it=>{const t=it.titulo_id&&RN.tits[it.titulo_id],falta=r2(+(t?t.valor:it.valor)-(t?.pago||0));if(falta<=0.004)return '';
+            return `<div data-rndvit="${esc(chave(it.nome))}" style="border-top:1px solid var(--line);padding:6px 0"><b>${esc(it.nome.trim())}</b> · ${fm(falta)}${dvHTML('rnDv_'+it.id,cs.map(c=>[c.id,c.nome]),true,falta)}</div>`}).join('')}</div>
+          <p class="note" style="margin:4px 0 0">Informe a parte que saiu da outra conta; o restante sai da conta escolhida acima.</p></details>`:'')}).join('')}
     <p class="err" id="rnGErr" hidden></p>`;
   $('rnDFoot').querySelector('[data-act="salvar"]').textContent='Marcar como pago';
+  $('rnDBody').querySelectorAll('[data-rndvq]').forEach(q=>q.oninput=()=>{const k=chave(q.value);q.parentElement.querySelectorAll('[data-rndvit]').forEach(d=>d.hidden=!!k&&!d.dataset.rndvit.includes(k))});
   dlgRN.showModal();
 }
 async function rnSalvaPago(b){
@@ -12258,14 +12329,19 @@ async function rnSalvaPago(b){
   const conta={};$('rnDBody').querySelectorAll('select[data-emp]').forEach(x=>conta[x.dataset.emp]=x.value);
   if(!data)return err('Informe a data do pagamento.');
   if(Object.values(conta).some(v=>!v))return err('Escolha a conta de cada empresa. Se faltar, cadastre em Gestão financeira › Contas bancárias.');
+  // partes em outra conta de cada repasse (ex.: parte na Tesouraria e parte no banco)
+  const dvs={};for(const it of ls){const d=dvLe('rnDv_'+it.id);if(d.erro)return err(`${it.nome.trim()}: ${d.erro}`);
+    const t=it.titulo_id&&RN.tits[it.titulo_id],falta=r2(+(t?t.valor:it.valor)-(t?.pago||0));
+    if(d.soma>falta+0.004)return err(`${it.nome.trim()}: as partes em outra conta (${fm(d.soma)}) passam do valor do repasse (${fm(falta)}).`);
+    dvs[it.id]=d}
   b.disabled=true;const cont={n:0};let n=0;
   try{
     await rnCriaTitulos(ls,RN.lote.vencimento||data,cont);
-    const movs=ls.map(it=>{const t=RN.tits[it.titulo_id],falta=r2(t.valor-(t.pago||0));if(falta<=0.004)return null;
-      return {cliente_id:it.empresa_id,conta_id:conta[it.empresa_id],data,tipo:'saida',valor:falta,juros:0,desconto:0,titulo_id:t.id,
-        descricao:t.descricao||'Pagamento',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:t.forma||null}}).filter(Boolean);
+    const movs=ls.flatMap(it=>{const t=RN.tits[it.titulo_id],falta=r2(t.valor-(t.pago||0));if(falta<=0.004)return [];
+      return dvDivide(conta[it.empresa_id],falta,dvs[it.id]||{partes:[],soma:0}).map(pt=>({cliente_id:it.empresa_id,conta_id:pt.conta,data,tipo:'saida',valor:pt.valor,juros:0,desconto:0,titulo_id:t.id,
+        descricao:t.descricao||'Pagamento',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:t.forma||null}))});
     for(let i=0;i<movs.length;i+=200){const {error}=await sb.from('fin_movimentos').insert(movs.slice(i,i+200));if(error)throw error}
-    movs.forEach(m=>{const t=RN.tits[m.titulo_id];t.pago=r2((t.pago||0)+m.valor);t.conta_id=m.conta_id;t.data=m.data});n=movs.length;
+    movs.forEach(m=>{const t=RN.tits[m.titulo_id];t.pago=r2((t.pago||0)+m.valor);t.conta_id=m.conta_id;t.contas=[...new Set([...(t.contas||[]),m.conta_id])];t.data=m.data});n=new Set(movs.map(m=>m.titulo_id)).size;
     toast(`${n} ${n===1?'repasse marcado':'repasses marcados'} como pago${n===1?'':'s'}`);dlgRN.close();RN.sel.clear();
   }catch(e){console.error(e);err((v45(e)?v45Msg:'Não foi possível registrar: '+(e.message||e))+(cont.n?` (${cont.n} contas a pagar já foram geradas)`:''))}
   b.disabled=false;GT.key='';rnDesenha();
