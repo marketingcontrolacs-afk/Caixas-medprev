@@ -2510,7 +2510,7 @@ async function renderExConf(){
   const dk=exOrig.value==='pagar'?'vencimento':'data';
   box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
     <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">No Bom Controle</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
-      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBR(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${r.categoria_ok?'<span class="chip c-ok">categoria ok · falta o fornecedor</span> ':sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
+      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBRv(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${r.categoria_ok?'<span class="chip c-ok">categoria ok · falta o fornecedor</span> ':sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
     <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button><button type="button" class="btn small ghost" data-catnova-input="">+ Cadastrar nova categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
@@ -3015,6 +3015,10 @@ const MODCFG={
     conf:['Marcar como conferido','Desfazer conferência'],okTxt:'Conferido',novo:'Novo lançamento'}
 };
 let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
+// envio simples dos boletos e notas a pagar: vale para quem não é do escritório, em todas as empresas
+const pagSimples=()=>MOD==='pagar'&&!ehEsc();
+const SIMP_DICA='Diga do que se trata a despesa: o que foi comprado ou qual serviço, de quem e de qual mês ou parcela, se souber. Isso ajuda a Controlacs a achar a conta certa.';
+const dBRv=s=>s?dBR(s):'—';
 const mFiltro=$('mFiltro');
 function initMod(m){
   const cfg=MODCFG[m],cli=cliOuTodas();
@@ -3062,10 +3066,10 @@ async function renderMod(){
   const empC=r=>tod?`<br><span class="chip c-done">${esc(CLIENTES.find(c=>c.id===r.cliente_id)?.nome||'')}</span>`:'';
   let head,body,foot='',tiles;
   if(MOD==='pagar'){
-    const st=r=>{if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
+    const st=r=>{if(!r.conferido&&!r.vencimento)return '<span class="chip c-warn" title="A Controlacs confere e completa o vencimento e o valor">Enviado · a Controlacs completa</span>';if(r.conferido)return `<span class="chip c-done">✓ Paga${r.pago_em?' '+dBR(r.pago_em).slice(0,5):''}</span>`;const dias=Math.round((dObj(r.vencimento)-dObj(TODAY))/864e5);
       return dias<0?`<span class="chip c-bad">Vencida há ${-dias} dia${dias<-1?'s':''}</span>`:dias<=7?`<span class="chip c-warn">Vence ${dias===0?'hoje':dias===1?'amanhã':'em '+dias+' dias'}</span>`:'<span class="chip c-none">A pagar</span>'};
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.vencimento)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBRv(r.vencimento)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':'no mês']];
   }else if(MOD==='cartao'){
@@ -3106,9 +3110,10 @@ async function openReg(r){
   const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
   const ed=regEditavel(),dis=ed?'':' disabled';
   const v=k=>r?r[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
-  $('rTitle').textContent=r?(MOD==='pagar'?r.fornecedor:MOD==='tesouraria'?r.descricao:r.fornecedor):cfg.novo;
+  $('rTitle').textContent=r?(MOD==='pagar'?r.fornecedor||r.sobre||'Boleto ou nota enviado':MOD==='tesouraria'?r.descricao:r.fornecedor):cfg.novo;
+  const simp=pagSimples();
   $('rChip').innerHTML=r?(r.conferido?`<span class="chip c-done">✓ ${cfg.okTxt}</span>`:'<span class="chip c-none">Aberto</span>'):'';
-  $('rFields').innerHTML=cfg.campos.map(([k,t,tp,req])=>{
+  const campo=([k,t,tp,req0])=>{const req=simp?k==='sobre':req0;
     const lab=t+(req?'':' (opcional)');
     if(tp==='textarea')return `<label class="f wide">${lab}<textarea data-k="${k}"${dis}>${esc(v(k))}</textarea></label>`;
     if(tp==='parc')return `<label class="f">${lab}<select data-k="${k}"${dis}>${Array.from({length:12},(_,i)=>`<option value="${i+1}"${+v(k)===i+1?' selected':''}>${i+1}x</option>`).join('')}</select></label>`;
@@ -3116,10 +3121,16 @@ async function openReg(r){
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
     if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
     // boleto: colar a linha digitável (ou anexar o PDF) preenche valor e vencimento; a chave da NF-e vai junto, escondida
-    if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label><div class="note wide" id="rLeitura" style="margin-top:-6px"></div>`;
-    if(tp==='sobre')return `<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
-    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k))}"${dis}></label>`;
-  }).join('');
+    if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
+    if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
+      :`<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
+    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${dis}></label>`;
+  };
+  // cliente nos boletos e notas a pagar: só anexa e diz do que se trata; o resto é opcional e a Controlacs completa (Carol, 04/11)
+  $('rFields').innerHTML=simp?`<p class="note wide" style="margin:0">Anexe o <b>boleto</b> e/ou a <b>nota fiscal</b> logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere, procura se a conta já está lançada (ou se é recorrente) e completa o resto.</p>`
+    +campo(cfg.campos.find(c=>c[0]==='sobre'))
+    +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
+    :cfg.campos.map(campo).join('');
   // quem lança em mais de uma empresa escolhe a empresa aqui mesmo; o escritório também usa para corrigir a empresa errada
   const emps=empresasDe(MOD).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
@@ -3159,9 +3170,9 @@ $('rForm').addEventListener('submit',async e=>{
   let m='';
   if('linha_digitavel' in row)row.linha_digitavel=soDig(row.linha_digitavel)||null;
   if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else delete row.conta_destino}
-  const falta=!m&&cfg.campos.find(([k,,,req])=>req&&(row[k]==null||row[k]===''));
-  if(falta)m='Preencha: '+falta[1]+'.';
-  else if(Number.isNaN(row.valor)||!(row.valor>0))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
+  const simp=pagSimples(),falta=!m&&cfg.campos.find(([k,,,req])=>(simp?k==='sobre':req)&&(row[k]==null||row[k]===''));
+  if(falta)m=simp?'Escreva do que se trata esta despesa.':'Preencha: '+falta[1]+'.';
+  else if(Number.isNaN(row.valor)||!(row.valor>0)&&!(simp&&row.valor==null))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
   else if(MOD!=='tesouraria'&&cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
   if(MOD==='pagar'){liqLer();const l=(RLIQ||[]).filter(x=>x.nome||x.valor);
     if(!m&&l.some(x=>!x.nome||!(x.valor>0)))m='No relatório de líquidos, preencha o nome e o valor de cada pessoa (ou tire a linha).';
@@ -3175,13 +3186,15 @@ $('rForm').addEventListener('submit',async e=>{
   if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
   err.hidden=true;$('rSave').disabled=true;
   try{
-    row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
+    if(row.valor!=null)row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
     await moverDocs(RDOCS,cli.id);
     let {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();
     // banco ainda sem o v46: salva sem a linha digitável e a chave da nota
     if(e1&&/linha_digitavel|nfe_chave/.test(e1.message||'')){delete row.linha_digitavel;delete row.nfe_chave;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
     // banco ainda sem o v54: salva sem o relatório de líquidos
     if(e1&&/liquidos/.test(e1.message||'')){delete row.liquidos;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single());if(!e1)toast('Conta salva sem o relatório de líquidos: rode a atualização v54 do banco.')}
+    // banco ainda sem o v99: o envio simples precisa que fornecedor, nº, vencimento e valor possam ficar em branco
+    if(e1&&/not-null|null value/i.test(e1.message||'')&&MOD==='pagar'){err.textContent=ehEsc()?'Rode a atualização v99 do banco para salvar sem fornecedor, nº, vencimento ou valor.':'Preencha também o fornecedor, o nº da nota, o vencimento e o valor (em “Outros dados”). O envio só com o anexo será liberado em breve.';err.hidden=false;return}
     if(e1&&/BOLETO_REPETIDO/.test(e1.message||'')){err.textContent='Este boleto já está lançado em outra conta a pagar. Confira se é o boleto certo desta empresa.';err.hidden=false;return}
     if(e1)throw e1;
     const {error:e2}=await sb.from('documentos').delete().eq('registro_id',sv.id);if(e2)throw e2;
@@ -5113,7 +5126,7 @@ async function boletoRepetido(bol,contaId){
   const {data,error}=await sb.rpc('boleto_ja_lancado',{linhas:ls,conta:contaId||null});
   if(error){console.error(error);return []}return data||[];
 }
-const repetidoTxt=xs=>xs.map(x=>`${x.empresa}: ${x.fornecedor||''} ${fm(x.valor)}, vencimento ${dBR(x.vencimento)}${x.pago?' (JÁ PAGO)':''}, em ${x.onde}`).join('; ');
+const repetidoTxt=xs=>xs.map(x=>`${x.empresa}: ${x.fornecedor||''} ${fm(x.valor)}, vencimento ${dBRv(x.vencimento)}${x.pago?' (JÁ PAGO)':''}, em ${x.onde}`).join('; ');
 // o que o pedido vai gerar (antes de marcar como feito): uma linha por fornecedor
 function benGrupos(){
   const g={};BEN.rows.forEach(r=>{const nome=(r.empresa||'').trim()||BEN_SEMF,k=chaveForn(nome);
@@ -6603,21 +6616,49 @@ const bolMesmo=(t,r)=>r.pessoa_id&&t.pessoa_id===r.pessoa_id||pessoaChave(t.pess
 const bolDias=(a,b)=>Math.round(Math.abs(dObj(a)-dObj(b))/864e5);
 // sugestão: mesmo fornecedor, vencimento até 20 dias de diferença; prefere a prevista, depois a de valor igual e a de data mais perto
 function bolSugere(r,livres){
-  const c=livres.filter(t=>bolMesmo(t,r)&&bolDias(t.vencimento,r.vencimento)<=20);
-  c.sort((a,b)=>(b.previsto-a.previsto)||((Math.abs(a.valor-r.valor)>0.004)-(Math.abs(b.valor-r.valor)>0.004))||bolDias(a.vencimento,r.vencimento)-bolDias(b.vencimento,r.vencimento));
-  return c[0]||null;
+  if(r.pessoa_nome&&r.vencimento){
+    const c=livres.filter(t=>bolMesmo(t,r)&&bolDias(t.vencimento,r.vencimento)<=20);
+    c.sort((a,b)=>(b.previsto-a.previsto)||((Math.abs(a.valor-r.valor)>0.004)-(Math.abs(b.valor-r.valor)>0.004))||bolDias(a.vencimento,r.vencimento)-bolDias(b.vencimento,r.vencimento));
+    if(c[0])return {t:c[0],como:'pelo fornecedor'};
+  }
+  return bolPorTexto(r,livres);
+}
+// envio simples do cliente (só anexo e descrição): procura pelo fornecedor, pelas palavras da descrição, pelo valor e pelo
+// vencimento entre as contas em aberto (previstas e recorrentes). Só sugere quando há pelo menos dois sinais (Carol, 04/11)
+const BOL_STOP=new Set('para pela pelo com sem das dos uma uns umas mes conta contas pagar pagamento referente boleto nota fiscal despesa valor loja empresa clinica'.split(' '));
+// palavras do dia a dia que o cliente usa para o mesmo tipo de conta
+const BOL_SIN={luz:'energia',eletrica:'energia',agua:'saneamento',esgoto:'saneamento',telefone:'telefonia',celular:'telefonia',internet:'internet',aluguel:'aluguel',condominio:'condominio',limpeza:'limpeza'};
+const bolPalavras=t=>{const ws=pessoaChave(t).split(' ');return new Set(ws.flatMap(w=>BOL_SIN[w]?[w,BOL_SIN[w]]:[w]).filter(w=>(w.length>=4||w==='luz')&&!BOL_STOP.has(w)&&!/^\d+$/.test(w)))};
+function bolPorTexto(r,livres){
+  const ws=bolPalavras([r.descricao,r.pessoa_nome].filter(Boolean).join(' ')),ref=r.vencimento||r.enviado_em||TODAY;
+  let best=null;
+  for(const t of livres){
+    const alvo=bolPalavras([t.pessoa_nome,t.descricao,t.categoria].filter(Boolean).join(' '));
+    const hits=[...ws].filter(w=>alvo.has(w)||[...alvo].some(a=>a.length>=5&&(a.startsWith(w)||w.startsWith(a)))).length;
+    const forn=r.pessoa_nome&&bolMesmo(t,r),val=r.valor>0&&Math.abs(t.valor-r.valor)<0.005,dd=bolDias(t.vencimento,ref),perto=dd<=(r.vencimento?20:45);
+    const pts=(forn?4:0)+hits*2+(val?3:0)+(perto?1:0)+(t.previsto?1:0);
+    if(!perto||pts<3||!(forn||hits||val))continue;
+    if(!best||pts>best.pts||pts===best.pts&&dd<best.dd)best={t,pts,dd,como:forn?'pelo fornecedor':hits?'pela descrição':'pelo valor'};
+  }
+  return best;
 }
 const bolOpt=(t,r)=>`<option value="${t.id}">${dBR(t.vencimento)} · ${esc(t.pessoa_nome||'—')} · ${fm(t.valor)}${t.parcelas>1?` · parcela ${t.parcela}/${t.parcelas}`:''}${t.previsto?' · prevista':''}${t.descricao?' · '+esc(t.descricao).slice(0,40):''}</option>`;
 function bolDesenha(){
   const livres=bolAbertas(),usadas=new Set(BOL.it.map(x=>x.dest).filter(d=>d&&d!=='nova'));
-  $('bolBody').innerHTML=`<p class="note" style="margin:0">Confira cada boleto ou nota que o cliente enviou na Rotina diária. Em “Lançar como”, escolha <b>Conta nova</b> ou a conta que já está lançada (prevista ou recorrente) para o documento ficar anexado nela. Quando o sistema acha a conta do mesmo fornecedor com vencimento perto, ela já vem escolhida. Quando você registrar o pagamento aqui, o boleto também fica como pago na tela do cliente.</p>
+  $('bolBody').innerHTML=`<p class="note" style="margin:0">Confira cada boleto ou nota que o cliente enviou na Rotina diária. Em “Lançar como”, escolha <b>Conta nova</b> ou a conta que já está lançada (prevista ou recorrente) para o documento ficar anexado nela. Quando o sistema acha a conta do mesmo fornecedor com vencimento perto, ela já vem escolhida. Quando o cliente mandou só o anexo e a descrição, o sistema procura pelas palavras da descrição, pelo valor e pela data; se não achar nada, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha (ou cadastra o fornecedor). Quando você registrar o pagamento aqui, o boleto também fica como pago na tela do cliente.</p>
   <div class="tablebox" style="max-height:none"><table><thead><tr><th></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos do cliente</th><th class="l">Lançar como</th></tr></thead><tbody>${BOL.it.map((x,i)=>{const r=x.row,b=x.bol;
-    const mesmo=livres.filter(t=>bolMesmo(t,r)&&(t.id===x.dest||!usadas.has(t.id))),outras=livres.filter(t=>!bolMesmo(t,r)&&bolDias(t.vencimento,r.vencimento)<=30&&(t.id===x.dest||!usadas.has(t.id)));
-    const t=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null,dif=t&&Math.abs(t.valor-r.valor)>0.004;
-    return `<tr><td><input type="checkbox" data-bolok="${i}"${x.ok?' checked':''} aria-label="Trazer este"></td><td>${dBR(r.vencimento)}</td><td class="l"><b>${esc(b.fornecedor||'')}</b></td><td class="l">${esc(b.sobre||'')||'<span class="muted">—</span>'}</td><td class="l">${esc(b.documento||'')||'<span class="muted">—</span>'}</td><td>${fm(r.valor)}</td>
+    const ref=r.vencimento||b.enviado_em?.slice(0,10)||TODAY,livre=t=>t.id===x.dest||!usadas.has(t.id);
+    const mesmo=r.pessoa_nome?livres.filter(t=>bolMesmo(t,r)&&livre(t)):[],outras=livres.filter(t=>!mesmo.includes(t)&&bolDias(t.vencimento,ref)<=(r.vencimento?30:60)&&livre(t));
+    const t=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null,dif=t&&r.valor>0&&Math.abs(t.valor-r.valor)>0.004;
+    // o que o cliente não preencheu: vem da conta já lançada ou o escritório completa aqui
+    const vc=r.vencimento?dBR(r.vencimento):t?`${dBR(t.vencimento)}<br><span class="muted">da conta lançada</span>`:`<input type="date" data-bolv="${i}" value="${esc(x.venc||'')}" aria-label="Vencimento" style="max-width:150px">`;
+    const vl=r.valor>0?fm(r.valor):t?`${fm(t.valor)}<br><span class="muted">da conta lançada</span>`:`<input class="money" data-bolval="${i}" inputmode="decimal" placeholder="0,00" value="${x.val!=null?showMoney(x.val):''}" aria-label="Valor" style="max-width:120px;text-align:right">`;
+    const fo=b.fornecedor?`<b>${esc(b.fornecedor)}</b>`:t?`<b>${esc(t.pessoa_nome||'—')}</b><br><span class="muted">da conta lançada</span>`:`<input data-bolf="${i}" list="bolPesList" value="${esc(x.forn||'')}" placeholder="Fornecedor" aria-label="Fornecedor" style="max-width:200px">`;
+    return `<tr><td><input type="checkbox" data-bolok="${i}"${x.ok?' checked':''} aria-label="Trazer este"></td><td>${vc}</td><td class="l">${fo}</td><td class="l">${esc(b.sobre||'')||'<span class="muted">—</span>'}${b.fornecedor||b.valor?'':'<br><span class="chip c-warn">Envio simples: só anexo e descrição</span>'}</td><td class="l">${esc(b.documento||'')||'<span class="muted">—</span>'}</td><td>${vl}</td>
       <td class="l">${(BOL.docs[b.id]||[]).map(d=>`<a href="${BOL.urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria||'Anexo')}</a>`).join('<br>')||'<span class="neg">sem anexo</span>'}</td>
       <td class="l"><select data-boldest="${i}" aria-label="Lançar como" style="max-width:340px"><option value="nova">Conta nova</option>${mesmo.length?`<optgroup label="Contas lançadas deste fornecedor">${mesmo.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}${outras.length?`<optgroup label="Outras contas em aberto perto do vencimento">${outras.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}</select>
-      ${t?`<br><span class="chip c-done">Vai para a conta já lançada</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`:''}`:''}</td></tr>`}).join('')}</tbody></table></div>`;
+      ${t?`<br><span class="chip c-done">Vai para a conta já lançada${x.como&&x.dest===x.sug?' (achei '+x.como+')':''}</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`:''}`:x.sug?'':`<br><span class="chip c-bad" title="Não achei conta em aberto parecida: confira se é algo novo e cadastre o fornecedor se precisar">Novo: não achei conta lançada</span>`}</td></tr>`}).join('')}</tbody></table></div>
+  <datalist id="bolPesList">${(BOL.pes||[]).map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist>`;
   BOL.it.forEach((x,i)=>{const s=document.querySelector(`[data-boldest="${i}"]`);if(s)s.value=x.dest||'nova'});
 }
 $('gtImp').onclick=async()=>{
@@ -6625,36 +6666,49 @@ $('gtImp').onclick=async()=>{
   $('gtImp').disabled=true;
   try{
     const pes=await gfPessoasDe(cli.id,'fornecedor');
-    const acha=r=>pes.find(p=>r.fornecedor_bc&&p.fornecedor_bc===r.fornecedor_bc)||pes.find(p=>chave(p.nome)===chave(r.fornecedor)||chave(p.fantasia)===chave(r.fornecedor));
+    const acha=r=>pes.find(p=>r.fornecedor_bc&&p.fornecedor_bc===r.fornecedor_bc)||(r.fornecedor?pes.find(p=>chave(p.nome)===chave(r.fornecedor)||p.fantasia&&chave(p.fantasia)===chave(r.fornecedor)):null);
     const docs={};const {data:dd}=await sb.from('documentos').select('*').in('registro_id',ls.map(r=>r.id));(dd||[]).forEach(d=>(docs[d.registro_id]||=[]).push(d));
     const urls=await signed((dd||[]).map(d=>d.caminho).filter(Boolean)).catch(()=>({}));
     const livres=bolAbertas(),it=[];
     for(const b of ls){const p=acha(b),row={cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||b.fornecedor,descricao:b.sobre||null,documento:b.documento||null,
       categoria:b.categoria_ok?b.categoria:null,vencimento:b.vencimento,valor:b.valor,forma:'Boleto',linha_digitavel:b.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:b.id,obs:b.obs||null};
-      const s=bolSugere(row,livres);if(s)livres.splice(livres.indexOf(s),1);it.push({bol:b,row,dest:s?s.id:'nova',ok:true})}
-    BOL={cli,it,docs,urls:urls||{}};
+      const s=bolSugere({...row,enviado_em:b.enviado_em?.slice(0,10)},livres);if(s)livres.splice(livres.indexOf(s.t),1);it.push({bol:b,row,dest:s?s.t.id:'nova',sug:s?.t.id||null,como:s?.como||null,ok:true})}
+    BOL={cli,it,docs,urls:urls||{},pes};
     $('bolTitle').textContent=`Boletos e notas enviados pelo cliente (${ls.length})`;bolDesenha();dlgBol.showModal();
   }catch(e){fail(e,'Não foi possível abrir os boletos enviados')}
   $('gtImp').disabled=false;
 };
 dlgBol.addEventListener('change',ev=>{const d=ev.target.dataset;
   if(d.boldest!==undefined){BOL.it[+d.boldest].dest=ev.target.value;bolDesenha()}
-  if(d.bolok!==undefined)BOL.it[+d.bolok].ok=ev.target.checked});
+  if(d.bolok!==undefined)BOL.it[+d.bolok].ok=ev.target.checked;
+  if(d.bolv!==undefined)BOL.it[+d.bolv].venc=ev.target.value||null;
+  if(d.bolval!==undefined){const n=parseMoney(ev.target.value);BOL.it[+d.bolval].val=n>0?r2(n):null;if(n>0)ev.target.value=showMoney(n)}
+  if(d.bolf!==undefined)BOL.it[+d.bolf].forn=ev.target.value.trim()||null});
 dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]')?.dataset.act;if(!a)return;
   if(a==='fechar')return dlgBol.close();
   if(a!=='trazer'||!BOL)return;
   const sel=BOL.it.filter(x=>x.ok);if(!sel.length)return toast('Marque pelo menos um boleto ou nota.');
+  // envio simples: conta nova precisa do vencimento e do valor (o escritório completa na linha)
+  const comp=x=>{const r={...x.row};if(!r.vencimento)r.vencimento=x.venc||null;if(!(r.valor>0))r.valor=x.val||null;
+    if(!r.pessoa_nome&&x.forn){const p=(BOL.pes||[]).find(p=>chave(p.nome)===chave(x.forn)||p.fantasia&&chave(p.fantasia)===chave(x.forn));r.pessoa_nome=p?.nome||x.forn;r.pessoa_id=p?.id||null;r.pix_chave=r.pix_chave||p?.pix_chave||null}return r};
+  const falta=sel.find(x=>{const r=comp(x),t=x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest);return !t&&(!r.vencimento||!(r.valor>0))});
+  if(falta)return toast('Complete o vencimento e o valor de “'+(falta.bol.sobre||falta.bol.fornecedor||'boleto')+'” ou escolha a conta já lançada.');
   const bt=ev.target.closest('button');bt.disabled=true;let novas=0,ligadas=0;
   try{
-    const ins=[];
-    for(const x of sel){const r=x.row;
+    const ins=[],cps=[];
+    for(const x of sel){const r=comp(x),t0=x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest);
+      // o boleto do cliente fica com os dados completos (na tela dele também)
+      const b=x.bol,cp={};if(!b.vencimento)cp.vencimento=r.vencimento||t0?.vencimento;if(!(b.valor>0))cp.valor=r.valor||t0?.valor;if(!b.fornecedor)cp.fornecedor=r.pessoa_nome||t0?.pessoa_nome||null;
+      Object.keys(cp).forEach(k=>cp[k]==null&&delete cp[k]);if(Object.keys(cp).length)cps.push([b.id,cp]);
       if(x.dest==='nova'){ins.push(r);continue}
-      const t=GT.lista.find(y=>y.id===x.dest);if(!t){ins.push(r);continue}
+      const t=t0;if(!t){ins.push(r);continue}
+      ['vencimento','valor','pessoa_nome','pessoa_id'].forEach(k=>{if(r[k]==null||r[k]==='')delete r[k]});
       // vai para a conta já lançada: o boleto manda no vencimento, no valor e no documento; o resto da conta continua como estava
       const {error}=await sb.from('fin_titulos').update({...r,pessoa_id:r.pessoa_id||t.pessoa_id,pessoa_nome:r.pessoa_id?r.pessoa_nome:t.pessoa_nome||r.pessoa_nome,categoria:r.categoria||t.categoria,conta_id:t.conta_id,
         descricao:r.descricao||t.descricao,documento:r.documento||t.documento,pix_chave:r.pix_chave||t.pix_chave,previsto:false,obs:[t.obs,r.obs].filter(Boolean).join(' | ')||null}).eq('id',t.id);
       if(error)throw error;ligadas++}
     if(ins.length){const {error}=await sb.from('fin_titulos').insert(ins);if(error)throw error;novas=ins.length}
+    for(const [id,cp] of cps){const {error}=await sb.from('contas_pagar').update(cp).eq('id',id);if(error)console.error(error)}
     toast([novas?`${novas} ${novas===1?'conta nova':'contas novas'}`:'',ligadas?`${ligadas} ${ligadas===1?'boleto anexado em conta já lançada':'boletos anexados em contas já lançadas'}`:''].filter(Boolean).join(' e '));
     dlgBol.close();
   }catch(e){fail(e,'Não foi possível trazer os boletos')}
@@ -7524,7 +7578,7 @@ function dsModDesenha(){
   if(tem.pagar){
     const v=P.filter(r=>r.vencimento&&r.vencimento<TODAY),tot=r2(P.reduce((x,r)=>x+(+r.valor||0),0));
     ks.push(kpi(v.length?'t-bad':'t-ok',ico(ICO.pagar),'pagar','Boletos a pagar',fm(tot),v.length?`<span class="chip c-bad">${qt(v.length,'vencido','vencidos')}</span>`:qt(P.length,'conta em aberto','contas em aberto')));
-    cards.push(`<div class="card"><div class="ch"><div><h2>Boletos e notas a pagar ${cnt(P.length)}</h2><p class="sub">Próximos vencimentos</p></div></div><div class="dl">${P.slice(0,6).map(r=>`<button type="button" class="dr dvenc" data-go="pagar"><span class="dd${r.vencimento<TODAY?' late':''}"><b>${(r.vencimento||'').slice(8,10)}</b><small>${r.vencimento?MESES[+r.vencimento.slice(5,7)-1].slice(0,3):''}</small></span><span class="nm"><b>${esc(r.fornecedor||'—')}</b><span>${esc(r.documento?'Doc. '+r.documento:r.sobre||'')}</span></span><span class="neg" style="font-weight:600">${fm(r.valor)}</span></button>`).join('')||vazio('Nenhuma conta em aberto.')}</div></div>`);
+    cards.push(`<div class="card"><div class="ch"><div><h2>Boletos e notas a pagar ${cnt(P.length)}</h2><p class="sub">Próximos vencimentos</p></div></div><div class="dl">${P.slice(0,6).map(r=>`<button type="button" class="dr dvenc" data-go="pagar"><span class="dd${r.vencimento<TODAY?' late':''}"><b>${(r.vencimento||'').slice(8,10)}</b><small>${r.vencimento?MESES[+r.vencimento.slice(5,7)-1].slice(0,3):''}</small></span><span class="nm"><b>${esc(r.fornecedor||r.sobre||'—')}</b><span>${esc(r.documento?'Doc. '+r.documento:r.fornecedor?r.sobre||'':'a Controlacs completa')}</span></span><span class="neg" style="font-weight:600">${fm(r.valor)}</span></button>`).join('')||vazio('Nenhuma conta em aberto.')}</div></div>`);
   }
   if(tem.cartao){const tot=r2(C.reduce((x,r)=>x+(+r.valor||0),0));ks.push(kpi('t-cred',ico(ICO.cartao),'cartao','Cartão no mês',fm(tot),qt(C.length,'nota lançada','notas lançadas')))}
   if(tem.tar){
@@ -9825,14 +9879,16 @@ const MANUAL=[
 <li>Clique em <b>Enviar fechamento</b>.</li>
 </ol>
 <p>O quadro <b>Últimos dias</b> mostra a situação dos dias anteriores. Dias sem lançamento ou com diferença sem explicação aparecem marcados para você resolver.</p>`},
-    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar.png',
-      txt:`<p>O cliente envia o boleto e a nota fiscal de cada conta, e a Controlacs faz o pagamento.</p>
+    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar-envio.png',
+      txt:`<p>O cliente envia o boleto e a nota fiscal de cada conta, e a Controlacs faz o pagamento. O envio é simples: só o anexo e a descrição.</p>
 <ol>
 <li>Clique em <b>+ Nova conta</b>.</li>
-<li>Cole a linha digitável do boleto (o portal lê o valor e o vencimento) e preencha o fornecedor, do que se trata a despesa, o nº da NF ou do documento, o vencimento e o valor.</li>
-<li>Anexe o boleto e a nota fiscal. Dá para anexar mais de um documento no mesmo lançamento e escolher vários arquivos de uma vez.</li>
-<li>Salve.</li>
+<li>Em <b>Do que se trata esta despesa</b>, escreva o que foi comprado ou qual serviço, de quem e de qual mês ou parcela, se souber. Ex.: <i>conta de luz de outubro da loja</i>.</li>
+<li>Anexe o boleto e/ou a nota fiscal. Dá para anexar mais de um documento no mesmo lançamento e escolher vários arquivos de uma vez. Quando o boleto é PDF, o portal já lê o valor e o vencimento sozinho.</li>
+<li>Salve. Não precisa preencher mais nada.</li>
 </ol>
+<p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
+<p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha. O escritório continua vendo e editando todos os campos do lançamento.</p>
 <p>Os quadros mostram o total a pagar, o que vence em 7 dias, o que está vencido e o que já foi pago. Em <b>Mostrar</b> escolha <i>Em aberto</i> ou um período. Contas sem anexo aparecem com <span style="color:var(--bad)">sem documento</span>. Clique numa linha para ver os documentos; o escritório marca a conta como paga.</p>`},
     {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',
       txt:`<p>O controle do dinheiro guardado na empresa: o que entra do caixa, as despesas pagas em dinheiro e os depósitos no banco.</p>
@@ -10080,6 +10136,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05bols',data:'2026-11-05',t:'Boletos e notas a pagar: envio simples pelo cliente',itens:[
+    {x:'Rotina diária › Boletos e notas fiscais a pagar: agora basta anexar o boleto e/ou a nota fiscal e escrever do que se trata a despesa. Fornecedor, nº da nota, vencimento e valor ficam opcionais em “Outros dados do boleto”: a Controlacs completa.',mods:['pagar']},
+    {x:'Enquanto a Controlacs não completa, a conta aparece como “Enviado · a Controlacs completa”.',mods:['pagar']},
+    {x:'Na validação dos boletos e notas do cliente (Contas a pagar), o sistema procura a conta já lançada (prevista ou recorrente) também pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como “Novo” e você completa vencimento, fornecedor e valor na própria linha.',para:'esc'}]},
   {k:'2026-11-05pes',data:'2026-11-05',t:'Cadastrar fornecedor ou cliente na hora',itens:[
     {x:'Contas a pagar, Contas a receber, Conciliação bancária e Movimentação financeira: se o fornecedor ou o cliente ainda não está no cadastro, use o botão “+ Cadastrar” embaixo do campo, como já acontece com a categoria. Ao digitar um nome que não existe, o botão já oferece cadastrar esse nome.',mods:['gfpagar','gfrec','gfconc','gfmov']},
     {x:'O cadastro na hora pede o CNPJ ou o CPF e confere se os números são válidos. Com o CNPJ, os dados vêm da Receita. Não deixa repetir: se o CNPJ/CPF ou o nome já estiverem cadastrados (mesmo inativos), o portal mostra o cadastro e oferece usar o que já existe.',mods:['gfpagar','gfrec','gfconc','gfmov']},
