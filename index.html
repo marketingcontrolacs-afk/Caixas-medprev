@@ -6636,7 +6636,14 @@ const abat=m=>r2(m.valor-(+m.juros||0)+(+m.desconto||0));   // quanto o moviment
 const pessoaChave=t=>(t||'').toLowerCase().replace(/&/g,' e ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/( (ltda|me|epp|eireli|sa|s a|mei))+$/,'');
 const v45=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/fin_titulos|fin_movimentos|fin_contas/.test(e.message||''));
 const v45Msg='Este módulo precisa da atualização v45 do banco. Rode o SQL no Supabase.';
-async function todas(q){const out=[];for(let i=0;;i+=1000){const {data,error}=await q().range(i,i+999);if(error)throw error;out.push(...data);if(data.length<1000)return out}}
+// lê tudo em páginas de 1000. A 1ª página vem sozinha; as seguintes vêm 4 de cada vez, ao mesmo tempo, e são juntadas
+// na mesma ordem (antes era uma depois da outra: 11 páginas = 11 esperas). Resultado igual, mais rápido (Carol, 05/11)
+async function todas(q){
+  const pg=async i=>{const {data,error}=await q().range(i,i+999);if(error){if(i&&error.code==='PGRST103')return [];throw error}return data||[]};   // PGRST103: página depois do fim
+  const out=await pg(0);if(out.length<1000)return out;
+  for(let i=1000;;i+=4000){const ls=await Promise.all([0,1,2,3].map(k=>pg(i+k*1000)));
+    for(const d of ls){out.push(...d);if(d.length<1000)return out}}
+}
 async function gfContasDe(cid,forcar){
   if(forcar||GFC.cid!==cid){const {data,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cid).order('nome');if(error)throw error;GFC={cid,lista:data||[]}}
   return GFC.lista;
@@ -6697,12 +6704,15 @@ async function gtCarrega(tipo,cli){
   const tod=cli.id==='*',ids=tod?empresasDe(VIEW).map(c=>c.id):[cli.id],emp=q=>tod?q.in('cliente_id',ids):q.eq('cliente_id',cli.id);
   const tq=()=>{let q=emp(sb.from('fin_titulos').select('*'));if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
   const mq=()=>{let q=emp(sb.from('fin_movimentos').select('*'));if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
-  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')):gfContasDe(cli.id,true)]);
-  GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;
+  // tudo ao mesmo tempo: contas, lançamentos, remessas e anexos (antes as remessas e os anexos esperavam os outros)
+  const [lista,movs,contas,rem,anx]=await Promise.all([todas(tq),todas(mq),tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')):gfContasDe(cli.id,true),
+    tipo!=='receber'&&!tod?rmItensDe(cli.id):{},
+    // lançamentos com anexo do escritório (v94): mostram 📎 na lista
+    todas(()=>emp(sb.from('documentos').select('registro_id')).eq('modulo','financeiro')).then(l=>l.map(d=>d.registro_id)).catch(()=>[])]);
+  GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;GT.mvL=null;
   movs.filter(m=>m.titulo_id).forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
-  GT.rem=tipo!=='receber'&&!tod?await rmItensDe(cli.id):{};GT.todasE=tod;
-  // lançamentos com anexo do escritório (v94): mostram 📎 na lista
-  GT.anx=new Set(await todas(()=>emp(sb.from('documentos').select('registro_id')).eq('modulo','financeiro')).then(l=>l.map(d=>d.registro_id)).catch(()=>[]));
+  GT.rem=rem;GT.todasE=tod;
+  GT.anx=new Set(anx);
   GT.key=key;
 }
 async function renderGT(){
@@ -7012,9 +7022,10 @@ const MVST={aberto:['c-none','Em aberto'],atrasado:['c-bad','Atrasado'],concilia
 const mvSt=x=>MVST[x.st]||['c-done',x.tipo==='entrada'?'Recebido':'Pago'];
 const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tipo==='entrada'?'Entrada':'Saída';
 function mvDesenha(){
-  const L=mvLinhas();mvOpcoes(L);
-  const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*(a.data.localeCompare(b.data)||(a.k==='t')-(b.k==='t')));
-  const cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
+  const L=mvLinhas();GT.mvL=L;mvOpcoes(L);
+  // datas no formato AAAA-MM-DD: comparar o texto direto dá a mesma ordem e é bem mais rápido que localeCompare
+  const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*((a.data<b.data?-1:a.data>b.data?1:0)||(a.k==='t')-(b.k==='t')));
+  const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>cnm.get(id)||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
@@ -7070,7 +7081,7 @@ async function mvTrocar(){
   toast('Categoria trocada');dlgGT.close();MV.sel.clear();GT.key='';renderGT();
 }
 // seleção em lote (pedido da Carol, 29/10): marca lançamentos e troca a categoria, a conta ou exclui de uma vez
-const mvSelRows=()=>{const L=mvLinhas();return L.filter(x=>MV.sel.has(x.k+':'+x.id))};
+const mvSelRows=()=>{const L=GT.mvL||mvLinhas();return L.filter(x=>MV.sel.has(x.k+':'+x.id))};   // usa as linhas da última tela desenhada
 function mvBulk(){
   const n=MV.sel.size;$('mvBulk').hidden=!n;if(!n)return;
   const ls=mvSelRows(),e=r2(ls.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+x.valor,0)),sd=r2(ls.filter(x=>x.tipo==='saida').reduce((a,x)=>a+x.valor,0));
@@ -11217,6 +11228,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05rapido',data:'2026-11-05',t:'Gestão financeira mais rápida',itens:[
+    {x:'A Movimentação financeira, as Contas a pagar e a receber e as outras telas da Gestão financeira carregam bem mais rápido, principalmente nas empresas com muitos lançamentos (como a MPA Palmas) e em “Todas as empresas”. Nada mudou no que cada pessoa vê.',mods:['gfmov','gfpagar','gfrec']}]},
   {k:'2026-11-05mvlote',data:'2026-11-05',t:'Movimentação financeira: quitar várias contas de uma vez',itens:[
     {x:'Na Movimentação financeira, ao marcar lançamentos, a barra agora tem também $ Quitar (para as contas em aberto: escolha a data e a conta, por exemplo a Tesouraria), Estornar, 🔗 Conciliar e Desconciliar, como nas Contas a pagar e a receber.',mods:['gfmov']}]},
   {k:'2026-11-05assina',data:'2026-11-05',t:'Contratos da Controlacs: assinatura eletrônica pela Autentique',itens:[
