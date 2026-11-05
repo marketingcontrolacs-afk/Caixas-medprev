@@ -720,7 +720,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <button class="btn mvf" id="mvXls" hidden>Baixar Excel</button>
     </div>
     <div class="cal" id="gtCal" hidden></div>
-    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
     <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
     <p class="note" id="gtNote"></p>
@@ -6636,7 +6636,14 @@ const abat=m=>r2(m.valor-(+m.juros||0)+(+m.desconto||0));   // quanto o moviment
 const pessoaChave=t=>(t||'').toLowerCase().replace(/&/g,' e ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/( (ltda|me|epp|eireli|sa|s a|mei))+$/,'');
 const v45=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/fin_titulos|fin_movimentos|fin_contas/.test(e.message||''));
 const v45Msg='Este módulo precisa da atualização v45 do banco. Rode o SQL no Supabase.';
-async function todas(q){const out=[];for(let i=0;;i+=1000){const {data,error}=await q().range(i,i+999);if(error)throw error;out.push(...data);if(data.length<1000)return out}}
+// lê tudo em páginas de 1000. A 1ª página vem sozinha; as seguintes vêm 4 de cada vez, ao mesmo tempo, e são juntadas
+// na mesma ordem (antes era uma depois da outra: 11 páginas = 11 esperas). Resultado igual, mais rápido (Carol, 05/11)
+async function todas(q){
+  const pg=async i=>{const {data,error}=await q().range(i,i+999);if(error){if(i&&error.code==='PGRST103')return [];throw error}return data||[]};   // PGRST103: página depois do fim
+  const out=await pg(0);if(out.length<1000)return out;
+  for(let i=1000;;i+=4000){const ls=await Promise.all([0,1,2,3].map(k=>pg(i+k*1000)));
+    for(const d of ls){out.push(...d);if(d.length<1000)return out}}
+}
 async function gfContasDe(cid,forcar){
   if(forcar||GFC.cid!==cid){const {data,error}=await sb.from('fin_contas').select('*').eq('cliente_id',cid).order('nome');if(error)throw error;GFC={cid,lista:data||[]}}
   return GFC.lista;
@@ -6697,12 +6704,15 @@ async function gtCarrega(tipo,cli){
   const tod=cli.id==='*',ids=tod?empresasDe(VIEW).map(c=>c.id):[cli.id],emp=q=>tod?q.in('cliente_id',ids):q.eq('cliente_id',cli.id);
   const tq=()=>{let q=emp(sb.from('fin_titulos').select('*'));if(tipo!=='mov')q=q.eq('tipo',tipo);return q.order('vencimento').order('criado_em')};
   const mq=()=>{let q=emp(sb.from('fin_movimentos').select('*'));if(tipo!=='mov')q=q.not('titulo_id','is',null);return q.order('data').order('criado_em')};
-  const [lista,movs,contas]=await Promise.all([todas(tq),todas(mq),tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')):gfContasDe(cli.id,true)]);
-  GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;
+  // tudo ao mesmo tempo: contas, lançamentos, remessas e anexos (antes as remessas e os anexos esperavam os outros)
+  const [lista,movs,contas,rem,anx]=await Promise.all([todas(tq),todas(mq),tod?todas(()=>sb.from('fin_contas').select('*').in('cliente_id',ids).order('nome')):gfContasDe(cli.id,true),
+    tipo!=='receber'&&!tod?rmItensDe(cli.id):{},
+    // lançamentos com anexo do escritório (v94): mostram 📎 na lista
+    todas(()=>emp(sb.from('documentos').select('registro_id')).eq('modulo','financeiro')).then(l=>l.map(d=>d.registro_id)).catch(()=>[])]);
+  GT.lista=lista;GT.movs={};GT.pago={};GT.tipo=tipo;GT.todos=tipo==='mov'?movs:[];GT.contas=contas;GT.mvL=null;
   movs.filter(m=>m.titulo_id).forEach(m=>{(GT.movs[m.titulo_id]||=[]).push(m);GT.pago[m.titulo_id]=r2((GT.pago[m.titulo_id]||0)+abat(m))});
-  GT.rem=tipo!=='receber'&&!tod?await rmItensDe(cli.id):{};GT.todasE=tod;
-  // lançamentos com anexo do escritório (v94): mostram 📎 na lista
-  GT.anx=new Set(await todas(()=>emp(sb.from('documentos').select('registro_id')).eq('modulo','financeiro')).then(l=>l.map(d=>d.registro_id)).catch(()=>[]));
+  GT.rem=rem;GT.todasE=tod;
+  GT.anx=new Set(anx);
   GT.key=key;
 }
 async function renderGT(){
@@ -6915,8 +6925,8 @@ $('gtBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-g
   if(a==='quitar')return gtLoteQuitar();
   b.disabled=true;try{await gtLote(a)}catch(err){fail(err,'Não foi possível concluir')}finally{b.disabled=false}});
 // estornar, desconciliar e excluir as contas selecionadas
-async function gtLote(a){
-  const ls=gtSelRows(),movsDe=t=>GT.movs[t.id]||[];
+async function gtLote(a,lsIn){
+  const ls=lsIn||gtSelRows(),movsDe=t=>GT.movs[t.id]||[];
   if(a==='estornar'){const com=ls.filter(t=>movsDe(t).length),ms=com.flatMap(movsDe),cc=ms.filter(movConc).length;if(!com.length)return;
     if(!confirm(`Estornar ${com.length===1?'a conta selecionada':'as '+com.length+' contas selecionadas'}?\n\nOs pagamentos e recebimentos (${ms.length}) saem do extrato, o saldo das contas muda e as contas voltam a ficar em aberto.`+(cc?`\nA conciliação com o extrato do banco também será desfeita em ${cc} ${cc===1?'lançamento':'lançamentos'} (as linhas voltam a ficar pendentes na Conciliação bancária).`:'')))return;
     const tr=[...new Set(ms.filter(m=>m.transf_id).map(m=>m.transf_id))],ids=ms.filter(m=>!m.transf_id).map(m=>m.id);
@@ -6935,11 +6945,11 @@ async function gtLote(a){
     if(!confirm(`Excluir ${ok.length===1?'a conta selecionada':ok.length+' contas'}? Não dá para desfazer.`+(pg?`\n\n${pg} ${pg===1?'conta paga ou recebida não será excluída':'contas pagas ou recebidas não serão excluídas'}: estorne antes.`:'')))return;
     const ids=ok.map(t=>t.id);for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').delete().in('id',ids.slice(i,i+200));if(error)throw error}
     toast(ok.length===1?'Conta excluída':ok.length+' contas excluídas')}
-  GT.sel.clear();GT.key='';renderGT();
+  GT.sel.clear();MV.sel.clear();GT.key='';renderGT();
 }
 // quitar as contas selecionadas: data e conta do pagamento (o vencimento e a conta prevista de cada uma, ou uma só para todas)
-async function gtLoteQuitar(){
-  const ls=gtSelRows().filter(t=>gtFalta(t)>0.004);if(!ls.length)return;
+async function gtLoteQuitar(lsIn){
+  const ls=(lsIn||gtSelRows()).filter(t=>gtFalta(t)>0.004);if(!ls.length)return;
   const emps=[...new Set(ls.map(t=>t.cliente_id))];let contas=[];
   try{contas=emps.length===1?await gfContasDe(emps[0]):[]}catch(e){console.error(e)}
   const P=ls.every(t=>t.tipo==='pagar')?'pagamento':ls.every(t=>t.tipo==='receber')?'recebimento':'pagamento ou recebimento';
@@ -6972,7 +6982,7 @@ async function lqAcao(a){
   // boletos enviados pelo cliente também ficam como pagos (Exportação do Bom Controle)
   for(const t of ls.filter(x=>x.origem_id)){const c=GFC.lista.find(x=>x.id===(conta||t.conta_id));
     const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:uma?dt:(t.vencimento<TODAY?t.vencimento:TODAY),banco:c?.conta_bc||c?.nome||null}).eq('id',t.origem_id);if(error)console.error(error)}
-  toast(ls.length===1?'Conta quitada':ls.length+' contas quitadas');GT.lote=null;GT.sel.clear();dlgGT.close();GT.key='';renderGT();
+  toast(ls.length===1?'Conta quitada':ls.length+' contas quitadas');GT.lote=null;GT.sel.clear();MV.sel.clear();dlgGT.close();GT.key='';renderGT();
 }
 // ---------- Movimentação financeira: todos os lançamentos por data (pedido da Carol, 29/10) ----------
 // Junta o que já entrou ou saiu das contas (fin_movimentos: pagamentos, recebimentos, avulsos, transferências e o
@@ -7012,9 +7022,10 @@ const MVST={aberto:['c-none','Em aberto'],atrasado:['c-bad','Atrasado'],concilia
 const mvSt=x=>MVST[x.st]||['c-done',x.tipo==='entrada'?'Recebido':'Pago'];
 const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tipo==='entrada'?'Entrada':'Saída';
 function mvDesenha(){
-  const L=mvLinhas();mvOpcoes(L);
-  const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*(a.data.localeCompare(b.data)||(a.k==='t')-(b.k==='t')));
-  const cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
+  const L=mvLinhas();GT.mvL=L;mvOpcoes(L);
+  // datas no formato AAAA-MM-DD: comparar o texto direto dá a mesma ordem e é bem mais rápido que localeCompare
+  const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*((a.data<b.data?-1:a.data>b.data?1:0)||(a.k==='t')-(b.k==='t')));
+  const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>cnm.get(id)||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
@@ -7070,13 +7081,17 @@ async function mvTrocar(){
   toast('Categoria trocada');dlgGT.close();MV.sel.clear();GT.key='';renderGT();
 }
 // seleção em lote (pedido da Carol, 29/10): marca lançamentos e troca a categoria, a conta ou exclui de uma vez
-const mvSelRows=()=>{const L=mvLinhas();return L.filter(x=>MV.sel.has(x.k+':'+x.id))};
+const mvSelRows=()=>{const L=GT.mvL||mvLinhas();return L.filter(x=>MV.sel.has(x.k+':'+x.id))};   // usa as linhas da última tela desenhada
 function mvBulk(){
   const n=MV.sel.size;$('mvBulk').hidden=!n;if(!n)return;
   const ls=mvSelRows(),e=r2(ls.filter(x=>x.tipo==='entrada').reduce((a,x)=>a+x.valor,0)),sd=r2(ls.filter(x=>x.tipo==='saida').reduce((a,x)=>a+x.valor,0));
   const nv=ls.filter(x=>x.k==='m'&&x.ref.validar).length,bv=$('mvBulk').querySelector('[data-mb="valida"]');bv.hidden=!nv;bv.textContent=nv===n?'Marcar como validado':`Marcar ${nv} como ${nv===1?'validado':'validados'}`;
   // com "Todas as empresas", conta e categoria são de cada empresa: trocar só abrindo a empresa
   $('mvBulk').querySelectorAll('[data-mb="cat"],[data-mb="conta"]').forEach(x=>x.hidden=!!GT.todasE);
+  // quitar, estornar e conciliar também aqui, como nas contas a pagar e a receber (Carol, 05/11)
+  const mb=k=>$('mvBulk').querySelector(`[data-mb="${k}"]`);
+  mb('quitar').disabled=!ls.some(x=>x.k==='t');mb('estornar').disabled=!ls.some(x=>x.k==='m'&&x.tit);
+  mb('conc').disabled=!ls.some(x=>x.k==='m'&&!movConc(x.ref));mb('desconc').disabled=!ls.some(x=>x.k==='m'&&movConc(x.ref));
   $('mvBulkTxt').innerHTML=`<b>${n} ${n===1?'lançamento selecionado':'lançamentos selecionados'}</b> · entradas <b class="pos">${fm(e)}</b> · saídas <b class="neg">${fm(sd)}</b> · total <b class="tot ${e-sd<0?'neg':'pos'}">${fm(r2(e-sd))}</b>`;
 }
 $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
@@ -7088,6 +7103,17 @@ $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-m
     toast(ids.length===1?'Lançamento validado':`${ids.length} lançamentos validados`);MV.sel.clear();GT.key='';return renderGT()}
   if(a==='conta')return mvContaAbre(mvSelRows());
   if(a==='excluir')return mvExcluir(mvSelRows());
+  if(b.disabled)return;const sel=mvSelRows();
+  if(a==='quitar')return gtLoteQuitar(sel.filter(x=>x.k==='t').map(x=>x.ref));
+  if(a==='estornar'){const ids=new Set(sel.filter(x=>x.k==='m'&&x.tit).map(x=>x.tit));
+    b.disabled=true;try{await gtLote('estornar',GT.lista.filter(t=>ids.has(t.id)))}catch(err){fail(err,'Não foi possível estornar')}finally{b.disabled=false}return}
+  if(a==='conc'||a==='desconc'){const ms=sel.filter(x=>x.k==='m').map(x=>x.ref).filter(m=>a==='conc'?!movConc(m):movConc(m));if(!ms.length)return;
+    b.disabled=true;try{
+      if(a==='conc'){if(!confirm(`Conciliar ${ms.length} ${ms.length===1?'lançamento':'lançamentos'}?\n\nCada um é ligado à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias). Os que não tiverem linha no extrato: o portal pergunta antes de marcar.`))return;toast(concTxt(await concLigar(ms)))}
+      else{if(!confirm(`Desconciliar ${ms.length} ${ms.length===1?'lançamento':'lançamentos'}?\n\nContinuam pagos ou recebidos; só a ligação com o extrato do banco é desfeita.`))return;
+        const ids=ms.map(m=>m.id);for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({ofx_id:null,conciliado:false}).in('id',ids.slice(i,i+200));if(error)throw error}
+        toast(ms.length===1?'Desconciliado':ms.length+' lançamentos desconciliados')}
+      MV.sel.clear();GT.key='';renderGT()}catch(err){fail(err,'Não foi possível concluir')}finally{b.disabled=false}}
 });
 async function mvContaAbre(rows){
   rows=rows.filter(x=>x.nat!=='transf');if(!rows.length)return toast('Transferências não mudam de conta por aqui: abra a transferência para corrigir.');
@@ -10904,6 +10930,12 @@ const MANUAL=[
 <li><b>Conciliar sem enviar o extrato de novo:</b> abra a conta e use <b>🔗 Conciliar</b> no pagamento (por exemplo, depois de estornar para corrigir a categoria e registrar o pagamento de novo). O portal liga à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias); se não achar, pergunta se marca como conciliado mesmo assim. <b>Desconciliar</b> tira só a ligação com o extrato. Na conta nova, <b>🔗 Salvar quitado e conciliado</b> já lança paga e conciliada.</li>
 <li><b>Várias contas de uma vez:</b> marque as contas na caixinha da esquerda (a do título marca todas do filtro). Na barra que aparece: <b>$ Quitar</b> (data: o vencimento de cada conta, ou hoje se ainda não venceu, ou uma data só; conta: a prevista de cada uma ou outra), <b>Estornar</b> (volta para em aberto e desfaz a conciliação), <b>🔗 Conciliar</b>, <b>Desconciliar</b> (continua pago, só tira a ligação com o extrato do banco) e <b>Excluir</b> (conta paga não é excluída: estorne antes).</li>
 </ul>`},
+    {k:'gfmov',t:'Movimentação financeira',
+      txt:`<p>Todos os lançamentos da empresa por data: o que já entrou ou saiu das contas e o que falta pagar ou receber (pelo vencimento).</p>
+<ul>
+<li><b>Vários de uma vez:</b> marque os lançamentos na caixinha da esquerda. Na barra que aparece: <b>$ Quitar</b> (as contas em aberto: data do vencimento de cada uma ou uma data só, e a conta prevista ou outra, por exemplo a Tesouraria), <b>Estornar</b>, <b>🔗 Conciliar</b>, <b>Desconciliar</b>, <b>Trocar categoria</b>, <b>Trocar conta</b> e <b>Excluir</b>.</li>
+<li>Clique num lançamento para abrir e corrigir.</li>
+</ul>`},
     {k:'gfext',t:'Extrato da conta',
       txt:`<p>Todas as entradas e saídas de uma conta bancária, dia a dia, com o saldo de cada dia para conferir com o extrato do banco.</p>
 <ol>
@@ -11196,6 +11228,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05rapido',data:'2026-11-05',t:'Gestão financeira mais rápida',itens:[
+    {x:'A Movimentação financeira, as Contas a pagar e a receber e as outras telas da Gestão financeira carregam bem mais rápido, principalmente nas empresas com muitos lançamentos (como a MPA Palmas) e em “Todas as empresas”. Nada mudou no que cada pessoa vê.',mods:['gfmov','gfpagar','gfrec']}]},
+  {k:'2026-11-05mvlote',data:'2026-11-05',t:'Movimentação financeira: quitar várias contas de uma vez',itens:[
+    {x:'Na Movimentação financeira, ao marcar lançamentos, a barra agora tem também $ Quitar (para as contas em aberto: escolha a data e a conta, por exemplo a Tesouraria), Estornar, 🔗 Conciliar e Desconciliar, como nas Contas a pagar e a receber.',mods:['gfmov']}]},
   {k:'2026-11-05assina',data:'2026-11-05',t:'Contratos da Controlacs: assinatura eletrônica pela Autentique',itens:[
     {x:'No contrato (Controlacs › Contratos e reajustes), o botão “✍ Enviar para assinatura” manda o PDF para a Autentique, que envia o e-mail para cada pessoa assinar.',para:'master'},
     {x:'O contrato e o Painel mostram quem já assinou. Quando todos assinarem, o PDF assinado com a autenticação fica guardado nos Documentos do cliente.',para:'master'}]},
