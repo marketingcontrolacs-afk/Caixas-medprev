@@ -6704,7 +6704,7 @@ function mvFiltra(L){
     if(ct&&x.conta_id!==ct)return false;
     if(tp==='transf'||tp==='aporte'?x.nat!==tp:tp&&(x.tipo!==tp||x.nat==='transf'))return false;
     if(pe&&!chave(x.pessoa).includes(pe))return false;
-    if(cat&&(cat==='-'?x.categoria:x.categoria!==cat))return false;
+    if(cat&&(cat==='-'?x.categoria||x.nat==='transf':x.categoria!==cat))return false;
     if(st==='validar'?!x.ref.validar:st==='revisar'?!x.ref.cat_revisar:st&&!(st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
     if(ini&&x.data<ini||fim&&x.data>fim)return false;
     if(vn>0&&x.valor<vn||vx>0&&x.valor>vx)return false;
@@ -8278,12 +8278,14 @@ async function abrirAvulso(m){
   const c=GX.conta,v=k=>esc(m?.[k]??'');outras=outras.filter(x=>x.id!==c.id);
   const tipo=m?(m.transf_id?'transf':m.tipo):'saida';
   // transferência: mostra de qual conta saiu e em qual entrou (Carol, 04/11)
-  let deParaTxt='';
+  let deParaTxt='',soloTxt='';
   if(m?.transf_id){const {data:op}=await sb.from('fin_movimentos').select('conta_id').eq('transf_id',m.transf_id).neq('id',m.id).limit(1);
     const cn=id=>{const k=CGRUPO.find(x=>x.id===id);if(!k)return '—';const e=k.cliente_id!==cli?.id?CLIENTES.find(x=>x.id===k.cliente_id)?.nome:'';return esc(k.nome)+(e?' · '+esc(e):'')};
     const o=op?.[0]?.conta_id;
     deParaTxt=o?`<p class="note wide" style="margin:0">Transferência: saiu de <b>${cn(m.tipo==='saida'?c.id:o)}</b> e entrou em <b>${cn(m.tipo==='saida'?o:c.id)}</b>.</p>`
-      :`<p class="note wide neg" style="margin:0">Transferência com uma ponta só: falta a outra conta (${m.tipo==='saida'?'para onde foi':'de onde veio'}).</p>`}
+      :`<p class="note wide neg" style="margin:0">Transferência com uma ponta só: falta a outra conta (${m.tipo==='saida'?'para onde foi':'de onde veio'}). Escolha abaixo em “${m.tipo==='saida'?'Foi para':'Veio de'}”.</p>`;
+    if(!o){try{GXCG=await trContas()}catch(e){GXCG=[]}
+      soloTxt=`<label class="f wide" id="ga_outraBox">${m.tipo==='saida'?'Foi para (conta de destino)':'Veio de (conta de origem)'}<select id="ga_outra"><option value="">Escolha…</option>${trOpts(GXCG,cli,c.id,'')}</select><span class="note">Se for a Tesouraria, liga ao lançamento da tesouraria; se não estiver lançado lá, é criado na tesouraria.</span></label>`}}
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if(m?.categoria&&!cats.includes(m.categoria))cats.unshift(m.categoria);
   $('gtdTitle').textContent=(m?'Lançamento avulso':'Novo lançamento avulso')+' · '+c.nome;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<div class="fields">
@@ -8292,11 +8294,11 @@ async function abrirAvulso(m){
     <label class="f">Data *<input type="date" id="ga_data" value="${m?m.data:TODAY}"></label>
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m?showMoney(m.valor):''}" placeholder="0,00"></label>
     <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
-    <label class="f">Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
+    ${soloTxt}<label class="f" id="ga_catBox"${tipo==='transf'?' hidden':''}>Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${m?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}"><datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
   </div>${deParaTxt}${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
-  $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf'};
+  $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf';$('ga_catBox').hidden=t==='transf'};
   $('gtdFoot').innerHTML=`${m?'<button type="button" class="btn ghost" data-act="av_apagar">Apagar</button>':''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="av_salvar">Salvar</button>`;
   dlgGT.showModal();
   faInit(cli,m?[m.id]:null,[]);
@@ -8310,11 +8312,16 @@ async function gxAcao(a){
   }
   const val=k=>($('ga_'+k)?.value||'').trim()||null,valor=parseMoney($('ga_valor').value),tipo=$('ga_tipo').value;
   if(!val('data'))return gtErr('Informe a data.');if(!(valor>0))return gtErr('Informe o valor.');if(!val('descricao'))return gtErr('Informe a descrição.');
-  const base={data:val('data'),valor:r2(valor),descricao:val('descricao'),categoria:val('categoria'),pessoa_nome:val('pessoa'),documento:val('documento')};
+  // transferência não tem categoria (Carol, 05/11)
+  const base={data:val('data'),valor:r2(valor),descricao:val('descricao'),categoria:tipo==='transf'||m?.transf_id?null:val('categoria'),pessoa_nome:val('pessoa'),documento:val('documento')};
   let error;
   if(m){
     if(m.transf_id){({error}=await sb.from('fin_movimentos').update({data:base.data,valor:base.valor,descricao:base.descricao,documento:base.documento}).eq('transf_id',m.transf_id));
-      if(!error)({error}=await sb.from('fin_movimentos').update({categoria:base.categoria,pessoa_nome:base.pessoa_nome,...(m.cat_revisar?{cat_revisar:false}:{})}).eq('id',m.id))}
+      if(!error)({error}=await sb.from('fin_movimentos').update({categoria:null,pessoa_nome:base.pessoa_nome,...(m.cat_revisar?{cat_revisar:false}:{})}).eq('id',m.id));
+      // transferência com uma ponta só: liga à conta escolhida (ou cria a outra ponta / o lançamento na tesouraria)
+      const ou=$('ga_outra')?.value,oc=ou&&GXCG.find(x=>x.id===ou);
+      if(!error&&oc){try{const {data:lg,error:e1}=await sb.from('fin_movimentos').select('*').eq('id',m.id).single();if(e1)throw e1;
+        const r=await trLigar(lg,oc,GXCG);toast(trMsg(r,oc));dlgGT.close();return gxVolta()}catch(e){console.error(e);return gtErr('Salvo, mas não foi possível ligar à outra conta: '+(e.message||'verifique a internet'))}}}
     else ({error}=await sb.from('fin_movimentos').update(m.cat_revisar?{...base,cat_revisar:false}:base).eq('id',m.id));
   }else if(tipo==='transf'){
     const dest=val('dest'),tid=crypto.randomUUID();if(!dest)return gtErr('Escolha a conta de destino.');
@@ -8403,7 +8410,7 @@ $('gtBCArq').addEventListener('change',async e=>{
     if(!linhas.length)return toast('Nenhum lançamento encontrado no arquivo.');
     if(!PCAT.ok)await loadCats();
     const [contas,plano,pes]=await Promise.all([gfContasDe(cli.id,true),planoDe(cli),gfPessoasDe(cli.id,'fornecedor')]);
-    Object.assign(BCI,{cli,linhas,contas,plano:plano.filter(p=>p.ativo!==false),pesLista:pes,arqs:fs.map(f=>f.name),mapa:{},cats:{},criarPes:true,baixar:true,dbKeyOk:''});
+    Object.assign(BCI,{cli,linhas,contas,plano:plano.filter(p=>p.ativo!==false),pesLista:pes,arqs:fs.map(f=>f.name),mapa:{},cats:{},criarPes:true,baixar:true,dbKeyOk:'',orig:{},cand:{},cg:null});
     // contas do arquivo × contas da empresa (pelo nome no Bom Controle ou pelo nome da conta)
     const tes=chave(cli.conta_tesouraria_bc);
     [...new Set(linhas.map(l=>l.contaBC))].forEach(n=>{
@@ -8413,7 +8420,7 @@ $('gtBCArq').addEventListener('change',async e=>{
     });
     // categorias do arquivo que não estão no plano
     const ls=bcLS(cli.id),pk=Object.fromEntries(BCI.plano.map(p=>[chave(p.categoria),p.categoria]));
-    linhas.forEach(l=>{if(!l.cat||chave(l.cat)==='transferencia'||/^pendencia/.test(chave(l.cat)))return;
+    linhas.forEach(l=>{if(!l.cat||chave(l.cat)==='transferencia'||/^pendencia/.test(chave(l.cat))||l.transf&&!/ordem de pagamento/.test(l.txt))return;
       if(pk[chave(l.cat)]){l.catOk=pk[chave(l.cat)];return}
       const c=BCI.cats[l.cat]||={nome:l.cat,grupo:l.grupo,tipo:l.tipo==='entrada'?'Receita':'Despesa',n:0,total:0,escolha:null};c.n++;c.total=r2(c.total+l.valor)});
     Object.values(BCI.cats).forEach(c=>{const ant=ls[c.nome];c.sug=bcSugCat(c.nome,c.tipo,BCI.plano);c.escolha=ant&&BCI.plano.some(p=>p.categoria===ant)?ant:c.sug;c.lembrada=!!(ant&&c.escolha===ant)});
@@ -8429,9 +8436,12 @@ async function bcMonta(){
   const ids=[...new Set(L.map(l=>BCI.mapa[l.contaBC]))],ds=L.map(l=>l.data).filter(Boolean).sort(),vs=L.map(l=>l.venc).filter(Boolean).sort();
   const key=BCI.dbKey=ids.join(',')+'|'+ds[0]+'|'+ds.at(-1);
   if(BCI.dbKeyOk!==key){
-    const [movs,tits]=await Promise.all([ids.length&&ds.length?todas(()=>sb.from('fin_movimentos').select('id,conta_id,data,tipo,valor,transf_id').in('conta_id',ids).gte('data',ds[0]).lte('data',ds.at(-1))):[],
+    const [movs,tits]=await Promise.all([ids.length&&ds.length?todas(()=>sb.from('fin_movimentos').select('id,cliente_id,conta_id,data,tipo,valor,transf_id,descricao,documento,validar').in('conta_id',ids).gte('data',ds[0]).lte('data',ds.at(-1))):[],
       vs.length?todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor').eq('cliente_id',cli.id).gte('vencimento',vs[0]).lte('vencimento',vs.at(-1))):[]]);
-    BCI.movs=movs;BCI.tits=tits;BCI.dbKeyOk=key;
+    BCI.movs=movs;BCI.tits=tits;BCI.dbKeyOk=key;BCI.cand={};
+    // quantas pontas tem cada transferência já gravada (a de uma ponta só aparece para escolher a outra conta)
+    BCI.tfN={};const tfs=[...new Set(movs.map(m=>m.transf_id).filter(Boolean))];
+    for(let i=0;i<tfs.length;i+=150){const {data,error}=await sb.from('fin_movimentos').select('transf_id').in('transf_id',tfs.slice(i,i+150));if(error)throw error;(data||[]).forEach(x=>BCI.tfN[x.transf_id]=(BCI.tfN[x.transf_id]||0)+1)}
     // contas a pagar e a receber em aberto (inclusive as previstas pelo histórico) perto das datas do arquivo:
     // o pagamento importado baixa a conta, em vez de ficar duplicado (Carol, 04/11)
     BCI.abertos=[];
@@ -8447,7 +8457,7 @@ async function bcMonta(){
   const pes=BCI.pesLista,dig=t=>String(t||'').replace(/\D/g,''),novosP={};
   const achaP=(n,d)=>pes.find(p=>d&&dig(p.documento)===d)||pes.find(p=>pessoaChave(p.nome)===pessoaChave(n)||p.fantasia&&pessoaChave(p.fantasia)===pessoaChave(n));
   const catDe=l=>l.catOk||(BCI.cats[l.cat]?.escolha&&pk[chave(BCI.cats[l.cat].escolha)])||null;
-  const R={movs:[],tits:[],ja:0,jaT:0,pulo:BCI.linhas.length-L.length,trPar:0,trSem:0,ordem:0,pend:0,semCat:0,porConta:{}};
+  const R={movs:[],tits:[],ja:0,jaT:0,pulo:BCI.linhas.length-L.length,trPar:0,trSem:0,ordem:0,pend:0,semCat:0,porConta:{},soltas:[]};
   const pc=n=>R.porConta[n]||={linhas:0,novos:0,ja:0,ent:0,sai:0};
   BCI.linhas.forEach(l=>{pc(l.contaBC).linhas++});
   // transferências: as duas pontas do arquivo viram uma só
@@ -8476,9 +8486,12 @@ async function bcMonta(){
         const legs=[l,l.par].filter(Boolean);legs.forEach(x=>feitos.add(x));
         const ex=legs.map(x=>usa(ja,BCI.mapa[x.contaBC]+'|'+x.data+'|'+x.tipo+'|'+Math.round(x.valor*100)));
         const tid=ex.find(x=>x?.transf_id)?.transf_id||crypto.randomUUID();
-        legs.forEach((x,i)=>{const cx=pc(x.contaBC);if(ex[i]){cx.ja++;R.ja++;return}
-          R.movs.push({...base,conta_id:BCI.mapa[x.contaBC],tipo:x.tipo,data:x.data,valor:x.valor,descricao:x.descricao||'Transferência',pessoa_nome:null,categoria:null,forma:x.forma,documento:x.documento,
+        legs.forEach((x,i)=>{const cx=pc(x.contaBC);if(ex[i]){cx.ja++;R.ja++;
+            if(legs.length<2&&ex[i].transf_id&&(BCI.tfN[ex[i].transf_id]||0)<2)R.soltas.push({k:x.arq+'|'+x.linha,l:x,conta:BCI.mapa[x.contaBC],ex:ex[i]});return}
+          if(legs.length<2)R.soltas.push({k:x.arq+'|'+x.linha,l:x,conta:BCI.mapa[x.contaBC],mov:null});
+          R.movs.push({...base,id:crypto.randomUUID(),conta_id:BCI.mapa[x.contaBC],tipo:x.tipo,data:x.data,valor:x.valor,descricao:x.descricao||'Transferência',pessoa_nome:null,categoria:null,forma:x.forma,documento:x.documento,
             transf_id:tid,conciliado:x.conc,validar:legs.length<2&&!ex.some(Boolean)?'Transferência: o Bom Controle não diz a outra conta':null,_l:x});
+          if(legs.length<2)R.soltas.at(-1).mov=R.movs.at(-1);
           cx.novos++;cx[x.tipo==='entrada'?'ent':'sai']=r2(cx[x.tipo==='entrada'?'ent':'sai']+x.valor)});
         if(legs.length>1)R.trPar++;else R.trSem++;return;
       }
@@ -8514,8 +8527,105 @@ function bcBaixas(movs){
   });
   return [...out.values()];
 }
+// ---- transferência com uma ponta só (Carol, 05/11) ----
+// O Bom Controle não diz a outra conta da transferência. Na importação (e na edição do lançamento) escolhe-se a outra
+// conta: se já existe lá um lançamento igual (mesmo valor, sentido contrário, até 3 dias), as duas pontas são ligadas;
+// na Tesouraria, liga ao lançamento da tesouraria (concilia sozinho, sem duplicar) e, se não estiver lançado, cria o
+// lançamento na tesouraria (Depósito bancário ou Suprimento), que aparece também na Rotina diária.
+let GXCG=[];
+const bcTesTxt=/dep|dinheiro|esp[eé]cie|tesour|caixa|saque/i;
+async function trContas(){const {data,error}=await sb.from('fin_contas').select('id,nome,tipo,cliente_id,ativo,espelho_tes,conta_bc').eq('ativo',true).order('nome');if(error)throw error;return data||[]}
+function trOpts(ls,cli,excl,sel){
+  const ok=ls.filter(c=>c.id!==excl&&c.tipo!=='Cartão de crédito'),da=ok.filter(c=>c.cliente_id===cli?.id),por={};
+  ok.filter(c=>c.cliente_id!==cli?.id).forEach(c=>(por[c.cliente_id]||=[]).push(c));
+  const op=c=>`<option value="${c.id}"${c.id===sel?' selected':''}>${esc(c.nome)}${c.espelho_tes?' (tesouraria)':''}</option>`;
+  const srt=l=>[...l].sort((a,b)=>(b.espelho_tes?1:0)-(a.espelho_tes?1:0)||a.nome.localeCompare(b.nome));
+  return (da.length?`<optgroup label="${esc(cli?.nome||'Esta empresa')}">${srt(da).map(op).join('')}</optgroup>`:'')
+    +Object.entries(por).map(([id,l])=>`<optgroup label="${esc(CLIENTES.find(x=>x.id===id)?.nome||'Outra empresa')}">${srt(l).map(op).join('')}</optgroup>`).join('');
+}
+// lançamentos da outra conta que podem ser a outra ponta, do mais perto da data ao mais longe
+async function trCandidatos(leg,outra){
+  const op=leg.tipo==='saida'?'entrada':'saida',sd=(d,n)=>isoLocal(new Date(dObj(d).getTime()+n*864e5));
+  const {data,error}=await sb.from('fin_movimentos').select('id,conta_id,data,tipo,valor,transf_id,tes_id,titulo_id').eq('conta_id',outra.id).eq('tipo',op).eq('valor',leg.valor).gte('data',sd(leg.data,-3)).lte('data',sd(leg.data,3));
+  if(error)throw error;
+  let cs=(data||[]).filter(x=>!x.titulo_id&&x.id!==leg.id&&(!leg.transf_id||x.transf_id!==leg.transf_id)&&(outra.espelho_tes?!!x.tes_id:!x.tes_id));
+  const tids=[...new Set(cs.map(x=>x.transf_id).filter(Boolean))],ou={};
+  if(tids.length){const {data:o,error:e}=await sb.from('fin_movimentos').select('id,transf_id,tes_id').in('transf_id',tids);if(e)throw e;(o||[]).forEach(y=>(ou[y.transf_id]||=[]).push(y))}
+  // fora o que já tem a outra ponta (a entrada provisória que a tesouraria cria no banco não conta)
+  cs=cs.map(x=>({...x,_prov:x.transf_id?(ou[x.transf_id]||[]).filter(y=>y.id!==x.id):[]})).filter(x=>outra.espelho_tes?x._prov.every(y=>y.tes_id):!x._prov.length);
+  return cs.sort((a,b)=>Math.abs(dObj(a.data)-dObj(leg.data))-Math.abs(dObj(b.data)-dObj(leg.data))||a.data.localeCompare(b.data));
+}
+// liga a ponta já gravada (leg) à outra conta; devolve 'ligado', 'tes' (criado na tesouraria) ou 'criado'
+async function trLigar(leg,outra,cg,usados=new Set()){
+  const chk=r=>{if(r.error)throw r.error;return r.data};
+  const tid=leg.transf_id||crypto.randomUUID();
+  if(!leg.transf_id){chk(await sb.from('fin_movimentos').update({transf_id:tid,categoria:null}).eq('id',leg.id));leg.transf_id=tid}
+  let r=null;
+  // o banco pode ter ligado sozinho ao gravar (depósito × saída da tesouraria)
+  const ja=chk(await sb.from('fin_movimentos').select('id,conta_id,tes_id').eq('transf_id',tid).neq('id',leg.id))||[];
+  if(ja.some(x=>x.conta_id===outra.id||!x.tes_id))r='ligado';
+  else for(const x of ja){   // ligou à tesouraria, mas a outra conta escolhida é outra: desfaz
+    if(cg.find(c=>c.id===x.conta_id)?.espelho_tes)chk(await sb.from('fin_movimentos').update({transf_id:null}).eq('id',x.id));
+    else chk(await sb.from('fin_movimentos').delete().eq('id',x.id))}
+  if(!r){
+    const c=(await trCandidatos(leg,outra)).find(x=>!usados.has(x.id));
+    if(c){
+      if(c._prov.length)chk(await sb.from('fin_movimentos').delete().in('id',c._prov.map(y=>y.id)));
+      chk(await sb.from('fin_movimentos').update({transf_id:tid,categoria:null,validar:null}).eq('id',c.id));usados.add(c.id);r='ligado';
+    }else if(outra.espelho_tes){
+      const k=cg.find(x=>x.id===leg.conta_id),dep=leg.tipo==='entrada';
+      const t=chk(await sb.from('tesouraria').insert({cliente_id:outra.cliente_id,data:leg.data,valor:leg.valor,tipo:dep?'Depósito bancário':'Suprimento',
+        descricao:leg.descricao||(dep?'Depósito bancário':'Saque no banco'),documento:leg.documento||null,conta_destino:dep?(k?.conta_bc||k?.nome||null):null,
+        obs:'Criado pela transferência '+(dep?'para ':'de ')+(k?.nome||'a conta do banco')+' (Gestão financeira)'}).select('id').single());
+      const es=chk(await sb.from('fin_movimentos').select('id,transf_id').eq('tes_id',t.id).eq('conta_id',outra.id))||[];
+      for(const e of es){if(e.transf_id===tid)continue;
+        if(e.transf_id)chk(await sb.from('fin_movimentos').delete().eq('transf_id',e.transf_id).neq('id',e.id).not('tes_id','is',null));
+        chk(await sb.from('fin_movimentos').update({transf_id:tid,categoria:null}).eq('id',e.id))}
+      r='tes';
+    }else{
+      chk(await sb.from('fin_movimentos').insert({cliente_id:outra.cliente_id,conta_id:outra.id,data:leg.data,tipo:leg.tipo==='saida'?'entrada':'saida',valor:leg.valor,transf_id:tid,descricao:leg.descricao||'Transferência',documento:leg.documento||null}));
+      r='criado';
+    }
+  }
+  chk(await sb.from('fin_movimentos').update({validar:null}).eq('id',leg.id));
+  return r;
+}
+const trMsg=(r,o)=>r==='tes'?'Transferência ligada. Não estava na tesouraria: foi criado o lançamento na tesouraria.':r==='criado'?'Transferência ligada: criada a outra ponta em '+o.nome+'.':'Transferência ligada a '+o.nome+'.';
+// para cada transferência com uma ponta só: a outra conta sugerida e o que vai acontecer
+async function bcSoltas(R){
+  if(!R.soltas.length)return;const cli=BCI.cli;
+  if(!BCI.cg)BCI.cg=await trContas();
+  const esp=BCI.cg.find(c=>c.cliente_id===cli.id&&c.espelho_tes),usados=new Set(),leg=s=>s.ex||s.mov;
+  const cands=async(s,o)=>{const k=s.k+'|'+o.id;if(!(k in BCI.cand))BCI.cand[k]=await trCandidatos(leg(s),o);return BCI.cand[k]};
+  for(const s of R.soltas){
+    const l=s.l,ct=Math.round(l.valor*100);
+    if(BCI.orig[s.k]===undefined){
+      // a outra ponta está no arquivo, numa conta marcada "Não importar" (ex.: a Tesouraria do Bom Controle)
+      const p=BCI.linhas.find(y=>y!==l&&y.transf&&y.quit&&y.tipo!==l.tipo&&y.data===l.data&&Math.round(y.valor*100)===ct&&y.contaBC!==l.contaBC&&!BCI.mapa[y.contaBC]);
+      let sug=null;
+      if(p){const n=chave(p.contaBC);sug=/tesouraria/.test(n)||n===chave(cli.conta_tesouraria_bc)?esp:BCI.cg.find(c=>c.id!==s.conta&&(chave(c.conta_bc)===n||chave(c.nome)===n))}
+      if(!sug&&esp&&(bcTesTxt.test(l.descricao||'')||(await cands(s,esp)).length))sug=esp;
+      BCI.orig[s.k]=sug?.id||'';
+    }
+    s.outra=BCI.cg.find(c=>c.id===BCI.orig[s.k])||null;
+    s.cand=s.outra?(await cands(s,s.outra)).find(x=>!usados.has(x.id))||null:null;if(s.cand)usados.add(s.cand.id);
+  }
+}
+function bcSoltasHTML(R){
+  if(!R.soltas.length)return '';const cli=BCI.cli,cg=BCI.cg||[],nm=id=>esc(cg.find(c=>c.id===id)?.nome||BCI.contas.find(c=>c.id===id)?.nome||'—');
+  return `<div class="alerta" style="display:block"><b>⚠ ${R.soltas.length===1?'1 transferência tem':R.soltas.length+' transferências têm'} só uma conta no arquivo</b><br><span class="note">O Bom Controle não diz a outra conta. Confira a conta do arquivo e escolha de onde veio (ou para onde foi). Na Tesouraria, liga ao lançamento da tesouraria, sem duplicar; se não estiver lançado lá, é criado na tesouraria. Sem escolha, fica “a validar”.</span>
+    <div class="tablebox" style="margin:8px 0 0;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th>Valor</th><th class="l">Descrição</th><th class="l">Saiu de</th><th class="l">Entrou em</th><th class="l">O que acontece</th></tr></thead><tbody>${
+    R.soltas.map((x,i)=>{const l=x.l,ent=l.tipo==='entrada',o=x.outra;
+      const arq=`<b>${nm(x.conta)}</b><br><span class="note">conta do arquivo${x.ex?' · já importado':''}</span>`;
+      const sel=`<select data-bcorig="${i}"${o?'':' style="border-color:var(--warn,#c80)"'}><option value="">Escolha…</option>${trOpts(cg,cli,x.conta,o?.id||'')}</select>`;
+      const st=!o?'<span class="chip c-warn">Fica a validar</span>'
+        :x.cand?`<span class="chip c-ok">✓ Já ${o.espelho_tes?'está na tesouraria':'lançado em '+esc(o.nome)} (${dBR(x.cand.data)})</span><br><span class="note">${o.espelho_tes?'Concilia automático':'Liga as duas'}, sem duplicar</span>`
+        :o.espelho_tes?`<span class="chip c-warn">⚠ Não está na tesouraria</span><br><span class="note">Será criado na tesouraria: ${ent?'Depósito bancário':'Suprimento'} de ${fm(l.valor)} em ${dBR(l.data)}</span>`
+        :`<span class="note">Será criada a ${ent?'saída':'entrada'} em ${esc(o.nome)}</span>`;
+      return `<tr><td>${dBR(l.data)}</td><td>${fm(l.valor)}</td><td class="l">${esc(l.descricao||'')}</td><td class="l">${ent?sel:arq}</td><td class="l">${ent?arq:sel}</td><td class="l">${st}</td></tr>`}).join('')}</tbody></table></div></div>`;
+}
 async function bcPrevia(){
-  const cli=BCI.cli,R=await bcMonta();BCI.R=R;
+  const cli=BCI.cli,R=await bcMonta();BCI.R=R;await bcSoltas(R);
   const falta=Object.keys(BCI.mapa).filter(n=>BCI.mapa[n]===null);
   const cOpts=sel=>`<option value="">Não importar</option>${BCI.contas.filter(c=>c.ativo!==false).map(c=>`<option value="${c.id}"${c.id===sel?' selected':''}>${esc(c.nome)}${c.conta_bc?' · BC: '+esc(c.conta_bc):''}</option>`).join('')}`;
   const pOpts=(sel,tipo)=>`<option value="">Deixar sem categoria</option>`+['Receita','Despesa'].map(tp=>{const l=BCI.plano.filter(p=>(p.tipo||'Despesa')===tp);return l.length?`<optgroup label="${tp==='Receita'?'Receitas':'Despesas'}">${l.map(p=>`<option${p.categoria===sel?' selected':''}>${esc(p.categoria)}</option>`).join('')}</optgroup>`:''}).join('')+catNovaOpt;
@@ -8527,6 +8637,7 @@ async function bcPrevia(){
     <h3 style="margin:4px 0 0">Contas</h3>
     <div class="tablebox" style="margin:0"><table class="cfg"><thead><tr><th class="l">Conta no Bom Controle</th><th class="l">Conta no portal</th><th>Linhas</th><th>Novos</th><th>Já existem</th><th>Entradas novas</th><th>Saídas novas</th></tr></thead><tbody>${
       Object.keys(BCI.mapa).map(n=>{const p=R.porConta[n]||{},v=BCI.mapa[n];return `<tr><td class="l">${esc(n)}${v===''&&(/tesouraria/.test(chave(n)))?`<br><span class="note">A tesouraria vem da Rotina diária › Tesouraria</span>`:''}</td><td class="l"><select data-bcconta="${esc(n)}"${v===null?' style="border-color:var(--bad)"':''}>${v===null?'<option value="?" selected>Escolha…</option>':''}${cOpts(v)}</select></td><td>${p.linhas||0}</td><td>${v?p.novos||0:'—'}</td><td>${v?p.ja||0:'—'}</td><td class="pos">${v&&p.ent?fm(p.ent):''}</td><td class="neg">${v&&p.sai?fm(p.sai):''}</td></tr>`}).join('')}</tbody></table></div>
+    ${bcSoltasHTML(R)}
     ${cats.length?`<div class="alerta" style="display:block"><b>⚠ ${cats.length===1?'1 categoria do Bom Controle não existe':cats.length+' categorias do Bom Controle não existem'} no plano de contas${cli.plano_proprio?' de '+esc(cli.nome):''}</b><br><span class="note">Confira a sugestão, escolha outra do plano ou cadastre a categoria (“+ Cadastrar nova categoria…” no fim da lista ou o botão ao lado). A escolha fica guardada para as próximas importações desta empresa.</span>
       <div class="tablebox" style="margin:8px 0 0;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th class="l">No Bom Controle</th><th>Lançamentos</th><th>Valor</th><th class="l">Usar no portal</th><th></th></tr></thead><tbody>${
         cats.map((c,i)=>`<tr><td class="l"><b>${esc(c.nome)}</b>${c.grupo?`<br><span class="note">${esc(c.grupo)} · ${c.tipo}</span>`:''}</td><td>${c.n}</td><td>${fm(c.total)}</td><td class="l"><select data-bccat="${i}" data-catnova="${c.tipo}">${pOpts(c.escolha,c.tipo)}</select>${c.escolha&&c.escolha===c.sug&&!c.lembrada?' <span class="chip c-warn">sugestão</span>':c.lembrada?' <span class="chip c-none">da última importação</span>':''}</td><td><button type="button" class="btn small" data-bcnova="${i}" title="Cadastrar “${esc(c.nome)}” no plano de contas">+ Cadastrar</button></td></tr>`).join('')}</tbody></table></div></div>`:''}
@@ -8535,7 +8646,8 @@ async function bcPrevia(){
       <li><b>${R.movs.length}</b> ${R.movs.length===1?'lançamento novo':'lançamentos novos'} na Movimentação (entradas ${fm(totE)}, saídas ${fm(totS)}, fora as transferências)${R.ja?` · ${R.ja} já ${R.ja===1?'existia':'existiam'} e ${R.ja===1?'fica':'ficam'} de fora`:''}.</li>
       ${R.baixas.length?`<li><b>${R.baixas.length}</b> ${R.baixas.length===1?'conta a pagar ou a receber que já estava lançada é baixada':'contas a pagar ou a receber que já estavam lançadas são baixadas'} pelo pagamento do arquivo, sem duplicar${R.baixas.some(b=>b.t.previsto)?` (${R.baixas.filter(b=>b.t.previsto).length} ${R.baixas.filter(b=>b.t.previsto).length===1?'prevista fica':'previstas ficam'} com o valor pago)`:''}. <a href="#" id="bciVerBx">Ver</a></li>`:''}
       ${R.tits.length||R.jaT?`<li><b>${R.tits.length}</b> ${R.tits.length===1?'conta em aberto vai':'contas em aberto vão'} para as contas a pagar e a receber${R.jaT?` · ${R.jaT} já ${R.jaT===1?'existia':'existiam'}`:''}.</li>`:''}
-      ${R.trPar||R.trSem?`<li>Transferências: ${R.trPar} com as duas contas no arquivo${R.trSem?`; <b>${R.trSem}</b> só com uma ponta (o Bom Controle não diz a outra conta) ${R.trSem===1?'fica':'ficam'} “a validar”. Para ligar as duas pontas, importe junto o arquivo da outra conta.`:'.'}</li>`:''}
+      ${R.trPar||R.trSem?`<li>Transferências: ${R.trPar} com as duas contas no arquivo${R.trSem?`; ${R.trSem} só com uma ponta (o Bom Controle não diz a outra conta): escolha a outra conta na tabela de transferências${R.soltas.filter(x=>!x.outra).length?` (<b>${R.soltas.filter(x=>!x.outra).length}</b> sem a outra conta ${R.soltas.filter(x=>!x.outra).length===1?'fica':'ficam'} “a validar”)`:''}.`:'.'}</li>`:''}
+      ${R.soltas.some(x=>x.outra?.espelho_tes&&!x.cand)?`<li><b>⚠ ${R.soltas.filter(x=>x.outra?.espelho_tes&&!x.cand).length}</b> ${R.soltas.filter(x=>x.outra?.espelho_tes&&!x.cand).length===1?'transferência não está lançada':'transferências não estão lançadas'} na tesouraria: ${R.soltas.filter(x=>x.outra?.espelho_tes&&!x.cand).length===1?'o lançamento será criado':'os lançamentos serão criados'} também na tesouraria (Rotina diária).</li>`:''}
       ${R.ordem?`<li>${R.ordem} ${R.ordem===1?'transferência':'transferências'} para Ordem de Pagamento de Terceiros ${R.ordem===1?'entra':'entram'} como repasse às clínicas (Restituições).</li>`:''}
       ${R.pend?`<li>${R.pend} ${R.pend===1?'lançamento marcado':'lançamentos marcados'} como Pendência no Bom Controle ${R.pend===1?'fica':'ficam'} “a validar”.</li>`:''}
       ${R.semCat?`<li>${R.semCat} ${R.semCat===1?'lançamento fica':'lançamentos ficam'} sem categoria.</li>`:''}
@@ -8543,7 +8655,7 @@ async function bcPrevia(){
     </ul>`;
   if(R.baixas.length||BCI.baixar===false)$('bciBody').insertAdjacentHTML('beforeend',`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bciBaixa" style="width:auto"${BCI.baixar===false?'':' checked'}> Baixar as contas a pagar e a receber em aberto (inclusive as recorrentes previstas) com os pagamentos do arquivo</label>
     <div id="bciBx" hidden class="tablebox" style="margin:0"><table class="cfg"><thead><tr><th class="l">Conta em aberto</th><th>Vencimento</th><th>Valor</th><th class="l">Pago no arquivo</th></tr></thead><tbody>${R.baixas.map(b=>`<tr><td class="l">${esc(b.t.pessoa_nome||'')}${b.t.previsto?' <span class="chip c-warn">prevista</span>':''}</td><td>${dBR(b.t.vencimento)}</td><td>${fm(b.t.valor)}</td><td class="l">${b.movs.map(m=>`${dBR(m.data)} · ${fm(m.valor)}`).join('<br>')}</td></tr>`).join('')}</tbody></table></div>`);
-  const n=R.movs.length+R.tits.length;
+  const n=R.movs.length+R.tits.length+R.soltas.filter(x=>x.ex&&x.outra).length;
   $('bciOk').disabled=!!falta.length||!n;$('bciOk').textContent=n?`Importar ${n} ${n===1?'lançamento':'lançamentos'}`:'Nada novo para importar';
   $('bciInfo').textContent=falta.length?'Escolha a conta de cada linha da tabela de contas.':'';
 }
@@ -8551,6 +8663,7 @@ $('bciFechar').onclick=()=>$('dlgBCI').close();
 $('bciBody').addEventListener('change',async e=>{
   const s=e.target;
   if(s.dataset.bcconta!=null){BCI.mapa[s.dataset.bcconta]=s.value==='?'?null:s.value;return bcPrevia()}
+  if(s.dataset.bcorig!=null){const x=BCI.R.soltas[+s.dataset.bcorig];if(x)BCI.orig[x.k]=s.value;return bcPrevia()}
   if(s.dataset.bccat!=null){if(s.value===CATNOVA)return;const c=Object.values(BCI.cats).sort((a,b)=>b.n-a.n)[+s.dataset.bccat];
     if(s.value&&!BCI.plano.some(p=>p.categoria===s.value)){delete PLANOS[BCI.cli.id];BCI.plano=(await planoDe(BCI.cli)).filter(p=>p.ativo!==false)}
     c.escolha=s.value||null;c.lembrada=false;return bcPrevia()}
@@ -8586,13 +8699,19 @@ $('bciOk').onclick=async()=>{
       const {error}=await sb.from('fin_titulos').update({valor:r2(b.movs.reduce((x,m)=>x+m.valor,0)),previsto:false}).eq('id',b.t.id);if(error)throw error}
     const movs=R.movs.map(({_l,_p,...m})=>m);
     for(let i=0;i<movs.length;i+=500){const {error}=await sb.from('fin_movimentos').insert(movs.slice(i,i+500));if(error)throw error}
+    // transferências com uma ponta só: liga à outra conta escolhida (ou cria a outra ponta / o lançamento na tesouraria)
+    let nTes=0,nLig=0,nFal=0;const usados=new Set();
+    if(R.soltas.length&&!BCI.cg)BCI.cg=await trContas();
+    for(const x of R.soltas){const o=BCI.cg.find(c=>c.id===BCI.orig[x.k]);if(!o)continue;
+      try{const lg=x.ex?{...x.ex}:(await sb.from('fin_movimentos').select('*').eq('id',x.mov.id).maybeSingle()).data;if(!lg)continue;
+        const r=await trLigar(lg,o,BCI.cg,usados);nLig++;if(r==='tes')nTes++}catch(e){console.warn(e);nFal++}}
     // a ponta de transferência que o banco ligou sozinho à outra conta (ex.: depósito do dinheiro ligado à saída da
     // tesouraria) deixa de ficar "a validar" (Carol, 04/11)
     try{const tids=[...new Set(movs.filter(m=>m.transf_id&&m.validar).map(m=>m.transf_id))];
       for(let i=0;i<tids.length;i+=150){const {data}=await sb.from('fin_movimentos').select('transf_id').in('transf_id',tids.slice(i,i+150));
         const n={};(data||[]).forEach(x=>n[x.transf_id]=(n[x.transf_id]||0)+1);const ok=Object.keys(n).filter(k=>n[k]>1);
         if(ok.length)await sb.from('fin_movimentos').update({validar:null}).in('transf_id',ok).like('validar','Transferência:%')}}catch(e){console.warn(e)}
-    toast(`Importado: ${movs.length} ${movs.length===1?'lançamento':'lançamentos'}${tits.length?` e ${tits.length} ${tits.length===1?'conta em aberto':'contas em aberto'}`:''}`);
+    toast(`${movs.length||tits.length||!nLig?`Importado: ${movs.length} ${movs.length===1?'lançamento':'lançamentos'}`:'Importado'}${tits.length?` e ${tits.length} ${tits.length===1?'conta em aberto':'contas em aberto'}`:''}${nLig?` · ${nLig} ${nLig===1?'transferência ligada':'transferências ligadas'}`:''}${nTes?` (${nTes} ${nTes===1?'lançamento criado':'lançamentos criados'} na tesouraria)`:''}${nFal?` · ${nFal} não ${nFal===1?'foi ligada':'foram ligadas'}, ${nFal===1?'fica':'ficam'} a validar`:''}`);
     $('dlgBCI').close();BCI.dbKeyOk='';GT.key='';renderGT();
   }catch(err){console.error(err);toast((v45(err)?v45Msg:'Não foi possível importar: '+(err.message||'verifique a internet'))+(err.message&&/validar|conciliado/.test(err.message)?' (rode a atualização v66 do banco)':''));bcPrevia()}
 };
@@ -9843,6 +9962,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05tr',data:'2026-11-05',t:'Transferências: conta de origem na importação e ligação com a tesouraria',itens:[
+    {x:'Importar do Bom Controle: a transferência que vem com uma conta só ganhou o campo para escolher de onde veio (ou para onde foi) e mostra a conta do arquivo para conferir. Vale também para as transferências já importadas que ficaram “a validar”: importe o mesmo arquivo de novo.',para:'esc'},
+    {x:'Se a outra conta for a Tesouraria, o lançamento da tesouraria (mesmo valor, até 3 dias) é conciliado sozinho, sem duplicar. Se não estiver lançado na tesouraria, o portal avisa e cria o lançamento lá (Depósito bancário ou Suprimento), que aparece também na Rotina diária.',para:'esc'},
+    {x:'Transferência não tem categoria: o campo Categoria some na transferência e o filtro “Sem categoria” da Movimentação não mostra mais as transferências. Ao abrir uma transferência com uma ponta só, dá para escolher a outra conta ali mesmo.',para:'esc'}]},
   {k:'2026-11-05ofx',data:'2026-11-05',t:'Conciliação bancária: pendentes guardadas, filtros e vendas do dia somadas',itens:[
     {x:'Gestão financeira › Conciliação bancária: as linhas do extrato que ainda não foram validadas ficam pendentes até você validar ou ignorar. Ao abrir a tela ou atualizar a página, o portal vai para a conta com pendências e mostra essas linhas; não precisa importar o OFX de novo.',mods:['gfconc']},
     {x:'Lançamentos do mesmo dia com o mesmo histórico do banco (ex.: “Vendas - Disponível PIX”, cartão) entram somados numa linha só, com a observação de quantos lançamentos formam o total.',mods:['gfconc']},
