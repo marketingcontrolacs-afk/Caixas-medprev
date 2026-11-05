@@ -11345,6 +11345,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05parcseguro',data:'2026-11-05',t:'Repasse de parceiros: parceiro certo na conta a pagar',itens:[
+    {x:'Correção: o repasse só usa o cadastro do parceiro (nome, conta e Pix) quando o nome é igual ou o CPF/CNPJ bate. Antes, um nome parecido (ex.: Print Clínica de Diagnóstico por Imagem e Imax Clínica de Diagnóstico por Imagem) podia trazer o cadastro de outra clínica. Quando o parceiro não está cadastrado, aparece “Parceiro sem conta nem Pix” e a conta a pagar sai com o nome do relatório.',mods:['gfrepasse']}]},
   {k:'2026-11-05forma',data:'2026-11-05',t:'Forma de pagamento em cada pagamento',itens:[
     {x:'No Registrar pagamento e no $ Salvar quitado há o campo Forma de pagamento: vem a forma do lançamento e dá para trocar. Cada parte em outra conta também tem a sua forma (ex.: Pix no banco e Dinheiro na Tesouraria). A forma aparece na lista de pagamentos da conta.',mods:['gfpagar','gfrec','gfrepasse']}]},
   {k:'2026-11-05inter',data:'2026-11-05',t:'Remessa de pagamentos do Inter',itens:[
@@ -12028,10 +12030,19 @@ const rnSitDe=it=>rnNf(it)?.situacao||'sem';
 const rnGrupoSit=s=>s==='emite'?'emite':s==='sem'?'sem':'nao';
 const rnEmpNome=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
 // parceiro cadastrado (conta e Pix): o da empresa escolhida; se não houver empresa, o primeiro do grupo com conta
+// SEGURANÇA (Carol, 05/11): o parceiro que recebe o pagamento nunca vem de um nome só "parecido".
+// Antes, "Print Clinica De Diagnóstico Por Imagem" caía na "Imax Clinica De Diagnóstico Por Imagem" e a conta a pagar saía com o nome da Imax.
+// Agora vale só: o mesmo CPF/CNPJ do controle de NF (quando o controle foi ligado pelo nome exato) ou o mesmo nome
+// (igual, ou começo igual em nome cortado); e nunca um parceiro com CPF/CNPJ diferente do controle.
+function rnAchaExato(nomes,lista,nomesDe){
+  for(const nome of nomes){const a=rnChave(nome);if(!a)continue;
+    for(const x of lista)for(const n of nomesDe(x)){if(rnChave(n)===a)return x}
+    for(const x of lista)for(const n of nomesDe(x)){const b=rnChave(n);if(b&&Math.min(a.length,b.length)>=25&&(a.startsWith(b)||b.startsWith(a)))return x}}
+  return null}
 function rnParc(it,emp){
-  const nf=rnNf(it),doc=rnDig(nf?.cpf_cnpj),cand=RN.parc.filter(p=>!emp||!p.cliente_id||p.cliente_id===emp);
+  const nf=rnNf(it),doc=it.nf_via==='parecido'?'':rnDig(nf?.cpf_cnpj),cand=RN.parc.filter(p=>!emp||!p.cliente_id||p.cliente_id===emp);
   let p=doc?cand.find(x=>rnDig(x.cpf_cnpj)===doc):null;
-  if(!p)p=rnAcha(it.nome,cand,rnParcNomes)[0]||(nf?rnAcha(nf.nome,cand,rnParcNomes)[0]:null);
+  if(!p)p=rnAchaExato([it.nome,...(nf&&it.nf_via!=='parecido'?rnNfNomes(nf):[])],cand.filter(x=>!doc||!rnDig(x.cpf_cnpj)||rnDig(x.cpf_cnpj)===doc),rnParcNomes);
   if(!p&&!emp)return null;
   if(!emp&&p&&!rnTemConta(p)){const o=RN.parc.find(x=>x!==p&&rnChave(x.nome)===rnChave(p.nome)&&rnTemConta(x));if(o)p=o}
   return p||(emp?rnParc(it,null):null);
