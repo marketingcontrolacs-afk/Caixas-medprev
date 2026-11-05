@@ -1352,12 +1352,11 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
       <label class="f wide">Nome ou razão social *<input id="pn_nome" autocomplete="off"></label>
       <label class="f wide">Nome fantasia<input id="pn_fantasia" autocomplete="off"></label>
       <label class="f">É<select id="pn_papel"><option value="fornecedor">Fornecedor</option><option value="cliente">Cliente</option><option value="ambos">Cliente e fornecedor</option></select></label>
-      <label class="f">Vale para<select id="pn_vale"><option value="esta">Só esta empresa</option><option value="todas">Todas as empresas</option></select></label>
       <label class="f">Telefone<input id="pn_telefone"></label>
       <label class="f">E-mail<input id="pn_email"></label>
       <label class="f">Tipo da chave Pix<select id="pn_pix_tipo"><option value=""></option><option>CPF</option><option>CNPJ</option><option>E-mail</option><option>Telefone</option><option>Aleatória</option></select></label>
       <label class="f">Chave Pix<input id="pn_pix_chave"></label>
-      <p class="note wide" id="pnNota" style="margin:0">O cadastro vai para Gestão financeira › Clientes e fornecedores. Endereço, banco e os outros dados podem ser completados lá depois.</p>
+      <p class="note wide" id="pnNota" style="margin:0">O cadastro vale para todas as empresas (inclusive as que forem cadastradas depois) e fica em Gestão financeira › Clientes e fornecedores. Endereço, banco e os outros dados podem ser completados lá depois.</p>
     </div><p class="err" id="pnErr" hidden></p><div class="row" id="pnUsarBox" hidden><button type="button" class="btn small" id="pnUsar">Usar o cadastro que já existe</button></div></div>
     <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="pnClose">Cancelar</button><button type="submit" class="btn primary" id="pnSave">Cadastrar</button></div>
   </form>
@@ -3144,6 +3143,21 @@ function ajustaDeposito(){
   $('rFields').querySelectorAll('[data-dep]').forEach(el=>el.hidden=!dep);
   const d=$('rFields').querySelector('[data-k="descricao"]');if(d)d.closest('label').hidden=dep;
 }
+// nomes do cadastro de clientes e fornecedores para quem lança (sem Pix nem banco): função pessoas_lista da v101;
+// sem a v101, quem tem Gestão financeira ainda vê a lista pela tabela
+let PESLISTA=null;
+async function pesLista(){
+  if(PESLISTA)return PESLISTA;
+  let {data,error}=await sb.rpc('pessoas_lista');
+  if(error){console.error(error);data=okGestao()?await todas(()=>sb.from('fin_pessoas').select('nome,fantasia,documento,papel').is('cliente_id',null).eq('ativo',true).order('nome')).catch(()=>[]):[]}
+  return PESLISTA=data||[];
+}
+function pesListaLiga(box){
+  const ins=[...box.querySelectorAll('input[data-k="fornecedor"],input[data-k="descricao"]')].filter(i=>!i.disabled);if(!ins.length)return;
+  if(!$('rPesLista')){const dl=document.createElement('datalist');dl.id='rPesLista';document.body.appendChild(dl)}
+  ins.forEach(i=>{i.setAttribute('list','rPesLista');i.autocomplete='off'});
+  pesLista().then(ls=>{const dl=$('rPesLista');if(dl&&!dl.options.length)dl.innerHTML=ls.map(p=>`<option value="${esc(p.nome)}">${esc([p.fantasia&&p.fantasia!==p.nome?p.fantasia:'',p.documento||''].filter(Boolean).join(' · '))}</option>`).join('')}).catch(console.error);
+}
 async function openReg(r,pre){
   if(escCli.value==='*')CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null;
   if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
@@ -3171,6 +3185,8 @@ async function openReg(r,pre){
     +campo(cfg.campos.find(c=>c[0]==='sobre'))
     +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
     :cfg.campos.map(campo).join('');
+  // fornecedor: sugere os nomes do cadastro único de clientes e fornecedores (vale para todas as empresas; v101)
+  pesListaLiga($('rFields'));
   // quem lança em mais de uma empresa escolhe a empresa aqui mesmo; o escritório também usa para corrigir a empresa errada
   const emps=empresasDe(MOD).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
@@ -6391,7 +6407,7 @@ async function renderGF(){
   $('gfH1').textContent=contas?'Contas bancárias e cartões':'Clientes e fornecedores';$('gfPapelBox').hidden=contas;
   $('gfNovo').textContent=contas?'+ Nova conta':'+ Novo cadastro';
   $('gfSub').textContent=contas?'Contas bancárias da empresa, usadas nas contas a pagar e a receber, na conciliação do extrato (OFX) e na remessa ao banco. Se a empresa tem cartão de crédito, cadastre-o aqui com o tipo “Cartão de crédito”.'
-    :'Quem paga e quem recebe da empresa. Os fornecedores do Bom Controle valem para todas as empresas. Ao digitar o CNPJ, os dados vêm da Receita; ao digitar o CEP, o endereço vem dos Correios.';
+    :'Quem paga e quem recebe da empresa. O cadastro é um só e vale para todas as empresas, inclusive as que forem cadastradas depois. Ao digitar o CNPJ, os dados vêm da Receita; ao digitar o CEP, o endereço vem dos Correios.';
   $('gfNovo').hidden=!cli;$('gfFbc').hidden=contas||!ehAdm();
   if(!cli){gfVazio('Escolha uma empresa.');return}
   const key=gfTab+'|'+cli.id;
@@ -6459,7 +6475,7 @@ function abrirGF(r){
       +`<p class="note wide" id="gfRecNote" style="margin:0">${r?.situacao_receita?`Situação na Receita: <b class="${/ATIVA/i.test(r.situacao_receita)?'pos':'neg'}">${esc(r.situacao_receita)}</b>${r.situacao_em?' (consultado em '+dBR(r.situacao_em)+')':''}.`:''}</p>`
       +inp('nome','Nome ou razão social *')+inp('fantasia','Nome fantasia')
       +sel('papel','É',[['cliente','Cliente'],['fornecedor','Fornecedor'],['ambos','Cliente e fornecedor']],pdef)
-      +sel('vale','Vale para',[['esta','Só '+(cli?.nome||'esta empresa')],['todas','Todas as empresas']],r&&!r.cliente_id?'todas':'esta')
+      +`<p class="note wide" style="margin:0">O cadastro vale para todas as empresas, inclusive as que forem cadastradas depois.</p>`
       +sel('grupo','Grupo (clientes)',['',...GFGRUPOS],'')
       +inp('telefone','Telefone')+inp('email','E-mail')
       +`<label class="f">CEP<input id="gf_cep" value="${v('cep')}" inputmode="numeric" placeholder="00000-000"></label>`+inp('endereco','Endereço','rua, avenida','wide')+inp('numero','Número')+inp('complemento','Complemento')+inp('bairro','Bairro')+inp('cidade','Cidade')+inp('uf','UF')
@@ -6521,7 +6537,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
       ...(GFREC||GFR?.situacao_receita!=null||val('cep')||val('endereco')||val('uf')||GFR?.cep!=null?{cep:val('cep'),endereco:val('endereco'),numero:val('numero'),complemento:val('complemento'),bairro:val('bairro'),uf:(val('uf')||'').toUpperCase()||null,
         situacao_receita:GFREC?.sit??GFR?.situacao_receita??null,situacao_em:GFREC?.em??GFR?.situacao_em??null}:{}),
       pix_tipo:val('pix_tipo'),pix_chave:val('pix_chave'),banco:val('banco'),agencia:val('agencia'),conta:val('conta'),obs:val('obs'),ativo:$('gf_ativo').checked,
-      cliente_id:val('vale')==='todas'?null:(GFR?.cliente_id||cli.id)};
+      cliente_id:null};   // todo cadastro vale para todas as empresas, inclusive as futuras (Carol, 05/11; v101)
     const d=gfDig(row.documento);
     if(d&&d.length!==11&&d.length!==14)return err('O CNPJ tem 14 números e o CPF tem 11.');
     const dup=d&&GFL.find(x=>x.id!==GFR?.id&&gfDig(x.documento)===d);
@@ -6536,7 +6552,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
   const {error}=GFR?await sb.from(tb).update(row).eq('id',GFR.id):await sb.from(tb).insert(row);
   $('gfSave').disabled=false;
   if(error){console.error(error);return err(v52(error)?v52Msg:v48(error)?v48Msg:/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')?'O endereço e a situação na Receita precisam da atualização v49 do banco. Rode o SQL no Supabase.':error.message||'Não foi possível salvar.')}
-  toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';GFP.key='';GFPT.cid=null;GFC.cid='';renderGF();
+  toast(GFR?'Cadastro atualizado':'Cadastro incluído');dlgGF.close();GFKEY='';PESLISTA=null;GFP.key='';GFPT.cid=null;GFC.cid='';renderGF();
 });
 $('gfDel').onclick=async()=>{if(!GFR||!confirm(`Apagar “${GFR.nome}”? Se já tiver lançamentos, prefira desmarcar “Ativo”.`))return;
   const {error}=await sb.from(gfTab==='contas'?'fin_contas':'fin_pessoas').delete().eq('id',GFR.id);
@@ -8150,7 +8166,7 @@ function pesNova(cli,papel,nome,doc){
     const d=$('dlgPesNova');if(!cli){toast('Escolha uma empresa no topo.');return res(null)}
     PNREC=null;$('pnTitle').textContent=(papel==='cliente'?'Novo cliente':'Novo fornecedor')+' · '+cli.nome;
     $('pn_nome').value=nome||'';$('pn_documento').value=doc||'';['fantasia','telefone','email','pix_chave'].forEach(k=>$('pn_'+k).value='');$('pn_pix_tipo').value='';
-    $('pn_papel').value=papel==='cliente'?'cliente':'fornecedor';$('pn_vale').value='esta';$('pn_vale').options[0].textContent='Só '+cli.nome;
+    $('pn_papel').value=papel==='cliente'?'cliente':'fornecedor';
     $('pnErr').hidden=true;$('pnUsarBox').hidden=true;$('pnRecNote').innerHTML='';
     let feito=null;const fim=()=>{d.removeEventListener('close',fim);res(feito)};d.addEventListener('close',fim);
     const escolhe=async(p,msg)=>{
@@ -8177,11 +8193,11 @@ function pesNova(cli,papel,nome,doc){
         const k=pessoaChave(nm),igual=ls.find(x=>pessoaChave(x.nome)===k&&!(c.length===14&&pnAlnum(x.documento).length===14));
         if(igual)return err(`Já existe “${igual.nome}” no cadastro${igual.documento?' ('+igual.documento+')':' sem CNPJ/CPF'}${igual.ativo===false?', inativo':''}. O mesmo nome só pode ser cadastrado de novo com outro CNPJ; pessoa física nunca.`,igual);
         const row={nome:nm,fantasia:$('pn_fantasia').value.trim()||null,documento:pnFmt(c),papel:$('pn_papel').value,telefone:$('pn_telefone').value.trim()||null,email:email||null,
-          pix_tipo:$('pn_pix_tipo').value||null,pix_chave:$('pn_pix_chave').value.trim()||null,ativo:true,cliente_id:$('pn_vale').value==='todas'?null:cli.id,...(PNREC||{})};
+          pix_tipo:$('pn_pix_tipo').value||null,pix_chave:$('pn_pix_chave').value.trim()||null,ativo:true,cliente_id:null,...(PNREC||{})};   // o cadastro vale para todas as empresas (Carol, 05/11; v101)
         let {data,error}=await sb.from('fin_pessoas').insert(row).select().single();
         // sem a v49 (endereço e situação na Receita) grava só o básico
         if(error&&PNREC&&/cep|endereco|bairro|situacao_|complemento|numero|'uf'/.test(error.message||'')){const {cep,endereco,numero,complemento,bairro,uf,situacao_receita,situacao_em,...b}=row;({data,error}=await sb.from('fin_pessoas').insert(b).select().single())}
-        if(error){console.error(error);return err(error.code==='42501'?'Você não tem permissão para cadastrar clientes e fornecedores nesta empresa.':error.message||'Não foi possível cadastrar.')}
+        if(error){console.error(error);return err(error.code==='42501'?(ehEsc()?'Você não tem permissão para cadastrar clientes e fornecedores.':'O cadastro para todas as empresas precisa da atualização v101 do banco. Peça ao escritório para rodar o SQL no Supabase.'):error.message||'Não foi possível cadastrar.')}
         if(Array.isArray(data))data=data[0];
         pnCache(cli,data);feito=data;toast((data.papel==='cliente'?'Cliente':data.papel==='ambos'?'Cadastro':'Fornecedor')+' cadastrado');d.close();
       }catch(x){console.error(x);err('Não foi possível conferir o cadastro. Verifique a internet e tente de novo.')}
@@ -8194,7 +8210,7 @@ function pesNova(cli,papel,nome,doc){
 function pnCache(cli,p){
   if(GFP.key.startsWith(cli.id+'|')&&!GFP.lista.some(x=>x.id===p.id))GFP.lista.push(p);
   if(GFPT.cid===cli.id&&!GFPT.lista.some(x=>x.id===p.id))GFPT.lista.push(p);
-  GFKEY='';
+  GFKEY='';PESLISTA=null;
 }
 const ordPlano=ls=>[...ls].sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='Receita'?-1:1)||(a.codigo||'zz').localeCompare(b.codigo||'zz',undefined,{numeric:true})||a.categoria.localeCompare(b.categoria));
 function pcVazio(t,cl){$('pcHead').innerHTML='';$('pcBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('pcNote').textContent=''}
@@ -9990,7 +10006,18 @@ const MANUAL=[
 <li><b>Fornecedor ou cliente que não está cadastrado:</b> no <b>Lançar</b>, use <b>+ Cadastrar</b> embaixo do campo Fornecedor (ou Cliente). Informe o CNPJ ou o CPF (obrigatório; com o CNPJ os dados vêm da Receita). Se o CNPJ/CPF ou o nome já existirem, o portal mostra o cadastro e oferece usar o que já existe, sem repetir. O mesmo botão está nas Contas a pagar, nas Contas a receber e na Movimentação financeira.</li>
 <li><b>Desfazer</b> numa linha conciliada pergunta se apaga o lançamento (ele sai também das contas a pagar ou a receber e do extrato) ou se só desfaz a ligação.</li>
 </ul>
-<div class="mndica"><b>Dica:</b> ao lançar, marque <b>Lembrar</b>. As próximas linhas com o mesmo texto do banco já chegam com a sugestão, e é só usar <b>Aprovar todas as sugestões</b>.</div>`}]},
+<div class="mndica"><b>Dica:</b> ao lançar, marque <b>Lembrar</b>. As próximas linhas com o mesmo texto do banco já chegam com a sugestão, e é só usar <b>Aprovar todas as sugestões</b>.</div>`},
+    {k:'gfpes',t:'Clientes e fornecedores',
+      txt:`<p>O cadastro de quem paga e de quem recebe. É <b>um só</b> e vale para <b>todas as empresas</b>, inclusive as que forem cadastradas depois: uma empresa nova já usa o mesmo cadastro.</p>
+<ol>
+<li>Clique em <b>+ Novo cadastro</b>, digite o CNPJ ou o CPF e saia do campo. Com o CNPJ, o nome, o endereço e a situação vêm da Receita.</li>
+<li>Escolha se é cliente, fornecedor ou os dois, complete o que faltar (telefone, Pix, banco) e salve.</li>
+</ol>
+<ul>
+<li><b>Sem repetidos:</b> o mesmo CNPJ/CPF não entra duas vezes, e o mesmo nome só entra de novo com outro CNPJ.</li>
+<li><b>Na hora do lançamento:</b> nas contas a pagar e a receber, na conciliação e na movimentação, use <b>+ Cadastrar</b> embaixo do campo Fornecedor ou Cliente.</li>
+<li>Nos boletos e notas a pagar, no cartão e na tesouraria, ao digitar o fornecedor aparecem os nomes do cadastro para escolher.</li>
+</ul>`}]},
   {g:'Comunicação',itens:[
     {k:'tarefas',t:'Tarefas e recados',img:'tarefas.png',
       txt:`<p>Um quadro com as tarefas da equipe e os recados trocados com os clientes, em quatro colunas: <b>A fazer</b>, <b>Em andamento</b>, <b>Aguardando terceiros</b> e <b>Concluída</b>.</p>
@@ -10202,6 +10229,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-05pes2',data:'2026-11-05',t:'Clientes e fornecedores valem para todas as empresas',itens:[
+    {x:'O cadastro de clientes e fornecedores é um só e vale para todas as empresas, inclusive as que forem cadastradas depois. Cadastrou uma empresa nova? Ela já usa o mesmo cadastro, sem precisar copiar nada.'},
+    {x:'Boletos e notas a pagar, Cartão de crédito e Tesouraria: ao digitar o fornecedor, aparecem os nomes do cadastro para escolher (só o nome e o CNPJ/CPF).',mods:['pagar','cartao','tesouraria']}]},
   {k:'2026-11-05pmes',data:'2026-11-05',t:'Boletos e notas: contas do mês e o que você já enviou',itens:[
     {x:'Rotina diária › Boletos e notas fiscais a pagar: o quadro “Contas do mês” mostra tudo o que a Controlacs tem para pagar no mês, inclusive o que chegou por e-mail, e o que falta enviar o boleto. Conforme os pagamentos são feitos, a conta aparece como paga. É só para consultar.',mods:['pagar']},
     {x:'Na conta que falta o boleto, o botão “📎 Enviar boleto” já abre o envio com a descrição preenchida.',mods:['pagar']},
