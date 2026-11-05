@@ -877,7 +877,6 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <input id="rnBusca" data-rnf placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
     </div>
     <div class="tiles" id="rnTiles"></div>
-    <div class="row" id="rnRemTopo" style="gap:8px;flex-wrap:wrap;margin:8px 0" hidden></div>
     <div class="alerta" id="rnBulk" hidden><span id="rnBulkTxt"></span><span class="row" style="gap:8px;flex-wrap:wrap" id="rnBulkBtns"></span></div>
     <div class="card tablebox"><table><thead id="rnHead"></thead><tbody id="rnBody"></tbody></table></div>
     <div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px;flex-wrap:wrap"><span id="rnRem" class="row" style="gap:8px;flex-wrap:wrap"></span><button class="btn primary" id="rnGerar" hidden></button></div>
@@ -11037,7 +11036,7 @@ const MANUAL=[
 <li><b>Conciliar sem enviar o extrato de novo:</b> abra a conta e use <b>🔗 Conciliar</b> no pagamento (por exemplo, depois de estornar para corrigir a categoria e registrar o pagamento de novo). O portal liga à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias); se não achar, pergunta se marca como conciliado mesmo assim. <b>Desconciliar</b> tira só a ligação com o extrato. Na conta nova, <b>🔗 Salvar quitado e conciliado</b> já lança paga e conciliada.</li>
 <li><b>Forma de pagamento de cada pagamento:</b> no <b>Registrar pagamento</b> e no <b>$ Salvar quitado</b> a forma de pagamento já vem a do lançamento, e dá para trocar (por exemplo, parte em <b>Pix</b> no banco e parte em <b>Dinheiro</b> na Tesouraria). A forma aparece na lista de pagamentos da conta.</li>
 <li><b>Pagamento em mais de uma conta:</b> quando parte sai de uma conta e parte de outra (por exemplo, parte da <b>Tesouraria</b> e parte do banco), clique em <b>+ Pagar parte em outra conta</b>, escolha a outra conta, a forma de pagamento e o valor dessa parte. O restante sai da conta escolhida no campo <b>Conta</b>. Cada parte entra no extrato da sua conta. Funciona no <b>Registrar pagamento</b>, no <b>$ Salvar quitado</b> (uma parcela por vez) e no <b>Marcar como pago</b> do Repasse de parceiros.</li>
-<li><b>Remessa dos repasses:</b> depois de gerar as contas a pagar, os botões <b>Remessa [empresa]</b> aparecem abaixo dos quadros do topo e no fim da lista do Repasse da semana. Só aparecem para a empresa que tem repasse com conta a pagar ainda não paga; se tudo do relatório já foi pago, não aparece botão.</li>
+<li><b>Remessa dos repasses:</b> no Repasse da semana, marque só os repasses que vão no arquivo do banco e clique em <b>Gerar remessa</b>. Escolha a empresa que vai pagar: o Envio de remessa abre só com os marcados. Os sem empresa são separados nela na hora; os já separados em outra empresa ficam de fora.</li>
 <li><b>Repasse já separado ou já pago:</b> no Repasse da semana, o repasse que já tem empresa (conta a pagar criada) fica com a linha verde-azulada e a etiqueta <b>➜ Já separado em …</b>; o já pago fica verde, com <b>✓ Já pago</b>. Se marcar de novo um repasse já separado na mesma empresa, o portal avisa e não muda nada.</li>
 <li><b>Repasse da semana:</b> a tela abre em branco. Escolha em <b>Relatório</b> qual relatório quer ver (os totais e os parceiros são só dele). Para achar um relatório antigo, use o período em <b>Relatórios de</b> e <b>até</b>. O relatório importado agora já abre escolhido.</li>
 <li><b>Repasse de parceiros com o mesmo parceiro repetido:</b> ao importar o relatório, as linhas do mesmo parceiro (mesmo nome) são somadas numa linha só, com os protocolos juntos, para fazer um pagamento único. O aviso da importação lista quem foi somado.</li>
@@ -11353,8 +11352,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
-  {k:'2026-11-05rnremtopo',data:'2026-11-05',t:'Repasse da semana: botão de remessa também no topo',itens:[
-    {x:'Os botões “Remessa [empresa]” agora aparecem também logo abaixo dos quadros do topo, além do fim da lista. Eles aparecem para cada empresa que tem conta a pagar de repasse ainda não paga no relatório escolhido.'}]},
+  {k:'2026-11-05rnremsel',data:'2026-11-05',t:'Repasse da semana: remessa só dos repasses marcados',itens:[
+    {x:'A remessa do repasse agora é feita só com o que você marcar. Marque os repasses que vão no arquivo do banco e clique em “Gerar remessa”: escolha a empresa que vai pagar e o Envio de remessa abre só com eles. Os outros repasses da empresa (pagos por fora ou em outro dia) não entram.'},
+    {x:'Repasse ainda sem empresa é separado na empresa escolhida na hora. Repasse já separado em outra empresa fica de fora e aparece no aviso.'},
+    {x:'Os botões “Remessa [empresa]”, que somavam tudo da empresa, saíram da tela.'}]},
   {k:'2026-11-05rnjasep',data:'2026-11-05',t:'Repasse da semana: já separados e já pagos em destaque',itens:[
     {x:'No Repasse da semana, o repasse que já tem empresa escolhida (conta a pagar criada) fica com a linha verde-azulada e a etiqueta “➜ Já separado em …” ao lado do nome. O que já foi pago fica verde, com “✓ Já pago”. Assim não dá para confundir e pagar de novo. A seleção continua funcionando para estornar ou trocar a empresa.',mods:['gfrepasse']}]},
   {k:'2026-11-05parcseguro',data:'2026-11-05',t:'Repasse de parceiros: parceiro certo na conta a pagar',itens:[
@@ -12105,7 +12106,7 @@ async function renderRN(recarrega=true){
   sel.value=lsL.some(l=>l.id===cur)?cur:'';
   RN.lote=RN.lotes.find(l=>l.id===sel.value)||null;
   document.querySelectorAll('#rnBar [data-rnf]').forEach(x=>x.hidden=!RN.lote);
-  if(!RN.lote&&RN.lotes.length){RN.itens=[];RN.sel.clear();$('rnRem').innerHTML='';$('rnRemTopo').innerHTML='';$('rnRemTopo').hidden=true;
+  if(!RN.lote&&RN.lotes.length){RN.itens=[];RN.sel.clear();$('rnRem').innerHTML='';
     rnVazio(`Escolha em <b>Relatório</b> qual relatório quer ver. Para achar um relatório antigo, use o período em <b>Relatórios de</b> e <b>até</b>. Para um relatório novo, use <b>Importar relatório de repasses</b>.`);
     $('rnBar').hidden=false;return}
   if(!RN.lote){rnVazio(`Nenhum relatório importado no grupo ${esc(RN.grupo.nome)}. Use “Importar relatório de repasses” com o relatório de restituições (.xls).`+(RN.nf.length?'':' Importe também o controle de NF dos parceiros, para o sistema saber quem emite nota.'));return}
@@ -12167,23 +12168,17 @@ function rnDesenha(){
     .map((t,i)=>`<div class="card tile"${t[0]==='Alteração de conta'?' data-rf="alt"':t[0]==='Desconto a fazer'?' data-rf="desc"':t[0]==='Falta pagar'?' data-rs="falta"':''}${['Alteração de conta','Desconto a fazer','Falta pagar'].includes(t[0])?' style="cursor:pointer" title="Clique para filtrar"':''}><div class="k">${t[0]}</div><div class="v${t[0]==='Sem empresa'&&semE.length||t[0]==='Não encontrados'||t[0]==='Alteração de conta'||t[0]==='Desconto a fazer'?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   const ns=RN.sel.size;$('rnBulk').hidden=!ns;
   $('rnBulkTxt').textContent=`${ns} ${ns===1?'repasse selecionado':'repasses selecionados'} · ${fm(soma(it.filter(i=>RN.sel.has(i.id))))}`;
-  $('rnBulkBtns').innerHTML=G.empresas.map(id=>`<button type="button" class="btn small primary" data-rb="${id}">Pagar em ${esc(rnEmpNome(id))}</button>`).join('')+'<button type="button" class="btn small primary" data-rb="pago">Marcar como pago</button><button type="button" class="btn small" data-rb="-">Tirar a empresa</button><button type="button" class="btn small ghost" data-rb="limpa">Limpar seleção</button>';
+  $('rnBulkBtns').innerHTML=G.empresas.map(id=>`<button type="button" class="btn small primary" data-rb="${id}">Pagar em ${esc(rnEmpNome(id))}</button>`).join('')+'<button type="button" class="btn small primary" data-rb="rem">Gerar remessa</button><button type="button" class="btn small primary" data-rb="pago">Marcar como pago</button><button type="button" class="btn small" data-rb="-">Tirar a empresa</button><button type="button" class="btn small ghost" data-rb="limpa">Limpar seleção</button>';
   const prontos=it.filter(i=>i.empresa_id&&!i.titulo_id);$('rnGerar').hidden=!prontos.length;
   $('rnGerar').textContent=`Gerar ${prontos.length} ${prontos.length===1?'conta':'contas'} a pagar (${fm(soma(prontos))})`;
-  // remessa de pagamento (CNAB) de cada empresa, com as contas a pagar dos repasses ainda não pagas
-  $('rnRem').innerHTML=G.empresas.map(id=>{const l=it.filter(i=>i.empresa_id===id&&i.titulo_id&&RN.tits[i.titulo_id]&&RN.tits[i.titulo_id].pago<RN.tits[i.titulo_id].valor-0.004);
-    return l.length?`<button type="button" class="btn" data-rem="${id}" title="Abre o Envio de remessa da empresa só com estes repasses">Remessa ${esc(rnEmpNome(id))} (${l.length} · ${fm(soma(l))})</button>`:''}).join('');
-  $('rnRemTopo').innerHTML=$('rnRem').innerHTML?'<span class="muted" style="align-self:center">Remessa de pagamento:</span>'+$('rnRem').innerHTML:'';$('rnRemTopo').hidden=!$('rnRem').innerHTML;
+  // remessa: só dos repasses selecionados, pelo botão “Gerar remessa” (Carol, 05/11)
+  $('rnRem').innerHTML='';
   const faltaG=G.empresas.length<4?`<b>O grupo ${esc(G.nome)} tem ${G.empresas.length} ${G.empresas.length===1?'empresa':'empresas'}. Confira em “Empresas do grupo”.</b><br>`:'';
   $('rnNote').innerHTML=faltaG+(RN.nf.length?'':'<b>O controle de NF está vazio: importe a planilha de controle de NF dos parceiros.</b><br>')
     +'Para separar, marque os repasses e clique em “Pagar em” da empresa: a coluna “Pagar em” é preenchida e a conta a pagar já é criada nessa empresa (se o repasse estava em outra empresa e ainda não foi pago, a conta a pagar muda para a nova). Use o filtro Situação “Falta pagar” para ver só o que ainda não foi pago. Parceiro com alteração de conta fica em vermelho e com desconto a fazer fica em amarelo; ao importar o relatório, aparece um aviso com os dois. '
-    +'Pagou pelo internet banking? Marque os repasses e use “Marcar como pago”: escolha a data e a conta de cada empresa, e o pagamento entra nas Contas a pagar e no extrato da conta. Depois de gerar as contas a pagar, use “Remessa” de cada empresa para gerar o arquivo de pagamento do banco só com estes repasses (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
+    +'Pagou pelo internet banking? Marque os repasses e use “Marcar como pago”: escolha a data e a conta de cada empresa, e o pagamento entra nas Contas a pagar e no extrato da conta. Para pagar por remessa, marque só os repasses que vão no arquivo e clique em “Gerar remessa”: escolha a empresa e o Envio de remessa abre só com eles (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
 }
 ['rnLote','rnDe','rnAte'].forEach(id=>$(id).onchange=()=>renderRN(false));
-[$('rnRem'),$('rnRemTopo')].forEach(el=>el.addEventListener('click',e=>{const b=e.target.closest('[data-rem]');if(!b)return;const id=b.dataset.rem;
-  const ids=new Set(RN.itens.filter(i=>i.empresa_id===id&&i.titulo_id).map(i=>i.titulo_id));
-  RM.so={cli:id,ids,data:RN.lote.vencimento||proxQuinta(),txt:`os repasses de parceiros do relatório de ${dBR(RN.lote.data_relatorio)}`};
-  escCli.value=id;guardaEmp();go('gfremessa')}));
 $('rnFiltro').onchange=$('rnEmpF').onchange=$('rnSitF').onchange=()=>rnDesenha();
 $('rnTiles').addEventListener('click',e=>{const t=e.target.closest('[data-rf],[data-rs]');if(!t)return;if(t.dataset.rf)$('rnFiltro').value=t.dataset.rf;if(t.dataset.rs)$('rnSitF').value=t.dataset.rs;rnDesenha()});
 $('rnBusca').oninput=()=>{clearTimeout(rnDesenha.t);rnDesenha.t=setTimeout(rnDesenha,200)};
@@ -12250,6 +12245,7 @@ async function rnSalvaConta(b){
 }
 $('rnBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-rb]');if(!b)return;
   if(b.dataset.rb==='limpa'){RN.sel.clear();return rnDesenha()}
+  if(b.dataset.rb==='rem')return rnAbreRem(RN.itens.filter(i=>RN.sel.has(i.id)&&!rnPago(i)));
   if(b.dataset.rb==='pago')return rnAbrePago(RN.itens.filter(i=>RN.sel.has(i.id)&&!rnPago(i)));
   b.disabled=true;await rnPagarEm(RN.itens.filter(i=>RN.sel.has(i.id)&&!rnPago(i)),b.dataset.rb==='-'?null:b.dataset.rb);b.disabled=false;rnDesenha()});
 // escolher a empresa já cria a conta a pagar nela; se estava em outra empresa (sem pagamento), a conta muda de empresa (Carol, 03/11)
@@ -12421,6 +12417,37 @@ const rnPago=it=>{const t=it.titulo_id&&RN.tits[it.titulo_id];return !!t&&t.pago
 const RNST={sem:['Sem conta a pagar','c-none'],aberto:['Em aberto','c-warn'],atrasado:['Atrasado','c-bad'],pago:['Pago','c-done'],conciliado:['Conciliado','c-ok']};
 function rnStatus(it){const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t)return 'sem';
   if(t.pago>=t.valor-0.004)return t.conc?'conciliado':'pago';return t.vencimento<TODAY?'atrasado':'aberto'}
+// remessa de pagamento só dos repasses selecionados, numa empresa escolhida na hora (Carol, 05/11)
+function rnAbreRem(ls){
+  if(!ls.length)return alert('Os repasses marcados já estão pagos. Nada para enviar na remessa.');
+  const emps=RN.grupo.empresas,conta=id=>ls.filter(i=>i.empresa_id===id).length;
+  const pad=emps.reduce((a,id)=>conta(id)>conta(a)?id:a,emps[0]);
+  RN.dlg={modo:'rem',ls};$('rnDFoot').querySelector('[data-act="salvar"]').textContent='Abrir a remessa';
+  $('rnDTit').textContent=`Gerar remessa de ${ls.length} ${ls.length===1?'repasse':'repasses'}`;
+  $('rnDBody').innerHTML=`<p class="note" style="margin:0">A remessa vai só com os repasses marcados, de uma empresa por vez. Os outros repasses da empresa não entram.</p>
+    <label class="f">Empresa que vai pagar<select id="rnRemEmp">${emps.map(id=>`<option value="${id}"${id===pad?' selected':''}>${esc(rnEmpNome(id))}${conta(id)?` · ${conta(id)} já separado${conta(id)===1?'':'s'} aqui`:''}</option>`).join('')}</select></label>
+    <div id="rnRemRes" class="note" style="margin:0"></div>`;
+  const res=()=>{const emp=$('rnRemEmp').value,vai=ls.filter(i=>i.empresa_id===emp),sem=ls.filter(i=>!i.empresa_id),fora=ls.filter(i=>i.empresa_id&&i.empresa_id!==emp);
+    $('rnRemRes').innerHTML=`Vão na remessa: <b>${vai.length+sem.length}</b> · ${fm(r2([...vai,...sem].reduce((x,i)=>x+(+i.valor),0)))}`
+      +(sem.length?`<br>${sem.length} ainda sem empresa ${sem.length===1?'será separado':'serão separados'} em ${esc(rnEmpNome(emp))} (a conta a pagar é criada agora).`:'')
+      +(fora.length?`<br><b>Ficam de fora</b> (já separados em outra empresa): ${fora.map(i=>esc(i.nome.trim())+' em '+esc(rnEmpNome(i.empresa_id))).join(', ')}.`:'')};
+  $('rnRemEmp').onchange=res;res();dlgRN.showModal();
+}
+async function rnSalvaRem(b){
+  const emp=$('rnRemEmp').value,ls=RN.dlg.ls,sem=ls.filter(i=>!i.empresa_id),vai=ls.filter(i=>i.empresa_id===emp||!i.empresa_id);
+  if(!vai.length)return alert(`Nenhum dos repasses marcados está em ${rnEmpNome(emp)} ou sem empresa.`);
+  b.disabled=true;
+  if(sem.length)await rnPagarEm(sem,emp);
+  // quem já tem conta a pagar na empresa e ainda não tem: cria agora
+  const falta=vai.filter(i=>i.empresa_id===emp&&!i.titulo_id);
+  if(falta.length){try{await rnCriaTitulos(falta,RN.lote.vencimento||proxQuinta(),{n:0})}catch(e){b.disabled=false;return fail(e)}}
+  b.disabled=false;
+  const ids=new Set(vai.filter(i=>i.empresa_id===emp&&i.titulo_id).map(i=>i.titulo_id));
+  if(!ids.size){renderRN(false);return alert('Não foi possível separar os repasses nesta empresa. Confira e tente de novo.')}
+  dlgRN.close();RN.sel.clear();GT.key='';
+  RM.so={cli:emp,ids,data:RN.lote.vencimento||proxQuinta(),txt:`${ids.size===1?'o repasse de parceiro marcado':`os ${ids.size} repasses de parceiros marcados`} (relatório de ${dBR(RN.lote.data_relatorio)})`};
+  escCli.value=emp;guardaEmp();go('gfremessa');
+}
 function rnAbrePago(ls){
   const sem=ls.filter(i=>!i.empresa_id);
   if(sem.length)return alert(`Escolha antes em qual empresa ${sem.length===1?'foi pago':'foram pagos'} ${sem.length===1?'1 repasse':sem.length+' repasses'} (coluna “Pagar em”).`);
@@ -12498,6 +12525,7 @@ $('rnCfg').onclick=()=>{RN.dlg={modo:'grupo'};$('rnDFoot').querySelector('[data-
   dlgRN.showModal()};
 $('rnDFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgRN.close();
   if(RN.dlg?.modo==='pago')return rnSalvaPago(b);
+  if(RN.dlg?.modo==='rem')return rnSalvaRem(b);
   if(RN.dlg?.modo==='conta')return rnSalvaConta(b);
   if(RN.dlg?.modo==='aviso')return dlgRN.close();
   const nome=$('rnGNome').value.trim(),emps=[...$('rnGEmps').querySelectorAll('input:checked')].map(x=>x.value),err=t=>{$('rnGErr').textContent=t;$('rnGErr').hidden=false};
