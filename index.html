@@ -7640,13 +7640,13 @@ function cnabSicredi({conta,empresa,nsa,agora,itens}){
   const a=agConta(conta),cnpj=soDig(empresa.cnpj),ti=cnpj.length===11?'1':'2',conv=conta.cnab_convenio;
   const L=[],lin=s=>{if(s.length!==240)throw new Error('Linha do CNAB com '+s.length+' posições');L.push(s)};
   const hh=agora.toTimeString().slice(0,8).replace(/:/g,''),hoje=isoLocal(agora);
-  lin('748'+'0000'+'0'+cB(9)+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+cX(a.agdv,1)+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cX('SICREDI',30)+cB(10)
+  lin('748'+'0000'+'0'+cB(9)+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+' '+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cX('SICREDI',30)+cB(10)
     +'1'+cD(hoje)+hh+cN(nsa,6)+'082'+'01600'+cB(20)+cB(20)+cB(29));
   const grupos=[['03','30',i=>i.forma==='boleto'&&i.banco==='748'],['03','31',i=>i.forma==='boleto'&&i.banco!=='748'],['22','11',i=>i.forma==='consumo'],['20','45',i=>i.forma==='pix']];
   let lote=0;
   for(const [serv,forma,f] of grupos){const its=itens.filter(f);if(!its.length)continue;lote++;
     const lt=cN(lote,4),ini=L.length;let seq=0,soma=0;const sq=()=>cN(++seq,5);
-    lin('748'+lt+'1'+'C'+serv+forma+'042'+' '+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+cX(a.agdv,1)+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cB(40)
+    lin('748'+lt+'1'+'C'+serv+forma+'042'+' '+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+' '+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cB(40)
       +cB(30)+cN(0,5)+cB(15)+cB(20)+cN(0,5)+cN(0,3)+cB(2)+cB(8)+cB(10));
     for(const i of its){soma+=Math.round(i.valor*100);
       if(i.forma==='boleto'){
