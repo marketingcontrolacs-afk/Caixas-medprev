@@ -166,6 +166,9 @@ tfoot td{font-weight:700;background:var(--sunk)}
 .gxext th,.gxext td{padding:4px 6px}
 }
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:16px}
+.expgrp{display:inline-flex;gap:8px;align-items:center}.expdd{position:relative}.expdd>summary{list-style:none}.expdd>summary::-webkit-details-marker{display:none}
+.expmenu{position:absolute;left:0;top:calc(100% + 4px);z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:grid;min-width:170px;padding:4px}
+.expmenu button{background:none;border:0;text-align:left;padding:9px 12px;font:600 14px var(--body);color:var(--ink);cursor:pointer;border-radius:6px}.expmenu button:hover,.expmenu button:focus-visible{background:var(--brand-soft)}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;width:min(680px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
 .fin{display:flex;align-items:center;gap:2px}.fin input{min-width:90px;width:100%;padding:4px 6px;font-size:13px;border-color:transparent;background:transparent}.fin input:hover{border-color:var(--line)}.fin input:focus{background:var(--surface);border-color:var(--brand)}.ffixo{border:0;background:none;cursor:pointer;font-size:12px;padding:2px;opacity:.3;filter:grayscale(1)}.ffixo:hover{opacity:.8}.ffixo.on{opacity:1;filter:none}.fvolta{border:0;background:none;color:var(--warn);cursor:pointer;font-size:15px;padding:2px 4px}#folGrid td{padding:4px 6px}td.fadj{background:var(--warn-soft)}td.fpend{background:var(--bad-soft)}td.fpend input,td.fpend{color:var(--bad);font-weight:600}.fadto{display:inline-flex;gap:2px;margin-left:2px}.fadto button{border:1px solid var(--line);background:var(--surface);border-radius:4px;cursor:pointer;font-size:12px;padding:1px 5px;line-height:1.4}.fadto button[data-adto=ok]{color:var(--ok)}.fadto button[data-adto=x]{color:var(--bad)}td.fpend{white-space:nowrap}#folGrid td.fpend .fin{display:inline-flex;width:auto;vertical-align:middle}#folGrid td.fpend .fin input{width:90px}.fadto{vertical-align:middle}
 .fdet{display:block;padding:16px 18px;min-width:0}.fdet>*+*{margin-top:12px}.fdet summary{cursor:pointer}
@@ -659,7 +662,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     </div>
     <div id="tabPainel">
       <div class="tiles" id="tiles"></div>
-      <div class="toolbar"><span class="spacer"></span><button class="btn" id="btnPlanMes">Baixar planilha do período</button></div>
+      <div class="toolbar"><span class="spacer"></span><span class="expgrp" id="escExp" data-exp="esc"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn" id="btnPlanMes">Baixar planilha do período</button></div>
       <div class="card tablebox">
         <table>
           <thead><tr><th>Dia</th><th>Dinheiro</th><th>Saídas</th><th>Falta/sobra</th><th>Débito</th><th>Dif. débito</th><th>Crédito</th><th>Juros</th><th class="l">Situação</th></tr></thead>
@@ -675,7 +678,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewMod" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="mTitle"></h1><p class="sub" id="mSub"></p></div>
-      <div class="row" style="align-items:flex-end"><label class="f" id="mFiltroBox">Mostrar<select id="mFiltro"></select></label><label class="f" id="mPerBox">De<input type="date" id="mIni"></label><label class="f" id="mPerBox2">Até<input type="date" id="mFim"></label><label class="f" id="mTipoBox" hidden>Lançamentos<select id="mTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f" id="mFiltroBox">Mostrar<select id="mFiltro"></select></label><label class="f" id="mPerBox">De<input type="date" id="mIni"></label><label class="f" id="mPerBox2">Até<input type="date" id="mFim"></label><label class="f" id="mTipoBox" hidden>Lançamentos<select id="mTipo"><option value="">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select></label><button class="btn primary" id="mNovo">+ Novo lançamento</button><span class="expgrp" id="modExp" data-exp="mod"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span></div>
     </div>
     <div class="tiles" id="mTiles"></div>
     <div id="mConf"></div>
@@ -693,7 +696,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     </div>
     <div class="alerta" id="pAlerta" hidden></div>
     <div class="tiles" id="pTiles"></div>
-    <div class="toolbar"><input id="pBusca" placeholder="Buscar parceiro" style="max-width:280px"></div>
+    <div class="toolbar"><input id="pBusca" placeholder="Buscar parceiro" style="max-width:280px"><span class="spacer"></span><span class="expgrp" id="repExp" data-exp="rep"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span></div>
     <div class="card tablebox"><table><thead id="pHead"></thead><tbody id="pBody"></tbody></table></div>
     <p class="note" id="pNote"></p>
   </section>
@@ -722,7 +725,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <button class="btn ghost mvf" id="mvLimpa" hidden>Limpar filtros</button>
       <button class="btn mvf" id="mvTroca" hidden>Trocar a categoria dos filtrados</button>
       <button class="btn mvf" id="mvValida" hidden>Marcar os filtrados como validados</button>
-      <button class="btn mvf" id="mvXls" hidden>Baixar Excel</button>
+      <span class="expgrp" id="gtExp" data-exp="gt"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span>
     </div>
     <div class="cal" id="gtCal" hidden></div>
     <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
@@ -759,7 +762,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewRel" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="relTitle"></h1><p class="sub" id="relSub"></p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="relXls">Baixar Excel</button><button class="btn primary" id="relSalvar" hidden>Salvar orçamento</button></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="relXls" data-exp="rel"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="relSalvar" hidden>Salvar orçamento</button></div>
     </div>
     <div class="toolbar">
       <label class="f" id="relIniBox">De<input type="date" id="relIni"></label>
@@ -778,7 +781,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewGX" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Extrato da conta</h1><p class="sub" id="gxSub"></p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="gxBaixar" hidden>Baixar planilha</button><button class="btn primary" id="gxAvulso" hidden>+ Lançamento avulso</button></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="gxBaixar" data-exp="gx" hidden><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="gxAvulso" hidden>+ Lançamento avulso</button></div>
     </div>
     <div class="toolbar">
       <label class="f">Conta<select id="gxConta"></select></label>
@@ -809,7 +812,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewGC" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Conciliação bancária</h1><p class="sub">Importe o OFX do banco e ligue cada linha a um lançamento do sistema. O que o sistema reconhece chega como sugestão, só para aprovar. O que não for validado fica aqui como pendente até você validar ou ignorar.</p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="gcAprovaTodas" hidden></button><span class="btn primary fotobtn" id="gcImp" hidden>Importar OFX<input type="file" id="gcArq" accept=".ofx,.OFX,application/x-ofx,text/plain" aria-label="Importar arquivo OFX"></span></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="gcExp" data-exp="gc"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn" id="gcAprovaTodas" hidden></button><span class="btn primary fotobtn" id="gcImp" hidden>Importar OFX<input type="file" id="gcArq" accept=".ofx,.OFX,application/x-ofx,text/plain" aria-label="Importar arquivo OFX"></span></div>
     </div>
     <div class="toolbar">
       <label class="f">Conta<select id="gcConta"></select></label>
@@ -834,7 +837,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Controle de notas fiscais</h1><p class="sub" id="nfSub">Notas fiscais emitidas pelos parceiros, mês a mês. Quem tem nota lançada passa a “Emite NF”, e isso vale também no Repasse de parceiros.</p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="nfNovo" hidden>+ Parceiro</button><span class="btn fotobtn" id="nfImp" hidden>Importar planilha<input type="file" id="nfImpArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF"></span><button class="btn" id="nfXls" hidden>Exportar Excel</button></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="nfNovo" hidden>+ Parceiro</button><span class="btn fotobtn" id="nfImp" hidden>Importar planilha<input type="file" id="nfImpArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF"></span><span class="expgrp" id="nfXls" data-exp="nf" hidden><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span></div>
     </div>
     <div class="toolbar" id="nfBar" hidden>
       <label class="f">Ano<select id="nfAno"></select></label>
@@ -864,14 +867,14 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Repasse de parceiros</h1><p class="sub">Importe o relatório de restituições da semana. O sistema separa quem emite nota fiscal e quem não emite e traz a conta e o Pix de cada parceiro. Você escolhe em qual empresa do grupo cada repasse vai ser pago e gera as contas a pagar.</p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="rnCfg" hidden>Empresas do grupo</button><span class="btn fotobtn" id="rnCtrl" hidden>Importar controle de NF<input type="file" id="rnCtrlArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF dos parceiros"></span><button class="btn" id="rnXls" hidden>Baixar Excel</button><span class="btn primary fotobtn" id="rnImp" hidden>Importar relatório de repasses<input type="file" id="rnArq" accept=".xls,.xlsx" aria-label="Importar o relatório de restituições"></span></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="rnCfg" hidden>Empresas do grupo</button><span class="btn fotobtn" id="rnCtrl" hidden>Importar controle de NF<input type="file" id="rnCtrlArq" accept=".xlsx,.xls" aria-label="Importar a planilha de controle de NF dos parceiros"></span><span class="expgrp" id="rnXls" data-exp="rn" hidden><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><span class="btn primary fotobtn" id="rnImp" hidden>Importar relatório de repasses<input type="file" id="rnArq" accept=".xls,.xlsx" aria-label="Importar o relatório de restituições"></span></div>
     </div>
     <div class="toolbar" id="rnBar" hidden>
       <label class="f">Relatórios de<input type="date" id="rnDe" title="Mostra na lista só os relatórios a partir desta data"></label>
       <label class="f">até<input type="date" id="rnAte" title="Mostra na lista só os relatórios até esta data"></label>
       <label class="f">Relatório<select id="rnLote"></select></label>
       <label class="f" data-rnf>Pagamento em<input type="date" id="rnVenc"></label>
-      <label class="f" data-rnf>Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option></select></label>
+      <label class="f" data-rnf>Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="semPix">Sem chave Pix</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option></select></label>
       <label class="f" data-rnf>Situação<select id="rnSitF"><option value="">Todas</option><option value="falta">Falta pagar</option><option value="sem">Sem empresa (sem conta a pagar)</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="pago">Pagos</option><option value="conciliado">Conciliados</option></select></label>
       <label class="f" data-rnf>Empresa<select id="rnEmpF"></select></label>
       <input id="rnBusca" data-rnf placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
@@ -887,7 +890,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewFat" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Fatura do cartão de crédito</h1><p class="sub">Tudo o que foi pago com o cartão é lançado aqui, na fatura em que vai cair. No fim do mês, confira com a fatura do banco e feche: ela vira uma conta a pagar.</p></div>
-      <div class="row" style="align-items:flex-end"><button class="btn" id="ftImp" hidden></button><button class="btn" id="ftXls" hidden>Baixar Excel</button><button class="btn primary" id="ftNovo" hidden>+ Lançamento no cartão</button></div>
+      <div class="row" style="align-items:flex-end"><button class="btn" id="ftImp" hidden></button><span class="expgrp" id="ftXls" data-exp="fat" hidden><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="ftNovo" hidden>+ Lançamento no cartão</button></div>
     </div>
     <div class="toolbar">
       <label class="f">Cartão<select id="ftConta"></select></label>
@@ -5814,6 +5817,144 @@ function xTabela(ws,{money=[],neg=[],texto=[],nomeCol=-1,alturaCab=30}={}){
     xSt(ws,r,c,XS.cel,r%2?null:XS.zebra,cel&&(cel.t==='n'||cel.t==='d')?XS.num:texto.includes(c)?XS.txt:null,c===nomeCol?XS.nome:null)}
   ws['!rows']=[{hpt:alturaCab}];
 }
+// =====================================================================
+// EXPORTAR E IMPRIMIR O QUE ESTÁ NA TELA (Carol, 06/11): em toda tela que lista movimentações, o botão “Exportar”
+// gera Excel ou PDF e o “Imprimir” imprime, sempre só com o que está filtrado na tela (não tudo o que está cadastrado).
+// Cada tela tem um “fornecedor” em EXPT que devolve {titulo,sub,H,rows,tot}; sem fornecedor próprio, lê a tabela da tela.
+// =====================================================================
+const expEmpresa=()=>{try{const o=escCli?.selectedOptions?.[0];return o?o.text.trim():''}catch(e){return ''}};
+const expMoeda=s=>{const m=/^(-|−)?\s*R\$\s*(-|−)?\s*([\d.]+,\d{2})$/.exec(s);if(!m)return null;const v=+m[3].replace(/\./g,'').replace(',','.');return (m[1]||m[2])?-v:v};
+// texto de uma célula como aparece: lista escolhida vira o texto escolhido, campo vira o valor, botões e caixas de marcar saem
+function expCel(td){
+  if(td.dataset.v!=null&&td.dataset.v!==''&&!isNaN(+td.dataset.v))return +td.dataset.v;
+  const c=td.cloneNode(true);
+  c.querySelectorAll('select').forEach(s=>{const o=s.options[s.selectedIndex];s.replaceWith(document.createTextNode(o?o.text:''))});
+  c.querySelectorAll('input').forEach(i=>{if(i.type==='checkbox'||i.type==='radio'||i.type==='file'||i.type==='hidden')return i.remove();i.replaceWith(document.createTextNode(i.value||''))});
+  c.querySelectorAll('button,svg,.stic,.noexp,[hidden]').forEach(x=>x.remove());
+  c.querySelectorAll('br').forEach(b=>b.replaceWith(document.createTextNode('\n')));
+  c.querySelectorAll('div,p,li').forEach(b=>b.prepend(document.createTextNode('\n')));
+  const t=c.textContent.split('\n').map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean).join(' · ');
+  const n=expMoeda(t);return n!=null?n:t;
+}
+const expVis=el=>!el.hidden&&getComputedStyle(el).display!=='none';
+// lê uma tabela da tela: só as linhas que estão aparecendo; colunas sem título e sem nada escrito (marcar, botões) saem
+function expDaTabela(tb){
+  if(!tb)return {H:[],rows:[],tot:[]};
+  const lin=tr=>{const out=[];[...tr.cells].forEach(td=>{out.push(expCel(td));for(let i=1;i<(td.colSpan||1);i++)out.push('')});return out};
+  const hr=[...(tb.tHead?.rows||[])].filter(r=>expVis(r)&&!r.classList.contains('gcfil')&&!r.querySelector('input:not([type=checkbox]),select'));
+  const H=hr.length?lin(hr[0]).map(v=>typeof v==='number'?String(v):v):[];
+  const corpo=[...tb.tBodies].flatMap(b=>expVis(b)?[...b.rows]:[]).filter(expVis).map(lin);
+  const tot=[...(tb.tFoot?.rows||[])].filter(expVis).map(lin);
+  const W=Math.max(H.length,...corpo.map(r=>r.length),...tot.map(r=>r.length),0);
+  const vazia=r=>r.every(v=>v===''||v==null);
+  const keep=[...Array(W).keys()].filter(c=>(H[c]||'')!==''||corpo.some(r=>r[c]!==''&&r[c]!=null)||tot.some(r=>r[c]!==''&&r[c]!=null));
+  const pick=r=>keep.map(c=>r[c]??'');
+  return {H:pick(H),rows:corpo.map(pick).filter(r=>!vazia(r)),tot:tot.map(pick).filter(r=>!vazia(r))};
+}
+// filtros escolhidos na tela, para o subtítulo do relatório
+function expFiltros(sec){
+  const out=[];
+  sec.querySelectorAll('label.f').forEach(l=>{if(!expVis(l)||l.closest('[hidden]')||l.closest('dialog')||l.closest('.card'))return;const el=l.querySelector('select')||l.querySelector('input');if(!el||el.type==='file'||el.type==='checkbox')return;
+    const nome=[...l.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join(' ').trim();
+    let v=el.tagName==='SELECT'?(el.value?el.selectedOptions[0]?.text||'':''):el.value;
+    if(/^(todos|todas)$/i.test(el.value)||/^(todos|todas)$/i.test(String(v).trim()))v='';
+    if(el.type==='date'&&v)v=dBR(v);if(el.type==='month'&&v)v=v.slice(5)+'/'+v.slice(0,4);
+    if(v)out.push((nome?nome+': ':'')+v)});
+  sec.querySelectorAll('.toolbar > input:not([type]),.toolbar > input[type=text],.toolbar > input[type=search]').forEach(i=>{if(i.value.trim()&&expVis(i))out.push('Busca: '+i.value.trim())});
+  return out.join(' · ');
+}
+function expTela(secId,tblSel){
+  const sec=$(secId),tb=typeof tblSel==='string'?sec.querySelector(tblSel):tblSel;
+  const h1=[...sec.querySelectorAll('h1')].find(expVis)?.textContent.trim()||document.title;
+  return {titulo:h1,sub:expFiltros(sec),...expDaTabela(tb)};
+}
+// fornecedores por tela
+const EXPT={
+  esc:()=>expTela('viewEsc','table'),
+  mod:()=>expTela('viewMod','table'),
+  rep:()=>expTela('viewRep','table'),
+  rel:()=>expTela('viewRel','#relTable'),
+  gc:()=>expTela('viewGC',$('gcHead').closest('table')),
+  nf:()=>expTela('viewNF','.nfgrid table'),
+  fat:()=>expTela('viewFat',$('ftHead').closest('table')),
+  gt:()=>{
+    if(GT.modo!=='gfmov')return expTela('viewGT',$('gtHead').closest('table'));
+    const rows=GT.mvRows||[],cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'';
+    const sv=tp=>r2(rows.filter(x=>x.tipo===tp).reduce((a,x)=>a+(+x.valor||0),0));
+    return {titulo:'Movimentação financeira',sub:expFiltros($('viewGT')),H:['Data','Tipo','Conta','Fornecedor ou cliente','Descrição','Categoria','Documento','Entrada','Saída','Situação'],
+      rows:rows.map(x=>[dBR(x.data),mvNat(x),cn(x.conta_id),x.pessoa,x.descricao,x.categoria,x.documento,x.tipo==='entrada'?+x.valor:'',x.tipo==='saida'?+x.valor:'',mvSt(x)[1].replace('✓ ','')]),
+      tot:rows.length?[[`${rows.length} ${rows.length===1?'lançamento':'lançamentos'}`,'','','','','','',sv('entrada'),sv('saida'),'']]:[]};
+  },
+  gx:()=>{
+    if(!$('gxTes').hidden)return expTela('viewGX',$('gteHead').closest('table'));
+    const c=GX.conta,antes=isoLocal(new Date(dObj(GX.ini).getTime()-864e5)),rows=[[dBR(antes),'Saldo anterior','','','','','',GX.ant]];
+    gxLinhas().forEach(x=>rows.push(x.m?[dBR(x.m.data),x.m.descricao||'',x.m.pessoa_nome||'',x.m.documento||'',x.m.categoria||'',x.m.tipo==='entrada'?+x.m.valor:'',x.m.tipo==='saida'?+x.m.valor:'',x.saldo]:[dBR(x.dia),'Total do dia','','','',x.ent||'',x.sai||'',x.saldo]));
+    return {titulo:`Extrato da conta ${c?.nome||''}`,sub:expFiltros($('viewGX')),H:['Data','Descrição','Fornecedor ou cliente','Documento','Categoria','Entradas','Saídas','Saldo'],rows,tot:[]};
+  },
+  // Repasse da semana: o que está no filtro, na ordem da tela, com a conta e o Pix de cada parceiro (para buscar o Pix que falta)
+  rn:()=>{
+    const l=rnFiltrados(),ord=[...l.filter(i=>rnGrupoSit(rnSitDe(i))==='emite'),...l.filter(i=>rnGrupoSit(rnSitDe(i))==='nao'),...l.filter(i=>rnGrupoSit(rnSitDe(i))==='sem')];
+    const rows=ord.map(it=>{const p=rnParc(it,it.empresa_id),nf=rnNf(it);return [it.nome.trim(),p?.cpf_cnpj||nf?.cpf_cnpj||'',it.guias==null?'':String(it.guias),+it.valor||0,RNSIT[rnSitDe(it)][0],it.empresa_id?rnEmpNome(it.empresa_id):'',RNST[rnStatus(it)][0],p?(p.titular||p.nome_global||''):'Parceiro não cadastrado',p?.banco||'',p?.agencia||'',p?.conta||'',p?.pix_chave||'',it.protocolo||'']});
+    return {titulo:`Repasse de parceiros ${RN.grupo?.nome||''}`.trim(),sub:expFiltros($('viewRN')),
+      H:['Parceiro','CPF/CNPJ','Guias','Valor','Nota fiscal','Pagar em','Situação','Titular','Banco','Agência','Conta','Pix','Protocolo'],rows,
+      tot:rows.length?[[`${rows.length} ${rows.length===1?'parceiro':'parceiros'}`,'','',r2(ord.reduce((x,i)=>x+(+i.valor||0),0)),'','','','','','','','','']]:[]};
+  },
+};
+const expArq=(d,ext)=>`${d.titulo} ${expEmpresa()} ${dBR(TODAY).replace(/\//g,'-')}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,' ').trim()+'.'+ext;
+function expExcel(d){
+  const W=Math.max(d.H.length,1),emp=expEmpresa(),aoa=[[d.titulo+(emp?' · '+emp:'')],[d.sub||''],[],d.H,...d.rows,...d.tot];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  const larg=[...Array(W).keys()].map(c=>Math.min(50,Math.max(8,...aoa.slice(3).map(r=>String(r[c]??'').length+2))));ws['!cols']=larg.map(w=>({wch:w}));
+  xSt(ws,0,0,{font:{bold:true,sz:13}});xFaixa(ws,3,0,W-1,XS.cab);
+  for(let r=4;r<aoa.length;r++)for(let c=0;c<W;c++){const k=XLSX.utils.encode_cell({r,c});if(ws[k]?.t==='n')ws[k].z='#,##0.00';xSt(ws,r,c,XS.cel,ws[k]?.t==='n'?XS.num:XS.txt,r>=4+d.rows.length?{font:{bold:true}}:null)}
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,abaNome(d.titulo)||'Relatório');XLSX.writeFile(wb,expArq(d,'xlsx'));
+}
+const expTxt=v=>typeof v==='number'?fm(v):String(v??'');
+// a fonte padrão do PDF só tem os caracteres latinos: troca os símbolos por equivalentes
+const expPdfTxt=s=>String(s).replace(/[—–−]/g,'-').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/…/g,'...').replace(/[✓✔]/g,'').replace(/⚠/g,'!').replace(/[➜→]/g,'>').replace(/[▲▼▾]/g,'').replace(/[^\x00-\xFF]/g,'').replace(/\s+/g,' ').trim();
+function expScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('Não consegui carregar '+src));document.head.appendChild(s)})}
+async function expPDF(d){
+  if(!window.jspdf){await expScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');await expScript('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js')}
+  const W=d.H.length,doc=new window.jspdf.jsPDF({orientation:W>5?'landscape':'portrait',unit:'mm',format:'a4'}),emp=expEmpresa();
+  const num=[...Array(W).keys()].filter(c=>d.rows.some(r=>typeof r[c]==='number'));
+  doc.setFontSize(13);doc.text(expPdfTxt(d.titulo+(emp?' · '+emp:'')),10,12);
+  doc.setFontSize(8);doc.setTextColor(90);const sub=doc.splitTextToSize(expPdfTxt([d.sub,'Gerado em '+new Date().toLocaleString('pt-BR')].filter(Boolean).join(' · ')),doc.internal.pageSize.getWidth()-20);doc.text(sub,10,17);doc.setTextColor(0);
+  const cs={};num.forEach(c=>cs[c]={halign:'right'});
+  doc.autoTable({head:[d.H.map(expPdfTxt)],body:d.rows.map(r=>r.map(v=>expPdfTxt(expTxt(v)))),foot:d.tot.length?d.tot.map(r=>r.map(v=>expPdfTxt(expTxt(v)))):undefined,
+    startY:17+sub.length*3.5,margin:{left:10,right:10},styles:{fontSize:W>10?6.5:W>7?7:8,cellPadding:1.2,overflow:'linebreak'},headStyles:{fillColor:[2,85,86],textColor:255},footStyles:{fillColor:[227,240,239],textColor:20,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[245,248,248]},columnStyles:cs,showFoot:'lastPage',
+    didDrawPage:()=>{const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();doc.setFontSize(7);doc.setTextColor(120);doc.text('Página '+doc.internal.getNumberOfPages(),pw-10,ph-5,{align:'right'});doc.setTextColor(0)}});
+  doc.save(expArq(d,'pdf'));
+}
+function expImprimir(d){
+  const W=d.H.length,emp=expEmpresa(),num=[...Array(W).keys()].filter(c=>d.rows.some(r=>typeof r[c]==='number'));
+  const td=(v,c,tag='td')=>`<${tag}${num.includes(c)?' class="n"':''}>${esc(expTxt(v))}</${tag}>`;
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(d.titulo)}</title><style>
+    @page{size:A4 ${W>5?'landscape':'portrait'};margin:10mm}body{font:11px/1.35 Arial,Helvetica,sans-serif;color:#13232B;margin:0}
+    h1{font-size:16px;margin:0 0 2px}p{margin:0 0 8px;color:#5B6B70}table{border-collapse:collapse;width:100%}
+    th{background:#025556;color:#fff;text-align:left;padding:4px 5px;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    td{border-bottom:1px solid #BFCBCB;padding:3px 5px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}
+    tfoot td{font-weight:bold;background:#E3F0EF;-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{page-break-inside:avoid}</style></head><body>
+    <h1>${esc(d.titulo)}${emp?' · '+esc(emp):''}</h1><p>${esc([d.sub,'Impresso em '+new Date().toLocaleString('pt-BR')].filter(Boolean).join(' · '))}</p>
+    <table><thead><tr>${d.H.map((h,c)=>td(h,c,'th')).join('')}</tr></thead><tbody>${d.rows.map(r=>`<tr>${r.map((v,c)=>td(v,c)).join('')}</tr>`).join('')||`<tr><td colspan="${W||1}">Nada neste filtro.</td></tr>`}</tbody>
+    ${d.tot.length?`<tfoot>${d.tot.map(r=>`<tr>${r.map((v,c)=>td(v,c)).join('')}</tr>`).join('')}</tfoot>`:''}</table></body></html>`;
+  const fr=document.createElement('iframe');fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(fr);
+  const dc=fr.contentWindow.document;dc.open();dc.write(html);dc.close();
+  setTimeout(()=>{try{fr.contentWindow.focus();fr.contentWindow.print()}finally{setTimeout(()=>fr.remove(),60000)}},250);
+}
+// o menu do Exportar abre para a direita; se não couber na tela (botão no canto direito), abre para a esquerda
+document.addEventListener('toggle',e=>{const dd=e.target;if(!dd.classList?.contains('expdd')||!dd.open)return;const m=dd.querySelector('.expmenu');m.style.left='0';m.style.right='auto';
+  if(m.getBoundingClientRect().right>document.documentElement.clientWidth-8){m.style.left='auto';m.style.right='0'}},true);
+document.addEventListener('click',async e=>{
+  document.querySelectorAll('details.expdd[open]').forEach(dd=>{if(!dd.contains(e.target))dd.open=false});
+  const b=e.target.closest('[data-expf]');if(!b)return;const g=b.closest('[data-exp]'),f=EXPT[g?.dataset.exp];if(!f)return;
+  b.closest('details')?.removeAttribute('open');
+  let d;try{d=f()}catch(err){console.error(err);return toast('Não foi possível montar o relatório desta tela.')}
+  if(!d||!d.rows.length)return toast('Nada para exportar: a tela não tem lançamentos neste filtro.');
+  try{if(b.dataset.expf==='xlsx')expExcel(d);else if(b.dataset.expf==='pdf'){b.disabled=true;await expPDF(d)}else expImprimir(d)}
+  catch(err){console.error(err);toast(b.dataset.expf==='pdf'?'Não foi possível gerar o PDF. Verifique a internet e tente de novo.':'Não foi possível gerar o arquivo.')}
+  finally{b.disabled=false}
+});
 // Planilhas para a contabilidade (mesmo formato das planilhas da Carol)
 const abaNome=s=>String(s).replace(/^Cl[ií]nica\s+/i,'').replace(/[\\/?*[\]:]/g,' ').slice(0,31);
 const celXL=(v,z)=>v==null||v===''?null:typeof v==='number'?(z?{t:'n',v,z}:{t:'n',v}):{t:'s',v:String(v)};
@@ -7171,14 +7312,6 @@ function mvAbre(tr){
 ['mvPessoa','mvVmin','mvVmax'].forEach(id=>$(id).oninput=()=>{MV.lim=300;clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,250)});
 $('gtHead').addEventListener('click',e=>{if(e.target.id==='mvOrd'){MV.asc=!MV.asc;gtDesenha()}});
 $('mvLimpa').onclick=()=>{['mvConta','mvTipo','mvCat','mvSit','mvPessoa','mvVmin','mvVmax','gtIni','gtFim','gtBusca'].forEach(id=>$(id).value='');MV.lim=300;gtDesenha()};
-$('mvXls').onclick=()=>{
-  const cli=cliAtual(),rows=GT.mvRows||[],cn=id=>(GT.contas||[]).find(c=>c.id===id)?.nome||contaNome(id)||'';
-  const aoa=[[`Movimentação financeira · ${cli?.nome||''}`],[],['Data','Tipo','Conta','Fornecedor ou cliente','Descrição','Categoria','Documento','Entrada','Saída','Situação']];
-  rows.forEach(x=>aoa.push([dBR(x.data),mvNat(x),cn(x.conta_id),x.pessoa,x.descricao,x.categoria,x.documento,x.tipo==='entrada'?x.valor:'',x.tipo==='saida'?x.valor:'',mvSt(x)[1].replace('✓ ','')]));
-  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:11},{wch:14},{wch:26},{wch:30},{wch:40},{wch:26},{wch:14},{wch:14},{wch:14},{wch:14}];
-  for(let r=3;r<aoa.length;r++)for(const col of [7,8]){const c=ws[XLSX.utils.encode_cell({r,c:col})];if(c&&c.t==='n')c.z='#,##0.00'}
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Movimentação');XLSX.writeFile(wb,`Movimentação ${cli?.nome||''}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
-};
 // inadimplência: contas a receber vencidas, agrupadas por cliente
 function gtInad(){
   const q=chave($('gtBusca').value),dias=t=>Math.round((dObj(TODAY)-dObj(t.vencimento))/864e5),mu=t=>`<span class="muted">${t}</span>`;
@@ -8256,15 +8389,6 @@ $('relSalvar').onclick=async()=>{
     if(del.length){const {error}=await sb.from('fin_orcamento').delete().in('id',del);if(error)throw error}
     toast('Orçamento salvo');renderRel()}catch(e){fail(e,'Não foi possível salvar o orçamento')}
   $('relSalvar').disabled=false};
-// baixar em Excel o que está na tela (valores como número)
-$('relXls').onclick=()=>{
-  const cli=cliAtual(),aoa=[[$('relTitle').textContent+' · '+(cli?.nome||'')],[$('relIni').closest('label').hidden?($('relSem').closest('label').hidden?'Em '+dBR(TODAY):$('relSem').selectedOptions[0].text):`Período: ${dBR($('relIni').value)} a ${dBR($('relFim').value)}`],[]];
-  $('relTable').querySelectorAll('tr').forEach(tr=>aoa.push([...tr.children].map(td=>{const i=td.querySelector('input');if(i)return parseMoney(i.value)||'';return td.dataset.v!=null?+td.dataset.v:td.innerText.replace(/\s+/g,' ').trim()})));
-  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:40},...Array(14).fill({wch:15})];
-  Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n')ws[k].z='#,##0.00'});
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Relatório');
-  XLSX.writeFile(wb,`${$('relTitle').textContent} ${cli?.nome||''} ${TODAY}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
-};
 
 // ---------- Gestão financeira › Fatura do cartão de crédito (v52) ----------
 // O cartão é uma conta (fin_contas.tipo = 'Cartão de crédito'). Cada compra é uma saída nele, com o mês da
@@ -8443,15 +8567,6 @@ $('ftImp').onclick=async()=>{
   const {error}=await sb.from('fin_movimentos').insert(rows);$('ftImp').disabled=false;
   if(error){console.error(error);return toast(v52(error)?v52Msg:'Não foi possível trazer as notas.')}
   toast('Notas trazidas para o cartão');renderFat();
-};
-$('ftXls').onclick=()=>{
-  const c=FT.conta,cli=cliAtual(),aoa=[[`Fatura do cartão ${c.nome} · ${cli?.nome||''}`],[`Fatura de ${mesTxt(FT.mes)}, vencimento ${dBR(ftFechada(FT.mes)?.vencimento||ftVenc(c,FT.mes))}`],[],['Data','Fornecedor','Descrição','Categoria','Documento','Parcela','Valor']];
-  FT.movs.forEach(m=>aoa.push([dBR(m.data),m.pessoa_nome||'',m.descricao||'',m.categoria||'',m.documento||'',m.parcelas>1?m.parcela+'/'+m.parcelas:'',r2(ftSinal(m))]));
-  aoa.push(['','Total','','','','',r2(FT.movs.reduce((x,m)=>x+ftSinal(m),0))]);
-  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:12},{wch:34},{wch:34},{wch:28},{wch:16},{wch:9},{wch:14}];
-  Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n')ws[k].z='#,##0.00'});
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fatura');
-  XLSX.writeFile(wb,`Fatura ${c.nome} ${FT.mes.slice(0,7)}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
 };
 // pagamento da fatura: a saída da conta bancária e a entrada no cartão formam uma transferência
 async function pernasFatura(t,mov){
@@ -9108,7 +9223,7 @@ async function renderGX(){
   const c=vis.find(x=>x.id===sel.value);
   // conta Tesouraria: mostra a revisão dos lançamentos do cliente (o que era Gestão financeira › Tesouraria)
   const tes=!!c&&!!c.espelho_tes;$('gxBanco').hidden=tes;$('gxTes').hidden=!tes;$('gxVer').closest('label').hidden=tes;
-  if(tes){$('gxBaixar').hidden=true;const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini){$('gxBanco').hidden=false;$('gxTes').hidden=true;return gxVazio('Escolha o período.')}return renderGTes()}
+  if(tes){$('gxBaixar').hidden=false;const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini){$('gxBanco').hidden=false;$('gxTes').hidden=true;return gxVazio('Escolha o período.')}return renderGTes()}
   if(!c)return gxVazio('Nenhuma conta bancária cadastrada nesta empresa. Cadastre em Gestão financeira › Contas bancárias.');
   const ini=$('gxIni').value,fim=$('gxFim').value;if(!ini||!fim||fim<ini)return gxVazio('Escolha o período.');
   let movs;try{movs=await todas(()=>sb.from('fin_movimentos').select('*').eq('conta_id',c.id).gte('data',c.saldo_data||'1900-01-01').lte('data',fim).order('data').order('criado_em'))}
@@ -9152,15 +9267,6 @@ function gxDesenha(){
   $('gxBaixar').hidden=false;
 }
 ['gxConta','gxIni','gxFim'].forEach(id=>$(id).onchange=renderGX);
-$('gxBaixar').onclick=()=>{
-  const c=GX.conta,cli=cliAtual(),antes=isoLocal(new Date(dObj(GX.ini).getTime()-864e5));
-  const aoa=[[`Extrato da conta ${c.nome} · ${cli?.nome||''}`],[`Período: ${dBR(GX.ini)} a ${dBR(GX.fim)}${GX.ver==='conc'?' · só conciliados':GX.ver==='nconc'?' · só não conciliados':''}`],[],['Data','Descrição','Fornecedor ou cliente','Documento','Categoria','Entradas','Saídas','Saldo'],[dBR(antes),'Saldo anterior','','','','','',GX.ant]];
-  gxLinhas().forEach(x=>aoa.push(x.m?[dBR(x.m.data),x.m.descricao||'',x.m.pessoa_nome||'',x.m.documento||'',x.m.categoria||'',x.m.tipo==='entrada'?+x.m.valor:'',x.m.tipo==='saida'?+x.m.valor:'',x.saldo]:[dBR(x.dia),'Total do dia','','','',x.ent||'',x.sai||'',x.saldo]));
-  const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[{wch:11},{wch:40},{wch:30},{wch:14},{wch:24},{wch:14},{wch:14},{wch:14}];
-  for(let r=4;r<aoa.length;r++)for(const col of [5,6,7]){const cell=ws[XLSX.utils.encode_cell({r,c:col})];if(cell&&cell.t==='n')cell.z='#,##0.00'}
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Extrato');
-  XLSX.writeFile(wb,`Extrato ${c.nome} ${GX.ini} a ${GX.fim}.xlsx`.replace(/[\\/:*?"<>|]/g,'-'));
-};
 // lançamento avulso: entrada, saída ou transferência entre contas da mesma empresa
 let GXR=null;
 $('gxAvulso').onclick=()=>abrirAvulso(null);
@@ -11024,6 +11130,7 @@ const MANUAL=[
 <ol>
 <li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas.</li>
 <li><b>Módulos:</b> Dashboard, Rotina diária, Gestão financeira, Contabilidade, RH, Comunicação e Configurações. Passe o mouse (ou clique) num módulo para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
+<li><b>Exportar e Imprimir:</b> nas telas com lista de lançamentos, o botão <b>Exportar</b> gera o arquivo em <b>Excel</b> ou <b>PDF</b> e o botão <b>Imprimir</b> abre a impressão. Sai só o que está na tela: filtre primeiro (situação, empresa, período, busca) e depois exporte. Os filtros usados aparecem no alto do relatório.</li>
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
 <li><b>No celular:</b> o alto da tela fica mais compacto (logo, nome e Sair numa linha e a empresa logo abaixo). Os módulos ficam numa faixa que corre para o lado com o dedo. Nas janelas, o texto rola e os botões (como <b>Visualizei</b>, Salvar e Cancelar) ficam sempre fixos embaixo.</li>
@@ -11418,6 +11525,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-06exportar',data:'2026-11-06',t:'Exportar em Excel e PDF e imprimir o que está filtrado',itens:[
+    {x:'Nas telas que listam lançamentos (Movimentação financeira, Contas a pagar e a receber, Extrato da conta, Conciliação bancária, Fatura do cartão, Relatórios, Repasse da semana, Controle de notas fiscais, Conferência de caixa, Boletos, Tesouraria e Cartão) o antigo “Baixar Excel” virou o botão “Exportar”, com as opções Excel e PDF, e ao lado tem o botão “Imprimir”.'},
+    {x:'O arquivo e a impressão saem só com o que está na tela: se você filtrou, sai só o filtrado (com os filtros escritos no alto do relatório). Vale para todas as empresas.'},
+    {x:'Repasse da semana: o relatório traz a conta, a agência e o Pix de cada parceiro. Novo filtro “Sem chave Pix” no Mostrar, para mandar à operadora a lista de quem falta cadastrar o Pix. O botão de importar o relatório continua igual.',mods:['gfrepasse']}]},
   {k:'2026-11-05rmcancel',data:'2026-11-05',t:'Cancelar uma remessa',itens:[
     {x:'Em Envio de remessa, a lista de Remessas geradas tem o botão “Cancelar”: use quando o banco recusou o arquivo ou você não vai enviar. Os pagamentos voltam a aparecer para gerar outra remessa. Vale para todas as empresas e todos os bancos.',mods:['gfremessa']},
     {x:'Ao cancelar, o portal pergunta se o banco recusou o arquivo. Se sim, o número fica livre e a próxima remessa usa o mesmo número (o Sicredi recusa arquivo com número pulado).',mods:['gfremessa']}]},
@@ -12203,7 +12314,7 @@ function rnFiltrados(){
     // filtro Situação (Carol, 03/11): “Falta pagar” = ainda sem pagamento (sem empresa, em aberto ou atrasado)
     if(sf==='falta'?(st==='pago'||st==='conciliado'):sf&&st!==sf)return false;
     if(f==='desc'&&(rnPago(it)||!rnDescPend(rnParc(it,it.empresa_id)).length))return false;
-    if(f==='emite'&&s!=='emite'||f==='nao'&&rnGrupoSit(s)!=='nao'||f==='sem'&&s!=='sem'||f==='semEmp'&&it.empresa_id||f==='semConta'&&rnTemConta(rnParc(it,it.empresa_id))||f==='alt'&&!rnAlt(it))return false;
+    if(f==='emite'&&s!=='emite'||f==='nao'&&rnGrupoSit(s)!=='nao'||f==='sem'&&s!=='sem'||f==='semEmp'&&it.empresa_id||f==='semConta'&&rnTemConta(rnParc(it,it.empresa_id))||f==='semPix'&&rnParc(it,it.empresa_id)?.pix_chave||f==='alt'&&!rnAlt(it))return false;
     if(ef==='-'&&it.empresa_id||ef&&ef!=='-'&&it.empresa_id!==ef)return false;
     return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)});
 }
@@ -12575,16 +12686,6 @@ async function rnDesfaz(it){
   }catch(e){fail(e)}
   rnDesenha();
 }
-$('rnXls').onclick=()=>{
-  const H=['Situação','Parceiro','Guias','Valor','Pagar em','Conta a pagar','Titular','CPF/CNPJ','Banco','Agência','Conta','Pix','Protocolo'];
-  const lin=it=>{const p=rnParc(it,it.empresa_id);return [RNSIT[rnSitDe(it)][0],it.nome.trim(),it.guias,+it.valor,rnEmpNome(it.empresa_id),it.titulo_id?'Gerada':'',p?.titular||p?.nome_global||'',p?.cpf_cnpj||rnNf(it)?.cpf_cnpj||'',p?.banco||'',p?.agencia||'',p?.conta||'',p?.pix_chave||'',it.protocolo||'']};
-  const ord=l=>[...l].sort((a,b)=>a.nome.localeCompare(b.nome)),wb=XLSX.utils.book_new();
-  [['Todos',RN.itens],['Emite NF',RN.itens.filter(i=>rnSitDe(i)==='emite')],['Não emite NF',RN.itens.filter(i=>rnGrupoSit(rnSitDe(i))==='nao')],['Não encontrados',RN.itens.filter(i=>rnSitDe(i)==='sem')],
-   ...RN.grupo.empresas.map(id=>[rnEmpNome(id).slice(0,31),RN.itens.filter(i=>i.empresa_id===id)])].forEach(([n,l])=>{if(!l.length&&n!=='Todos')return;
-    const rows=ord(l).map(lin),ws=XLSX.utils.aoa_to_sheet([H,...rows,['Total','',null,r2(l.reduce((x,i)=>x+(+i.valor),0))]]);
-    ws['!cols']=H.map((h,i)=>({wch:i===1?48:i===6?40:i===11||i===12?28:14}));xTabela(ws,{money:[3],texto:[1,6]});XLSX.utils.book_append_sheet(wb,ws,n.replace(/[\\/?*[\]:]/g,' '))});
-  XLSX.writeFile(wb,`Repasses ${RN.grupo.nome} ${dBR(RN.lote.data_relatorio).replace(/\//g,'-')}.xlsx`);
-};
 // empresas que dividem os repasses do grupo (ex.: MP, MP Coronel, MP Chopinzinho e MPA Pato Branco)
 const dlgRN=$('dlgRN');
 $('rnCfg').onclick=()=>{RN.dlg={modo:'grupo'};$('rnDFoot').querySelector('[data-act="salvar"]').textContent='Salvar';const g=RN.grupo,cli=cliAtual(),lista=CLIENTES.filter(c=>c.ativo!==false&&c.bpo_financeiro!==false);
@@ -12760,12 +12861,6 @@ $('nfImpArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(
     for(let i=0;i<ms.length;i+=200){const {error}=await sb.from('nf_mensal').upsert(ms.slice(i,i+200),{onConflict:'grupo_id,nome,competencia'});if(error)throw error}
     toast('Planilha importada');renderNF();
   }catch(err){console.error(err);alert(v77(err)?v77Msg:'Não foi possível importar: '+(err.message||err))}
-};
-$('nfXls').onclick=()=>{
-  const ls=nfLinhas(),H=['Situação','Parceiro','Nome global','CPF/CNPJ',...MES3,'Total','Última nota'];
-  const rows=ls.map(l=>[l.sit==='sem'?'Fora do controle':RNSIT[l.sit][0],l.nome,l.p?.nome_global||'',l.p?.cpf_cnpj||'',...Array.from({length:12},(_,i)=>l.m[i+1]?.quantidade||null),l.tot||null,l.ult?MES3[l.ult-1]+'/'+NF.ano:'']);
-  const ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map((h,i)=>({wch:i===1||i===2?40:i===0?16:i===3?20:i>=4&&i<16?6:12}));xTabela(ws,{texto:[1,2]});
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Controle NF');XLSX.writeFile(wb,`Controle NF ${NF.grupo.nome} ${NF.ano}.xlsx`);
 };
 // Repasses pagos → notas a emitir (Carol, 04/11; v93): os repasses pagos por uma empresa do grupo aparecem no
 // Controle de notas fiscais dessa empresa (ex.: pagos na MP Chopinzinho → NF de Chopinzinho), para o operador
