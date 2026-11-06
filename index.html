@@ -7640,13 +7640,13 @@ function cnabSicredi({conta,empresa,nsa,agora,itens}){
   const a=agConta(conta),cnpj=soDig(empresa.cnpj),ti=cnpj.length===11?'1':'2',conv=conta.cnab_convenio;
   const L=[],lin=s=>{if(s.length!==240)throw new Error('Linha do CNAB com '+s.length+' posições');L.push(s)};
   const hh=agora.toTimeString().slice(0,8).replace(/:/g,''),hoje=isoLocal(agora);
-  lin('748'+'0000'+'0'+cB(9)+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+' '+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cX('SICREDI',30)+cB(10)
+  lin('748'+'0000'+'0'+cB(9)+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+cX(a.agdv,1)+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cX('SICREDI',30)+cB(10)
     +'1'+cD(hoje)+hh+cN(nsa,6)+'082'+'01600'+cB(20)+cB(20)+cB(29));
   const grupos=[['03','30',i=>i.forma==='boleto'&&i.banco==='748'],['03','31',i=>i.forma==='boleto'&&i.banco!=='748'],['22','11',i=>i.forma==='consumo'],['20','45',i=>i.forma==='pix']];
   let lote=0;
   for(const [serv,forma,f] of grupos){const its=itens.filter(f);if(!its.length)continue;lote++;
     const lt=cN(lote,4),ini=L.length;let seq=0,soma=0;const sq=()=>cN(++seq,5);
-    lin('748'+lt+'1'+'C'+serv+forma+'042'+' '+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+' '+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cB(40)
+    lin('748'+lt+'1'+'C'+serv+forma+'042'+' '+ti+cN(cnpj,14)+cX(conv,4)+cB(16)+cN(a.ag,5)+cX(a.agdv,1)+cN(a.conta,12)+cX(a.dv,1)+' '+cX(empresa.nome,30)+cB(40)
       +cB(30)+cN(0,5)+cB(15)+cB(20)+cN(0,5)+cN(0,3)+cB(2)+cB(8)+cB(10));
     for(const i of its){soma+=Math.round(i.valor*100);
       if(i.forma==='boleto'){
@@ -7774,7 +7774,7 @@ async function renderGR(retHtml){
   const st={};if(rems.length){const {data:its}=await sb.from('fin_remessa_itens').select('remessa_id,status').in('remessa_id',rems.map(x=>x.id));
     (its||[]).forEach(i=>{const o=st[i.remessa_id]||(st[i.remessa_id]={abertos:0,excl:0,n:0});o.n++;if(i.status==='enviado'||i.status==='agendado')o.abertos++;if(i.status==='excluido')o.excl++})}
   const rmSit=x=>{const o=st[x.id];return o&&o.n&&o.excl===o.n?'<span class="chip c-none">Cancelada</span>':x.retorno_em?'✓ lido':'<span class="muted">aguardando</span>'};
-  const lista=`<h3 style="margin:8px 0 0">Remessas geradas</h3>`+(rems.length?`<div class="tablebox" style="margin:0;overflow-x:auto"><table><thead><tr><th>Nº</th><th class="l">Arquivo</th><th class="l">Conta</th><th>Gerada em</th><th>Pagamentos</th><th>Valor</th><th class="l">Retorno</th><th></th></tr></thead><tbody>${rems.map(x=>`<tr><td>${x.nsa}</td><td class="l">${esc(x.arquivo)}</td><td class="l">${esc(contaNome(x.conta_id))}</td><td>${new Date(x.gerado_em).toLocaleString('pt-BR').slice(0,17)}</td><td>${x.qtd}</td><td>${fm(x.valor)}</td><td class="l">${rmSit(x)}</td><td style="white-space:nowrap"><button type="button" class="btn small ghost" data-act="rm_baixar" data-id="${x.id}">Baixar</button>${ENV&&st[x.id]?.abertos?` <button type="button" class="btn small ghost" data-act="rm_cancelar" data-id="${x.id}" title="O banco recusou o arquivo ou você não vai enviar: os pagamentos voltam a ficar livres para outra remessa">Cancelar</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:0">Nenhuma remessa gerada ainda.</p>');
+  const lista=`<h3 style="margin:8px 0 0">Remessas geradas</h3>`+(rems.length?`<div class="tablebox" style="margin:0;overflow-x:auto"><table><thead><tr><th>Nº</th><th class="l">Arquivo</th><th class="l">Conta</th><th>Gerada em</th><th>Pagamentos</th><th>Valor</th><th class="l">Retorno</th><th></th></tr></thead><tbody>${rems.map(x=>`<tr><td>${x.nsa>0?x.nsa:'—'}</td><td class="l">${esc(x.arquivo)}</td><td class="l">${esc(contaNome(x.conta_id))}</td><td>${new Date(x.gerado_em).toLocaleString('pt-BR').slice(0,17)}</td><td>${x.qtd}</td><td>${fm(x.valor)}</td><td class="l">${rmSit(x)}</td><td style="white-space:nowrap"><button type="button" class="btn small ghost" data-act="rm_baixar" data-id="${x.id}">Baixar</button>${ENV&&st[x.id]?.abertos?` <button type="button" class="btn small ghost" data-act="rm_cancelar" data-id="${x.id}" title="O banco recusou o arquivo ou você não vai enviar: os pagamentos voltam a ficar livres para outra remessa">Cancelar</button>`:ENV&&x.nsa>0&&st[x.id]?.n&&st[x.id].excl===st[x.id].n?` <button type="button" class="btn small ghost" data-act="rm_liberar" data-id="${x.id}" title="O banco recusou este arquivo: libera o número para o próximo arquivo usar">Liberar nº</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:0">Nenhuma remessa gerada ainda.</p>');
   const so=ENV&&RM.so?.cli===cli.id?RM.so:null;
   if(ENV){
     const selB=`<label class="f" style="max-width:280px">Banco<select id="rm_banco">${RMBANCOS.map(b=>`<option value="${b.k}"${b.k===bco.k?' selected':''}>${b.n}${b.ok?'':' (aguardando o manual)'}</option>`).join('')}</select></label>`;
@@ -7830,10 +7830,15 @@ async function rmAcao(a,b){
   const cli=cliAtual();
   if(a==='rm_baixar'){const {data,error}=await sb.from('fin_remessas').select('arquivo,conteudo').eq('id',b.dataset.id).single();if(error)return fail(error,'Não foi possível baixar');return rmBaixar(data.arquivo,data.conteudo)}
   if(a==='rm_tudo'){RM.so=null;return renderGR()}
+  if(a==='rm_liberar'){const x=RM.rems.find(y=>y.id===b.dataset.id);if(!x)return;
+    if(!confirm(`Liberar o nº ${x.nsa}?\n\nUse só se o banco RECUSOU o arquivo ${x.arquivo}. O próximo arquivo desta conta volta a usar este número.`))return;
+    if(await rmLiberaNsa(x)){toast(`Nº ${x.nsa} liberado`);GT.key='';renderGR()}return}
   if(a==='rm_cancelar'){const x=RM.rems.find(y=>y.id===b.dataset.id);if(!x)return;
     if(!confirm(`Cancelar a remessa nº ${x.nsa} (${x.arquivo})?\n\nUse quando o banco recusou o arquivo ou quando você não vai enviar. Os pagamentos que ainda não foram pagos voltam a aparecer para gerar outra remessa. Se o arquivo já foi aceito pelo banco, cancele também lá, para não pagar duas vezes.`))return;
     const {error}=await sb.from('fin_remessa_itens').update({status:'excluido',atualizado_em:new Date().toISOString()}).eq('remessa_id',x.id).in('status',['enviado','agendado']);
-    if(error)return fail(error,'Não foi possível cancelar');toast(`Remessa nº ${x.nsa} cancelada`);GT.key='';return renderGR()}
+    if(error)return fail(error,'Não foi possível cancelar');
+    if(x.nsa>0&&confirm(`O banco RECUSOU o arquivo nº ${x.nsa}?\n\nOK = sim, recusou: o próximo arquivo volta a usar o nº ${x.nsa} (o banco não conta arquivo recusado).\nCancelar = não, o banco aceitou: a numeração continua.`)&&!await rmLiberaNsa(x))return;
+    toast(`Remessa nº ${x.nsa} cancelada`);GT.key='';return renderGR()}
   if(a!=='rm_gerar')return;
   const conta=GFC.lista.find(c=>c.id===$('rm_conta').value),dataPag=$('rm_data').value;
   const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
@@ -7844,7 +7849,7 @@ async function rmAcao(a,b){
   if(!confirm(`Gerar a remessa com ${sel.length} ${sel.length===1?'pagamento':'pagamentos'} (${fm(r2(sel.reduce((s,x)=>s+x.valor,0)))}) para ${dBR(dataPag)}?`))return;
   try{
     const {data:c2,error:e1}=await sb.from('fin_contas').select('cnab_seq').eq('id',conta.id).single();if(e1)throw e1;
-    const {data:ult}=await sb.from('fin_remessas').select('nsa').eq('conta_id',conta.id).order('nsa',{ascending:false}).limit(1);   // nunca repetir o nº de uma remessa que já existe na conta
+    const {data:ult}=await sb.from('fin_remessas').select('nsa').eq('conta_id',conta.id).gt('nsa',0).order('nsa',{ascending:false}).limit(1);   // nunca repetir o nº de uma remessa que já existe na conta
     const nsa=Math.max(c2.cnab_seq||0,ult?.[0]?.nsa||0)+1,agora=new Date(),hoje=isoLocal(agora);
     const {count}=await sb.from('fin_remessas').select('id',{count:'exact',head:true}).eq('conta_id',conta.id).gte('gerado_em',hoje+'T00:00:00');
     const bq=bancoDe(conta),inter=bq==='inter',seu=i=>inter?`${nsa}${cN(i+1,4)}`:`R${nsa}-${i+1}`;   // no Inter o seu número do boleto só aceita números
@@ -7875,6 +7880,12 @@ function lerRetorno(txt){
   }
   return out;
 }
+// banco recusou o arquivo: o número volta a ficar livre e o próximo arquivo usa o mesmo nº (o banco espera a sequência sem pular)
+async function rmLiberaNsa(x){
+  const {error:e1}=await sb.from('fin_remessas').update({nsa:-Math.floor(Date.now()/1000)}).eq('id',x.id);if(e1){fail(e1,'Não foi possível liberar o número');return false}
+  const {data:ult}=await sb.from('fin_remessas').select('nsa').eq('conta_id',x.conta_id).gt('nsa',0).order('nsa',{ascending:false}).limit(1),seq=ult?.[0]?.nsa||0;
+  const {error:e2}=await sb.from('fin_contas').update({cnab_seq:seq}).eq('id',x.conta_id);if(e2){fail(e2,'Não foi possível acertar o nº da última remessa');return false}
+  const c=GFC.lista.find(c=>c.id===x.conta_id);if(c)c.cnab_seq=seq;return true}
 const rmStatusDe=oc=>oc.some(c=>c==='00'||c==='03')?'pago':oc.includes('BF')?'excluido':oc.some(c=>c==='BD'||c==='BE'||c==='B1')||!oc.length?'agendado':'recusado';
 async function rmRetorno(f){
   const cli=cliAtual();$('rmRet').innerHTML='<p class="note">Lendo o retorno…</p>';
@@ -7887,7 +7898,7 @@ async function rmRetorno(f){
       :r.banco==='033'?bancoDe(c)==='santander'&&soDig(convSantander(c)).slice(-12).replace(/^0+/,'')===r.conv
       :(c.cnab_convenio||'').toUpperCase()===r.conv.toUpperCase()).map(c=>c.id);
     const mesmoSeu=(a,b)=>a===b||/^\d+$/.test(a)&&/^\d+$/.test(b)&&a.replace(/^0+/,'')===b.replace(/^0+/,'');
-    const doArq=its.filter(i=>!cv.length||cv.includes(i.conta_id));
+    const doArq=its.filter(i=>!cv.length||cv.includes(i.conta_id)).sort((a,b)=>(a.status==='excluido')-(b.status==='excluido'));   // remessa cancelada que reaproveitou o nº: vale a mais nova
     const res=[],remIds=new Set();let pagos=0;
     for(const x of r.itens){
       const it=doArq.find(i=>mesmoSeu(i.seu_numero||'',x.seu)),st=rmStatusDe(x.oc);if(/^0*$/.test(x.nome))x.nome='';
@@ -11123,7 +11134,7 @@ const MANUAL=[
 <li>No Inter, só Pix pode ser agendado para sábado, domingo ou feriado; boletos e contas precisam de dia útil.</li>
 <li>No Santander, envie o arquivo até as 20h do dia do pagamento. Boleto precisa do CNPJ/CPF do fornecedor no cadastro (sem ele a conta não fica disponível para marcar). Se o convênio tiver o “teste” contratado, as remessas nº 1 a 10 são só teste.</li>
 <li>No Repasse de parceiros, o botão <b>Remessa</b> de cada empresa abre esta tela só com os repasses.</li>
-<li><b>Cancelar remessa:</b> se o banco recusou o arquivo (por exemplo, convênio inválido) ou você não vai enviar, clique em <b>Cancelar</b> na lista de Remessas geradas. Os pagamentos que ainda não foram pagos voltam a aparecer para gerar outra remessa, e a remessa fica como “Cancelada”. Se o banco já aceitou o arquivo, cancele também no banco.</li>
+<li><b>Cancelar remessa:</b> se o banco recusou o arquivo (por exemplo, convênio inválido) ou você não vai enviar, clique em <b>Cancelar</b> na lista de Remessas geradas. Os pagamentos que ainda não foram pagos voltam a aparecer para gerar outra remessa, e a remessa fica como “Cancelada”. Se o banco já aceitou o arquivo, cancele também no banco. Se o banco <b>recusou</b> o arquivo, responda OK na pergunta seguinte: o número da remessa fica livre e o próximo arquivo usa o mesmo número, porque o banco (por exemplo, o Sicredi) espera a sequência sem pular. Numa remessa que já está cancelada, o botão <b>Liberar nº</b> faz o mesmo.</li>
 </ul>`},
     {k:'gfconc',t:'Conciliação bancária (extrato OFX)',img:'gfconc.png',
       txt:`<p>Aqui o extrato do banco (arquivo OFX) é ligado aos lançamentos do sistema, linha por linha.</p>
@@ -11408,7 +11419,8 @@ async function agBadge(){
 // =====================================================================
 const NOVIDADES=[
   {k:'2026-11-05rmcancel',data:'2026-11-05',t:'Cancelar uma remessa',itens:[
-    {x:'Em Envio de remessa, a lista de Remessas geradas tem o botão “Cancelar”: use quando o banco recusou o arquivo ou você não vai enviar. Os pagamentos voltam a aparecer para gerar outra remessa. Vale para todas as empresas e todos os bancos.',mods:['gfremessa']}]},
+    {x:'Em Envio de remessa, a lista de Remessas geradas tem o botão “Cancelar”: use quando o banco recusou o arquivo ou você não vai enviar. Os pagamentos voltam a aparecer para gerar outra remessa. Vale para todas as empresas e todos os bancos.',mods:['gfremessa']},
+    {x:'Ao cancelar, o portal pergunta se o banco recusou o arquivo. Se sim, o número fica livre e a próxima remessa usa o mesmo número (o Sicredi recusa arquivo com número pulado).',mods:['gfremessa']}]},
   {k:'2026-11-05santander',data:'2026-11-05',t:'Remessa de pagamentos do Santander',itens:[
     {x:'Gestão financeira › Envio de remessa agora gera também o arquivo de pagamentos do Santander (boletos, contas de consumo e tributos com código de barras e Pix por chave). Na conta do Santander, preencha o “Convênio de pagamentos (CNAB)” com o número do convênio de Pagamento a Fornecedores.',mods:['gfremessa']},
     {x:'No Santander, o boleto precisa do CNPJ/CPF do fornecedor no cadastro. O retorno do Santander é lido em Retorno de remessa, como o dos outros bancos.',mods:['gfremessa','gfretorno']}]},
