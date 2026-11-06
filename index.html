@@ -876,6 +876,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <label class="f" data-rnf>Pagamento em<input type="date" id="rnVenc"></label>
       <label class="f" data-rnf>Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="semPix">Sem chave Pix</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option></select></label>
       <label class="f" data-rnf>Situação<select id="rnSitF"><option value="">Todas</option><option value="falta">Falta pagar</option><option value="sem">Sem empresa (sem conta a pagar)</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="pago">Pagos</option><option value="conciliado">Conciliados</option></select></label>
+      <label class="f" data-rnf>Chave Pix<select id="rnPixF" title="Filtra pelo cadastro do parceiro na empresa escolhida"><option value="">Todos</option><option value="com">Com chave Pix cadastrada</option><option value="sem">Sem chave Pix cadastrada</option></select></label>
       <label class="f" data-rnf>Empresa<select id="rnEmpF"></select></label>
       <input id="rnBusca" data-rnf placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
     </div>
@@ -1786,7 +1787,7 @@ escCli.onchange=()=>{guardaEmp();openView()};
 const SECK='portal_secao';
 // filtros e buscas das telas voltam ao padrão ao trocar de tela: o nome de fornecedor digitado não fica lá esquecido (Carol, 04/11)
 // o F5 continua na mesma tela; trocar só a empresa mantém os filtros; o período das outras telas (extrato, conciliação, relatórios) não muda
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -11525,6 +11526,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-06rnpix',data:'2026-11-06',t:'Repasse da semana: filtro Chave Pix',itens:[
+    {x:'Novo filtro “Chave Pix” no Repasse da semana: Com chave Pix cadastrada ou Sem chave Pix cadastrada. Ele junta com os outros filtros (por exemplo, Situação “Falta pagar” + Sem chave Pix) e o Exportar e o Imprimir saem só com esse resultado.',mods:['gfrepasse']}]},
   {k:'2026-11-06exportar',data:'2026-11-06',t:'Exportar em Excel e PDF e imprimir o que está filtrado',itens:[
     {x:'Nas telas que listam lançamentos (Movimentação financeira, Contas a pagar e a receber, Extrato da conta, Conciliação bancária, Fatura do cartão, Relatórios, Repasse da semana, Controle de notas fiscais, Conferência de caixa, Boletos, Tesouraria e Cartão) o antigo “Baixar Excel” virou o botão “Exportar”, com as opções Excel e PDF, e ao lado tem o botão “Imprimir”.'},
     {x:'O arquivo e a impressão saem só com o que está na tela: se você filtrou, sai só o filtrado (com os filtros escritos no alto do relatório). Vale para todas as empresas.'},
@@ -12308,13 +12311,14 @@ async function renderRN(recarrega=true){
 }
 function rnFiltrados(){
   const f=$('rnFiltro').value,ef=$('rnEmpF').value,q=rnChave($('rnBusca').value),qd=$('rnBusca').value.trim();
-  const sf=$('rnSitF').value;
+  const sf=$('rnSitF').value,pf=$('rnPixF').value;
   return RN.itens.filter(it=>{const s=rnSitDe(it),st=rnStatus(it);
     if(f.startsWith('st:')&&st!==f.slice(3))return false;
     // filtro Situação (Carol, 03/11): “Falta pagar” = ainda sem pagamento (sem empresa, em aberto ou atrasado)
     if(sf==='falta'?(st==='pago'||st==='conciliado'):sf&&st!==sf)return false;
     if(f==='desc'&&(rnPago(it)||!rnDescPend(rnParc(it,it.empresa_id)).length))return false;
     if(f==='emite'&&s!=='emite'||f==='nao'&&rnGrupoSit(s)!=='nao'||f==='sem'&&s!=='sem'||f==='semEmp'&&it.empresa_id||f==='semConta'&&rnTemConta(rnParc(it,it.empresa_id))||f==='semPix'&&rnParc(it,it.empresa_id)?.pix_chave||f==='alt'&&!rnAlt(it))return false;
+    if(pf&&(pf==='com')!==!!rnParc(it,it.empresa_id)?.pix_chave)return false;
     if(ef==='-'&&it.empresa_id||ef&&ef!=='-'&&it.empresa_id!==ef)return false;
     return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)});
 }
@@ -12362,7 +12366,7 @@ function rnDesenha(){
     +'Pagou pelo internet banking? Marque os repasses e use “Marcar como pago”: escolha a data e a conta de cada empresa, e o pagamento entra nas Contas a pagar e no extrato da conta. Para pagar por remessa, marque só os repasses que vão no arquivo e clique em “Gerar remessa”: escolha a empresa e o Envio de remessa abre só com eles (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
 }
 ['rnLote','rnDe','rnAte'].forEach(id=>$(id).onchange=()=>renderRN(false));
-$('rnFiltro').onchange=$('rnEmpF').onchange=$('rnSitF').onchange=()=>rnDesenha();
+$('rnFiltro').onchange=$('rnEmpF').onchange=$('rnSitF').onchange=$('rnPixF').onchange=()=>rnDesenha();
 $('rnTiles').addEventListener('click',e=>{const t=e.target.closest('[data-rf],[data-rs]');if(!t)return;if(t.dataset.rf)$('rnFiltro').value=t.dataset.rf;if(t.dataset.rs)$('rnSitF').value=t.dataset.rs;rnDesenha()});
 $('rnBusca').oninput=()=>{clearTimeout(rnDesenha.t);rnDesenha.t=setTimeout(rnDesenha,200)};
 $('rnVenc').onchange=async()=>{const v=$('rnVenc').value||null;const {error}=await sb.from('repasse_lotes').update({vencimento:v}).eq('id',RN.lote.id);if(error)return fail(error);RN.lote.vencimento=v;toast('Data de pagamento salva')};
