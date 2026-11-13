@@ -3376,7 +3376,7 @@ function pagMesDesenha(){
 $('mPagMes').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.pm!==undefined){const k=+b.dataset.pm,[y,m]=PMES.split('-').map(Number),d=new Date(y,m-1+k,1);PMES=k===0?TODAY.slice(0,7):isoLocal(d).slice(0,7);renderMod();return}
   if(b.dataset.pmenv!==undefined){const t=PST.tits[+b.dataset.pmenv];if(!t)return;
-    openReg(null,{sobre:[t.descricao||t.categoria,t.pessoa_nome,t.parcelas>1?`parcela ${t.parcela}/${t.parcelas}`:'','vencimento '+dBR(t.vencimento)].filter(Boolean).join(' · '),fornecedor:t.pessoa_nome||null,vencimento:t.vencimento,valor:t.valor})}});
+    openReg(null,{sobre:[t.descricao||t.categoria,t.pessoa_nome,t.parcelas>1?`parcela ${t.parcela}/${t.parcelas}`:'','vencimento '+dBR(t.vencimento)].filter(Boolean).join(' · '),fornecedor:t.pessoa_nome||null,vencimento:t.vencimento,valor:t.valor,titulo_id:t.id,valor_previsto:t.valor})}});
 $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openReg(REGS.find(r=>r.id===tr.dataset.id))});
 $('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
 const dlgReg=$('dlgReg');
@@ -3403,10 +3403,13 @@ function pesListaLiga(box){
   ins.forEach(i=>{i.setAttribute('list','rPesLista');i.autocomplete='off'});
   pesLista().then(ls=>{const dl=$('rPesLista');if(dl&&!dl.options.length)dl.innerHTML=ls.map(p=>`<option value="${esc(p.nome)}">${esc([p.fantasia&&p.fantasia!==p.nome?p.fantasia:'',p.documento||''].filter(Boolean).join(' · '))}</option>`).join('')}).catch(console.error);
 }
+// boleto enviado por "Enviar boleto" (Contas do mês): lembra a conta prevista e o valor previsto, para avisar quando o
+// boleto anexado vier com outro valor e o escritório atualizar esta e as próximas (Carol, 13/11; v127)
+let REGPRE=null;
 async function openReg(r,pre){
   if(escCli.value==='*')CLIDLG=r?CLIENTES.find(c=>c.id===r.cliente_id)||null:null;
   if(MOD==='tesouraria'&&!MAPA.length)await loadMapa().catch(()=>{});
-  const cfg=MODCFG[MOD];REG=r;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
+  const cfg=MODCFG[MOD];REG=r;REGPRE=!r&&MOD==='pagar'&&pre?.titulo_id?{titulo_id:pre.titulo_id,valor:+pre.valor_previsto||null}:null;RDOCS=r?[...(DOCS[r.id]||[])]:[];RLIQ=MOD==='pagar'&&r?.liquidos?.length?r.liquidos.map(x=>({...x})):null;
   const ed=regEditavel(),dis=ed?'':' disabled';
   const v=k=>r?r[k]:pre&&pre[k]!=null?pre[k]:k==='data'?TODAY:k==='parcelas'?1:k==='tipo'?'Despesa':'';
   $('rTitle').textContent=r?(MOD==='pagar'?r.fornecedor||r.sobre||'Boleto ou nota enviado':MOD==='tesouraria'?r.descricao:r.fornecedor):cfg.novo;
@@ -3485,14 +3488,19 @@ $('rForm').addEventListener('submit',async e=>{
   if(m){err.textContent=m;err.hidden=false;return}
   // tesouraria: nº da NF e comprovante não impedem salvar (Carol, 30/10): só avisa
   if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
+  // leu valor diferente do previsto e ainda não confirmou: pergunta antes de enviar (Carol, 13/11)
+  if(!REG&&REGPRE?.lido&&!REGPRE.ok&&Math.abs((row.valor||0)-REGPRE.lido)>0.004&&confirm(`O valor do boleto anexado (${fm(REGPRE.lido)}) é diferente do valor previsto (${fm(REGPRE.valor)}).\n\nConfirma a atualização do valor para ${fm(REGPRE.lido)}?`)){regPrevOk();row.valor=REGPRE.lido}
   err.hidden=true;$('rSave').disabled=true;
   try{
     if(row.valor!=null)row.valor=r2(row.valor);if(REG)row.id=REG.id;else row.enviado_em=new Date().toISOString();
+    if(!REG&&REGPRE){row.titulo_id=REGPRE.titulo_id;row.valor_previsto=REGPRE.valor}
     await moverDocs(RDOCS,cli.id);
     let {data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single();
     // banco ainda sem o v46: salva sem a linha digitável e a chave da nota
     if(e1&&/linha_digitavel|nfe_chave/.test(e1.message||'')){delete row.linha_digitavel;delete row.nfe_chave;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
     // banco ainda sem o v54: salva sem o relatório de líquidos
+    // banco ainda sem o v127: envia sem a ligação com a conta prevista
+    if(e1&&/titulo_id|valor_previsto/.test(e1.message||'')){delete row.titulo_id;delete row.valor_previsto;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
     if(e1&&/liquidos/.test(e1.message||'')){delete row.liquidos;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single());if(!e1)toast('Conta salva sem o relatório de líquidos: rode a atualização v54 do banco.')}
     // banco ainda sem o v99: o envio simples precisa que fornecedor, nº, vencimento e valor possam ficar em branco
     if(e1&&/not-null|null value/i.test(e1.message||'')&&MOD==='pagar'){err.textContent=ehEsc()?'Rode a atualização v99 do banco para salvar sem fornecedor, nº, vencimento ou valor.':'Preencha também o fornecedor, o nº da nota, o vencimento e o valor (em “Outros dados”). O envio só com o anexo será liberado em breve.';err.hidden=false;return}
@@ -3704,8 +3712,11 @@ async function aplicarLeitura({bol,nfe,cnpjs},origem){
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=el.classList.contains('money')?showMoney(v):v;lidos.push(txt+' '+(fmt?fmt(v):v))}
     else if(String(el.classList.contains('money')?r2(atual):atual)!==String(v))avisos.push(`${txt} no ${origem}: ${fmt?fmt(v):v}, diferente do digitado`)};
+  let prevDif=null;
   if(bol){const el=rCampo('linha_digitavel');if(el&&!soDig(el.value))el.value=bol.linha||bol.barra;
-    poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR);
+    // valor do boleto diferente do previsto: pergunta antes de trocar (Carol, 13/11)
+    if(REGPRE?.valor&&bol.valor>0&&Math.abs(bol.valor-REGPRE.valor)>0.004&&Math.abs((parseMoney(rCampo('valor')?.value)||0)-bol.valor)>0.004){prevDif=r2(bol.valor);REGPRE.lido=prevDif}
+    else poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR);
     // o mesmo boleto em outra conta (de qualquer empresa) e boleto de outra empresa (v72)
     const rp=await boletoRepetido(bol,REG?.id);if(rp.length)avisos.push('ESTE BOLETO JÁ ESTÁ LANÇADO EM OUTRA CONTA: '+repetidoTxt(rp));
     const pg=cnpjs&&regCli()&&benPagador(cnpjs,regCli());if(pg)avisos.push(pg)}
@@ -3714,8 +3725,13 @@ async function aplicarLeitura({bol,nfe,cnpjs},origem){
     if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
   const box=$('rLeitura');if(!box)return;
   box.innerHTML=!bol&&!nfe?'':(lidos.length?`<span class="pos">✓ Lido ${origem==='PDF'?'do PDF':'da linha digitável'}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${origem==='PDF'?'do PDF':'da linha digitável'}; os campos já estavam preenchidos.</span> `)
-    +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'');
+    +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'')
+    +(prevDif?`<div class="alerta" id="rPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto anexado (${fm(prevDif)}) é diferente do valor previsto (${fm(REGPRE.valor)}).</b> Confirma a atualização do valor?<br><button type="button" class="btn small primary" id="rPrevOk" style="margin-top:6px">Sim, o valor é ${fm(prevDif)}</button></div>`:'');
 }
+// confirmou o valor do boleto: o envio vai com o valor novo e a Controlacs atualiza esta e as próximas contas previstas
+function regPrevOk(){if(!REGPRE?.lido)return;const el=rCampo('valor');if(el)el.value=showMoney(REGPRE.lido);REGPRE.ok=true;
+  const b=$('rPrevBox');if(b)b.innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(REGPRE.lido)}</b>. Ao enviar, a Controlacs confere e decide se altera também as contas futuras.</span>`}
+$('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()});
 $('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf$/i.test(f.type||f.name)||!regEditavel())return;
   try{const t=await pdfTexto(f),r={...lerTextoDoc(t),cnpjs:cnpjsDoTexto(t)};if(r.bol||r.nfe)await aplicarLeitura(r,'PDF');else if($('rLeitura')&&!soDig(rCampo('linha_digitavel')?.value))$('rLeitura').innerHTML='<span class="muted">Não achei a linha digitável neste PDF. Se for boleto, cole a linha digitável acima.</span>'}
   catch(err){console.error(err)}});
@@ -7274,6 +7290,22 @@ async function renderGT(){
   gtDesenha();
   if(M==='gfpagar'&&!tod)gtBoletos(cli);
 }
+// Boleto com valor diferente do previsto (Carol, 13/11): as próximas contas da mesma série (mesma empresa, fornecedor e
+// categoria, ainda previstas, sem boleto, sem pagamento e com o mesmo valor antigo) passam ao valor do boleto. Vale para todas as empresas.
+// Só as futuras (vencimento a partir de hoje) e só se confirmar a pergunta: as vencidas e não quitadas podem ser do Bom Controle
+// ainda não conferido e o boleto pode ter só um desconto daquele mês (Carol, 13/11)
+async function serieProximas(t){
+  if(!t?.vencimento||!(+t.valor>0))return [];
+  let q=sb.from('fin_titulos').select('id,vencimento,valor,pessoa_id,pessoa_nome').eq('cliente_id',t.cliente_id).eq('tipo',t.tipo||'pagar').eq('previsto',true).is('origem_id',null).gt('vencimento',t.vencimento>=TODAY?t.vencimento:isoLocal(new Date(dObj(TODAY).getTime()-864e5))).eq('valor',r2(+t.valor));
+  q=t.categoria?q.eq('categoria',t.categoria):q.is('categoria',null);
+  const {data,error}=await q.order('vencimento');if(error){console.error(error);return []}
+  const ls=(data||[]).filter(x=>x.id!==t.id&&(t.pessoa_id&&x.pessoa_id?x.pessoa_id===t.pessoa_id:pessoaChave(x.pessoa_nome)===pessoaChave(t.pessoa_nome)));
+  if(!ls.length)return [];
+  const {data:mv,error:e2}=await sb.from('fin_movimentos').select('titulo_id').in('titulo_id',ls.map(x=>x.id));if(e2)console.error(e2);
+  const pg=new Set((mv||[]).map(m=>m.titulo_id));return ls.filter(x=>!pg.has(x.id));
+}
+async function serieAtualiza(ids,valor){if(!ids?.length)return 0;const {error}=await sb.from('fin_titulos').update({valor:r2(valor)}).in('id',ids);if(error)throw error;return ids.length}
+const serieDatas=ls=>ls.map(s=>dBR(s.vencimento)).join(', ');
 // boletos e notas enviados pelo cliente (Financeiro › Boletos e notas fiscais a pagar) que ainda não viraram conta a pagar
 async function gtBoletos(cli){
   const {data,error}=await sb.from('contas_pagar').select('*').eq('cliente_id',cli.id).eq('conferido',false).order('vencimento');
@@ -7317,6 +7349,10 @@ function bolPorTexto(r,livres){
   return best;
 }
 const bolOpt=(t,r)=>`<option value="${t.id}">${dBR(t.vencimento)} · ${esc(t.pessoa_nome||'—')} · ${fm(t.valor)}${t.parcelas>1?` · parcela ${t.parcela}/${t.parcelas}`:''}${t.previsto?' · prevista':''}${t.descricao?' · '+esc(t.descricao).slice(0,40):''}</option>`;
+// aviso do valor do boleto diferente do previsto, com a opção de atualizar as próximas da mesma série (Carol, 13/11)
+const bolDifTxt=(x,t,i)=>`<div class="alerta" style="display:block;margin:6px 0 0;padding:6px 8px">⚠ <b>Valor do boleto diferente do ${t.previsto?'previsto':'lançado'}</b>: ${fm(t.valor)} → ${fm(x.row.valor)}${x.bol.valor_previsto>0?' (o cliente confirmou o valor do boleto)':''}.${x.serie?.length?`<label style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-bolserie="${i}" style="width:auto"${x.serieOk===true?' checked':''}> <span><b>Deseja alterar também as contas futuras?</b> Marque para ${x.serie.length===1?'a próxima conta prevista':'as próximas '+x.serie.length+' contas previstas'} (${serieDatas(x.serie)}) também passar${x.serie.length===1?'':'em'} a ${fm(x.row.valor)}. Desmarcado, muda só esta conta.</span></label>`:''}</div>`;
+async function bolSerie(x){x.serie=null;const t=x.dest&&x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest);
+  if(!t||!(x.row.valor>0)||Math.abs(t.valor-x.row.valor)<=0.004)return;x.serie=await serieProximas(t)}
 function bolDesenha(){
   const livres=bolAbertas(),usadas=new Set(BOL.it.map(x=>x.dest).filter(d=>d&&d!=='nova'));
   $('bolBody').innerHTML=`<p class="note" style="margin:0">Confira cada boleto ou nota que o cliente enviou na Rotina diária. Em “Lançar como”, escolha <b>Conta nova</b> ou a conta que já está lançada (prevista ou recorrente) para o documento ficar anexado nela. Quando o sistema acha a conta do mesmo fornecedor com vencimento perto, ela já vem escolhida. Quando o cliente mandou só o anexo e a descrição, o sistema procura pelas palavras da descrição, pelo valor e pela data; se não achar nada, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha (ou cadastra o fornecedor). Quando você registrar o pagamento aqui, o boleto também fica como pago na tela do cliente.</p>
@@ -7332,7 +7368,7 @@ function bolDesenha(){
       <td class="l">${(BOL.docs[b.id]||[]).map(d=>`<a href="${BOL.urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria||'Anexo')}</a>`).join('<br>')||'<span class="neg">sem anexo</span>'}</td>
       <td class="l"><select data-boldest="${i}" aria-label="Lançar como" style="max-width:340px"><option value="nova">Conta nova</option>${mesmo.length?`<optgroup label="Contas lançadas deste fornecedor">${mesmo.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}${outras.length?`<optgroup label="Outras contas em aberto perto do vencimento">${outras.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}</select>
       <br><button type="button" class="btn small" data-bolcria="${i}" title="Abre a tela completa do lançamento (pagar ou receber), com categoria, parcelas e nº da nota, já com os dados e os anexos deste documento">✚ Criar lançamento</button>
-      ${t?`<br><span class="chip c-done">Vai para a conta já lançada${x.como&&x.dest===x.sug?' (achei '+x.como+')':''}</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`:''}`:x.sug?'':`<br><span class="chip c-bad" title="Não achei conta em aberto parecida: confira se é algo novo e cadastre o fornecedor se precisar">Novo: não achei conta lançada</span>`}</td></tr>`}).join('')}</tbody></table></div>
+      ${t?`<br><span class="chip c-done">Vai para a conta já lançada${x.como&&x.dest===x.sug?' (achei '+x.como+')':''}</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`+bolDifTxt(x,t,i):''}`:x.sug?'':`<br><span class="chip c-bad" title="Não achei conta em aberto parecida: confira se é algo novo e cadastre o fornecedor se precisar">Novo: não achei conta lançada</span>`}</td></tr>`}).join('')}</tbody></table></div>
   <datalist id="bolPesList">${(BOL.pes||[]).map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist>`;
   BOL.it.forEach((x,i)=>{const s=document.querySelector(`[data-boldest="${i}"]`);if(s)s.value=x.dest||'nova'});
 }
@@ -7347,14 +7383,17 @@ $('gtImp').onclick=async()=>{
     const livres=bolAbertas(),it=[];
     for(const b of ls){const p=acha(b),row={cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||b.fornecedor,descricao:b.sobre||null,documento:b.documento||null,
       categoria:b.categoria_ok?b.categoria:null,vencimento:b.vencimento,valor:b.valor,forma:'Boleto',linha_digitavel:b.linha_digitavel||null,pix_chave:p?.pix_chave||null,origem:'boleto_cliente',origem_id:b.id,obs:b.obs||null};
-      const s=bolSugere({...row,enviado_em:b.enviado_em?.slice(0,10)},livres);if(s)livres.splice(livres.indexOf(s.t),1);it.push({bol:b,row,dest:s?s.t.id:'nova',sug:s?.t.id||null,como:s?.como||null,ok:true})}
+      // enviado pelo cliente em "Enviar boleto": já vem ligado à conta prevista (v127)
+      const s0=b.titulo_id&&livres.find(t=>t.id===b.titulo_id),s=s0?{t:s0,como:'pelo envio do cliente'}:bolSugere({...row,enviado_em:b.enviado_em?.slice(0,10)},livres);if(s)livres.splice(livres.indexOf(s.t),1);it.push({bol:b,row,dest:s?s.t.id:'nova',sug:s?.t.id||null,como:s?.como||null,ok:true})}
+    await Promise.all(it.map(bolSerie)).catch(console.error);
     BOL={cli,it,docs,urls:urls||{},pes};
     $('bolTitle').textContent=`Boletos e notas enviados pelo cliente (${ls.length})`;bolDesenha();dlgBol.showModal();
   }catch(e){fail(e,'Não foi possível abrir os boletos enviados')}
   $('gtImp').disabled=false;
 };
 dlgBol.addEventListener('change',ev=>{const d=ev.target.dataset;
-  if(d.boldest!==undefined){BOL.it[+d.boldest].dest=ev.target.value;bolDesenha()}
+  if(d.boldest!==undefined){const x=BOL.it[+d.boldest];x.dest=ev.target.value;bolDesenha();bolSerie(x).then(()=>{if(dlgBol.open&&x.serie?.length)bolDesenha()}).catch(console.error)}
+  if(d.bolserie!==undefined)BOL.it[+d.bolserie].serieOk=ev.target.checked;
   if(d.bolok!==undefined)BOL.it[+d.bolok].ok=ev.target.checked;
   if(d.bolv!==undefined)BOL.it[+d.bolv].venc=ev.target.value||null;
   if(d.bolval!==undefined){const n=parseMoney(ev.target.value);BOL.it[+d.bolval].val=n>0?r2(n):null;if(n>0)ev.target.value=showMoney(n)}
@@ -7373,7 +7412,10 @@ dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]
     if(!r.pessoa_nome&&x.forn){const p=(BOL.pes||[]).find(p=>chave(p.nome)===chave(x.forn)||p.fantasia&&chave(p.fantasia)===chave(x.forn));r.pessoa_nome=p?.nome||x.forn;r.pessoa_id=p?.id||null;r.pix_chave=r.pix_chave||p?.pix_chave||null}return r};
   const falta=sel.find(x=>{const r=comp(x),t=x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest);return !t&&(!r.vencimento||!(r.valor>0))});
   if(falta)return toast('Complete o vencimento e o valor de “'+(falta.bol.sobre||falta.bol.fornecedor||'boleto')+'” ou escolha a conta já lançada.');
-  const bt=ev.target.closest('button');bt.disabled=true;let novas=0,ligadas=0;
+  // valor do boleto diferente do previsto: confirma a atualização dos valores (esta e as próximas da série)
+  const difs=sel.map(x=>[x,x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest)]).filter(([x,t])=>t&&x.row.valor>0&&Math.abs(t.valor-x.row.valor)>0.004);
+  if(difs.length&&!confirm('O valor do boleto é diferente do previsto:\n\n'+difs.map(([x,t])=>`• ${t.pessoa_nome||x.bol.sobre||'Conta'} (${dBR(t.vencimento)}): ${fm(t.valor)} → ${fm(x.row.valor)}`+(x.serie?.length&&x.serieOk===true?` (esta e ${x.serie.length===1?'a próxima':'as próximas '+x.serie.length}: ${serieDatas(x.serie)})`:' (só esta conta)')).join('\n')+'\n\nConfirma a atualização dos valores?'))return;
+  const bt=ev.target.closest('button');bt.disabled=true;let novas=0,ligadas=0,prox=0;
   try{
     const ins=[],cps=[];
     for(const x of sel){const r=comp(x),t0=x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest);
@@ -7386,10 +7428,11 @@ dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]
       // vai para a conta já lançada: o boleto manda no vencimento, no valor e no documento; o resto da conta continua como estava
       const {error}=await sb.from('fin_titulos').update({...r,pessoa_id:r.pessoa_id||t.pessoa_id,pessoa_nome:r.pessoa_id?r.pessoa_nome:t.pessoa_nome||r.pessoa_nome,categoria:r.categoria||t.categoria,conta_id:t.conta_id,
         descricao:r.descricao||t.descricao,documento:r.documento||t.documento,pix_chave:r.pix_chave||t.pix_chave,previsto:false,obs:[t.obs,r.obs].filter(Boolean).join(' | ')||null}).eq('id',t.id);
-      if(error)throw error;ligadas++}
+      if(error)throw error;ligadas++;
+      if(x.serie?.length&&x.serieOk===true&&x.row.valor>0)prox+=await serieAtualiza(x.serie.map(s=>s.id),x.row.valor)}
     if(ins.length){const {error}=await sb.from('fin_titulos').insert(ins);if(error)throw error;novas=ins.length}
     for(const [id,cp] of cps){const {error}=await sb.from('contas_pagar').update(cp).eq('id',id);if(error)console.error(error)}
-    toast([novas?`${novas} ${novas===1?'conta nova':'contas novas'}`:'',ligadas?`${ligadas} ${ligadas===1?'boleto anexado em conta já lançada':'boletos anexados em contas já lançadas'}`:''].filter(Boolean).join(' e '));
+    toast([novas?`${novas} ${novas===1?'conta nova':'contas novas'}`:'',ligadas?`${ligadas} ${ligadas===1?'boleto anexado em conta já lançada':'boletos anexados em contas já lançadas'}`:''].filter(Boolean).join(' e ')+(prox?` · ${prox} ${prox===1?'próxima conta prevista atualizada':'próximas contas previstas atualizadas'}`:''));
     dlgBol.close();
   }catch(e){fail(e,'Não foi possível trazer os boletos')}
   bt.disabled=false;GT.key='';renderGT();
@@ -7826,7 +7869,10 @@ async function gtLeArquivo(f){
   const r=await leArquivoDoc(f);if(!$('dlgGT').open)return;
   if(r.erro){if(box)box.innerHTML=`<span class="muted">${esc(r.erro)}</span>`;return}
   const lidos=[],avisos=[],cli=cliAtual();
-  const poe=(id,v,txt,fmt,money)=>{const el=$(id);if(!el||el.disabled||v==null||v==='')return;
+  // conta já lançada com valor diferente do boleto: pergunta antes de trocar e oferece atualizar as próximas previstas (Carol, 13/11)
+  const t0=GTR,dup0=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0],vb=r2(+(r.bol?.valor||dup0?.valor||r.valor||0)),va=parseMoney($('gt_valor')?.value);
+  const difP=!!(t0&&t0.tipo==='pagar'&&vb>0&&va>0&&Math.abs(va-vb)>0.004);
+  const poe=(id,v,txt,fmt,money)=>{const el=$(id);if(!el||el.disabled||v==null||v==='')return;if(id==='gt_valor'&&difP)return;
     const atual=money?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=money?showMoney(v):v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));lidos.push(txt+' '+(fmt?fmt(v):v))}
     else if(String(money?r2(atual):atual)!==String(money?r2(v):v))avisos.push(`${txt} no arquivo: ${fmt?fmt(v):v}, diferente do digitado`)};
@@ -7856,6 +7902,11 @@ async function gtLeArquivo(f){
   if(!box)return;
   box.innerHTML=(lidos.length?`<span class="pos">✓ Lido d${r.origem==='foto'?'a':'o'} ${esc(r.origem)}: ${esc(lidos.join(', '))}. Confira antes de salvar.</span> `:`<span class="muted">Li ${r.origem==='foto'?'a':'o'} ${esc(r.origem)}${r.bol||r.valor||r.nfe?', mas os campos já estavam preenchidos':', mas não achei linha digitável, chave da nota nem valor'}.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}.</span>`:'');
+  if(difP){const serie=await serieProximas(t0).catch(()=>[]);if(!$('dlgGT').open||GTR!==t0)return;
+    box.insertAdjacentHTML('beforeend',`<div class="alerta" id="gtPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto (${fm(vb)}) é diferente do ${t0.previsto?'previsto':'lançado'} (${fm(va)}).</b> Confirma a atualização do valor?${serie.length?`<br><b>Deseja alterar também as contas futuras?</b> <span class="muted">(${serie.length===1?'a próxima conta prevista':'as próximas '+serie.length+' contas previstas'} desta série: ${serieDatas(serie)})</span>`:''}<br><button type="button" class="btn small primary" id="gtPrevOk" style="margin-top:6px">${serie.length?'Só esta conta':'Sim, atualizar'} para ${fm(vb)}</button>${serie.length?` <button type="button" class="btn small primary" id="gtPrevTodas" style="margin-top:6px">Esta e as futuras para ${fm(vb)}</button>`:''}</div>`);
+    const ok=todas=>{const el=$('gt_valor');el.value=showMoney(vb);el.dispatchEvent(new Event('input',{bubbles:true}));GT.serieV=todas?{ids:serie.map(s=>s.id),valor:vb}:null;
+      $('gtPrevBox').innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(vb)}</b>${todas?` nesta conta e em ${serie.length===1?'mais 1 conta futura':'mais '+serie.length+' contas futuras'} (${serieDatas(serie)})`:' só nesta conta'}. Clique em Salvar para gravar.</span>`};
+    $('gtPrevOk').onclick=()=>ok(false);if($('gtPrevTodas'))$('gtPrevTodas').onclick=()=>ok(true)}
 }
 // regs: ids dos lançamentos (null = novo); grupo: ids de todas as parcelas
 async function faInit(cli,regs,grupo){
@@ -7958,7 +8009,7 @@ const dlgGT=$('dlgGT');
 // GTBOL: lançamento criado a partir de um boleto ou nota que o cliente enviou (Carol, 05/11)
 let GTBOL=null;
 async function abrirGT(t,tipo,pre){
-  if(t||!pre)GTBOL=null;
+  if(t||!pre)GTBOL=null;GT.serieV=null;
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
   let pes=[],contas=GFC.lista;
   let plano=[];try{[pes,contas,plano]=await Promise.all([gfPessoasDe(cli.id,P?'fornecedor':'cliente'),gfContasDe(cli.id),planoDe(cli)])}catch(e){console.error(e)}
@@ -8109,6 +8160,9 @@ async function gtAcao(a,b){
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
       const rev=t.cat_revisar||(GT.movs[t.id]||[]).some(m=>m.cat_revisar);if(rev)row.cat_revisar=false;
       ({error}=await sb.from('fin_titulos').update({...row,valor}).eq('id',t.id));
+      // valor do boleto confirmado: as próximas contas previstas da série também passam ao valor novo (Carol, 13/11)
+      if(!error&&GT.serieV?.ids?.length&&Math.abs(r2(valor)-GT.serieV.valor)<0.005){try{GT.serieN=await serieAtualiza(GT.serieV.ids,valor)}catch(e){console.error(e);alert('A conta foi salva, mas as próximas contas previstas não foram atualizadas: '+(e.message||e))}}
+      GT.serieV=null;
       // esta e as próximas: o que mudou vai também para as próximas parcelas em aberto (datas andam mês a mês)
       if(!error&&b?.dataset.prox==='1'&&t.grupo_id){
         const nv={...row,valor:r2(valor)},ch={},muda=k=>(nv[k]??null)!==(k==='valor'?r2(+t.valor):(k==='competencia'?(t.competencia||null):(t[k]??null)));
@@ -8158,6 +8212,7 @@ async function gtAcao(a,b){
     const qual=GT.dlg==='pagar'?'pagamento':'recebimento';
     if(jaErr)alert(`A conta foi lançada, mas o ${qual} não foi registrado. Abra a conta e use “Registrar ${qual}”.`);
     if(t&&GT.proxOk){toast(`Correção salva nesta e nas próximas ${GT.proxOk} parcelas`);GT.proxOk=0;dlgGT.close();GT.key='';return renderGT()}
+    if(t&&GT.serieN){toast(`Correção salva · ${GT.serieN===1?'a próxima conta prevista também foi atualizada':'as próximas '+GT.serieN+' contas previstas também foram atualizadas'}`);GT.serieN=0;dlgGT.close();GT.key='';return renderGT()}
     toast(t?'Correção salva':jaPago&&!jaErr?(GT.dlg==='pagar'?'Conta lançada e paga':'Conta lançada e recebida')+(GT.concR?' · '+concTxt(GT.concR):''):'Conta lançada');GT.concR=null;dlgGT.close();GT.key='';renderGT();
   }else if(a==='baixa'){
     const data=$('gb_data').value,conta=$('gb_conta').value,valor=parseMoney($('gb_valor').value),juros=parseMoney($('gb_juros').value)||0,desconto=parseMoney($('gb_desconto').value)||0;
@@ -12194,6 +12249,7 @@ const MANUAL=[
 <li>Salve. Não precisa preencher mais nada.</li>
 </ol>
 <p><b>Contas do mês:</b> logo acima da lista aparece tudo o que a Controlacs tem para pagar no mês (inclusive o que chegou por e-mail), com a situação de cada conta: <span class="chip c-bad">Falta enviar o boleto</span>, <span class="chip c-ok">Boleto recebido</span> ou <span class="chip c-done">✓ Paga</span>. Use ‹ e › para trocar o mês. Na conta que falta, o botão <b>📎 Enviar boleto</b> já abre o envio com a descrição preenchida. Essa lista é só para consultar: quem lança é a Controlacs.</p>
+<p><b>Boleto com valor diferente do previsto:</b> ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para confirmar o valor novo. No escritório, ao validar o boleto (ou ao anexar o boleto na própria conta em Contas a pagar), o sistema mostra o mesmo aviso e pergunta “Deseja alterar também as contas futuras?”. Sem marcar, muda só esta conta; marcando, mudam também as próximas contas previstas do mesmo fornecedor e categoria que ainda vão vencer. As vencidas e não quitadas nunca mudam sozinhas: corrija à mão.</p>
 <p><b>O que eu enviei:</b> em <b>Mostrar</b>, escolha <i>Tudo o que foi enviado</i> para ver todos os boletos e notas que já mandou. Cada um mostra <span class="chip c-none">Aguardando a Controlacs</span> ou <span class="chip c-ok">✓ Lançado pela Controlacs</span> e, depois do pagamento, <span class="chip c-done">✓ Paga</span>.</p>
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
 <p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
@@ -12589,6 +12645,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13boleto-valor-previsto',data:'2026-11-13',t:'Boleto com valor diferente do previsto',itens:[
+    {x:'Boletos e notas a pagar: em “📎 Enviar boleto” (Contas do mês), ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para você confirmar o valor novo.',mods:['pagar']},
+    {x:'Contas a pagar: ao validar o boleto do cliente ou ao anexar o boleto na conta, o sistema avisa quando o valor do boleto é diferente do previsto. Ao confirmar, atualiza o valor desta conta e pergunta “Deseja alterar também as contas futuras?” (próximas contas previstas do mesmo fornecedor e categoria, que ainda vão vencer, sem boleto e sem pagamento). As vencidas e não quitadas nunca mudam sozinhas. Vale para todas as empresas.',para:'esc'}]},
   {k:'2026-11-13aviso-versao-nova',data:'2026-11-13',t:'Aviso quando sair versão nova do sistema',itens:[
     {x:'Quando o sistema for atualizado, aparece no alto da tela a faixa “🔄 Saiu uma versão nova do sistema” com o botão “Atualizar agora”. Clique nele (salve antes o que estiver fazendo) e a página recarrega já na versão nova. Não precisa mais apertar Ctrl+F5. “Depois” esconde o aviso por 30 minutos.'}]},
   {k:'2026-11-13bol-validar-sempre',data:'2026-11-13',t:'Boletos e notas do cliente: botão sempre à vista',itens:[
