@@ -3275,7 +3275,7 @@ function initMod(m){
   const cfg=MODCFG[m],cli=cliOuTodas();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
-    mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option><option value="todos">Tudo o que foi enviado</option>':'';
+    mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option><option value="todos">Tudo o que foi enviado</option><option value="falta">Falta enviar o boleto</option>':'';
     $('mFiltroBox').hidden=m!=='pagar';$('mTipo').value='';$('mTipoBox').hidden=m!=='tesouraria';
     mFiltro.value=m==='pagar'?'aberto':'';[$('mIni').value,$('mFim').value]=monthRange(TODAY.slice(0,7));
   }
@@ -3294,7 +3294,8 @@ async function renderMod(){
   let q=tod?sb.from(cfg.tabela).select('*').in('cliente_id',empresasDe(MOD).map(c=>c.id)):sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
   const f=MOD==='pagar'?mFiltro.value:'per',per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
   const [pIni,pFim]=[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31'];
-  if(f==='aberto')q=q.eq('conferido',false);else if(f!=='todos')q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
+  // "Falta enviar o boleto" (Carol, 13/11): a lista de enviados fica como Em aberto e Contas do mês mostra só o que falta
+  if(f==='aberto'||f==='falta')q=q.eq('conferido',false);else if(f!=='todos')q=q.gte(cfg.dataK,pIni).lte(cfg.dataK,pFim);
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
   REGS=data||[];DOCS={};
@@ -3365,17 +3366,17 @@ function pagMesDesenha(){
   const box=$('mPagMes');if(!box)return;
   if(MOD!=='pagar'||!PST.cli){box.innerHTML='';return}
   if(PST.erro){box.innerHTML=ehEsc()?'<p class="note">Para o cliente ver as contas do mês aqui, rode a atualização v100 do banco.</p>':'';return}
-  const ls=PST.tits,st=ls.map(pagSt),n=k=>st.filter(x=>x[2]===k).length,pode=podeLancar(PST.cli,'pagar'),mesAt=PMES===TODAY.slice(0,7);
+  const ls=PST.vis=MOD==='pagar'&&mFiltro.value==='falta'?PST.tits.filter(t=>pagSt(t)[2]==='falta'):PST.tits,st=ls.map(pagSt),n=k=>st.filter(x=>x[2]===k).length,pode=podeLancar(PST.cli,'pagar'),mesAt=PMES===TODAY.slice(0,7);
   box.innerHTML=`<div class="card" style="margin:14px 0"><div class="row" style="justify-content:space-between;align-items:center;gap:8px">
     <div><h2 style="margin:0">Contas do mês</h2><p class="sub" style="margin:2px 0 0">Tudo o que a Controlacs tem para pagar em ${mesTxt(PMES)}, inclusive o que chegou por e-mail. Conforme os pagamentos são feitos, a conta aparece como paga.</p></div>
     <div class="row" style="gap:6px;align-items:center"><button type="button" class="btn small ghost" data-pm="-1" aria-label="Mês anterior">‹</button><b>${mesTxt(PMES)}</b><button type="button" class="btn small ghost" data-pm="1" aria-label="Próximo mês">›</button>${mesAt?'':'<button type="button" class="btn small ghost" data-pm="0">Mês atual</button>'}</div></div>
     ${ls.length?`<p class="note" style="margin:8px 0">${[n('falta')?`<span class="chip c-bad">${n('falta')} falta${n('falta')>1?'m':''} enviar o boleto</span>`:'',n('ok')?`<span class="chip c-ok">${n('ok')} com boleto recebido</span>`:'',n('pago')?`<span class="chip c-done">${n('pago')} paga${n('pago')>1?'s':''}</span>`:''].filter(Boolean).join(' ')}</p>
     <div class="tablebox" style="margin:0"><table><thead><tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Situação</th><th></th></tr></thead><tbody>${ls.map((t,i)=>`<tr${st[i][2]==='falta'?' class="pend"':''}><td>${dBR(t.vencimento)}</td><td class="l">${esc(t.pessoa_nome||'—')}</td><td class="l">${esc(t.descricao||t.categoria||'')}${t.parcelas>1?` <span class="muted">${t.parcela}/${t.parcelas}</span>`:''}</td><td>${fm(t.valor)}</td><td class="l"><span class="chip ${st[i][0]}">${st[i][1]}</span></td><td>${st[i][2]==='falta'&&pode?`<button type="button" class="btn small" data-pmenv="${i}">📎 Enviar boleto</button>`:''}</td></tr>`).join('')}</tbody></table></div>`
-    :`<p class="note" style="margin:8px 0 0">Nenhuma conta a pagar lançada pela Controlacs em ${mesTxt(PMES)}.</p>`}</div>`;
+    :`<p class="note" style="margin:8px 0 0">${PST.tits.length?`Nenhuma conta sem boleto em ${mesTxt(PMES)}.`:`Nenhuma conta a pagar lançada pela Controlacs em ${mesTxt(PMES)}.`}</p>`}</div>`;
 }
 $('mPagMes').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.pm!==undefined){const k=+b.dataset.pm,[y,m]=PMES.split('-').map(Number),d=new Date(y,m-1+k,1);PMES=k===0?TODAY.slice(0,7):isoLocal(d).slice(0,7);renderMod();return}
-  if(b.dataset.pmenv!==undefined){const t=PST.tits[+b.dataset.pmenv];if(!t)return;
+  if(b.dataset.pmenv!==undefined){const t=(PST.vis||PST.tits)[+b.dataset.pmenv];if(!t)return;
     openReg(null,{sobre:[t.descricao||t.categoria,t.pessoa_nome,t.parcelas>1?`parcela ${t.parcela}/${t.parcelas}`:'','vencimento '+dBR(t.vencimento)].filter(Boolean).join(' · '),fornecedor:t.pessoa_nome||null,vencimento:t.vencimento,valor:t.valor,titulo_id:t.id,valor_previsto:t.valor})}});
 $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if(tr)openReg(REGS.find(r=>r.id===tr.dataset.id))});
 $('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
@@ -3706,7 +3707,7 @@ async function pdfTexto(file){
 }
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
-async function aplicarLeitura({bol,nfe,cnpjs,valor:vt},origem){
+async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem){
   const avisos=[],lidos=[];
   const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
@@ -3722,12 +3723,17 @@ async function aplicarLeitura({bol,nfe,cnpjs,valor:vt},origem){
     // o mesmo boleto em outra conta (de qualquer empresa) e boleto de outra empresa (v72)
     const rp=await boletoRepetido(bol,REG?.id);if(rp.length)avisos.push('ESTE BOLETO JÁ ESTÁ LANÇADO EM OUTRA CONTA: '+repetidoTxt(rp));
     const pg=cnpjs&&regCli()&&benPagador(cnpjs,regCli());if(pg)avisos.push(pg)}
+  // nota fiscal anexada (também a de serviço, sem chave): nº da nota e descrição do serviço (Carol, 13/11)
+  if(!nfe&&numero)poe('documento',numero,'NF nº');
+  if(servico){const so=rCampo('sobre'),ob=rCampo('obs');
+    if(so&&!so.disabled&&(!so.value.trim()||/^previsto:/i.test(so.value.trim()))){so.value=servico;lidos.push('descrição do serviço')}
+    else if(ob&&!ob.disabled&&!ob.value.trim()&&chave(so?.value||'')!==chave(servico)){ob.value=servico;lidos.push('descrição do serviço (em Observação)')}}
   if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº');
     const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:nfe.cnpj}).then(r=>r,()=>({data:null}));
     if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
   const box=$('rLeitura');if(!box)return;
   const de=origem==='linha'?'da linha digitável':origem==='foto'?'da foto':'do '+origem;
-  box.innerHTML=!bol&&!nfe&&!prevDif&&!(vt>0)?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
+  box.innerHTML=!bol&&!nfe&&!prevDif&&!(vt>0)&&!numero&&!servico?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'')
     +(prevDif?`<div class="alerta" id="rPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto anexado (${fm(prevDif)}) é diferente do valor previsto (${fm(REGPRE.valor)}).</b> Confirma a atualização do valor?<br><button type="button" class="btn small primary" id="rPrevOk" style="margin-top:6px">Sim, o valor é ${fm(prevDif)}</button></div>`:'');
 }
@@ -3738,12 +3744,18 @@ $('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()
 // leitura do boleto anexado. Roda ANTES do envio do arquivo (capture), porque o envio limpa o campo do arquivo e a leitura
 // ficava sem o arquivo. Também lê PDF escaneado e foto (OCR), como em Contas a pagar (Carol, 13/11)
 $('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf|image/i.test(f.type||'')&&!/\.(pdf|jpe?g|png|webp)$/i.test(f.name||'')||!regEditavel())return;
-  const box=$('rLeitura');if(box)box.innerHTML='<span class="muted">Lendo o boleto…</span>';
+  const box=$('rLeitura');if(box)box.innerHTML=`<span class="muted">Lendo ${e.target.dataset.cat==='Nota fiscal'?'a nota fiscal':'o boleto'}…</span>`;
+  const nota=e.target.dataset.cat==='Nota fiscal';
   try{const r=await leArquivoDoc(f);
     if(r.erro){if(box)box.innerHTML=`<span class="muted">${esc(r.erro)}</span>`;return}
-    if(r.bol||r.nfe||r.valor>0)await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:r.bol?null:r.valor},r.origem);
+    // na nota fiscal o valor não dispara o aviso do previsto (o valor da nota pode ter retenções); só preenche se estiver vazio
+    const vt=r.bol?null:nota?(REGPRE?null:r.valor):r.valor,numero=r.nfseNum||(nota||!r.bol?r.numero:'')||'',servico=r.servico||'';
+    if(r.bol||r.nfe||vt>0||numero||servico)await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:vt,numero,servico},r.origem);
     else if(box)box.innerHTML=!soDig(rCampo('linha_digitavel')?.value)?'<span class="muted">Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.</span>':''}
   catch(err){console.error(err);if(box)box.innerHTML='<span class="muted">Não consegui ler este arquivo. Se for boleto, cole a linha digitável acima.</span>'}},true);
+// leitura mais rápida (Carol, 13/11): o leitor de PDF já carrega ao clicar para anexar, enquanto a pessoa escolhe o arquivo
+$('rDocs').addEventListener('pointerdown',e=>{if(MOD!=='pagar'||!e.target.closest('.fotobtn'))return;
+  if(!window.pdfjsLib)carregaJs(PDFJS+'pdf.min.js').then(()=>{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}).catch(()=>{})},true);
 $('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitavel')return;const d=soDig(e.target.value),box=$('rLeitura');
   if(d.length<44){if(box)box.innerHTML='';return}
   const b=boletoDe(d);if(b)aplicarLeitura({bol:b},'linha');else if(box)box.innerHTML='<span class="neg">Esta linha digitável não confere. Verifique os números.</span>'});
@@ -7859,6 +7871,13 @@ function textoNota(t){
   const venc=dBRiso((T.match(/vencimento\D{0,25}(\d{2}\/\d{2}\/\d{4})/i)||[])[1]);
   const numero=((T.match(/(?:NFC?-?e|nota\s+fiscal(?:\s+eletr[oô]nica)?|n[uú]mero\s+da\s+nota|cupom(?:\s+fiscal)?|extrato)\s*(?:n[º°o.]*|n[uú]mero)?\s*[:.]?\s*(\d{1,3}(?:\.\d{3})+|\d{3,9})\b/i)||[])[1]||'').replace(/\D/g,'');
   return {valor,emissao,venc,numero:numero?String(+numero):''}}
+// nota fiscal de serviço (NFS-e): número da nota e a descrição do serviço (discriminação), para preencher a conta (Carol, 13/11)
+function nfseDe(t){
+  const T=String(t||'').replace(/\s+/g,' ');
+  const num=(T.match(/(?:n[uú]mero\s+da\s+(?:nfs-?e|nota(?:\s+fiscal)?)|nfs-?e\s*(?:n[º°o.]*|n[uú]mero)|n[º°o.]\s*da\s+nota(?:\s+fiscal)?)\s*[:.]?\s*(\d{1,3}(?:\.\d{3})+|\d{1,12})\b/i)||[])[1]||'';
+  let serv=(T.match(/(?:discrimina[çc][ãa]o\s+(?:dos?\s+)?servi[çc]os?|descri[çc][ãa]o\s+(?:dos?\s+)?servi[çc]os?|discrimina[çc][ãa]o)\s*[:\-]?\s*(.{4,400}?)(?=\s+(?:valor\s+(?:total|do\s+servi|da\s+nota|l[ií]quido|bruto)|c[oó]digo\s+(?:do\s+servi|de\s+tributa|da\s+atividade)|item\s+da\s+lista|atividade|tributa[çc][ãa]o|dedu[çc]|base\s+de\s+c[aá]lculo|reten[çc]|outras\s+informa|informa[çc][õo]es\s+complementares|natureza\s+da\s+opera|aliquota|al[ií]quota|iss\b)|$)/i)||[])[1]||'';
+  serv=serv.replace(/^[\s:\-–]+|[\s\-–]+$/g,'').slice(0,200);
+  return {nfseNum:num?String(+num.replace(/\D/g,'')):'',servico:serv.length>=4?serv:''}}
 async function leArquivoDoc(f){
   const nome=f.name||'',xml=/xml/i.test(f.type||'')||/\.xml$/i.test(nome);
   if(xml){const x=xmlNota(await f.text());if(!x)return {erro:'Este XML não é de nota fiscal (NF-e ou NFC-e).'};return {...x,origem:'XML da nota',cnpjs:[x.cnpj].filter(Boolean)}}
@@ -7871,7 +7890,7 @@ async function leArquivoDoc(f){
     const w=await tessW(),{data}=await w.recognize(f);t=data.text||'';origem='foto'}
   else return {erro:'Envie o boleto, a nota ou o cupom em PDF, foto ou XML.'};
   const r=lerTextoDoc(t),n=textoNota(t);
-  return {...n,bol:r.bol,nfe:r.nfe,cnpjs:cnpjsDoTexto(t),origem,texto:t}}
+  return {...n,...nfseDe(t),bol:r.bol,nfe:r.nfe,cnpjs:cnpjsDoTexto(t),origem,texto:t}}
 // preenche a conta a pagar que está aberta com o que o arquivo trouxe (só o que está em branco; o diferente vira aviso)
 async function gtLeArquivo(f){
   const box=$('faLeitura');if(box)box.innerHTML='<span class="muted">Lendo o arquivo…</span>';
@@ -7892,7 +7911,8 @@ async function gtLeArquivo(f){
   const dup=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0];
   poe('gt_valor',dup?.valor||r.valor,'valor',fm,true);
   poe('gt_vencimento',dup?.venc||r.venc,'vencimento',dBR);
-  poe('gt_documento',r.numero||r.nfe?.numero,r.modelo==='65'?'cupom nº':'NF nº');
+  poe('gt_documento',r.numero||r.nfe?.numero||r.nfseNum,r.modelo==='65'?'cupom nº':'NF nº');
+  if(r.servico)poe('gt_descricao',r.servico,'descrição do serviço');
   if(r.emissao&&$('gt_competencia')?.dataset.auto==='1')$('gt_competencia').value='';   // a emissão da nota manda na competência sugerida
   if(r.emissao)poe('gt_competencia',r.emissao.slice(0,7),'competência',v=>v.split('-').reverse().join('/'));
   if(r.xml&&r.pix&&!$('gt_forma').value){$('gt_forma').value='Pix';$('gt_forma').dispatchEvent(new Event('change',{bubbles:true}))}
@@ -12259,6 +12279,7 @@ const MANUAL=[
 </ol>
 <p><b>Contas do mês:</b> logo acima da lista aparece tudo o que a Controlacs tem para pagar no mês (inclusive o que chegou por e-mail), com a situação de cada conta: <span class="chip c-bad">Falta enviar o boleto</span>, <span class="chip c-ok">Boleto recebido</span> ou <span class="chip c-done">✓ Paga</span>. Use ‹ e › para trocar o mês. Na conta que falta, o botão <b>📎 Enviar boleto</b> já abre o envio com a descrição preenchida. Essa lista é só para consultar: quem lança é a Controlacs.</p>
 <p><b>Boleto com valor diferente do previsto:</b> ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para confirmar o valor novo. No escritório, ao validar o boleto (ou ao anexar o boleto na própria conta em Contas a pagar), o sistema mostra o mesmo aviso e pergunta “Deseja alterar também as contas futuras?”. Sem marcar, muda só esta conta; marcando, mudam também as próximas contas previstas do mesmo fornecedor e categoria que ainda vão vencer. As vencidas e não quitadas nunca mudam sozinhas: corrija à mão.</p>
+<p><b>Só o que falta:</b> em <b>Mostrar</b>, escolha <i>Falta enviar o boleto</i> para ver em Contas do mês só as contas que ainda estão sem boleto.</p>
 <p><b>O que eu enviei:</b> em <b>Mostrar</b>, escolha <i>Tudo o que foi enviado</i> para ver todos os boletos e notas que já mandou. Cada um mostra <span class="chip c-none">Aguardando a Controlacs</span> ou <span class="chip c-ok">✓ Lançado pela Controlacs</span> e, depois do pagamento, <span class="chip c-done">✓ Paga</span>.</p>
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
 <p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
@@ -12654,6 +12675,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13nota-servico',data:'2026-11-13',t:'Leitura da nota fiscal: número e descrição do serviço',itens:[
+    {x:'Boletos e notas a pagar: ao anexar a nota fiscal (PDF ou foto), o sistema preenche o nº da nota e a descrição do serviço em “Do que se trata”. Se já houver uma descrição escrita, a do serviço vai para Observação.',mods:['pagar']},
+    {x:'Em “Mostrar”, a nova opção “Falta enviar o boleto” deixa em Contas do mês só as contas que ainda estão sem boleto.',mods:['pagar']},
+    {x:'Contas a pagar: ao anexar a nota de serviço na conta, o nº da nota e a descrição do serviço também são preenchidos (só o que estiver em branco).',para:'esc'}]},
   {k:'2026-11-13boleto-valor-previsto',data:'2026-11-13',t:'Boleto com valor diferente do previsto',itens:[
     {x:'Boletos e notas a pagar: em “📎 Enviar boleto” (Contas do mês), ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para você confirmar o valor novo.',mods:['pagar']},
     {x:'Contas a pagar: ao validar o boleto do cliente ou ao anexar o boleto na conta, o sistema avisa quando o valor do boleto é diferente do previsto. Ao confirmar, atualiza o valor desta conta e pergunta “Deseja alterar também as contas futuras?” (próximas contas previstas do mesmo fornecedor e categoria, que ainda vão vencer, sem boleto e sem pagamento). As vencidas e não quitadas nunca mudam sozinhas. Vale para todas as empresas.',para:'esc'}]},
