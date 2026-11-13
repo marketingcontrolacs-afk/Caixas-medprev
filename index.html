@@ -3706,17 +3706,19 @@ async function pdfTexto(file){
 }
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
-async function aplicarLeitura({bol,nfe,cnpjs},origem){
+async function aplicarLeitura({bol,nfe,cnpjs,valor:vt},origem){
   const avisos=[],lidos=[];
   const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=el.classList.contains('money')?showMoney(v):v;lidos.push(txt+' '+(fmt?fmt(v):v))}
     else if(String(el.classList.contains('money')?r2(atual):atual)!==String(v))avisos.push(`${txt} no ${origem}: ${fmt?fmt(v):v}, diferente do digitado`)};
   let prevDif=null;
+  // valor do boleto diferente do previsto: pergunta antes de trocar (Carol, 13/11). Sem linha digitável, vale o valor escrito no documento
+  const vb=r2(+(bol?.valor||vt||0));
+  if(REGPRE?.valor&&vb>0&&Math.abs(vb-REGPRE.valor)>0.004&&Math.abs((parseMoney(rCampo('valor')?.value)||0)-vb)>0.004){prevDif=vb;REGPRE.lido=prevDif}
+  else if(!bol&&vt>0)poe('valor',vt,'valor',fm);
   if(bol){const el=rCampo('linha_digitavel');if(el&&!soDig(el.value))el.value=bol.linha||bol.barra;
-    // valor do boleto diferente do previsto: pergunta antes de trocar (Carol, 13/11)
-    if(REGPRE?.valor&&bol.valor>0&&Math.abs(bol.valor-REGPRE.valor)>0.004&&Math.abs((parseMoney(rCampo('valor')?.value)||0)-bol.valor)>0.004){prevDif=r2(bol.valor);REGPRE.lido=prevDif}
-    else poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR);
+    if(!prevDif)poe('valor',bol.valor,'valor',fm);poe('vencimento',bol.venc,'vencimento',dBR);
     // o mesmo boleto em outra conta (de qualquer empresa) e boleto de outra empresa (v72)
     const rp=await boletoRepetido(bol,REG?.id);if(rp.length)avisos.push('ESTE BOLETO JÁ ESTÁ LANÇADO EM OUTRA CONTA: '+repetidoTxt(rp));
     const pg=cnpjs&&regCli()&&benPagador(cnpjs,regCli());if(pg)avisos.push(pg)}
@@ -3724,7 +3726,8 @@ async function aplicarLeitura({bol,nfe,cnpjs},origem){
     const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:nfe.cnpj}).then(r=>r,()=>({data:null}));
     if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
   const box=$('rLeitura');if(!box)return;
-  box.innerHTML=!bol&&!nfe?'':(lidos.length?`<span class="pos">✓ Lido ${origem==='PDF'?'do PDF':'da linha digitável'}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${origem==='PDF'?'do PDF':'da linha digitável'}; os campos já estavam preenchidos.</span> `)
+  const de=origem==='linha'?'da linha digitável':origem==='foto'?'da foto':'do '+origem;
+  box.innerHTML=!bol&&!nfe&&!prevDif&&!(vt>0)?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'')
     +(prevDif?`<div class="alerta" id="rPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto anexado (${fm(prevDif)}) é diferente do valor previsto (${fm(REGPRE.valor)}).</b> Confirma a atualização do valor?<br><button type="button" class="btn small primary" id="rPrevOk" style="margin-top:6px">Sim, o valor é ${fm(prevDif)}</button></div>`:'');
 }
@@ -3732,9 +3735,15 @@ async function aplicarLeitura({bol,nfe,cnpjs},origem){
 function regPrevOk(){if(!REGPRE?.lido)return;const el=rCampo('valor');if(el)el.value=showMoney(REGPRE.lido);REGPRE.ok=true;
   const b=$('rPrevBox');if(b)b.innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(REGPRE.lido)}</b>. Ao enviar, a Controlacs confere e decide se altera também as contas futuras.</span>`}
 $('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()});
-$('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf$/i.test(f.type||f.name)||!regEditavel())return;
-  try{const t=await pdfTexto(f),r={...lerTextoDoc(t),cnpjs:cnpjsDoTexto(t)};if(r.bol||r.nfe)await aplicarLeitura(r,'PDF');else if($('rLeitura')&&!soDig(rCampo('linha_digitavel')?.value))$('rLeitura').innerHTML='<span class="muted">Não achei a linha digitável neste PDF. Se for boleto, cole a linha digitável acima.</span>'}
-  catch(err){console.error(err)}});
+// leitura do boleto anexado. Roda ANTES do envio do arquivo (capture), porque o envio limpa o campo do arquivo e a leitura
+// ficava sem o arquivo. Também lê PDF escaneado e foto (OCR), como em Contas a pagar (Carol, 13/11)
+$('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf|image/i.test(f.type||'')&&!/\.(pdf|jpe?g|png|webp)$/i.test(f.name||'')||!regEditavel())return;
+  const box=$('rLeitura');if(box)box.innerHTML='<span class="muted">Lendo o boleto…</span>';
+  try{const r=await leArquivoDoc(f);
+    if(r.erro){if(box)box.innerHTML=`<span class="muted">${esc(r.erro)}</span>`;return}
+    if(r.bol||r.nfe||r.valor>0)await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:r.bol?null:r.valor},r.origem);
+    else if(box)box.innerHTML=!soDig(rCampo('linha_digitavel')?.value)?'<span class="muted">Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.</span>':''}
+  catch(err){console.error(err);if(box)box.innerHTML='<span class="muted">Não consegui ler este arquivo. Se for boleto, cole a linha digitável acima.</span>'}},true);
 $('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitavel')return;const d=soDig(e.target.value),box=$('rLeitura');
   if(d.length<44){if(box)box.innerHTML='';return}
   const b=boletoDe(d);if(b)aplicarLeitura({bol:b},'linha');else if(box)box.innerHTML='<span class="neg">Esta linha digitável não confere. Verifique os números.</span>'});
