@@ -332,6 +332,10 @@ main{padding-block:26px 64px}
 h1{font-size:28px;letter-spacing:-.02em}
 .card{border-color:var(--line);box-shadow:var(--sh1)}
 .tiles{gap:14px}
+/* esconder/mostrar os quadros de resumo em todas as telas (Carol, 13/11) */
+.tiles.tiles-min{display:none!important}
+.tiles-tg{display:flex;justify-content:flex-end;margin:10px 0 -6px}
+.tiles-tg:has(+ .tiles:empty),.tiles-tg:has(+ .tiles[hidden]){display:none}
 .tile{padding:16px 18px;border-radius:var(--r)}
 .tile .k{font-size:11.5px;letter-spacing:.07em}
 .tile .v{font-size:25px;letter-spacing:-.01em}
@@ -12128,6 +12132,7 @@ const MANUAL=[
 <li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas. Se houver <b>grupos de empresas</b> (Configurações › Cadastro de empresas), aparecem também as opções <b>Grupo: …</b>, que somam só as empresas do grupo; a matriz com filiais vira um grupo sozinha.</li>
 <li><b>Módulos:</b> Dashboard, Rotina diária, Gestão financeira, Contabilidade, RH, Comunicação e Configurações. Passe o mouse (ou clique) num módulo para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
 <li><b>Exportar e Imprimir:</b> nas telas com lista de lançamentos, o botão <b>Exportar</b> gera o arquivo em <b>Excel</b> ou <b>PDF</b> e o botão <b>Imprimir</b> abre a impressão. Sai só o que está na tela: filtre primeiro (situação, empresa, período, busca) e depois exporte. Os filtros usados aparecem no alto do relatório.</li>
+<li><b>Esconder o resumo:</b> nas telas com quadros de resumo no alto (totais, pendentes, conciliadas…), clique em <b>▲ Esconder resumo</b> para recolher os quadros e ver mais da lista. Para ver de novo, clique em <b>▼ Mostrar resumo</b>. O portal lembra a escolha de cada tela neste aparelho.</li>
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
 <li><b>No celular:</b> o alto da tela fica mais compacto (logo, nome e Sair numa linha e a empresa logo abaixo). Os módulos ficam numa faixa que corre para o lado com o dedo. Nas janelas, o texto rola e os botões (como <b>Visualizei</b>, Salvar e Cancelar) ficam sempre fixos embaixo.</li>
@@ -12562,6 +12567,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13esconder-resumo',data:'2026-11-13',t:'Esconder os quadros de resumo em todas as telas',itens:[
+    {x:'Em todas as telas com quadros de resumo no alto (Dashboard, Contas a pagar e a receber, Conciliação bancária, Extrato da conta, Notas fiscais, RH e outras), há o botão “▲ Esconder resumo”. Os quadros recolhem e sobra mais espaço para a lista; “▼ Mostrar resumo” traz de volta. A escolha fica guardada para cada tela neste aparelho.'}]},
   {k:'2026-11-13lancar-juntas-soma',data:'2026-11-13',t:'Lançar juntas soma num lançamento só',itens:[
     {x:'Gestão financeira › Conciliação bancária: “Lançar juntas” agora soma as linhas selecionadas do mesmo dia e cria um lançamento só (mesma categoria, mesma conta), ligado a todas elas. No Extrato da conta aparece uma linha com a soma, em vez de um CIELO por linha.',para:'esc'},
     {x:'Contas a pagar e a receber: o lançamento que juntou várias linhas do banco aparece uma vez só, com a etiqueta “🔗 N lançamentos juntos”. Abra e clique em “Detalhar” para ver cada lançamento do banco (data, histórico e valor) que está dentro.',para:'esc'},
@@ -14336,6 +14343,18 @@ $('nfdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-
   }catch(x){console.error(x);err((v93(x)?v93Msg:'Não foi possível salvar: '+(x.message||x))+(feitos?` (${feitos} já ${feitos===1?'foi marcada':'foram marcadas'})`:''))}
   finally{b.disabled=false;nfDesenha();nfPgDesenha()}
 },true);
+// quadros de resumo (.tiles) de todas as telas: setinha para esconder ou mostrar, lembrada neste aparelho (Carol, 13/11).
+// O Repasse da semana já tem o seu “Esconder valores” (rnTiles) e continua igual.
+const TMINK='ctl_tiles_min';
+const tilesMin=()=>{try{return new Set(JSON.parse(localStorage.getItem(TMINK)||'[]'))}catch(e){return new Set()}};
+function tilesTg(el){if(el.dataset.tg||el.id==='rnTiles')return;el.dataset.tg='1';
+  const p=el.parentElement?.closest('[id]'),k=el.id||(p?p.id:'tela')+':'+[...(p||document).querySelectorAll('.tiles')].indexOf(el);
+  const box=document.createElement('div');box.className='tiles-tg';box.innerHTML='<button type="button" class="btn small ghost"></button>';el.before(box);
+  const b=box.firstChild,ap=()=>{const min=tilesMin().has(k);el.classList.toggle('tiles-min',min);b.textContent=min?'▼ Mostrar resumo':'▲ Esconder resumo';b.title=min?'Mostra os quadros de resumo':'Esconde os quadros de resumo para sobrar mais espaço na tela'};
+  b.onclick=()=>{const s=tilesMin();s.has(k)?s.delete(k):s.add(k);try{localStorage.setItem(TMINK,JSON.stringify([...s]))}catch(e){}ap()};ap()}
+document.querySelectorAll('.tiles').forEach(tilesTg);
+new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType!==1||n.tagName==='TR'||n.tagName==='TD'||n.tagName==='OPTION')continue;
+  if(n.classList.contains('tiles'))tilesTg(n);if(n.getElementsByClassName('tiles').length)[...n.getElementsByClassName('tiles')].forEach(tilesTg)}}).observe(document.body,{childList:true,subtree:true});
 // período no modelo do Bom Controle em todas as telas com De/Até
 [['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
