@@ -3993,7 +3993,7 @@ const ferPodeSol=r=>{const p=FPROG[r.id];return !!p&&p.status!=='Devolvida'&&fer
 function ferSolGuarda(fid,x,dt){(x?.parcelas||[]).forEach(q=>{const k=ferSolKey(fid,x.aq_ini,q.inicio,q.fim);if(!FSOLIC[k]||FSOLIC[k]<dt)FSOLIC[k]=dt})}
 $('fFiltro').onchange=()=>renderRH();
 // observações do relatório de férias (Carol, 13/11): do período, da programação, nota do escritório e pendências
-const ferObsRel=(r,p)=>{const al=ferAlertas(r);return [r.obs&&'Período: '+r.obs,p?.obs&&'Programação: '+p.obs,p?.nota_escritorio&&'Nota do escritório: '+p.nota_escritorio,al.length&&'Pendências: '+al.join('; ')].filter(Boolean).join(' | ')};
+const ferObsRel=(r,p)=>{const al=ferAlertas(r);return [r.obs&&'Período: '+r.obs,p?.obs&&!/^(Carga inicial|Importada) da planilha de controle\.?$/i.test(p.obs.trim())&&'Programação: '+p.obs,p?.nota_escritorio&&'Nota do escritório: '+p.nota_escritorio,al.length&&'Pendências: '+al.join('; ')].filter(Boolean).join(' | ')};
 // Pendências que o escritório precisa conferir em cada período (mesmas da coluna Alertas da planilha)
 function ferAlertas(r){
   const p=FPROG[r.id],ps=FPARC[p?.id]||[],a=[];
