@@ -1332,10 +1332,12 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="df"><button type="button" class="btn ghost" id="tcDel" hidden>Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="tcClose">Fechar</button><button type="submit" class="btn primary" id="tcSave">Salvar conferência</button></div>
   </form>
 </dialog>
-<dialog id="dlgFerQual" style="max-width:520px">
-  <div class="dh"><h2>Quais parcelas vão para a contabilidade?</h2></div>
-  <div class="db"><p style="margin:0 0 8px" id="fqTxt"></p><p class="note" style="margin:0">Com “Só a próxima parcela”, cada colaborador sai só com a parcela mais próxima que ainda não foi solicitada. Se a 1ª já foi, vem a 2ª.</p></div>
-  <div class="df"><button class="btn ghost" id="fqCancel">Cancelar</button><span class="spacer"></span><button class="btn" id="fqTodas">Todas as parcelas</button><button class="btn primary" id="fqProx">Só a próxima parcela</button></div>
+<dialog id="dlgFerQual" style="max-width:760px;width:calc(100% - 32px)">
+  <div class="dh"><h2>Solicitação para a contabilidade</h2></div>
+  <div class="db"><p class="note" style="margin:0 0 8px">Marque as parcelas de cada colaborador que vão no PDF. A parcela já solicitada aparece com a data; para pedir de novo, clique em “Desfazer” e marque.</p>
+    <div class="row" style="gap:8px;margin:0 0 10px"><button type="button" class="btn small" id="fqProx">Só a próxima parcela</button><button type="button" class="btn small" id="fqTodas">Todas as que faltam</button><button type="button" class="btn small ghost" id="fqNada">Desmarcar tudo</button></div>
+    <div id="fqLista" style="display:grid;gap:10px;max-height:55vh;overflow:auto"></div></div>
+  <div class="df"><button type="button" class="btn ghost" id="fqCancel">Cancelar</button><span class="spacer"></span><button type="button" class="btn primary" id="fqGerar">Gerar solicitação</button></div>
 </dialog>
 <dialog id="dlgFer">
   <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
@@ -3994,6 +3996,8 @@ const ferSolTag=dt=>dt?`<span class="chip c-done" title="Solicitação para a co
 // parcelas (ordem) da programação que ainda não foram solicitadas à contabilidade (Carol, 11/11: já solicitada não volta a ser selecionada)
 const ferSolPend=r=>{const p=FPROG[r.id];if(!p)return [];const ps=FPARC[p.id]||[];return ps.length?ps.filter(q=>!ferSolDe(r,q)).map(q=>q.ordem):(p.venda_total>0?[0]:[])};
 // a programação pode ir na solicitação para a contabilidade (tem venda ou datas ainda não solicitadas)
+// tem programação com datas ou venda (entra na janela da solicitação, mesmo já solicitada, para desfazer)
+const ferTemProg=r=>{const p=FPROG[r.id];return !!p&&p.status!=='Devolvida'&&((FPARC[p.id]||[]).length>0||p.venda_total>0)};
 const ferPodeSol=r=>{const p=FPROG[r.id];return !!p&&p.status!=='Devolvida'&&ferSolPend(r).length>0};
 function ferSolGuarda(fid,x,dt){(x?.parcelas||[]).forEach(q=>{const k=ferSolKey(fid,x.aq_ini,q.inicio,q.fim);if(!FSOLIC[k]||FSOLIC[k]<dt)FSOLIC[k]=dt})}
 $('fFiltro').onchange=()=>renderRH();
@@ -4056,7 +4060,7 @@ $('fBody').addEventListener('click',ev=>{const b=ev.target.closest('.lk');if(b)a
 const FSEL=new Set();
 function fSelBar(){const vis=[...document.querySelectorAll('#fBody [data-fsel]')].map(i=>i.dataset.fsel);
   [...FSEL].forEach(id=>{if(!vis.includes(id))FSEL.delete(id)});
-  const n=FSEL.size,sol=FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)).length,prop=[...FSEL].filter(id=>FPROG[id]?.status==='Proposta').length;
+  const n=FSEL.size,sol=FER.filter(r=>FSEL.has(r.id)&&ferTemProg(r)).length,prop=[...FSEL].filter(id=>FPROG[id]?.status==='Proposta').length;
   $('fRel').querySelector('summary').textContent=n?`Relatório (${n} ${n===1?'marcado':'marcados'}) ▾`:'Relatório ▾';
   $('fSol').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
   $('fAprov').hidden=!(ehEsc()&&prop);$('fAprov').textContent=`Aprovar marcadas (${prop})`;
@@ -4068,12 +4072,42 @@ $('fHead').addEventListener('change',ev=>{if(ev.target.id!=='fSelAll')return;doc
 const ferSolProx=r=>{const p=FPROG[r.id],ps=(p&&FPARC[p.id]||[]).filter(q=>!ferSolDe(r,q)).sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio))||a.ordem-b.ordem);return ps.length?[ps[0].ordem]:null};
 // Carol, 13/11 17h: o seletor ao lado do botão passava despercebido; quando alguém marcado tem mais de uma parcela
 // por solicitar, o portal pergunta numa janela (Só a próxima parcela / Todas as parcelas)
-$('fSol').onclick=()=>{const rs=FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)),div=rs.filter(r=>ferSolPend(r).length>1);
-  if(!div.length)return gerarSolFerias(rs);
-  $('fqTxt').textContent=`${div.length===1?'1 colaborador marcado tem':div.length+' colaboradores marcados têm'} férias divididas ainda não solicitadas (${div.slice(0,4).map(r=>r.nome.split(' ')[0]).join(', ')}${div.length>4?'…':''}).`;
-  $('fqProx').onclick=()=>{dlgFerQual.close();gerarSolFerias(rs,ferSolProx)};$('fqTodas').onclick=()=>{dlgFerQual.close();gerarSolFerias(rs)};
-  dlgFerQual.showModal()};
+// Carol, 13/11 17h18: a janela abre SEMPRE e mostra todos os marcados, com cada parcela para escolher (a próxima vem marcada).
+// A parcela já solicitada aparece com a data e o botão “Desfazer” (tudo no sistema precisa poder ser desfeito).
+const FQ={rs:[],sem:[],marca:new Map()};
+const ferParcsOrd=r=>{const p=FPROG[r.id];return p?(FPARC[p.id]||[]).slice().sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio))||a.ordem-b.ordem):[]};
+function fqMarca(modo){FQ.rs.forEach(r=>{const pd=ferSolPend(r);FQ.marca.set(r.id,new Set(modo==='nada'?[]:modo==='todas'?pd:(pd.includes(0)?[0]:ferSolProx(r)||[])))});fqDesenha()}
+function fqDesenha(){
+  $('fqLista').innerHTML=FQ.rs.map(r=>{const p=FPROG[r.id],ps=ferParcsOrd(r),m=FQ.marca.get(r.id)||new Set();
+    const lin=(o,txt,dt)=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-fq="${r.id}" data-o="${o}"${m.has(o)&&!dt?' checked':''}${dt?' disabled':''} style="width:auto">${txt}</label>${ferSolTag(dt)}${dt&&ehEsc()?`<button type="button" class="btn small ghost" data-fqdes="${r.id}" data-o="${o}" title="Tira a marcação de solicitada; a parcela volta a poder ser solicitada">Desfazer</button>`:''}</div>`;
+    const itens=ps.length?ps.map(q=>lin(q.ordem,`${q.ordem}ª parcela: ${dCurto(q.inicio)} a ${dCurto(q.fim_contabilidade)} (${q.dias_contabilidade} dias)`,ferSolDe(r,q))).join('')
+      :lin(0,`Só a venda de ${p.venda_total} dias (sem datas de gozo)`,'');
+    return `<div class="card" style="padding:10px 12px"><b>${esc(r.nome)}</b> <span class="muted">· período ${dAno2(r.inicio_aquisitivo)} a ${dAno2(r.fim_aquisitivo)}${p.venda_total?` · venda ${p.venda_total} dias (vai com a 1ª parcela)`:''}${p.status!=='Aprovada'?` · ${esc(p.status==='Proposta'?'a conferir':p.status)}`:''}</span><div style="display:grid;gap:4px;margin-top:6px">${itens}</div></div>`}).join('')
+    +(FQ.sem.length?`<p class="note" style="margin:0">Sem programação, não vão: ${FQ.sem.map(r=>esc(r.nome)).join(', ')}.</p>`:'');
+  const n=FQ.rs.filter(r=>(FQ.marca.get(r.id)||new Set()).size).length;
+  $('fqGerar').disabled=!n;$('fqGerar').textContent=n?`Gerar solicitação (${n} ${n===1?'colaborador':'colaboradores'})`:'Gerar solicitação';
+}
+$('fSol').onclick=()=>{const mar=FER.filter(r=>FSEL.has(r.id));FQ.rs=mar.filter(ferTemProg);FQ.sem=mar.filter(r=>!ferTemProg(r));FQ.marca=new Map();
+  if(!FQ.rs.length)return toast('Nenhum dos marcados tem programação de férias.');fqMarca('prox');dlgFerQual.showModal()};
+$('fqProx').onclick=()=>fqMarca('prox');$('fqTodas').onclick=()=>fqMarca('todas');$('fqNada').onclick=()=>fqMarca('nada');
+$('fqLista').addEventListener('change',ev=>{const c=ev.target.closest('[data-fq]');if(!c)return;const m=FQ.marca.get(c.dataset.fq)||new Set();c.checked?m.add(+c.dataset.o):m.delete(+c.dataset.o);FQ.marca.set(c.dataset.fq,m);fqDesenha()});
+$('fqLista').addEventListener('click',async ev=>{const b=ev.target.closest('[data-fqdes]');if(!b)return;const r=FQ.rs.find(x=>x.id===b.dataset.fqdes),q=r&&ferParcsOrd(r).find(z=>z.ordem===+b.dataset.o);if(!q)return;
+  b.disabled=true;if(await ferSolDesfazer(r,q)){fqDesenha();renderRH()}else b.disabled=false});
+$('fqGerar').onclick=()=>{const rs=FQ.rs.filter(r=>(FQ.marca.get(r.id)||new Set()).size);if(!rs.length)return;dlgFerQual.close();
+  gerarSolFerias(rs,r=>{const m=[...(FQ.marca.get(r.id)||[])];return m.includes(0)?null:m})};
 $('fqCancel').onclick=()=>dlgFerQual.close();
+// desfazer a marcação “Solicitada” de uma parcela (Carol, 13/11). O registro do PDF continua guardado em rh_documentos,
+// só a parcela sai da lista de parcelas solicitadas (fica em dados.desfeitas, com a data e quem desfez).
+async function ferSolDesfazer(r,q){
+  if(!confirm(`Desfazer a solicitação da ${q.ordem}ª parcela de ${r.nome} (${dCurto(q.inicio)} a ${dCurto(q.fim_contabilidade)})?\n\nO PDF que já foi para a contabilidade não muda. A parcela deixa de aparecer como “Solicitada” e pode ser solicitada de novo.`))return false;
+  const {data,error}=await sb.from('rh_documentos').select('id,dados').eq('funcionario_id',r.funcionario_id).eq('modelo','ferias_contab');
+  if(error){fail(error,'Não foi possível desfazer');return false}
+  const bate=x=>x.inicio===q.inicio&&x.fim===q.fim_contabilidade,agora=new Date().toISOString();let n=0;
+  for(const d of data||[]){const x=d.dados?.x;if(!x||x.aq_ini!==r.inicio_aquisitivo||!(x.parcelas||[]).some(bate))continue;
+    const dados={...d.dados,x:{...x,parcelas:x.parcelas.filter(z=>!bate(z))},desfeitas:[...(d.dados.desfeitas||[]),...x.parcelas.filter(bate).map(z=>({...z,em:agora,por:ME?.nome||ME?.email||''}))]};
+    const {error:e2}=await sb.from('rh_documentos').update({dados}).eq('id',d.id);if(e2){fail(e2,'Não foi possível desfazer');return false}n++}
+  delete FSOLIC[ferSolKey(r.funcionario_id,r.inicio_aquisitivo,q.inicio,q.fim_contabilidade)];
+  toast(n?'Solicitação desfeita. A parcela pode ser solicitada de novo.':'Esta parcela já não estava marcada como solicitada.');return true}
 $('fAprov').onclick=async ev=>{const ids=[...FSEL].map(id=>FPROG[id]).filter(p=>p?.status==='Proposta').map(p=>p.id);if(!ids.length)return;
   if(!confirm(`Aprovar ${ids.length} programaç${ids.length===1?'ão':'ões'} de férias?`))return;
   ev.target.disabled=true;const {error}=await sb.from('ferias_programacoes').update({status:'Aprovada',aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()}).in('id',ids);ev.target.disabled=false;
@@ -4083,7 +4117,7 @@ $('fAprov').onclick=async ev=>{const ids=[...FSEL].map(id=>FPROG[id]).filter(p=>
 // Quem lança (escritório ou usuário do cliente com "lançamento" em Férias) informa a venda e as datas aqui.
 let FERDLG=null;
 const addDias=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return isoLocal(d)};
-const fParcRow=(x={})=>{const sd=x.programacao_id&&FERDLG?ferSolDe(FERDLG.r,x):'';return `<div class="fparc"><label class="f">Início<input type="date" class="pIni" value="${x.inicio||''}"></label><label class="f">Dias<input type="number" class="pDias" min="1" max="30" value="${x.dias||''}"></label><div class="pCont note"></div><div class="pSolL" style="flex-direction:column;align-items:flex-start;gap:2px">${ferSolTag(sd)}<label title="Marque as parcelas que vão na solicitação para a contabilidade" style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="pSol"${sd||x.sol===false?'':' checked'}${sd?' disabled title="Já solicitada à contabilidade"':''}> Solicitar</label></div><button type="button" class="btn small ghost pDel" title="Apagar esta parcela (só vale depois de salvar)" aria-label="Apagar parcela">✕</button></div>`};
+const fParcRow=(x={})=>{const sd=x.programacao_id&&FERDLG?ferSolDe(FERDLG.r,x):'';return `<div class="fparc"><label class="f">Início<input type="date" class="pIni" value="${x.inicio||''}"></label><label class="f">Dias<input type="number" class="pDias" min="1" max="30" value="${x.dias||''}"></label><div class="pCont note"></div><div class="pSolL" style="flex-direction:column;align-items:flex-start;gap:2px">${ferSolTag(sd)}${sd&&ehEsc()?`<button type="button" class="btn small ghost" data-fedes="${x.ordem}" title="Tira a marcação de solicitada">Desfazer</button>`:''}<label title="Marque as parcelas que vão na solicitação para a contabilidade" style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="pSol"${sd||x.sol===false?'':' checked'}${sd?' disabled title="Já solicitada à contabilidade"':''}> Solicitar</label></div><button type="button" class="btn small ghost pDel" title="Apagar esta parcela (só vale depois de salvar)" aria-label="Apagar parcela">✕</button></div>`};
 // parcelas marcadas em "Solicitar" (Carol, 04/11: escolher qual período vai para a contabilidade gerar); ordem 1, 2, 3
 function feSelSol(){const fs=[...document.querySelectorAll('#feParcs .fparc')];if(fs.length)return fs.map((el,i)=>el.querySelector('.pSol').checked?i+1:0).filter(Boolean);
   return [...document.querySelectorAll('#feBody .pSolT')].filter(c=>c.checked).map(c=>+c.dataset.o)}
@@ -4105,7 +4139,7 @@ function abrirFerias(per){
   $('feTitle').textContent=`${r.nome} · ${r.matricula}`;$('feChip').innerHTML=`<span class="chip ${FSIT[r.situacao]||'c-none'}">${esc(r.situacao)}</span>`;
   const legal=p?Math.min(p.venda_total,Math.floor(r.direito/3)):0,fora=p?p.venda_total-legal:0;
   const tabela=ps.length?`<div class="tablebox" style="margin-top:8px"><table><thead><tr><th class="l">Parcela</th><th>Gozo real</th><th>Dias</th><th>Para a contabilidade</th><th>Aviso até</th><th>Pagar até</th>${edita?'':'<th>Solicitar</th>'}</tr></thead><tbody>
-        ${ps.map(x=>`<tr><td class="l">${x.ordem}ª${x.inicio_valido?'':' <span class="chip c-bad">data inválida</span>'}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_real)}</td><td>${x.dias}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_contabilidade)} (${x.dias_contabilidade} dias)</td><td>${dCurto(x.aviso_ate)}</td><td>${dCurto(x.pagar_ate)}</td>${edita?'':`<td>${ferSolTag(ferSolDe(r,x))} ${ferSolDe(r,x)?'':`<input type="checkbox" class="pSolT" data-o="${x.ordem}" checked style="width:auto" title="Vai na solicitação para a contabilidade">`}</td>`}</tr>`).join('')}
+        ${ps.map(x=>`<tr><td class="l">${x.ordem}ª${x.inicio_valido?'':' <span class="chip c-bad">data inválida</span>'}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_real)}</td><td>${x.dias}</td><td>${dCurto(x.inicio)} a ${dCurto(x.fim_contabilidade)} (${x.dias_contabilidade} dias)</td><td>${dCurto(x.aviso_ate)}</td><td>${dCurto(x.pagar_ate)}</td>${edita?'':`<td>${ferSolTag(ferSolDe(r,x))} ${ferSolDe(r,x)&&ehEsc()?`<button type="button" class="btn small ghost" data-fedes="${x.ordem}" title="Tira a marcação de solicitada">Desfazer</button>`:''}${ferSolDe(r,x)?'':`<input type="checkbox" class="pSolT" data-o="${x.ordem}" checked style="width:auto" title="Vai na solicitação para a contabilidade">`}</td>`}</tr>`).join('')}
       </tbody></table></div>`:'';
   const form=`<p class="note" style="margin:0 0 8px">Informe o total de dias vendidos e as datas reais de gozo (até 3 parcelas). O sistema separa a venda legal da venda por fora.</p>
       <div class="row" style="align-items:flex-end;gap:12px"><label class="f" style="max-width:180px">Dias vendidos (total)<input type="number" id="feVenda" min="0" max="30" value="${p?.venda_total||0}"></label>${p?`<span class="chip ${p.status==='Proposta'?'c-warn':p.status==='Devolvida'?'c-bad':'c-done'}">${esc(p.status==='Proposta'?'A conferir':p.status)}</span>`:''}</div>
@@ -4165,6 +4199,8 @@ async function gerarSolFerias(rs,sel){
     document.querySelectorAll('#feBody .pSolT').forEach(c=>{const q=ps.find(z=>z.ordem===+c.dataset.o),dt=q&&ferSolDe(FERDLG.r,q);if(!dt)return;c.checked=false;if(!c.previousElementSibling)c.insertAdjacentHTML('beforebegin',ferSolTag(dt)+' ');c.remove()});$('feSol').hidden=!ferSolPend(FERDLG.r).length}
   renderRH();
 }
+$('feBody').addEventListener('click',async ev=>{const b=ev.target.closest('[data-fedes]');if(!b||!FERDLG?.p)return;const {r,p}=FERDLG,q=(FPARC[p.id]||[]).find(z=>z.ordem===+b.dataset.fedes);if(!q)return;
+  b.disabled=true;if(!await ferSolDesfazer(r,q)){b.disabled=false;return}await renderRH();if(dlgFer.open){dlgFer.close();abrirFerias(r.id)}});
 $('feSol').onclick=()=>{if(!FERDLG?.p)return;
   const salvas=(FPARC[FERDLG.p.id]||[]).length,sel=feSelSol();
   if(salvas&&!sel.length){toast('Marque em “Solicitar” qual parcela vai para a contabilidade.');return}
@@ -12741,6 +12777,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13fer-desfazer',data:'2026-11-13',t:'Férias: escolher as parcelas de cada um e desfazer a solicitação',itens:[
+    {x:'RH › Férias: ao marcar colaboradores e clicar em “Solicitação para a contabilidade”, abre sempre uma janela com todos os marcados e as parcelas de cada um. A próxima parcela vem marcada; os botões “Só a próxima parcela”, “Todas as que faltam” e “Desmarcar tudo” ajudam, e você pode marcar uma por uma.'},
+    {x:'Parcela já solicitada aparece com a data e o botão “Desfazer” (na janela da solicitação e na janela do período). Desfazendo, ela deixa de aparecer como “Solicitada” e pode ser solicitada de novo. O PDF que já foi para a contabilidade não muda.',para:'esc'}]},
   {k:'2026-11-13ferias-proxima2',data:'2026-11-13',t:'Férias: só a próxima parcela, programação apagada de verdade, observações no relatório e aviso de login vencido',itens:[
     {x:'RH › Férias: ao marcar vários colaboradores e clicar em “Solicitação para a contabilidade”, se alguém tiver férias divididas o portal pergunta: “Só a próxima parcela” ou “Todas as parcelas”. Com “Só a próxima”, quem tem férias divididas sai só com a parcela mais próxima; se a 1ª já foi solicitada, vem a 2ª.',mods:['rh']},
     {x:'Se a programação foi lançada por engano, tire os dias vendidos e as datas e salve: a programação é apagada e o período volta a mostrar “lançar férias”, sem o aviso “Faltam N dias sem data”.',mods:['rh']},
