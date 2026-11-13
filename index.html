@@ -3724,7 +3724,7 @@ async function aplicarLeitura({bol,nfe,cnpjs},origem){
 }
 // confirmou o valor do boleto: o envio vai com o valor novo e a Controlacs atualiza esta e as próximas contas previstas
 function regPrevOk(){if(!REGPRE?.lido)return;const el=rCampo('valor');if(el)el.value=showMoney(REGPRE.lido);REGPRE.ok=true;
-  const b=$('rPrevBox');if(b)b.innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(REGPRE.lido)}</b>. Ao enviar, a Controlacs confere e atualiza também as próximas contas previstas.</span>`}
+  const b=$('rPrevBox');if(b)b.innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(REGPRE.lido)}</b>. Ao enviar, a Controlacs confere e decide se altera também as contas futuras.</span>`}
 $('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()});
 $('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf$/i.test(f.type||f.name)||!regEditavel())return;
   try{const t=await pdfTexto(f),r={...lerTextoDoc(t),cnpjs:cnpjsDoTexto(t)};if(r.bol||r.nfe)await aplicarLeitura(r,'PDF');else if($('rLeitura')&&!soDig(rCampo('linha_digitavel')?.value))$('rLeitura').innerHTML='<span class="muted">Não achei a linha digitável neste PDF. Se for boleto, cole a linha digitável acima.</span>'}
@@ -7285,10 +7285,12 @@ async function renderGT(){
   if(M==='gfpagar'&&!tod)gtBoletos(cli);
 }
 // Boleto com valor diferente do previsto (Carol, 13/11): as próximas contas da mesma série (mesma empresa, fornecedor e
-// categoria, ainda previstas, sem boleto, sem pagamento e com o mesmo valor antigo) passam ao valor do boleto. Vale para todas as empresas
+// categoria, ainda previstas, sem boleto, sem pagamento e com o mesmo valor antigo) passam ao valor do boleto. Vale para todas as empresas.
+// Só as futuras (vencimento a partir de hoje) e só se confirmar a pergunta: as vencidas e não quitadas podem ser do Bom Controle
+// ainda não conferido e o boleto pode ter só um desconto daquele mês (Carol, 13/11)
 async function serieProximas(t){
   if(!t?.vencimento||!(+t.valor>0))return [];
-  let q=sb.from('fin_titulos').select('id,vencimento,valor,pessoa_id,pessoa_nome').eq('cliente_id',t.cliente_id).eq('tipo',t.tipo||'pagar').eq('previsto',true).is('origem_id',null).gt('vencimento',t.vencimento).eq('valor',r2(+t.valor));
+  let q=sb.from('fin_titulos').select('id,vencimento,valor,pessoa_id,pessoa_nome').eq('cliente_id',t.cliente_id).eq('tipo',t.tipo||'pagar').eq('previsto',true).is('origem_id',null).gt('vencimento',t.vencimento>=TODAY?t.vencimento:isoLocal(new Date(dObj(TODAY).getTime()-864e5))).eq('valor',r2(+t.valor));
   q=t.categoria?q.eq('categoria',t.categoria):q.is('categoria',null);
   const {data,error}=await q.order('vencimento');if(error){console.error(error);return []}
   const ls=(data||[]).filter(x=>x.id!==t.id&&(t.pessoa_id&&x.pessoa_id?x.pessoa_id===t.pessoa_id:pessoaChave(x.pessoa_nome)===pessoaChave(t.pessoa_nome)));
@@ -7342,7 +7344,7 @@ function bolPorTexto(r,livres){
 }
 const bolOpt=(t,r)=>`<option value="${t.id}">${dBR(t.vencimento)} · ${esc(t.pessoa_nome||'—')} · ${fm(t.valor)}${t.parcelas>1?` · parcela ${t.parcela}/${t.parcelas}`:''}${t.previsto?' · prevista':''}${t.descricao?' · '+esc(t.descricao).slice(0,40):''}</option>`;
 // aviso do valor do boleto diferente do previsto, com a opção de atualizar as próximas da mesma série (Carol, 13/11)
-const bolDifTxt=(x,t,i)=>`<div class="alerta" style="display:block;margin:6px 0 0;padding:6px 8px">⚠ <b>Valor do boleto diferente do ${t.previsto?'previsto':'lançado'}</b>: ${fm(t.valor)} → ${fm(x.row.valor)}${x.bol.valor_previsto>0?' (o cliente confirmou o valor do boleto)':''}.${x.serie?.length?`<label style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-bolserie="${i}" style="width:auto"${x.serieOk!==false?' checked':''}> Atualizar também ${x.serie.length===1?'a próxima conta prevista':'as próximas '+x.serie.length+' contas previstas'} (${serieDatas(x.serie)}) para ${fm(x.row.valor)}</label>`:''}</div>`;
+const bolDifTxt=(x,t,i)=>`<div class="alerta" style="display:block;margin:6px 0 0;padding:6px 8px">⚠ <b>Valor do boleto diferente do ${t.previsto?'previsto':'lançado'}</b>: ${fm(t.valor)} → ${fm(x.row.valor)}${x.bol.valor_previsto>0?' (o cliente confirmou o valor do boleto)':''}.${x.serie?.length?`<label style="display:flex;gap:6px;align-items:center;margin-top:4px"><input type="checkbox" data-bolserie="${i}" style="width:auto"${x.serieOk===true?' checked':''}> <span><b>Deseja alterar também as contas futuras?</b> Marque para ${x.serie.length===1?'a próxima conta prevista':'as próximas '+x.serie.length+' contas previstas'} (${serieDatas(x.serie)}) também passar${x.serie.length===1?'':'em'} a ${fm(x.row.valor)}. Desmarcado, muda só esta conta.</span></label>`:''}</div>`;
 async function bolSerie(x){x.serie=null;const t=x.dest&&x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest);
   if(!t||!(x.row.valor>0)||Math.abs(t.valor-x.row.valor)<=0.004)return;x.serie=await serieProximas(t)}
 function bolDesenha(){
@@ -7406,7 +7408,7 @@ dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]
   if(falta)return toast('Complete o vencimento e o valor de “'+(falta.bol.sobre||falta.bol.fornecedor||'boleto')+'” ou escolha a conta já lançada.');
   // valor do boleto diferente do previsto: confirma a atualização dos valores (esta e as próximas da série)
   const difs=sel.map(x=>[x,x.dest!=='nova'&&GT.lista.find(y=>y.id===x.dest)]).filter(([x,t])=>t&&x.row.valor>0&&Math.abs(t.valor-x.row.valor)>0.004);
-  if(difs.length&&!confirm('O valor do boleto é diferente do previsto:\n\n'+difs.map(([x,t])=>`• ${t.pessoa_nome||x.bol.sobre||'Conta'} (${dBR(t.vencimento)}): ${fm(t.valor)} → ${fm(x.row.valor)}`+(x.serie?.length&&x.serieOk!==false?` (esta e ${x.serie.length===1?'a próxima':'as próximas '+x.serie.length}: ${serieDatas(x.serie)})`:' (só esta conta)')).join('\n')+'\n\nConfirma a atualização dos valores?'))return;
+  if(difs.length&&!confirm('O valor do boleto é diferente do previsto:\n\n'+difs.map(([x,t])=>`• ${t.pessoa_nome||x.bol.sobre||'Conta'} (${dBR(t.vencimento)}): ${fm(t.valor)} → ${fm(x.row.valor)}`+(x.serie?.length&&x.serieOk===true?` (esta e ${x.serie.length===1?'a próxima':'as próximas '+x.serie.length}: ${serieDatas(x.serie)})`:' (só esta conta)')).join('\n')+'\n\nConfirma a atualização dos valores?'))return;
   const bt=ev.target.closest('button');bt.disabled=true;let novas=0,ligadas=0,prox=0;
   try{
     const ins=[],cps=[];
@@ -7421,7 +7423,7 @@ dlgBol.addEventListener('click',async ev=>{const a=ev.target.closest('[data-act]
       const {error}=await sb.from('fin_titulos').update({...r,pessoa_id:r.pessoa_id||t.pessoa_id,pessoa_nome:r.pessoa_id?r.pessoa_nome:t.pessoa_nome||r.pessoa_nome,categoria:r.categoria||t.categoria,conta_id:t.conta_id,
         descricao:r.descricao||t.descricao,documento:r.documento||t.documento,pix_chave:r.pix_chave||t.pix_chave,previsto:false,obs:[t.obs,r.obs].filter(Boolean).join(' | ')||null}).eq('id',t.id);
       if(error)throw error;ligadas++;
-      if(x.serie?.length&&x.serieOk!==false&&x.row.valor>0)prox+=await serieAtualiza(x.serie.map(s=>s.id),x.row.valor)}
+      if(x.serie?.length&&x.serieOk===true&&x.row.valor>0)prox+=await serieAtualiza(x.serie.map(s=>s.id),x.row.valor)}
     if(ins.length){const {error}=await sb.from('fin_titulos').insert(ins);if(error)throw error;novas=ins.length}
     for(const [id,cp] of cps){const {error}=await sb.from('contas_pagar').update(cp).eq('id',id);if(error)console.error(error)}
     toast([novas?`${novas} ${novas===1?'conta nova':'contas novas'}`:'',ligadas?`${ligadas} ${ligadas===1?'boleto anexado em conta já lançada':'boletos anexados em contas já lançadas'}`:''].filter(Boolean).join(' e ')+(prox?` · ${prox} ${prox===1?'próxima conta prevista atualizada':'próximas contas previstas atualizadas'}`:''));
@@ -7895,9 +7897,10 @@ async function gtLeArquivo(f){
   box.innerHTML=(lidos.length?`<span class="pos">✓ Lido d${r.origem==='foto'?'a':'o'} ${esc(r.origem)}: ${esc(lidos.join(', '))}. Confira antes de salvar.</span> `:`<span class="muted">Li ${r.origem==='foto'?'a':'o'} ${esc(r.origem)}${r.bol||r.valor||r.nfe?', mas os campos já estavam preenchidos':', mas não achei linha digitável, chave da nota nem valor'}.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}.</span>`:'');
   if(difP){const serie=await serieProximas(t0).catch(()=>[]);if(!$('dlgGT').open||GTR!==t0)return;
-    box.insertAdjacentHTML('beforeend',`<div class="alerta" id="gtPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto (${fm(vb)}) é diferente do ${t0.previsto?'previsto':'lançado'} (${fm(va)}).</b> Confirma a atualização de valores?${serie.length?`<br><span class="muted">${serie.length===1?'A próxima conta prevista':'As próximas '+serie.length+' contas previstas'} desta série (${serieDatas(serie)}) também ${serie.length===1?'passa':'passam'} a ${fm(vb)}.</span>`:''}<br><button type="button" class="btn small primary" id="gtPrevOk" style="margin-top:6px">Sim, atualizar para ${fm(vb)}${serie.length?' nesta e nas próximas':''}</button></div>`);
-    $('gtPrevOk').onclick=()=>{const el=$('gt_valor');el.value=showMoney(vb);el.dispatchEvent(new Event('input',{bubbles:true}));GT.serieV={ids:serie.map(s=>s.id),valor:vb};
-      $('gtPrevBox').innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(vb)}</b>${serie.length?` nesta conta e em ${serie.length===1?'mais 1 conta prevista':'mais '+serie.length+' contas previstas'} (${serieDatas(serie)})`:''}. Clique em Salvar para gravar.</span>`}}
+    box.insertAdjacentHTML('beforeend',`<div class="alerta" id="gtPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto (${fm(vb)}) é diferente do ${t0.previsto?'previsto':'lançado'} (${fm(va)}).</b> Confirma a atualização do valor?${serie.length?`<br><b>Deseja alterar também as contas futuras?</b> <span class="muted">(${serie.length===1?'a próxima conta prevista':'as próximas '+serie.length+' contas previstas'} desta série: ${serieDatas(serie)})</span>`:''}<br><button type="button" class="btn small primary" id="gtPrevOk" style="margin-top:6px">${serie.length?'Só esta conta':'Sim, atualizar'} para ${fm(vb)}</button>${serie.length?` <button type="button" class="btn small primary" id="gtPrevTodas" style="margin-top:6px">Esta e as futuras para ${fm(vb)}</button>`:''}</div>`);
+    const ok=todas=>{const el=$('gt_valor');el.value=showMoney(vb);el.dispatchEvent(new Event('input',{bubbles:true}));GT.serieV=todas?{ids:serie.map(s=>s.id),valor:vb}:null;
+      $('gtPrevBox').innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(vb)}</b>${todas?` nesta conta e em ${serie.length===1?'mais 1 conta futura':'mais '+serie.length+' contas futuras'} (${serieDatas(serie)})`:' só nesta conta'}. Clique em Salvar para gravar.</span>`};
+    $('gtPrevOk').onclick=()=>ok(false);if($('gtPrevTodas'))$('gtPrevTodas').onclick=()=>ok(true)}
 }
 // regs: ids dos lançamentos (null = novo); grupo: ids de todas as parcelas
 async function faInit(cli,regs,grupo){
@@ -12240,7 +12243,7 @@ const MANUAL=[
 <li>Salve. Não precisa preencher mais nada.</li>
 </ol>
 <p><b>Contas do mês:</b> logo acima da lista aparece tudo o que a Controlacs tem para pagar no mês (inclusive o que chegou por e-mail), com a situação de cada conta: <span class="chip c-bad">Falta enviar o boleto</span>, <span class="chip c-ok">Boleto recebido</span> ou <span class="chip c-done">✓ Paga</span>. Use ‹ e › para trocar o mês. Na conta que falta, o botão <b>📎 Enviar boleto</b> já abre o envio com a descrição preenchida. Essa lista é só para consultar: quem lança é a Controlacs.</p>
-<p><b>Boleto com valor diferente do previsto:</b> ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para confirmar o valor novo. No escritório, ao validar o boleto (ou ao anexar o boleto na própria conta em Contas a pagar), o sistema mostra o mesmo aviso e, ao confirmar, atualiza o valor desta conta e das próximas contas previstas do mesmo fornecedor e categoria.</p>
+<p><b>Boleto com valor diferente do previsto:</b> ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para confirmar o valor novo. No escritório, ao validar o boleto (ou ao anexar o boleto na própria conta em Contas a pagar), o sistema mostra o mesmo aviso e pergunta “Deseja alterar também as contas futuras?”. Sem marcar, muda só esta conta; marcando, mudam também as próximas contas previstas do mesmo fornecedor e categoria que ainda vão vencer. As vencidas e não quitadas nunca mudam sozinhas: corrija à mão.</p>
 <p><b>O que eu enviei:</b> em <b>Mostrar</b>, escolha <i>Tudo o que foi enviado</i> para ver todos os boletos e notas que já mandou. Cada um mostra <span class="chip c-none">Aguardando a Controlacs</span> ou <span class="chip c-ok">✓ Lançado pela Controlacs</span> e, depois do pagamento, <span class="chip c-done">✓ Paga</span>.</p>
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
 <p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
@@ -12638,7 +12641,7 @@ async function agBadge(){
 const NOVIDADES=[
   {k:'2026-11-13boleto-valor-previsto',data:'2026-11-13',t:'Boleto com valor diferente do previsto',itens:[
     {x:'Boletos e notas a pagar: em “📎 Enviar boleto” (Contas do mês), ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para você confirmar o valor novo.',mods:['pagar']},
-    {x:'Contas a pagar: ao validar o boleto do cliente ou ao anexar o boleto na conta, o sistema avisa quando o valor do boleto é diferente do previsto. Ao confirmar, atualiza o valor desta conta e das próximas contas previstas da mesma série (mesmo fornecedor e categoria, ainda sem boleto e sem pagamento). Vale para todas as empresas.',para:'esc'}]},
+    {x:'Contas a pagar: ao validar o boleto do cliente ou ao anexar o boleto na conta, o sistema avisa quando o valor do boleto é diferente do previsto. Ao confirmar, atualiza o valor desta conta e pergunta “Deseja alterar também as contas futuras?” (próximas contas previstas do mesmo fornecedor e categoria, que ainda vão vencer, sem boleto e sem pagamento). As vencidas e não quitadas nunca mudam sozinhas. Vale para todas as empresas.',para:'esc'}]},
   {k:'2026-11-13bol-validar-sempre',data:'2026-11-13',t:'Boletos e notas do cliente: botão sempre à vista',itens:[
     {x:'Gestão financeira › Contas a pagar: o botão “Boletos e notas do cliente para validar (N)” agora aparece sempre no alto, mesmo quando não há nada novo (fica com 0). Quando o cliente envia boleto ou nota em Rotina diária › Boletos e notas fiscais a pagar, o número sobe e o botão fica verde.',para:'esc'}]},
   {k:'2026-11-13competencia',data:'2026-11-13',t:'Competência já preenchida nas contas a pagar',itens:[
