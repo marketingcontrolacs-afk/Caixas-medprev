@@ -1195,7 +1195,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewRH" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Férias</h1><p class="sub" id="fSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="expgrp" id="fRel" data-exp="fer"><details class="expdd"><summary class="btn" title="Relatório de férias dos colaboradores marcados na lista (sem ninguém marcado, sai a lista toda)">Relatório ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button><button type="button" data-expf="print">Imprimir</button></div></details></span><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="fRel" data-exp="fer"><details class="expdd"><summary class="btn" title="Relatório de férias dos colaboradores marcados na lista (sem ninguém marcado, sai a lista toda)">Relatório ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button><button type="button" data-expf="print">Imprimir</button></div></details></span><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><select id="fSolQual" hidden title="Quais parcelas vão na solicitação em lote" aria-label="Quais parcelas solicitar" style="width:auto"><option value="todas">Todas as parcelas que faltam</option><option value="prox">Só a próxima parcela</option></select><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
     </div>
     <div class="card block" id="fImpRes" hidden style="margin-top:16px"></div>
     <div class="tiles" id="fTiles"></div>
@@ -2037,7 +2037,21 @@ $('loginForm').addEventListener('submit',async e=>{
   lgGuarda($('lgEmail').value.trim(),$('lgSenha').value);
   boot();
 });
-$('btnSair').onclick=async()=>{await sb.auth.signOut();location.reload()};
+$('btnSair').onclick=async()=>{SAINDO=true;await sb.auth.signOut();location.reload()};
+// Sessão expirada (Carol, 13/11: as férias "sumiram" porque o login tinha vencido e o banco devolveu tudo vazio).
+// Ao voltar para a aba e a cada 2 minutos confere o login; se venceu e não renova, volta para a tela de entrar com o aviso,
+// em vez de mostrar as telas vazias. Depois de entrar, abre a mesma tela de antes.
+let SAINDO=false;
+function sessAviso(){if(SAINDO||$('app').hidden)return;document.querySelectorAll('dialog[open]').forEach(d=>{try{d.close()}catch(e){}});show('loginForm');$('lgErr').textContent='Sua sessão expirou. Entre de novo para continuar: nada foi apagado, os dados voltam a aparecer.';$('lgErr').hidden=false}
+async function sessConfere(){
+  if(SAINDO||$('app').hidden||!navigator.onLine)return;
+  try{const {data:{session}}=await sb.auth.getSession();if(session&&session.expires_at*1000>Date.now()+30000)return;
+    const {data,error}=await sb.auth.refreshSession();if(!error&&data?.session)return;
+    if(error&&/fetch|network/i.test(error.message||''))return;sessAviso()}catch(e){console.warn(e)}
+}
+sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')sessAviso()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sessConfere()});
+setInterval(sessConfere,120000);
 
 // =====================================================================
 // OPERADOR
@@ -3978,6 +3992,8 @@ const ferSolPend=r=>{const p=FPROG[r.id];if(!p)return [];const ps=FPARC[p.id]||[
 const ferPodeSol=r=>{const p=FPROG[r.id];return !!p&&p.status!=='Devolvida'&&ferSolPend(r).length>0};
 function ferSolGuarda(fid,x,dt){(x?.parcelas||[]).forEach(q=>{const k=ferSolKey(fid,x.aq_ini,q.inicio,q.fim);if(!FSOLIC[k]||FSOLIC[k]<dt)FSOLIC[k]=dt})}
 $('fFiltro').onchange=()=>renderRH();
+// observações do relatório de férias (Carol, 13/11): do período, da programação, nota do escritório e pendências
+const ferObsRel=(r,p)=>{const al=ferAlertas(r);return [r.obs&&'Período: '+r.obs,p?.obs&&!/^(Carga inicial|Importada) da planilha de controle\.?$/i.test(p.obs.trim())&&'Programação: '+p.obs,p?.nota_escritorio&&'Nota do escritório: '+p.nota_escritorio,al.length&&'Pendências: '+al.join('; ')].filter(Boolean).join(' | ')};
 // Pendências que o escritório precisa conferir em cada período (mesmas da coluna Alertas da planilha)
 function ferAlertas(r){
   const p=FPROG[r.id],ps=FPARC[p?.id]||[],a=[];
@@ -3993,7 +4009,7 @@ function ferAlertas(r){
 }
 async function renderRH(){
   const lista=empresasDe('rh'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[];
-  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
+  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fSolQual').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
   $('fImport').hidden=!e;
   $('fSub').textContent=e?'Períodos aquisitivos, saldos e prazos de cada colaborador. O cliente informa a programação e o escritório confere.'
     :'Veja as férias que estão para vencer e informe a programação de cada colaborador.';
@@ -4037,12 +4053,15 @@ function fSelBar(){const vis=[...document.querySelectorAll('#fBody [data-fsel]')
   [...FSEL].forEach(id=>{if(!vis.includes(id))FSEL.delete(id)});
   const n=FSEL.size,sol=FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)).length,prop=[...FSEL].filter(id=>FPROG[id]?.status==='Proposta').length;
   $('fRel').querySelector('summary').textContent=n?`Relatório (${n} ${n===1?'marcado':'marcados'}) ▾`:'Relatório ▾';
-  $('fSol').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
+  $('fSol').hidden=$('fSolQual').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
   $('fAprov').hidden=!(ehEsc()&&prop);$('fAprov').textContent=`Aprovar marcadas (${prop})`;
   const all=$('fSelAll');if(all){all.checked=n>0&&n===vis.length;all.indeterminate=n>0&&n<vis.length;all.disabled=!vis.length}}
 $('fBody').addEventListener('change',ev=>{const c=ev.target.closest('[data-fsel]');if(!c)return;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel);fSelBar()});
 $('fHead').addEventListener('change',ev=>{if(ev.target.id!=='fSelAll')return;document.querySelectorAll('#fBody [data-fsel]').forEach(c=>{c.checked=ev.target.checked;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel)});fSelBar()});
-$('fSol').onclick=()=>gerarSolFerias(FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)));
+// em lote (Carol, 13/11): "Todas as parcelas que faltam" ou "Só a próxima parcela" (a mais próxima ainda não solicitada;
+// se a 1ª já foi solicitada, vem só a 2ª)
+const ferSolProx=r=>{const p=FPROG[r.id],ps=(p&&FPARC[p.id]||[]).filter(q=>!ferSolDe(r,q)).sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio))||a.ordem-b.ordem);return ps.length?[ps[0].ordem]:null};
+$('fSol').onclick=()=>gerarSolFerias(FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)),$('fSolQual').value==='prox'?ferSolProx:undefined);
 $('fAprov').onclick=async ev=>{const ids=[...FSEL].map(id=>FPROG[id]).filter(p=>p?.status==='Proposta').map(p=>p.id);if(!ids.length)return;
   if(!confirm(`Aprovar ${ids.length} programaç${ids.length===1?'ão':'ões'} de férias?`))return;
   ev.target.disabled=true;const {error}=await sb.from('ferias_programacoes').update({status:'Aprovada',aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()}).in('id',ids);ev.target.disabled=false;
@@ -4121,7 +4140,7 @@ function solFerD(r,p,fu,sel){
 async function gerarSolFerias(rs,sel){
   const m=DOCMOD.find(x=>x.k==='ferias_contab'),its=rs.map(r=>({r,p:FPROG[r.id]})).filter(o=>o.p);if(!its.length)return;
   const {data:fus}=await sb.from('funcionarios').select('*').in('id',its.map(o=>o.r.funcionario_id));
-  const Ds=its.map(o=>{const pd=ferSolPend(o.r),tem=(FPARC[o.p.id]||[]).length;return solFerD(o.r,o.p,(fus||[]).find(f=>f.id===o.r.funcionario_id),sel||(tem&&pd.length<tem?pd:null))});
+  const Ds=its.map(o=>{const pd=ferSolPend(o.r),tem=(FPARC[o.p.id]||[]).length;const sl=typeof sel==='function'?sel(o.r):sel;return solFerD(o.r,o.p,(fus||[]).find(f=>f.id===o.r.funcionario_id),sl||(tem&&pd.length<tem?pd:null))});
   if(!docImprime(m,Ds))return;
   const nao=its.filter(o=>o.p.status!=='Aprovada').length;
   if(nao)toast(`Atenção: ${nao===1?'1 programação ainda não foi aprovada':nao+' programações ainda não foram aprovadas'} pelo escritório.`);
@@ -4151,11 +4170,16 @@ async function salvarFerias(status){
     if(r.direito-r.ja_gozados-venda-ps.reduce((s,x)=>s+x.dias,0)<0)return erro('Venda mais gozo passam do direito do período. Confira os dias.');
     if(!p&&!venda&&!ps.length&&!e)return erro('Informe os dias vendidos ou as datas de gozo.');
     if(status==='Aprovada'&&!venda&&!ps.length)return erro('Não há programação para aprovar.');
+    if(p&&!venda&&!ps.length&&!status&&!confirm('Sem dias vendidos e sem datas: apagar a programação deste período? Ele volta a ficar sem programação.'))return;
   }
   bts.forEach(b=>$(b).disabled=true);
   try{
     if(e){const {error}=await sb.from('ferias_periodos').update({obs:$('feObs').value.trim()||null}).eq('id',r.id);if(error)throw error}
     const nota=e?$('feNota').value.trim()||null:undefined;
+    // tirou a venda e todas as datas (Carol, 13/11: lançada por engano): apaga a programação, sem deixar
+    // "A conferir" / "Faltam N dias sem data"; o período volta a mostrar "lançar férias"
+    if(edita&&p&&!venda&&!ps.length&&!status){const {error}=await sb.from('ferias_programacoes').delete().eq('id',p.id);if(error)throw error;
+      dlgFer.close();toast('Programação apagada');renderRH();return}
     if(edita&&(p||venda||ps.length)){
       const fora=venda-Math.min(venda,Math.floor(r.direito/3)),dados={venda_total:venda,obs:$('feProgObs').value.trim()||null};
       if(e)dados.nota_escritorio=nota;else dados.status='Proposta';
@@ -6288,9 +6312,9 @@ const EXPT={
     const rows=ls.map(r=>{const p=FPROG[r.id],ps=p?(FPARC[p.id]||[]).slice().sort((a,b)=>a.ordem-b.ordem):[];
       const parc=ps.map(q=>`${q.dias} dias: ${dBR(q.inicio)} a ${dBR(q.fim_real)}${ferSolDe(r,q)?' (solicitada)':''}`).join('; ');
       const st=!p?'Sem programação':p.status==='Proposta'?'A conferir':p.status;
-      return [...(varias?[nomeCli(r.cliente_id)]:[]),N(r.matricula),r.nome,d2(r.admissao),`${d2(r.inicio_aquisitivo)} a ${d2(r.fim_aquisitivo)}`,d2(r.limite_concessivo),N(r.faltas_injustificadas),N(r.direito),N(r.ja_gozados),N(p?.venda_total||0),N(r.gozo_programado),N(r.saldo),d2(r.iniciar_ate),r.situacao,parc,st,[r.obs,p?.obs].filter(Boolean).join(' · ')]});
+      return [...(varias?[nomeCli(r.cliente_id)]:[]),N(r.matricula),r.nome,d2(r.admissao),`${d2(r.inicio_aquisitivo)} a ${d2(r.fim_aquisitivo)}`,d2(r.limite_concessivo),N(r.faltas_injustificadas),N(r.direito),N(r.ja_gozados),N(p?.venda_total||0),N(r.gozo_programado),N(r.saldo),d2(r.iniciar_ate),r.situacao,parc,st,ferObsRel(r,p)]});
     const nc=ls.length,sub=[expFiltros($('viewRH')),sel.size?`${nc} ${nc===1?'período marcado':'períodos marcados'}`:''].filter(Boolean).join(' · ');
-    return {titulo:'Controle de férias',sub,H:[...(varias?['Empresa']:[]),'Matrícula','Colaborador','Admissão','Período aquisitivo','Limite p/ gozo','Faltas','Direito','Já gozados','Vendidos','Programados','Saldo','Iniciar até','Situação','Programação','Status','Observações'],rows,tot:[],fs:7.5};
+    return {titulo:'Controle de férias',sub,H:[...(varias?['Empresa']:[]),'Matrícula','Colaborador','Admissão','Período aquisitivo','Limite p/ gozo','Faltas','Direito','Já gozados','Vendidos','Programados','Saldo','Iniciar até','Situação','Programação','Status','Observações'],rows,tot:[],fs:7.5,cw:{[(varias?1:0)+16]:62,[(varias?1:0)+14]:38}};
   },
   // Repasse da semana: o que está no filtro, na ordem da tela, com a conta e o Pix de cada parceiro (para buscar o Pix que falta)
   rn:()=>{
@@ -6321,6 +6345,8 @@ async function expPDF(d){
   doc.setFontSize(13);doc.text(expPdfTxt(d.titulo+(emp?' · '+emp:'')),10,12);
   doc.setFontSize(8);doc.setTextColor(40);const sub=doc.splitTextToSize(expPdfTxt([d.sub,'Gerado em '+new Date().toLocaleString('pt-BR')].filter(Boolean).join(' · ')),doc.internal.pageSize.getWidth()-20);doc.text(sub,10,17);doc.setTextColor(0);
   const cs={};num.forEach(c=>cs[c]={halign:'right'});
+  // largura fixa de algumas colunas (ex.: Observações do relatório de férias), em mm
+  if(d.cw)Object.entries(d.cw).forEach(([c,w])=>cs[c]={...(cs[c]||{}),cellWidth:w});
   doc.autoTable({head:[d.H.map(expPdfTxt)],body:d.rows.map(r=>r.map(v=>expPdfTxt(expTxt(v)))),foot:d.tot.length?d.tot.map(r=>r.map(v=>expPdfTxt(expTxt(v)))):undefined,
     startY:17+sub.length*3.5,margin:{left:10,right:10},styles:{fontSize:d.fs||(W>10?6.5:W>7?7:8),cellPadding:1.2,overflow:'linebreak',textColor:0,lineColor:[190,200,200]},headStyles:{fillColor:[2,85,86],textColor:255},footStyles:{fillColor:[227,240,239],textColor:0,fontStyle:'bold'},
     alternateRowStyles:{fillColor:[245,248,248]},columnStyles:cs,showFoot:'lastPage',
@@ -12703,6 +12729,11 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13ferias-proxima',data:'2026-11-13',t:'Férias: só a próxima parcela, programação apagada de verdade, observações no relatório e aviso de login vencido',itens:[
+    {x:'RH › Férias: ao marcar vários colaboradores, escolha ao lado do botão “Solicitação para a contabilidade” entre “Todas as parcelas que faltam” e “Só a próxima parcela”. Com “Só a próxima”, quem tem férias divididas sai só com a parcela mais próxima; se a 1ª já foi solicitada, vem a 2ª.',mods:['rh']},
+    {x:'Se a programação foi lançada por engano, tire os dias vendidos e as datas e salve: a programação é apagada e o período volta a mostrar “lançar férias”, sem o aviso “Faltam N dias sem data”.',mods:['rh']},
+    {x:'Relatório de férias (Excel, PDF e Imprimir): a coluna Observações traz a observação do período, a da programação, a nota do escritório e as pendências, com mais espaço no PDF.',mods:['rh']},
+    {x:'Login vencido: se a sessão expirar (por exemplo, computador parado muito tempo), o portal volta para a tela de entrar com o aviso “Sua sessão expirou”, em vez de mostrar as telas vazias. Depois de entrar, os dados aparecem normalmente.'}]},
   {k:'2026-11-13nota-servico',data:'2026-11-13',t:'Leitura da nota fiscal: número e descrição do serviço',itens:[
     {x:'Boletos e notas a pagar: ao anexar a nota fiscal (PDF ou foto), o sistema preenche o nº da nota e a descrição do serviço em “Do que se trata”. Se já houver uma descrição escrita, a do serviço vai para Observação.',mods:['pagar']},
     {x:'Pode anexar o boleto e a nota fiscal juntos (selecione os dois arquivos de uma vez). O sistema separa pelo nome do arquivo (ex.: “03.11 Boleto Prevence.pdf” vira Boleto e “03.11 NF 2203 Prevence.pdf” vira Nota fiscal) e lê os dois. Vale também nos anexos de Contas a pagar.'},
