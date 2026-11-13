@@ -7460,11 +7460,13 @@ $('gtBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-g
 async function gtLote(a,lsIn){
   const ls=lsIn||gtSelRows(),movsDe=t=>GT.movs[t.id]||[];
   if(a==='estornar'){const com=ls.filter(t=>movsDe(t).length),ms=com.flatMap(movsDe),cc=ms.filter(movConc).length;if(!com.length)return;
-    if(!confirm(`Estornar ${com.length===1?'a conta selecionada':'as '+com.length+' contas selecionadas'}?\n\nOs pagamentos e recebimentos (${ms.length}) saem do extrato, o saldo das contas muda e as contas voltam a ficar em aberto.`+(cc?`\nA conciliação com o extrato do banco também será desfeita em ${cc} ${cc===1?'lançamento':'lançamentos'} (as linhas voltam a ficar pendentes na Conciliação bancária).`:'')))return;
+    if(!confirm(`Estornar ${com.length===1?'a conta selecionada':'as '+com.length+' contas selecionadas'}?\n\nOs pagamentos e recebimentos (${ms.length}) saem do extrato, o saldo das contas muda e as contas voltam a ficar em aberto.`+(com.some(t=>t.origem==='ofx')?`\nAs contas criadas pela Conciliação bancária saem das contas a pagar e a receber (a linha do banco volta para a conciliação).`:'')+(cc?`\nA conciliação com o extrato do banco também será desfeita em ${cc} ${cc===1?'lançamento':'lançamentos'} (as linhas voltam a ficar pendentes na Conciliação bancária).`:'')))return;
     const tr=[...new Set(ms.filter(m=>m.transf_id).map(m=>m.transf_id))],ids=ms.filter(m=>!m.transf_id).map(m=>m.id);
     for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').delete().in('id',ids.slice(i,i+200));if(error)throw error}
     for(let i=0;i<tr.length;i+=200){const {error}=await sb.from('fin_movimentos').delete().in('transf_id',tr.slice(i,i+200));if(error)throw error}
     const org=com.filter(t=>t.origem_id).map(t=>t.origem_id);if(org.length){const {error}=await sb.from('contas_pagar').update({conferido:false,pago_em:null}).in('id',org);if(error)console.error(error)}
+    // conta que a própria conciliação criou: estornada, sai também das contas a pagar/receber e a linha volta para a conciliação (Carol, 13/11)
+    const doOfx=com.filter(t=>t.origem==='ofx').map(t=>t.id);for(let i=0;i<doOfx.length;i+=200){const {error}=await sb.from('fin_titulos').delete().in('id',doOfx.slice(i,i+200));if(error)console.error(error)}
     toast(com.length===1?'Conta estornada':com.length+' contas estornadas')}
   else if(a==='conc'){const ms=ls.flatMap(movsDe).filter(m=>!movConc(m));if(!ms.length)return;
     if(!confirm(`Conciliar ${ms.length} ${ms.length===1?'pagamento ou recebimento':'pagamentos ou recebimentos'}?\n\nCada um é ligado à linha do extrato já importado (mesma conta, mesmo valor, até 7 dias). Os que não tiverem linha no extrato: o portal pergunta antes de marcar.`))return;
@@ -8167,9 +8169,10 @@ async function gtAcao(a,b){
     dlgGT.close();GT.key='';renderGT();
   }else if(a==='desfaz'){
     const mv=(GT.movs[t.id]||[]).find(x=>x.id===b.dataset.id);
-    if(!confirm('Confirmar o estorno '+(P?'do pagamento':'do recebimento')+'?\n\nO saldo da conta muda e o lançamento volta a ficar em aberto. Ele sai também do extrato da conta.'+(mv&&movConc(mv)?'\nA conciliação com o extrato do banco também será desfeita (a linha volta a ficar pendente na Conciliação bancária).':'')))return;   // pagamento de fatura: sai também a entrada no cartão
+    if(!confirm('Confirmar o estorno '+(P?'do pagamento':'do recebimento')+'?\n\nO saldo da conta muda e o lançamento volta a ficar em aberto. Ele sai também do extrato da conta.'+(t.origem==='ofx'?'\nEsta conta foi criada pela Conciliação bancária: ela sai das contas a '+(P?'pagar':'receber')+' e a linha do banco volta para a conciliação.':'')+(mv&&movConc(mv)?'\nA conciliação com o extrato do banco também será desfeita (a linha volta a ficar pendente na Conciliação bancária).':'')))return;   // pagamento de fatura: sai também a entrada no cartão
     const {error}=mv?.transf_id?await sb.from('fin_movimentos').delete().eq('transf_id',mv.transf_id):await sb.from('fin_movimentos').delete().eq('id',b.dataset.id);if(error)return fail(error,'Não foi possível desfazer');
     if(t.origem_id){const {error:e2}=await sb.from('contas_pagar').update({conferido:false,pago_em:null}).eq('id',t.origem_id);if(e2)console.error(e2)}
+    if(t.origem==='ofx'&&(GT.movs[t.id]||[]).length<=1){const {error:e3}=await sb.from('fin_titulos').delete().eq('id',t.id);if(e3)console.error(e3)}   // criada pela conciliação: sai junto (Carol, 13/11)
     toast('Estornado');dlgGT.close();GT.key='';renderGT();
   }else if(a==='apagar'){
     if((GT.movs[t.id]||[]).length)return gtErr(`Desfaça ${P?'os pagamentos':'os recebimentos'} antes de apagar.`);
@@ -12567,6 +12570,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13estorno-conc',data:'2026-11-13',t:'Estorno de conta criada pela conciliação',itens:[
+    {x:'Contas a pagar e a receber: ao estornar uma conta que a própria Conciliação bancária criou, ela sai das contas a pagar/receber (não fica mais como vencida) e a linha do banco volta para a conciliação.',para:'esc'}]},
   {k:'2026-11-13esconder-resumo',data:'2026-11-13',t:'Esconder os quadros de resumo em todas as telas',itens:[
     {x:'Em todas as telas com quadros de resumo no alto (Dashboard, Contas a pagar e a receber, Conciliação bancária, Extrato da conta, Notas fiscais, RH e outras), há o botão “▲ Esconder resumo”. Os quadros recolhem e sobra mais espaço para a lista; “▼ Mostrar resumo” traz de volta. A escolha fica guardada para cada tela neste aparelho.'}]},
   {k:'2026-11-13lancar-juntas-soma',data:'2026-11-13',t:'Lançar juntas soma num lançamento só',itens:[
