@@ -11054,7 +11054,7 @@ $('gcBody').addEventListener('click',async e=>{const b=e.target.closest('[data-g
   if(a==='lanca')return abrirGC([l]);
   b.disabled=true;
   try{
-    if(a==='aprova')await gcAprovar([l]);
+    if(a==='aprova'){const rem=GC.sug[l.id]?.k==='rem';await gcAprovar([l]);if(rem){b.disabled=false;return renderGC()}}   // remessa: recarrega a tela (contas pagas saem das sugestões)
     else if(a==='ignora'||a==='volta'){const {error}=await sb.from('fin_ofx').update({ignorado:a==='ignora'}).eq('id',l.id);if(error)throw error;l.ignorado=a==='ignora'}
     else if(a==='desfaz')await gcDesfazer(l);
   }catch(err){fail(err,'Não foi possível salvar')}
@@ -11090,6 +11090,9 @@ async function gcInserir(rows){
 }
 async function gcAprovar(ls){
   const novos=[],usos={};let n=0;await contasGrupo(cliAtual()).catch(console.error);
+  ls=ls.filter(l=>gcSit(l)!=='conc');   // linha já conciliada não é aprovada de novo (evita lançar em dobro com clique repetido)
+  if(gcAprovar.rodando)return toast('Aguarde: a aprovação anterior ainda está sendo salva.');gcAprovar.rodando=true;
+  try{
   for(const l of ls){const g=GC.sug[l.id];if(!g)continue;
     if(g.k==='mov'){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',g.mov.id);if(error)throw error;n++}
     else if(g.k==='tit'){const t=g.tit;novos.push(...await pernasFatura(t,gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})));
@@ -11107,7 +11110,8 @@ async function gcAprovar(ls){
   await gcInserir(novos);
   for(const [id,k] of Object.entries(usos)){const r=GC.regras.find(x=>x.id===id);await sb.from('fin_conc_regras').update({usos:(r.usos||0)+k,atualizado_em:new Date().toISOString()}).eq('id',id)}
   toast(`${ls.length} ${ls.length===1?'linha conciliada':'linhas conciliadas'}`);
-  if(ls.length===1){const {data}=await sb.from('fin_movimentos').select('*').or(`ofx_id.eq.${ls[0].id},id.eq.${GC.sug[ls[0].id]?.mov?.id||ls[0].id}`);(data||[]).forEach(m=>{const i=GC.movs.findIndex(x=>x.id===m.id);i>=0?GC.movs[i]=m:GC.movs.push(m)})}
+  if(ls.length===1){const {data}=await sb.from('fin_movimentos').select('*').or(`ofx_id.eq.${ls[0].id},id.eq.${GC.sug[ls[0].id]?.mov?.id||ls[0].id},ofx_soma.eq.${ls[0].id}`);(data||[]).forEach(m=>{const i=GC.movs.findIndex(x=>x.id===m.id);i>=0?GC.movs[i]=m:GC.movs.push(m)})}
+  }finally{gcAprovar.rodando=false}
 }
 async function gcDesfazer(l){
   const m=GC.conc[l.id];if(!m)return;
