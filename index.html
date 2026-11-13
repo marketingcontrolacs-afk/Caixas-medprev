@@ -14530,21 +14530,43 @@ boot();
   // "impressão digital" do arquivo no servidor: ETag (ou data de alteração), sem o final que muda com a compressão
   const marca=r=>{const e=r.headers.get('etag');if(e)return e.replace(/^W\//,'').replace(/"/g,'').split('-')[0];return r.headers.get('last-modified')||''};
   let base=null,ult=0,adiadoAte=0,aviso=false;
+  // 1º: versao.txt, que o Netlify grava sozinho a cada publicação (código do commit, ver netlify.toml);
+  // se não existir, usa a ETag/data do index.html
+  const pasta=()=>location.origin+location.pathname.replace(/[^/]*$/,'');
+  async function marcaAtual(){
+    try{const r=await fetch(pasta()+'versao.txt?t='+Date.now(),{cache:'no-store'});
+      if(r.ok&&!/html/i.test(r.headers.get('content-type')||'')){const t=(await r.text()).trim();if(t&&t.length<200)return 'v:'+t}}catch(e){}
+    const r=await fetch(url(),{method:'HEAD',cache:'no-store'});if(!r.ok)return '';
+    const m=marca(r);return m?'e:'+m:'';
+  }
   async function confere(forca){
     if(!/^https?:/.test(location.protocol)||aviso)return;
-    const ag=Date.now();if(!forca&&ag-ult<60e3)return;ult=ag;
+    const ag=Date.now();if(!forca&&ag-ult<20e3)return;ult=ag;
     try{
-      const r=await fetch(url(),{method:'HEAD',cache:'no-store'});if(!r.ok)return;
-      const m=marca(r);if(!m)return;
-      if(base===null){base=m;return}
+      const m=await marcaAtual();if(!m)return;
+      if(base===null){base=m;window.__versaoPortal=m;return}
+      if(m.slice(0,2)!==base.slice(0,2)){base=m;return}   // mudou o jeito de conferir: só troca a referência
       if(m!==base)mostra();
     }catch(e){}
   }
+  // com uma janela aberta (ex.: lançamento de Contas a pagar) o resto da tela não recebe clique;
+  // por isso a faixa vai para dentro da janela aberta mais recente (e volta para a página quando ela fecha)
+  function lugar(){
+    const ds=[...document.querySelectorAll('dialog[open]')].filter(d=>{try{return d.matches(':modal')}catch(e){return true}});
+    return ds.length?ds[ds.length-1]:document.body;
+  }
+  function poe(){
+    if(!aviso)return;
+    const l=lugar();
+    if(box.parentNode!==l){if(temPop){try{box.hidePopover()}catch(e){}}l.appendChild(box)}
+    if(temPop){try{if(!box.matches(':popover-open'))box.showPopover()}catch(e){}}else box.hidden=false;
+  }
   function mostra(){
     if(Date.now()<adiadoAte)return;
-    aviso=true;
-    if(temPop){try{box.showPopover()}catch(e){}}else box.hidden=false;
+    aviso=true;poe();
   }
+  // quando abre ou fecha uma janela, leva a faixa junto
+  new MutationObserver(()=>{if(aviso)setTimeout(poe,0)}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
   function esconde(){aviso=false;if(temPop){try{box.hidePopover()}catch(e){}}else box.hidden=true}
   document.getElementById('nvvAtualizar').onclick=async function(){
     this.disabled=true;this.textContent='Atualizando…';
@@ -14556,7 +14578,7 @@ boot();
   // "Depois": esconde por 30 minutos e então avisa de novo
   document.getElementById('nvvDepois').onclick=()=>{esconde();adiadoAte=Date.now()+30*60e3;setTimeout(()=>confere(true),30*60e3+1e3)};
   confere(true);
-  setInterval(confere,5*60e3);                                                        // a cada 5 minutos
+  setInterval(confere,2*60e3);                                                        // a cada 2 minutos
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')confere()}); // ao voltar para a aba
   window.addEventListener('focus',()=>confere());
   window.addEventListener('online',()=>confere(true));
