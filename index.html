@@ -3460,7 +3460,7 @@ $('rDocs').addEventListener('change',async e=>{if(e.target.type!=='file'||!e.tar
   toast('Enviando arquivo…');
   // mais de um arquivo de uma vez (ex.: boleto em duas páginas): todos entram no mesmo lançamento (Carol, 04/11)
   const arqs=[...e.target.files],arq=arqs[0];e.target.value='';
-  try{for(const a of arqs)RDOCS.push({...await uploadAnexo(a,cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:e.target.dataset.cat});await renderRDocs();toast(arqs.length>1?arqs.length+' arquivos anexados':'Arquivo anexado')}catch(err){toast(err.message);await renderRDocs();return}
+  try{for(const a of arqs)RDOCS.push({...await uploadAnexo(a,cli.id,`${MOD}/${dt.slice(0,7)}`),categoria:catPeloNome(a.name,MODCFG[MOD].cats,e.target.dataset.cat)});await renderRDocs();toast(arqs.length>1?arqs.length+' arquivos anexados':'Arquivo anexado')}catch(err){toast(err.message);await renderRDocs();return}
   // PDF com vários recibos de pagamento (folha, 13º): monta o relatório de líquidos sozinho
   if(MOD==='pagar'&&!RLIQ&&/pdf$/i.test(arq.type||arq.name))try{const l=await lerRecibos(await arq.arrayBuffer(),await nomesCadastro(cli.id));
     if(l.length>=2){RLIQ=l;renderRLiq();toast(`Recibos de pagamento: li ${l.length} pessoas. Confira o relatório de líquidos.`)}
@@ -3707,7 +3707,7 @@ async function pdfTexto(file){
 }
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
-async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem){
+async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem,mais){
   const avisos=[],lidos=[];
   const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
@@ -3733,9 +3733,10 @@ async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem){
     if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
   const box=$('rLeitura');if(!box)return;
   const de=origem==='linha'?'da linha digitável':origem==='foto'?'da foto':'do '+origem;
-  box.innerHTML=!bol&&!nfe&&!prevDif&&!(vt>0)&&!numero&&!servico?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
+  const html=!bol&&!nfe&&!prevDif&&!(vt>0)&&!numero&&!servico?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}. Confira.</span>`:'')
-    +(prevDif?`<div class="alerta" id="rPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto anexado (${fm(prevDif)}) é diferente do valor previsto (${fm(REGPRE.valor)}).</b> Confirma a atualização do valor?<br><button type="button" class="btn small primary" id="rPrevOk" style="margin-top:6px">Sim, o valor é ${fm(prevDif)}</button></div>`:'');
+    +(prevDif?`<div class="alerta" id="rPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto anexado (${fm(prevDif)}) é diferente do valor previsto (${fm(REGPRE.valor)}).</b> Confirma a atualização do valor?<br><button type="button" class="btn small primary" id="rPrevOk" style="margin-top:6px">Sim, o valor é ${fm(prevDif)}</button></div>`:'');;
+  if(mais){if(html)box.insertAdjacentHTML('beforeend','<div style="margin-top:4px">'+html+'</div>')}else box.innerHTML=html
 }
 // confirmou o valor do boleto: o envio vai com o valor novo e a Controlacs atualiza esta e as próximas contas previstas
 function regPrevOk(){if(!REGPRE?.lido)return;const el=rCampo('valor');if(el)el.value=showMoney(REGPRE.lido);REGPRE.ok=true;
@@ -3743,16 +3744,23 @@ function regPrevOk(){if(!REGPRE?.lido)return;const el=rCampo('valor');if(el)el.v
 $('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()});
 // leitura do boleto anexado. Roda ANTES do envio do arquivo (capture), porque o envio limpa o campo do arquivo e a leitura
 // ficava sem o arquivo. Também lê PDF escaneado e foto (OCR), como em Contas a pagar (Carol, 13/11)
-$('rDocs').addEventListener('change',async e=>{const f=e.target.files?.[0];if(MOD!=='pagar'||!f||!/pdf|image/i.test(f.type||'')&&!/\.(pdf|jpe?g|png|webp)$/i.test(f.name||'')||!regEditavel())return;
-  const box=$('rLeitura');if(box)box.innerHTML=`<span class="muted">Lendo ${e.target.dataset.cat==='Nota fiscal'?'a nota fiscal':'o boleto'}…</span>`;
-  const nota=e.target.dataset.cat==='Nota fiscal';
-  try{const r=await leArquivoDoc(f);
-    if(r.erro){if(box)box.innerHTML=`<span class="muted">${esc(r.erro)}</span>`;return}
-    // na nota fiscal o valor não dispara o aviso do previsto (o valor da nota pode ter retenções); só preenche se estiver vazio
-    const vt=r.bol?null:nota?(REGPRE?null:r.valor):r.valor,numero=r.nfseNum||(nota||!r.bol?r.numero:'')||'',servico=r.servico||'';
-    if(r.bol||r.nfe||vt>0||numero||servico)await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:vt,numero,servico},r.origem);
-    else if(box)box.innerHTML=!soDig(rCampo('linha_digitavel')?.value)?'<span class="muted">Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.</span>':''}
-  catch(err){console.error(err);if(box)box.innerHTML='<span class="muted">Não consegui ler este arquivo. Se for boleto, cole a linha digitável acima.</span>'}},true);
+$('rDocs').addEventListener('change',async e=>{const fs=[...(e.target.files||[])].filter(f=>/pdf|image/i.test(f.type||'')||/\.(pdf|jpe?g|png|webp)$/i.test(f.name||''));
+  if(MOD!=='pagar'||!fs.length||!regEditavel())return;
+  const box=$('rLeitura'),cats=MODCFG[MOD].cats,pad=e.target.dataset.cat;
+  // vários arquivos de uma vez (ex.: boleto e nota): o boleto é lido primeiro e cada leitura vai somando na mensagem
+  const it=fs.map(f=>({f,cat:catPeloNome(f.name,cats,pad)})).sort((a,b)=>(a.cat==='Nota fiscal')-(b.cat==='Nota fiscal'));
+  if(box)box.innerHTML=`<span class="muted">Lendo ${it.length>1?'os arquivos':it[0].cat==='Nota fiscal'?'a nota fiscal':'o boleto'}…</span>`;
+  let n=0;
+  for(const {f,cat} of it){const nota=cat==='Nota fiscal',mais=n>0,nm=it.length>1?`<b>${esc(f.name)}:</b> `:'';
+    try{const r=await leArquivoDoc(f);
+      if(r.erro){if(box&&!mais)box.innerHTML='';if(box)box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}${esc(r.erro)}</div>`);n++;continue}
+      // na nota fiscal o valor não dispara o aviso do previsto (o valor da nota pode ter retenções); só preenche se estiver vazio
+      const vt=r.bol?null:nota?(REGPRE?null:r.valor):r.valor,numero=r.nfseNum||(nota||!r.bol?r.numero:'')||'',servico=r.servico||'';
+      if(box&&!mais)box.innerHTML='';
+      if(r.bol||r.nfe||vt>0||numero||servico){if(nm&&box)box.insertAdjacentHTML('beforeend',`<div class="note" style="margin:4px 0 0">${nm}</div>`);await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:vt,numero,servico},r.origem,true)}
+      else if(box)box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}${nota?'Não achei o nº nem a descrição nesta nota.':'Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.'}</div>`)}
+    catch(err){console.error(err);if(box){if(!mais)box.innerHTML='';box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}Não consegui ler este arquivo.</div>`)}}
+    n++}},true);
 // leitura mais rápida (Carol, 13/11): o leitor de PDF já carrega ao clicar para anexar, enquanto a pessoa escolhe o arquivo
 $('rDocs').addEventListener('pointerdown',e=>{if(MOD!=='pagar'||!e.target.closest('.fotobtn'))return;
   if(!window.pdfjsLib)carregaJs(PDFJS+'pdf.min.js').then(()=>{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}).catch(()=>{})},true);
@@ -7871,6 +7879,15 @@ function textoNota(t){
   const venc=dBRiso((T.match(/vencimento\D{0,25}(\d{2}\/\d{2}\/\d{4})/i)||[])[1]);
   const numero=((T.match(/(?:NFC?-?e|nota\s+fiscal(?:\s+eletr[oô]nica)?|n[uú]mero\s+da\s+nota|cupom(?:\s+fiscal)?|extrato)\s*(?:n[º°o.]*|n[uú]mero)?\s*[:.]?\s*(\d{1,3}(?:\.\d{3})+|\d{3,9})\b/i)||[])[1]||'').replace(/\D/g,'');
   return {valor,emissao,venc,numero:numero?String(+numero):''}}
+// anexar o boleto e a nota juntos (Carol, 13/11): o tipo de cada arquivo sai do nome ("03.11 Boleto Prevence.pdf",
+// "03.11 NF 2203 Prevence.pdf"); quando o nome não diz, fica o tipo escolhido no botão
+function catPeloNome(nome,cats,padrao){
+  const n=' '+String(nome||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\.[a-z0-9]{2,4}$/,'').replace(/[^a-z0-9]+/g,' ')+' ';
+  const ach=re=>(cats||[]).find(c=>re.test(String(c).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()))||padrao;
+  const bol=/ (boleto|boletos|fatura|bol) /.test(n),nf=/ (nf|nfe|nfse|nfs|nfce|danfe|nota|notas|cupom) /.test(n);
+  if(nf&&!bol)return ach(/nota/);if(bol&&!nf)return ach(/boleto/);
+  if(/ (comprovante|recibo) /.test(n))return ach(/comprovante/);
+  return padrao}
 // nota fiscal de serviço (NFS-e): número da nota e a descrição do serviço (discriminação), para preencher a conta (Carol, 13/11)
 function nfseDe(t){
   const T=String(t||'').replace(/\s+/g,' ');
@@ -7892,14 +7909,18 @@ async function leArquivoDoc(f){
   const r=lerTextoDoc(t),n=textoNota(t);
   return {...n,...nfseDe(t),bol:r.bol,nfe:r.nfe,cnpjs:cnpjsDoTexto(t),origem,texto:t}}
 // preenche a conta a pagar que está aberta com o que o arquivo trouxe (só o que está em branco; o diferente vira aviso)
-async function gtLeArquivo(f){
-  const box=$('faLeitura');if(box)box.innerHTML='<span class="muted">Lendo o arquivo…</span>';
+async function gtLeArquivo(f,mais,cat){
+  // mais de um arquivo: cada leitura fica numa linha própria, com o nome do arquivo
+  const box0=$('faLeitura');let box=box0;
+  if(box0&&mais){box=document.createElement('div');box.style.marginTop='4px';box0.appendChild(box)}
+  const nm=mais?`<b>${esc(f.name||'')}:</b> `:'';
+  if(box)box.innerHTML=nm+'<span class="muted">Lendo o arquivo…</span>';
   const r=await leArquivoDoc(f);if(!$('dlgGT').open)return;
-  if(r.erro){if(box)box.innerHTML=`<span class="muted">${esc(r.erro)}</span>`;return}
+  if(r.erro){if(box)box.innerHTML=nm+`<span class="muted">${esc(r.erro)}</span>`;return}
   const lidos=[],avisos=[],cli=cliAtual();
   // conta já lançada com valor diferente do boleto: pergunta antes de trocar e oferece atualizar as próximas previstas (Carol, 13/11)
   const t0=GTR,dup0=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0],vb=r2(+(r.bol?.valor||dup0?.valor||r.valor||0)),va=parseMoney($('gt_valor')?.value);
-  const difP=!!(t0&&t0.tipo==='pagar'&&vb>0&&va>0&&Math.abs(va-vb)>0.004);
+  const difP=!!(t0&&t0.tipo==='pagar'&&cat!=='Nota fiscal'&&vb>0&&va>0&&Math.abs(va-vb)>0.004);
   const poe=(id,v,txt,fmt,money)=>{const el=$(id);if(!el||el.disabled||v==null||v==='')return;if(id==='gt_valor'&&difP)return;
     const atual=money?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=money?showMoney(v):v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));lidos.push(txt+' '+(fmt?fmt(v):v))}
@@ -7912,7 +7933,8 @@ async function gtLeArquivo(f){
   poe('gt_valor',dup?.valor||r.valor,'valor',fm,true);
   poe('gt_vencimento',dup?.venc||r.venc,'vencimento',dBR);
   poe('gt_documento',r.numero||r.nfe?.numero||r.nfseNum,r.modelo==='65'?'cupom nº':'NF nº');
-  if(r.servico)poe('gt_descricao',r.servico,'descrição do serviço');
+  // descrição do serviço da nota: troca o texto automático "Previsto: …" da conta prevista; o resto só se estiver em branco
+  if(r.servico){const de=$('gt_descricao');if(de&&!de.disabled&&/^previsto:/i.test(de.value.trim())){de.value=r.servico;lidos.push('descrição do serviço')}else poe('gt_descricao',r.servico,'descrição do serviço')}
   if(r.emissao&&$('gt_competencia')?.dataset.auto==='1')$('gt_competencia').value='';   // a emissão da nota manda na competência sugerida
   if(r.emissao)poe('gt_competencia',r.emissao.slice(0,7),'competência',v=>v.split('-').reverse().join('/'));
   if(r.xml&&r.pix&&!$('gt_forma').value){$('gt_forma').value='Pix';$('gt_forma').dispatchEvent(new Event('change',{bubbles:true}))}
@@ -7929,7 +7951,7 @@ async function gtLeArquivo(f){
   if(r.xml&&!$('gt_obs').value.trim()&&r.nfe)$('gt_obs').value=`Chave da nota: ${r.nfe.chave}`;
   if(r.xml)avisos.push('o XML só é lido e não fica guardado; para guardar a nota, anexe também o PDF');
   if(!box)return;
-  box.innerHTML=(lidos.length?`<span class="pos">✓ Lido d${r.origem==='foto'?'a':'o'} ${esc(r.origem)}: ${esc(lidos.join(', '))}. Confira antes de salvar.</span> `:`<span class="muted">Li ${r.origem==='foto'?'a':'o'} ${esc(r.origem)}${r.bol||r.valor||r.nfe?', mas os campos já estavam preenchidos':', mas não achei linha digitável, chave da nota nem valor'}.</span> `)
+  box.innerHTML=nm+(lidos.length?`<span class="pos">✓ Lido d${r.origem==='foto'?'a':'o'} ${esc(r.origem)}: ${esc(lidos.join(', '))}. Confira antes de salvar.</span> `:`<span class="muted">Li ${r.origem==='foto'?'a':'o'} ${esc(r.origem)}${r.bol||r.valor||r.nfe?', mas os campos já estavam preenchidos':', mas não achei linha digitável, chave da nota nem valor'}.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}.</span>`:'');
   if(difP){const serie=await serieProximas(t0).catch(()=>[]);if(!$('dlgGT').open||GTR!==t0)return;
     box.insertAdjacentHTML('beforeend',`<div class="alerta" id="gtPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto (${fm(vb)}) é diferente do ${t0.previsto?'previsto':'lançado'} (${fm(va)}).</b> Confirma a atualização do valor?${serie.length?`<br><b>Deseja alterar também as contas futuras?</b> <span class="muted">(${serie.length===1?'a próxima conta prevista':'as próximas '+serie.length+' contas previstas'} desta série: ${serieDatas(serie)})</span>`:''}<br><button type="button" class="btn small primary" id="gtPrevOk" style="margin-top:6px">${serie.length?'Só esta conta':'Sim, atualizar'} para ${fm(vb)}</button>${serie.length?` <button type="button" class="btn small primary" id="gtPrevTodas" style="margin-top:6px">Esta e as futuras para ${fm(vb)}</button>`:''}</div>`);
@@ -7963,14 +7985,16 @@ async function faEnvia(files){
   if(!FA||!files.length)return;const cat=document.querySelector('input[name="faTipo"]:checked')?.value||'Outros';
   $('faLista').insertAdjacentHTML('afterbegin','<span class="muted">Enviando…<br></span>');
   // leitura do boleto, da nota (PDF ou XML) e do cupom (foto) para preencher a conta (Carol, 10/11)
-  const ler=files.find(f=>/pdf|image|xml/i.test(f.type||'')||/\.(pdf|xml|jpe?g|png|webp)$/i.test(f.name||''));
-  if(ler&&$('dlgGT').open&&$('gt_valor')&&!$('gt_valor').disabled)gtLeArquivo(ler).catch(e=>{console.error(e);if($('faLeitura'))$('faLeitura').innerHTML='<span class="muted">Não consegui ler este arquivo. Preencha os campos à mão.</span>'});
+  // boleto e nota juntos (Carol, 13/11): cada arquivo com o seu tipo (pelo nome) e todos são lidos, o boleto primeiro
+  const FACATS=['Boleto ou fatura','Comprovante','Nota fiscal','Outros'],catDe=f=>/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||'')?'Nota fiscal':catPeloNome(f.name,FACATS,cat);
+  const lers=files.filter(f=>/pdf|image|xml/i.test(f.type||'')||/\.(pdf|xml|jpe?g|png|webp)$/i.test(f.name||'')).sort((a,b)=>(catDe(a)==='Nota fiscal')-(catDe(b)==='Nota fiscal'));
+  if(lers.length&&$('dlgGT').open&&$('gt_valor')&&!$('gt_valor').disabled)(async()=>{if(lers.length>1&&$('faLeitura'))$('faLeitura').innerHTML='';for(const [i,f] of lers.entries())await gtLeArquivo(f,i>0||lers.length>1,catDe(f)).catch(e=>{console.error(e);if($('faLeitura'))$('faLeitura').insertAdjacentHTML('beforeend','<div class="muted">Não consegui ler '+esc(f.name||'este arquivo')+'. Preencha os campos à mão.</div>')})})();
   for(const f of files){
     // o XML da nota só é lido (não fica guardado); para guardar, anexe o PDF (DANFE)
     if(/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||'')){continue}
     try{const up=await uploadAnexo(f,FA.cli.id,'financeiro');
-      if(!FA.regs?.length){FA.pend.push({...up,categoria:cat});continue}
-      const rows=faAlvos().map(id=>({cliente_id:FA.cli.id,modulo:'financeiro',registro_id:id,categoria:cat,nome_arquivo:up.nome_arquivo,caminho:up.caminho}));
+      if(!FA.regs?.length){FA.pend.push({...up,categoria:catDe(f)});continue}
+      const rows=faAlvos().map(id=>({cliente_id:FA.cli.id,modulo:'financeiro',registro_id:id,categoria:catDe(f),nome_arquivo:up.nome_arquivo,caminho:up.caminho}));
       const {data,error}=await sb.from('documentos').insert(rows).select('*');if(error)throw error;
       FA.docs.push(...(data||[]).filter(d=>FA.regs.includes(d.registro_id)));FA.urls[up.caminho]=up.preview||(await signed([up.caminho]))[up.caminho];
       (data||[]).forEach(d=>GT.anx?.add(d.registro_id));
@@ -8126,6 +8150,10 @@ async function abrirGT(t,tipo,pre){
     else if(nt&&!pc.value.trim())nt.textContent=pe?'Este fornecedor não tem chave Pix no cadastro. Digite a chave; para guardar, edite o cadastro em Clientes e fornecedores.':''};
   $('gt_forma')?.addEventListener('change',gtPix);$('gt_pessoa')?.addEventListener('change',gtPix);$('gt_pessoa')?.addEventListener('input',gtPix);
   $('gt_pix_chave')?.addEventListener('input',e=>{delete e.target.dataset.auto;if($('gtPixNota'))$('gtPixNota').textContent=''});
+  // valor da conta corrigido (ex.: boleto com valor diferente do previsto): o "Valor pago" do pagamento acompanha o que falta,
+  // enquanto não foi mexido à mão (Carol, 13/11)
+  if(t&&$('gb_valor')){$('gb_valor').addEventListener('input',e=>e.target.dataset.mexeu='1');
+    $('gt_valor')?.addEventListener('input',()=>{const gv=$('gb_valor'),v=parseMoney($('gt_valor').value);if(!gv||gv.dataset.mexeu||!(v>0))return;gv.value=showMoney(Math.max(0,r2(v-pago)))})}
   $('gj_forma')?.addEventListener('change',e=>e.target.dataset.mexeu='1');
   $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
     if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
@@ -12677,6 +12705,8 @@ async function agBadge(){
 const NOVIDADES=[
   {k:'2026-11-13nota-servico',data:'2026-11-13',t:'Leitura da nota fiscal: número e descrição do serviço',itens:[
     {x:'Boletos e notas a pagar: ao anexar a nota fiscal (PDF ou foto), o sistema preenche o nº da nota e a descrição do serviço em “Do que se trata”. Se já houver uma descrição escrita, a do serviço vai para Observação.',mods:['pagar']},
+    {x:'Pode anexar o boleto e a nota fiscal juntos (selecione os dois arquivos de uma vez). O sistema separa pelo nome do arquivo (ex.: “03.11 Boleto Prevence.pdf” vira Boleto e “03.11 NF 2203 Prevence.pdf” vira Nota fiscal) e lê os dois. Vale também nos anexos de Contas a pagar.'},
+    {x:'Contas a pagar: ao confirmar o valor novo do boleto, o “Valor pago” lá embaixo, em Pagamentos, já acompanha o valor novo.',para:'esc'},
     {x:'Em “Mostrar”, a nova opção “Falta enviar o boleto” deixa em Contas do mês só as contas que ainda estão sem boleto.',mods:['pagar']},
     {x:'Contas a pagar: ao anexar a nota de serviço na conta, o nº da nota e a descrição do serviço também são preenchidos (só o que estiver em branco).',para:'esc'}]},
   {k:'2026-11-13boleto-valor-previsto',data:'2026-11-13',t:'Boleto com valor diferente do previsto',itens:[
