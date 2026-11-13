@@ -7429,6 +7429,7 @@ async function concLigar(ms,perguntar=true){
     let ls=[];try{const {data,error}=await sb.from('fin_ofx').select('id,data,valor,ignorado,junto_mov').eq('conta_id',m.conta_id).gte('data',addDias(m.data,-7)).lte('data',addDias(m.data,7)).gte('valor',r2(v-0.005)).lte('valor',r2(v+0.005));if(error)throw error;ls=(data||[]).filter(l=>!l.ignorado&&!usados.has(l.id))}catch(e){console.error(e)}
     if(ls.length){const {data:lk}=await sb.from('fin_movimentos').select('ofx_id').in('ofx_id',ls.map(l=>l.id));const ja=new Set((lk||[]).map(x=>x.ofx_id));ls=ls.filter(l=>!ja.has(l.id))}
     const jm=ls.filter(l=>l.junto_mov).map(l=>l.junto_mov);if(jm.length){const {data:jk}=await sb.from('fin_movimentos').select('id').in('id',jm).not('ofx_id','is',null);const jok=new Set((jk||[]).map(x=>x.id));ls=ls.filter(l=>!jok.has(l.junto_mov))}   // já entrou num lançamento somado
+    if(ls.length){const {data:sk}=await sb.from('fin_movimentos').select('ofx_soma').in('ofx_soma',ls.map(l=>l.id)).eq('conciliado',true);const sok=new Set((sk||[]).map(x=>x.ofx_soma));ls=ls.filter(l=>!sok.has(l.id))}   // já é a soma de vários lançamentos
     const dd=l=>Math.abs(new Date(l.data)-new Date(m.data)),l=ls.sort((a,b)=>dd(a)-dd(b))[0];
     if(l){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',m.id);if(error)throw error;usados.add(l.id);lig++}else sem.push(m)}
   if(sem.length&&(!perguntar||confirm(`${sem.length===1?'Não achei a linha':'Não achei as linhas'} do extrato importado para ${sem.length} ${sem.length===1?'lançamento':'lançamentos'} (mesma conta, mesmo valor, até 7 dias).\n\nMarcar como conciliado mesmo assim? (OK = marcar, Cancelar = deixar sem conciliar)`))){
@@ -10722,6 +10723,7 @@ async function gcPendCarrega(cli){
   const [ls,ms]=await Promise.all([todas(()=>sb.from('fin_ofx').select('id,conta_id,data,ignorado,junto_mov').eq('cliente_id',cli.id)),
     todas(()=>sb.from('fin_movimentos').select('id,ofx_id').eq('cliente_id',cli.id).not('ofx_id','is',null))]);
   const conc=new Set(ms.map(m=>m.ofx_id)),movC=new Set(ms.map(m=>m.id));
+  try{(await todas(()=>sb.from('fin_movimentos').select('ofx_soma').eq('cliente_id',cli.id).eq('conciliado',true).not('ofx_soma','is',null))).forEach(m=>conc.add(m.ofx_soma))}catch(e){console.error(e)}   // linha do banco = soma de vários lançamentos
   ls.forEach(l=>{if(l.junto_mov&&movC.has(l.junto_mov))conc.add(l.id)});   // linha que entrou somada num lançamento só (Lançar juntas)
   GC.pend={};GC.concIds=conc;GC.todasL=ls;
   ls.forEach(l=>{if(!l.ignorado&&!conc.has(l.id))(GC.pend[l.conta_id]||=[]).push(l)});
@@ -10752,11 +10754,14 @@ function gcSugestoes(){
   const movPor={};GC.movs.forEach(m=>movPor[m.id]=m);
   GC.linhas.forEach(l=>{const m=l.junto_mov&&movPor[l.junto_mov];if(m&&m.ofx_id&&!GC.conc[l.id])GC.conc[l.id]=m});
   GC.juntoQ={};GC.linhas.forEach(l=>{const m=GC.conc[l.id];if(m)GC.juntoQ[m.id]=(GC.juntoQ[m.id]||0)+1});
+  // uma linha do banco que é a soma de vários lançamentos do sistema (ex.: remessa de repasses) (Carol, 13/11)
+  GC.soma={};GC.movs.forEach(m=>{if(m.ofx_soma&&m.conciliado)(GC.soma[m.ofx_soma]||=[]).push(m)});
+  Object.entries(GC.soma).forEach(([id,ms])=>{if(!GC.conc[id])GC.conc[id]=ms[0]});
   const usadosM=new Set(),usadosT=new Set();
   for(const l of GC.linhas){if(GC.conc[l.id]||l.ignorado)continue;
     const tipo=l.valor>0?'entrada':'saida',v=Math.abs(l.valor),perto=(a,b)=>Math.abs(difDias(a,l.data))-Math.abs(difDias(b,l.data));
-    const m=GC.movs.filter(x=>!x.ofx_id&&!usadosM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
-    if(m){usadosM.add(m.id);GC.sug[l.id]={k:'mov',mov:m,txt:`Já lançado: ${m.descricao||m.pessoa_nome||'lançamento'} (${dBR(m.data)})`};continue}
+    const m=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&!usadosM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
+    if(m){usadosM.add(m.id);GC.sug[l.id]={k:'mov',mov:m,txt:`Já lançado: ${[m.pessoa_nome,m.descricao].filter(Boolean).join(' · ')||'lançamento'} (${dBR(m.data)})`};continue}
     const t=GC.tits.filter(x=>!usadosT.has(x.id)&&x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(r2(x.valor-(GC.pago[x.id]||0))-v)<0.005&&Math.abs(difDias(x.vencimento,l.data))<=10).sort((a,b)=>perto(a.vencimento,b.vencimento))[0];
     if(t){usadosT.add(t.id);GC.sug[l.id]={k:'tit',tit:t,txt:`${t.tipo==='pagar'?'Pagar':'Receber'}: ${t.pessoa_nome||''}${t.descricao?' · '+t.descricao:''} (venc. ${dBR(t.vencimento)})`};continue}
     const r=GC.regras.filter(x=>x.tipo===tipo&&l.padrao&&l.padrao.includes(x.padrao)).sort((a,b)=>b.padrao.length-a.padrao.length)[0];
@@ -10766,7 +10771,7 @@ function gcSugestoes(){
 const gcSit=l=>GC.conc[l.id]?'conc':l.ignorado?'ign':GC.sug[l.id]?'sug':'sem';
 // texto da coluna "Lançamento no sistema", para o filtro da coluna
 const gcLancTxt=l=>{const s=gcSit(l),m=GC.conc[l.id],g=GC.sug[l.id];
-  return s==='conc'?['Conciliada',m.descricao,m.pessoa_nome,m.categoria].filter(Boolean).join(' '):s==='ign'?'Ignorada':s==='sug'?'Sugestão '+g.txt:'Sem lançamento'};
+  return s==='conc'?['Conciliada',m.descricao,m.pessoa_nome,m.categoria,...(GC.soma?.[l.id]||[]).map(x=>(x.pessoa_nome||'')+' '+(x.descricao||''))].filter(Boolean).join(' '):s==='ign'?'Ignorada':s==='sug'?'Sugestão '+g.txt:'Sem lançamento'};
 const soDigV=t=>String(t||'').replace(/[^\d]/g,'');
 function gcFiltradas(){
   const F=msVals('gcFiltro'),q=chave($('gcBusca').value),fd=$('gcfData').value.trim(),fh=chave($('gcfHist').value),fv=soDigV($('gcfValor').value),fl=chave($('gcfLanc').value);
@@ -10783,7 +10788,7 @@ function gcDesenha(){
   const ok=a=>`<button type="button" class="btn small" data-gc="${a}">`;
   $('gcHead').hidden=false;$('gcTodas').checked=!!rows.length&&rows.every(l=>GC.sel.has(l.id));
   $('gcBody').innerHTML=rows.slice(0,MAX).map(l=>{const s=gcSit(l),m=GC.conc[l.id],g=GC.sug[l.id];
-    const cel=s==='conc'?`<span class="chip c-ok">✓ Conciliada</span> ${esc(m.descricao||m.pessoa_nome||'')}${m.categoria?' '+mu('· '+esc(m.categoria)):''}${(GC.juntoQ?.[m.id]||0)>1?' '+mu(`· lançamento único de ${fm(m.valor)} somando ${GC.juntoQ[m.id]} linhas`):''}`
+    const cel=s==='conc'?`<span class="chip c-ok">✓ Conciliada</span> ${m.pessoa_nome&&m.descricao?`<b>${esc(m.pessoa_nome)}</b> · `:''}${esc(m.descricao||m.pessoa_nome||'')}${m.categoria?' '+mu('· '+esc(m.categoria)):''}${(GC.juntoQ?.[m.id]||0)>1?' '+mu(`· lançamento único de ${fm(m.valor)} somando ${GC.juntoQ[m.id]} linhas`):''}${GC.soma?.[l.id]?' '+mu(`· soma de ${GC.soma[l.id].length} lançamentos do sistema (${fm(r2(GC.soma[l.id].reduce((a,x)=>a+(+x.valor),0)))})`):''}`
       :s==='ign'?'<span class="chip c-none">Ignorada</span>'
       :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
@@ -10862,6 +10867,9 @@ async function gcAprovar(ls){
 }
 async function gcDesfazer(l){
   const m=GC.conc[l.id];if(!m)return;
+  const sm=GC.soma?.[l.id];
+  if(sm){if(!confirm(`Desfazer a ligação desta linha do banco com os ${sm.length} lançamentos do sistema? Os lançamentos continuam no sistema, só ficam sem conciliar.`))return;
+    const {error}=await sb.from('fin_movimentos').update({ofx_soma:null,conciliado:false}).eq('ofx_soma',l.id);if(error)throw error;sm.forEach(x=>{x.ofx_soma=null;x.conciliado=false});return}
   if(m.titulo_id){const {data:t}=await sb.from('fin_titulos').select('id,origem').eq('id',m.titulo_id).maybeSingle();
     if(t?.origem==='ofx'){   // conta a pagar/receber que a própria conciliação criou
       if(confirm('Apagar o lançamento ligado a esta linha? Ele sai também das contas a '+(m.tipo==='saida'?'pagar':'receber')+', da Movimentação e do Extrato da conta.\n\nOK = apagar\nCancelar = só desfazer a ligação (o lançamento continua)')){
@@ -10910,6 +10918,7 @@ $('gcArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f|
     const jm=[...new Set(exist.filter(x=>x.junto_mov).map(x=>x.junto_mov))],jok=new Set();   // linhas lançadas juntas num lançamento só
     for(let i=0;i<jm.length;i+=200){const {data,error}=await sb.from('fin_movimentos').select('id').in('id',jm.slice(i,i+200)).not('ofx_id','is',null);if(error)throw error;(data||[]).forEach(m=>jok.add(m.id))}
     exist.forEach(x=>{if(x.junto_mov&&jok.has(x.junto_mov))conc.add(x.id)});
+    for(let i=0;i<ids.length;i+=200){const {data,error}=await sb.from('fin_movimentos').select('ofx_soma').in('ofx_soma',ids.slice(i,i+200)).eq('conciliado',true);if(!error)(data||[]).forEach(m=>conc.add(m.ofx_soma))}   // soma de vários lançamentos
     const ra=await sb.from('fin_ofx_arquivos').select('*').eq('conta_id',c.id).lte('ini',d1).gte('fim',d0).order('importado_em',{ascending:false}).limit(1);if(!ra.error)arqAnt=(ra.data||[])[0]||null;
   }catch(err){console.error(err);return toast(v47(err)?v47Msg:'Não foi possível conferir o extrato. Verifique a internet e tente de novo.')}
   const docDe=h=>(h.match(/(?<!\d)(\d{14}|\d{11})(?!\d)/)||[])[1]||null;
@@ -10955,12 +10964,20 @@ async function abrirGC(ls){
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);outras=outras.filter(x=>x.id!==c.id);
   const tits=um?GC.tits.filter(t=>t.tipo===(tipo==='saida'?'pagar':'receber')).sort((a,b)=>Math.abs(r2(a.valor-(GC.pago[a.id]||0))-tot)-Math.abs(r2(b.valor-(GC.pago[b.id]||0))-tot)||Math.abs(difDias(a.vencimento,l.data))-Math.abs(difDias(b.vencimento,l.data))).slice(0,30):[];
   const comum=ls.every(x=>x.padrao===l.padrao)?l.padrao:'';
+  // vários lançamentos do sistema para esta linha do banco (ex.: remessa de repasses que sai com o total) (Carol, 13/11)
+  const vls=um?GC.movs.filter(m=>m.tipo===tipo&&!movConc(m)&&!(m.ofx_soma&&m.conciliado)&&Math.abs(difDias(m.data,l.data))<=10).sort((a,b)=>Math.abs(difDias(a.data,l.data))-Math.abs(difDias(b.data,l.data))||String(a.pessoa_nome||'').localeCompare(String(b.pessoa_nome||''))):[];
+  // e também as contas em aberto (ex.: repasses da remessa ainda não baixados): ao conciliar, ficam pagas
+  const vts=um?GC.tits.filter(t=>t.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(difDias(t.vencimento,l.data))<=10).sort((a,b)=>Math.abs(difDias(a.vencimento,l.data))-Math.abs(difDias(b.vencimento,l.data))||String(a.pessoa_nome||'').localeCompare(String(b.pessoa_nome||''))):[];
+  const falta=t=>r2(t.valor-(GC.pago[t.id]||0)),vit=[...vls.map(m=>({k:'m:'+m.id,d:m.data,p:m.pessoa_nome,ds:m.descricao,c:m.categoria,doc:m.documento,v:+m.valor,st:'lançado'})),...vts.map(t=>({k:'t:'+t.id,d:t.vencimento,p:t.pessoa_nome,ds:t.descricao,c:t.categoria,doc:t.documento,v:falta(t),st:'em aberto'}))];
   const doc=l.documento&&pes.find(p=>soDig(p.documento)===l.documento);
   $('gtdTitle').textContent=um?`${tipo==='entrada'?'Entrada':'Saída'} de ${fm(Math.abs(l.valor))} em ${dBR(l.data)}`:`${ls.length} ${tipo==='entrada'?'entradas':'saídas'} (${fm(tot)})`;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<p class="note" style="margin:0">${um?'Banco: '+esc(histDe(l)):'As '+ls.length+' linhas selecionadas viram um lançamento só, com a soma'+(new Set(ls.map(x=>x.data)).size>1?' (um por dia)':'')+'. No Extrato da conta aparece uma linha só.'}</p>
     <datalist id="gcPesList">${pes.map(p=>`<option value="${esc(p.nome)}"></option>`).join('')}</datalist>
     <div class="fields">
-      <label class="f wide">O que é<select id="gc_modo"><option value="novo">Lançamento novo (${tipo==='entrada'?'receita':'despesa'}, tarifa, etc.)</option>${outras.length?`<option value="transf">Transferência ${tipo==='saida'?'para':'de'} outra conta (desta ou de outra empresa do grupo)</option>`:''}${tits.length?`<option value="tit">Baixa de uma conta a ${tipo==='saida'?'pagar':'receber'} em aberto</option>`:''}</select></label>
+      <label class="f wide">O que é<select id="gc_modo"><option value="novo">Lançamento novo (${tipo==='entrada'?'receita':'despesa'}, tarifa, etc.)</option>${outras.length?`<option value="transf">Transferência ${tipo==='saida'?'para':'de'} outra conta (desta ou de outra empresa do grupo)</option>`:''}${tits.length?`<option value="tit">Baixa de uma conta a ${tipo==='saida'?'pagar':'receber'} em aberto</option>`:''}${vit.length?`<option value="soma">Soma de vários lançamentos já feitos no sistema (ex.: remessa de repasses)</option>`:''}</select></label>
+      <div class="wide" id="gc_somaBox" hidden><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><input id="gc_somaBusca" placeholder="Buscar por nome, descrição, data ou valor" style="flex:1 1 220px"><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="gc_somaTodos" style="width:auto"> Marcar os da lista</label></div>
+        <div style="max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px"><table class="tbl" style="width:100%"><tbody id="gc_somaLista">${vit.map(m=>`<tr data-v="${esc(chave([dBR(m.d),m.p,m.ds,m.c,m.doc,m.st,fm(m.v),String(m.v)].join(' ')))}"><td><input type="checkbox" class="gcsm" value="${m.k}" style="width:auto"></td><td>${dBR(m.d)}</td><td class="l">${esc(m.p||'')}${m.ds?`<br><span class="muted">${esc(m.ds)}</span>`:''}</td><td class="l">${esc(m.c||'')}</td><td>${fm(m.v)}</td><td><span class="chip ${m.st==='lançado'?'c-done':'c-warn'}">${m.st}</span></td></tr>`).join('')}</tbody></table></div>
+        <p class="note" id="gc_somaTot" style="margin:6px 0 0"></p></div>
       <label class="f wide" id="gc_titBox" hidden>Conta em aberto<select id="gc_tit">${tits.map(t=>`<option value="${t.id}">${esc(t.pessoa_nome||'')} · ${esc(t.descricao||'')} · venc. ${dBR(t.vencimento)} · falta ${fm(r2(t.valor-(GC.pago[t.id]||0)))}</option>`).join('')}</select></label>
       <label class="f" id="gc_destBox" hidden>Outra conta<select id="gc_dest">${optContas(outras,cli)}</select></label>
       <label class="f wide" id="gc_descBox">Descrição *<input id="gc_desc" value="${esc(um?(l.nome||l.memo||''):'')}"></label>
@@ -10969,14 +10986,29 @@ async function abrirGC(ls){
       <label class="wide" id="gc_lembraBox" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="gc_lembra" style="width:auto"${comum?' checked':''}> Lembrar: as próximas linhas do banco com o texto</label>
       <label class="f wide" id="gc_padBox">Texto que identifica (pode encurtar)<input id="gc_pad" value="${esc(comum)}"></label>
     </div><p class="err" id="gtErr" hidden></p>`;
-  const modo=()=>{const v=$('gc_modo').value;$('gc_titBox').hidden=v!=='tit';$('gc_destBox').hidden=v!=='transf';$('gtdBody').querySelectorAll('[data-novo]').forEach(x=>x.hidden=v!=='novo');
-    $('gc_lembraBox').hidden=$('gc_padBox').hidden=$('gc_descBox').hidden=v==='tit';if(v==='transf'&&!$('gc_desc').value)$('gc_desc').value='Transferência entre contas'};
+  const somaTot=()=>{const b=$('gc_somaBox');if(!b)return;const t=r2([...b.querySelectorAll('.gcsm:checked')].reduce((a,x)=>a+vit.find(m=>m.k===x.value).v,0)),d=r2(tot-t);
+    $('gc_somaTot').innerHTML=`Marcados: <b>${b.querySelectorAll('.gcsm:checked').length}</b> · soma <b>${fm(t)}</b> · banco <b>${fm(tot)}</b> · ${Math.abs(d)<0.005?'<b class="pos">bate certinho</b>':`<b class="neg">${d>0?'faltam':'sobram'} ${fm(Math.abs(d))}</b>`}`};
+  if(vit.length){$('gc_somaLista').onchange=somaTot;
+    $('gc_somaBusca').oninput=()=>{const q=chave($('gc_somaBusca').value);$('gc_somaLista').querySelectorAll('tr').forEach(tr=>tr.hidden=!!q&&!tr.dataset.v.includes(q))};
+    $('gc_somaTodos').onchange=()=>{const on=$('gc_somaTodos').checked;$('gc_somaLista').querySelectorAll('tr').forEach(tr=>{if(!tr.hidden)tr.querySelector('.gcsm').checked=on});somaTot()};somaTot()}
+  const modo=()=>{const v=$('gc_modo').value;$('gc_titBox').hidden=v!=='tit';if($('gc_somaBox'))$('gc_somaBox').hidden=v!=='soma';$('gc_destBox').hidden=v!=='transf';$('gtdBody').querySelectorAll('[data-novo]').forEach(x=>x.hidden=v!=='novo');
+    $('gc_lembraBox').hidden=$('gc_padBox').hidden=$('gc_descBox').hidden=v==='tit'||v==='soma';if(v==='transf'&&!$('gc_desc').value)$('gc_desc').value='Transferência entre contas'};
   $('gc_modo').onchange=modo;modo();
   $('gtdFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="gc_salvar">Salvar e conciliar</button>`;
   dlgGT.showModal();
 }
 async function gcSalvar(){
   const ls=GCDLG,l=ls[0],tipo=l.valor>0?'entrada':'saida',modo=$('gc_modo').value,cli=cliAtual();
+  if(modo==='soma'){const ks=[...$('gc_somaBox').querySelectorAll('.gcsm:checked')].map(x=>x.value);if(!ks.length)return gtErr('Marque os lançamentos do sistema que somam esta linha do banco.');
+    const ids=ks.filter(k=>k[0]==='m').map(k=>k.slice(2)),tids=ks.filter(k=>k[0]==='t').map(k=>k.slice(2)),ts=GC.tits.filter(t=>tids.includes(t.id)),falta=t=>r2(t.valor-(GC.pago[t.id]||0));
+    const t=r2(GC.movs.filter(m=>ids.includes(m.id)).reduce((a,m)=>a+(+m.valor),0)+ts.reduce((a,x)=>a+falta(x),0)),v=Math.abs(l.valor);
+    if(Math.abs(t-v)>=0.005&&!confirm(`A soma dos lançamentos marcados (${fm(t)}) é diferente do banco (${fm(v)}). Conciliar mesmo assim?`))return;
+    for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').update({ofx_soma:l.id,conciliado:true}).in('id',ids.slice(i,i+200));if(error)return gtErr('Não foi possível salvar: '+(error.message||''))}
+    // contas em aberto marcadas: dá baixa na data do banco, cada uma com o seu valor, ligadas a esta linha
+    const novos=[];for(const x of ts)novos.push(...await pernasFatura(x,{...gcMov({...l,qtd:1,valor:(tipo==='saida'?-1:1)*falta(x)},{titulo_id:x.id,descricao:x.descricao||(tipo==='saida'?'Pagamento':'Recebimento'),pessoa_nome:x.pessoa_nome,documento:x.documento,categoria:x.categoria}),ofx_id:null,ofx_soma:l.id}));
+    if(novos.length)await gcInserir(novos);
+    for(const x of ts)if(x.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',x.origem_id);if(error)console.error(error)}
+    toast(`Linha conciliada com ${ks.length} ${ks.length===1?'lançamento':'lançamentos'}`);dlgGT.close();GC.sel.clear();return renderGC()}
   if(modo==='tit'){const t=GC.tits.find(x=>x.id===$('gc_tit').value),v=Math.abs(l.valor),falta=r2(t.valor-(GC.pago[t.id]||0));
     // diferença: a mais = juros/multa; a menos = desconto (a conta fica paga) ou pagamento parcial
     let juros=0,desconto=0;if(v>falta)juros=r2(v-falta);else if(v<falta&&confirm(`O banco mostra ${fm(v)} e falta ${fm(falta)} desta conta. Foi desconto? (OK = desconto, a conta fica quitada; Cancelar = pagamento parcial)`))desconto=r2(falta-v);
@@ -12244,6 +12276,7 @@ const MANUAL=[
 <li>Os lançamentos do <b>mesmo dia</b> com o <b>mesmo histórico</b> do banco (ex.: <i>Vendas - Disponível PIX</i>, vendas no cartão) entram somados numa linha só, com a observação “R$ 10.000,00 = 10 lançamentos somados”. Passe o mouse na observação para ver os valores.</li>
 <li>Para cada linha: <b>Aprovar</b> a sugestão, <b>Lançar</b> (lançamento novo, transferência ou baixa de uma conta em aberto) ou <b>Ignorar</b>. Marque várias linhas para lançar ou aprovar de uma vez.</li>
 <li><b>Lançar juntas</b>: marque as linhas do mesmo tipo (ex.: CIELO ELO, MASTER e VISA do dia) e clique em <b>Lançar juntas</b>. O portal soma as linhas de cada dia e cria <b>um lançamento só</b> com a categoria escolhida, ligado a todas elas. No Extrato da conta aparece uma linha só com a soma. Se clicar em <b>Desfazer</b> numa delas, todas voltam a ficar pendentes.</li>
+<li><b>Uma linha do banco = vários lançamentos do sistema</b> (ex.: a remessa de repasses sai no extrato do Sicredi numa linha só com o total, e no sistema cada repasse é um lançamento): clique em <b>Lançar</b> na linha do banco e escolha <b>Soma de vários lançamentos já feitos no sistema</b>. Marque os lançamentos (dá para buscar e marcar todos da lista); aparecem os já lançados e as contas em aberto (estas ficam pagas na data do banco). O portal mostra a soma e se bate com o banco. Os lançamentos continuam um por um no sistema, todos ligados àquela linha.</li>
 <li>O que você validar aparece também nas <b>Contas a receber</b> (entradas) ou nas <b>Contas a pagar</b> (saídas), já baixado, na <b>Movimentação financeira</b> e no <b>Extrato da conta</b>, onde dá para corrigir e conferir o saldo com o banco.</li>
 </ol>
 <ul>
@@ -12521,7 +12554,9 @@ async function agBadge(){
 // =====================================================================
 const NOVIDADES=[
   {k:'2026-11-13lancar-juntas-soma',data:'2026-11-13',t:'Lançar juntas soma num lançamento só',itens:[
-    {x:'Gestão financeira › Conciliação bancária: “Lançar juntas” agora soma as linhas selecionadas do mesmo dia e cria um lançamento só (mesma categoria, mesma conta), ligado a todas elas. No Extrato da conta aparece uma linha com a soma, em vez de um CIELO por linha.',para:'esc'}]},
+    {x:'Gestão financeira › Conciliação bancária: “Lançar juntas” agora soma as linhas selecionadas do mesmo dia e cria um lançamento só (mesma categoria, mesma conta), ligado a todas elas. No Extrato da conta aparece uma linha com a soma, em vez de um CIELO por linha.',para:'esc'},
+    {x:'Conciliação bancária: a sugestão “Já lançado” e a linha conciliada mostram o nome do parceiro, fornecedor ou cliente antes da descrição (ex.: “Dr. Fulano · Repasse de parceiro (restituição)…”), para facilitar a conferência do repasse.',para:'esc'},
+    {x:'Conciliação bancária: uma linha do banco pode ser ligada a vários lançamentos do sistema. Em “Lançar”, escolha “Soma de vários lançamentos já feitos no sistema” e marque os lançamentos (ex.: os repasses de uma remessa que o banco mostra num total só).',para:'esc'}]},
   {k:'2026-11-12grupos-empresas',data:'2026-11-12',t:'Filiais e grupos de empresas',itens:[
     {x:'Configurações › Cadastro de empresas: nova coluna “Filial de”. Na filial, escolha a matriz; deixe em branco na matriz e nas empresas sem filial. A matriz que tem filial já aparece como grupo “Matriz + filiais”.',para:'esc'},
     {x:'Configurações › Cadastro de empresas › Grupos de empresas: crie grupos (ex.: Oliveira, Pato Branco, Campos Souto e MAR) e marque as empresas de cada um. Uma empresa pode estar em mais de um grupo.',para:'esc'},
