@@ -4257,6 +4257,14 @@ const hhmm=min=>{min=Math.round(min||0);const s=min<0?'-':'';min=Math.abs(min);r
 const lerHoras=s=>{s=String(s||'').trim().replace(/h$/i,'');if(!s)return null;let m=s.match(/^(\d+)\s*[:hH]\s*(\d{1,2})$/);if(m)return +m[1]*60+ +m[2];
   m=s.replace(',','.').match(/^\d+(\.\d+)?$/);return m?Math.round(+m[0]*60):NaN};
 const pctTxt=v=>Math.round(v*1000)/10+'%';
+// competência sugerida para as contas (Carol, 13/11): segue o que o histórico da categoria mostra (ex.: salário vence no
+// mês seguinte ao da competência); sem histórico, folha e impostos (salário, FGTS, INSS, IRRF, DAS…) são do mês anterior ao vencimento
+const COMPANT=/sal[aá]rio|folha|fgts|inss|irrf|pr[oó].?labore|\bgps\b|\bdas\b|simples nacional|\biss\b|\bpis\b|cofins|encargos|f[eé]rias|rescis|d[eé]cimo|13[ºo°]? sal|contribui[cç][aã]o sindical|pens[aã]o aliment/i;
+function compSugerida(cat,venc,lista,menos){if(!venc||!/^\d{4}-\d{2}/.test(venc))return '';
+  const h=(lista||[]).filter(t=>t.id!==menos&&cat&&t.categoria===cat&&t.competencia&&t.vencimento&&!t.previsto).sort((a,b)=>b.vencimento.localeCompare(a.vencimento))[0];
+  let off=cat&&COMPANT.test(cat)?-1:0;
+  if(h){const m=x=>+x.slice(0,4)*12+ +x.slice(5,7),d=m(h.competencia)-m(h.vencimento);if(d>=-12&&d<=1)off=d}
+  return addMes(venc,off).slice(0,7)}
 const addMes=(comp,n)=>{const d=new Date(comp.slice(0,7)+'-01T12:00');d.setMonth(d.getMonth()+n);return isoLocal(d)};
 const fimMes=comp=>{const d=new Date(comp+'T12:00');d.setMonth(d.getMonth()+1,0);return isoLocal(d)};
 const colsDe=cli=>(cli.folha_colunas&&cli.folha_colunas.length?cli.folha_colunas:FPADRAO).filter(c=>FCOL[c]);
@@ -7824,6 +7832,7 @@ async function gtLeArquivo(f){
   poe('gt_valor',dup?.valor||r.valor,'valor',fm,true);
   poe('gt_vencimento',dup?.venc||r.venc,'vencimento',dBR);
   poe('gt_documento',r.numero||r.nfe?.numero,r.modelo==='65'?'cupom nº':'NF nº');
+  if(r.emissao&&$('gt_competencia')?.dataset.auto==='1')$('gt_competencia').value='';   // a emissão da nota manda na competência sugerida
   if(r.emissao)poe('gt_competencia',r.emissao.slice(0,7),'competência',v=>v.split('-').reverse().join('/'));
   if(r.xml&&r.pix&&!$('gt_forma').value){$('gt_forma').value='Pix';$('gt_forma').dispatchEvent(new Event('change',{bubbles:true}))}
   // fornecedor pelo CNPJ (do XML, da chave da nota ou o primeiro CNPJ do arquivo que não seja o da empresa)
@@ -8048,6 +8057,9 @@ async function abrirGT(t,tipo,pre){
     $('gj_data').addEventListener('change',()=>dMan=true);$('gj_conta').addEventListener('change',()=>cMan=true);
     ['gt_vencimento','gt_conta_id','gt_parcelas'].forEach(k=>{$(k).addEventListener('change',jp);$(k).addEventListener('input',jp)});jp()}
   if(!dlgGT.open)dlgGT.showModal();if(!t)$('gt_pessoa').focus();
+  // competência já vem preenchida pela categoria e pelo vencimento; quem digitar manda (Carol, 13/11)
+  {const cp=$('gt_competencia');if(cp&&!cp.disabled){const sug=()=>{if(cp.value&&cp.dataset.auto!=='1')return;const v=compSugerida($('gt_categoria')?.value,$('gt_vencimento')?.value,GT.lista,t?.id);if(v){cp.value=v;cp.dataset.auto='1'}};
+    cp.addEventListener('input',()=>{cp.dataset.auto=''});['gt_categoria','gt_vencimento'].forEach(k=>$(k)?.addEventListener('change',sug));sug()}}
   if($('gtJunto')){const mids=movs.map(m=>m.id),q=[ofxIds.length?`id.in.(${ofxIds.join(',')})`:'',`junto_mov.in.(${mids.join(',')})`].filter(Boolean).join(',');
     sb.from('fin_ofx').select('id,data,valor,memo,nome,qtd,itens,junto_mov').or(q).order('data').order('valor').then(({data,error})=>{const b=$('gtJuntoBody');if(!b)return;if(error){console.error(error);b.textContent='Não foi possível carregar os lançamentos do banco.';return}
       const ls=(data||[]).filter(l=>ofxIds.includes(l.id)||mids.includes(l.junto_mov)),n=ls.reduce((a,l)=>a+(l.qtd>1?l.qtd:1),0);$('gtJunto').hidden=n<2;
@@ -12202,6 +12214,7 @@ const MANUAL=[
       txt:`<p>As contas da empresa: o que tem para pagar aos fornecedores e o que tem para receber dos clientes.</p>
 <ol>
 <li>Clique em <b>+ Nova conta a pagar</b> (ou <b>+ Nova conta a receber</b>). Preencha o fornecedor (ou cliente), a descrição, a categoria, o vencimento e o valor. Para dividir em parcelas mensais, informe o número de parcelas.</li>
+<li><b>Competência:</b> já vem preenchida. O portal segue como a mesma categoria foi lançada antes; sem histórico, folha e impostos (salário, FGTS, INSS, IRRF, DAS, férias, rescisão…) ficam com o <b>mês anterior</b> ao vencimento e o resto com o mês do vencimento. Dá para trocar. Ao anexar a nota fiscal, vale o mês da emissão.</li>
 <li>Quando a conta for paga, abra a conta e use <b>Registrar pagamento</b> (ou <b>Registrar recebimento</b>) com a data, a conta bancária e, se houver, juros ou desconto.</li>
 </ol>
 <ul>
@@ -12570,6 +12583,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13competencia',data:'2026-11-13',t:'Competência já preenchida nas contas a pagar',itens:[
+    {x:'Gestão financeira › Contas a pagar e a receber: a Competência já vem preenchida. O portal olha como a mesma categoria foi lançada antes; sem histórico, folha e impostos (salário, FGTS, INSS, IRRF, DAS, férias, rescisão…) ficam com o mês anterior ao vencimento e o resto com o mês do vencimento. As contas previstas também vêm preenchidas ao abrir. Dá para trocar; ao anexar a nota fiscal, vale o mês da emissão.',para:'esc'}]},
   {k:'2026-11-13estorno-conc',data:'2026-11-13',t:'Estorno de conta criada pela conciliação',itens:[
     {x:'Contas a pagar e a receber: ao estornar uma conta que a própria Conciliação bancária criou, ela sai das contas a pagar/receber (não fica mais como vencida) e a linha do banco volta para a conciliação.',para:'esc'}]},
   {k:'2026-11-13esconder-resumo',data:'2026-11-13',t:'Esconder os quadros de resumo em todas as telas',itens:[
