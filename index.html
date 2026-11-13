@@ -14494,11 +14494,24 @@ boot();
       if(m!==base)mostra();
     }catch(e){}
   }
+  // com uma janela aberta (ex.: lançamento de Contas a pagar) o resto da tela não recebe clique;
+  // por isso a faixa vai para dentro da janela aberta mais recente (e volta para a página quando ela fecha)
+  function lugar(){
+    const ds=[...document.querySelectorAll('dialog[open]')].filter(d=>{try{return d.matches(':modal')}catch(e){return true}});
+    return ds.length?ds[ds.length-1]:document.body;
+  }
+  function poe(){
+    if(!aviso)return;
+    const l=lugar();
+    if(box.parentNode!==l){if(temPop){try{box.hidePopover()}catch(e){}}l.appendChild(box)}
+    if(temPop){try{if(!box.matches(':popover-open'))box.showPopover()}catch(e){}}else box.hidden=false;
+  }
   function mostra(){
     if(Date.now()<adiadoAte)return;
-    aviso=true;
-    if(temPop){try{box.showPopover()}catch(e){}}else box.hidden=false;
+    aviso=true;poe();
   }
+  // quando abre ou fecha uma janela, leva a faixa junto
+  new MutationObserver(()=>{if(aviso)setTimeout(poe,0)}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
   function esconde(){aviso=false;if(temPop){try{box.hidePopover()}catch(e){}}else box.hidden=true}
   document.getElementById('nvvAtualizar').onclick=async function(){
     this.disabled=true;this.textContent='Atualizando…';
