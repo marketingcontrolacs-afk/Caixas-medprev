@@ -10933,6 +10933,10 @@ async function renderGC(recarrega=true){
         todas(()=>sb.from('fin_conc_regras').select('*').eq('cliente_id',cli.id))]);
       GC.linhas=l;GC.movs=m;GC.regras=rg;GC.pago={};mt.forEach(x=>GC.pago[x.titulo_id]=r2((GC.pago[x.titulo_id]||0)+abat(x)));
       GC.tits=t.filter(x=>r2(x.valor-(GC.pago[x.id]||0))>0.004);GC.sel.clear();
+      // remessas de pagamento desta conta: o banco mostra a remessa numa linha só com o total (Carol, 13/11)
+      GC.rems=[];try{const rr=await sb.from('fin_remessas').select('id,nsa,gerado_em').eq('conta_id',c.id).gte('gerado_em',de).order('gerado_em');
+        if(!rr.error&&(rr.data||[]).length){const it=await todas(()=>sb.from('fin_remessa_itens').select('id,remessa_id,titulo_id,favorecido,valor,forma,data_pagamento,status').in('remessa_id',rr.data.map(x=>x.id)));
+          GC.rems=rr.data.map(r=>({...r,itens:it.filter(i=>i.remessa_id===r.id&&i.status!=='excluido'&&i.status!=='recusado')})).filter(r=>r.itens.length)}}catch(e){console.error(e)}
     }catch(e){console.error(e);return gcVazio(v47(e)?v47Msg:v45(e)?v45Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
   }
   gcSugestoes();gcDesenha();
@@ -10983,10 +10987,25 @@ function gcSugestoes(){
     if(m){usadosM.add(m.id);GC.sug[l.id]={k:'mov',mov:m,txt:`Já lançado: ${[m.pessoa_nome,m.descricao].filter(Boolean).join(' · ')||'lançamento'} (${dBR(m.data)})`};continue}
     const t=GC.tits.filter(x=>!usadosT.has(x.id)&&x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(r2(x.valor-(GC.pago[x.id]||0))-v)<0.005&&Math.abs(difDias(x.vencimento,l.data))<=10).sort((a,b)=>perto(a.vencimento,b.vencimento))[0];
     if(t){usadosT.add(t.id);GC.sug[l.id]={k:'tit',tit:t,txt:`${t.tipo==='pagar'?'Pagar':'Receber'}: ${t.pessoa_nome||''}${t.descricao?' · '+t.descricao:''} (venc. ${dBR(t.vencimento)})`};continue}
+    // remessa de pagamentos: a soma dos pagamentos da remessa (mesma conta, pagamento até 3 dias da linha) bate com o total do banco
+    if(tipo==='saida'){const rm=gcRemessaDe(l,usadosM,usadosT);if(rm){rm.ms.forEach(x=>usadosM.add(x.id));rm.ts.forEach(x=>usadosT.add(x.id));
+      GC.sug[l.id]={k:'rem',...rm,txt:`Remessa nº ${rm.rem.nsa} (${rm.n} ${rm.n===1?'pagamento':'pagamentos'}): ${rm.nomes.slice(0,6).join(', ')}${rm.nomes.length>6?` e mais ${rm.nomes.length-6}`:''}`};continue}}
     const r=GC.regras.filter(x=>x.tipo===tipo&&l.padrao&&l.padrao.includes(x.padrao)).sort((a,b)=>b.padrao.length-a.padrao.length)[0];
     if(r)GC.sug[l.id]={k:'regra',regra:r,txt:r.conta_destino?`Transferência ${tipo==='saida'?'para':'de'} ${contaNome(r.conta_destino)||'outra conta'}`:[r.descricao,r.categoria].filter(Boolean).join(' · ')||'Lançamento da regra'};
   }
 }
+// pagamentos de uma remessa que somam a linha do banco: cada um é o lançamento já pago (sem conciliar) ou a conta em aberto
+function gcRemessaDe(l,usM,usT){const v=Math.abs(l.valor);
+  for(const r of GC.rems||[]){const its=r.itens;if(!its.length)continue;
+    const d=its.map(i=>i.data_pagamento).filter(Boolean).sort()[0]||String(r.gerado_em).slice(0,10);if(Math.abs(difDias(d,l.data))>3)continue;
+    if(Math.abs(r2(its.reduce((a,i)=>a+(+i.valor),0))-v)>=0.005)continue;
+    const ms=[],ts=[];let ok=true;
+    for(const i of its){const m=GC.movs.find(x=>x.titulo_id===i.titulo_id&&x.tipo==='saida'&&!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&!usM.has(x.id));
+      if(m){ms.push(m);continue}const t=GC.tits.find(x=>x.id===i.titulo_id&&!usT.has(x.id));if(t){ts.push(t);continue}ok=false;break}
+    if(!ok)continue;
+    const nomes=[...ms.map(m=>m.pessoa_nome||m.descricao||''),...ts.map(t=>t.pessoa_nome||t.descricao||'')].filter(Boolean);
+    return {rem:r,ms,ts,n:ms.length+ts.length,nomes}}
+  return null}
 const gcSit=l=>GC.conc[l.id]?'conc':l.ignorado?'ign':GC.sug[l.id]?'sug':'sem';
 // texto da coluna "Lançamento no sistema", para o filtro da coluna
 const gcLancTxt=l=>{const s=gcSit(l),m=GC.conc[l.id],g=GC.sug[l.id];
@@ -11075,6 +11094,11 @@ async function gcAprovar(ls){
     if(g.k==='mov'){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',g.mov.id);if(error)throw error;n++}
     else if(g.k==='tit'){const t=g.tit;novos.push(...await pernasFatura(t,gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})));
       if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}
+    else if(g.k==='rem'){   // remessa: liga os pagamentos já lançados e dá baixa nas contas em aberto, todos nesta linha do banco
+      const ids=g.ms.map(x=>x.id);if(ids.length){const {error}=await sb.from('fin_movimentos').update({ofx_soma:l.id,conciliado:true}).in('id',ids);if(error)throw error}
+      for(const t of g.ts){const falta=r2(t.valor-(GC.pago[t.id]||0));
+        novos.push(...await pernasFatura(t,{...gcMov({...l,qtd:1,valor:-falta},{titulo_id:t.id,descricao:t.descricao||'Pagamento',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria}),ofx_id:null,ofx_soma:l.id}));
+        if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}}
     else{const r=g.regra;usos[r.id]=(usos[r.id]||0)+1;
       if(r.conta_destino){const tid=crypto.randomUUID(),base={descricao:r.descricao||'Transferência entre contas',transf_id:tid};
         novos.push(gcMov(l,base),{...gcMov(l,base),cliente_id:cliDaConta(r.conta_destino,GC.conta.cliente_id),conta_id:r.conta_destino,tipo:l.valor>0?'saida':'entrada',ofx_id:null,conciliado:false})}
@@ -11088,7 +11112,15 @@ async function gcAprovar(ls){
 async function gcDesfazer(l){
   const m=GC.conc[l.id];if(!m)return;
   const sm=GC.soma?.[l.id];
-  if(sm){if(!confirm(`Desfazer a ligação desta linha do banco com os ${sm.length} lançamentos do sistema? Os lançamentos continuam no sistema, só ficam sem conciliar.`))return;
+  if(sm){if(!confirm(`Desfazer a ligação desta linha do banco com os ${sm.length} lançamentos do sistema?`))return;
+    // pagamentos de contas (ex.: remessa de repasses): dá para estornar também, e as contas voltam a ficar em aberto (Carol, 13/11)
+    const pg=sm.filter(x=>x.titulo_id);
+    if(pg.length&&confirm(`Estornar também ${pg.length===1?'o pagamento':'os '+pg.length+' pagamentos'} ligados a esta linha?\n\nOK = estornar (as contas voltam a ficar em aberto)\nCancelar = os pagamentos continuam, só a conciliação é desfeita`)){
+      const ids=pg.map(x=>x.id);for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_movimentos').delete().in('id',ids.slice(i,i+200));if(error)throw error}
+      const tt=[...new Set(pg.map(x=>x.titulo_id))],{data:tl}=await sb.from('fin_titulos').select('id,origem,origem_id').in('id',tt);
+      const org=(tl||[]).filter(t=>t.origem_id).map(t=>t.origem_id);if(org.length){const {error}=await sb.from('contas_pagar').update({conferido:false,pago_em:null}).in('id',org);if(error)console.error(error)}
+      const doOfx=(tl||[]).filter(t=>t.origem==='ofx').map(t=>t.id);if(doOfx.length){const {error}=await sb.from('fin_titulos').delete().in('id',doOfx);if(error)console.error(error)}
+      GC.movs=GC.movs.filter(x=>!ids.includes(x.id))}
     const {error}=await sb.from('fin_movimentos').update({ofx_soma:null,conciliado:false}).eq('ofx_soma',l.id);if(error)throw error;sm.forEach(x=>{x.ofx_soma=null;x.conciliado=false});return}
   if(m.titulo_id){const {data:t}=await sb.from('fin_titulos').select('id,origem').eq('id',m.titulo_id).maybeSingle();
     if(t?.origem==='ofx'){   // conta a pagar/receber que a própria conciliação criou
@@ -12500,6 +12532,7 @@ const MANUAL=[
 <li>Os lançamentos do <b>mesmo dia</b> com o <b>mesmo histórico</b> do banco (ex.: <i>Vendas - Disponível PIX</i>, vendas no cartão) entram somados numa linha só, com a observação “R$ 10.000,00 = 10 lançamentos somados”. Passe o mouse na observação para ver os valores.</li>
 <li>Para cada linha: <b>Aprovar</b> a sugestão, <b>Lançar</b> (lançamento novo, transferência ou baixa de uma conta em aberto) ou <b>Ignorar</b>. Marque várias linhas para lançar ou aprovar de uma vez.</li>
 <li><b>Lançar juntas</b>: marque as linhas do mesmo tipo (ex.: CIELO ELO, MASTER e VISA do dia) e clique em <b>Lançar juntas</b>. O portal soma as linhas de cada dia e cria <b>um lançamento só</b> com a categoria escolhida, ligado a todas elas. No Extrato da conta aparece uma linha só com a soma. Se clicar em <b>Desfazer</b> numa delas, todas voltam a ficar pendentes. Nas Contas a pagar ou a receber esse lançamento aparece uma vez só, com a etiqueta “🔗 N lançamentos juntos”; abra e clique em <b>Detalhar</b> para ver cada lançamento do banco que está dentro.</li>
+<li><b>Remessa de pagamentos:</b> quando o banco mostra a remessa (ex.: repasses por Pix ou TED) numa linha só com o total, a linha vem com a sugestão <b>Remessa nº … (N pagamentos)</b> e os nomes. Clique em <b>Aprovar</b>: os pagamentos já lançados ficam conciliados e as contas em aberto da remessa são pagas na data do banco. Em <b>Desfazer</b>, o portal pergunta se estorna também os pagamentos (as contas voltam a ficar em aberto).</li>
 <li><b>Uma linha do banco = vários lançamentos do sistema</b> (ex.: a remessa de repasses sai no extrato do Sicredi numa linha só com o total, e no sistema cada repasse é um lançamento): clique em <b>Lançar</b> na linha do banco e escolha <b>Soma de vários lançamentos já feitos no sistema</b>. Marque os lançamentos (dá para buscar e marcar todos da lista); aparecem os já lançados e as contas em aberto (estas ficam pagas na data do banco). O portal mostra a soma e se bate com o banco. Os lançamentos continuam um por um no sistema, todos ligados àquela linha.</li>
 <li>O que você validar aparece também nas <b>Contas a receber</b> (entradas) ou nas <b>Contas a pagar</b> (saídas), já baixado, na <b>Movimentação financeira</b> e no <b>Extrato da conta</b>, onde dá para corrigir e conferir o saldo com o banco.</li>
 </ol>
@@ -12777,6 +12810,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13remessa-conc',data:'2026-11-13',t:'Conciliação: remessa de pagamentos numa linha só',itens:[
+    {x:'Gestão financeira › Conciliação bancária: quando o banco mostra a remessa de pagamentos (ex.: repasses por Pix ou TED) numa linha só com o total, a linha já vem com a sugestão “Remessa nº … (N pagamentos)” e os nomes dos parceiros. Ao Aprovar, os pagamentos já lançados ficam conciliados e as contas em aberto da remessa são pagas na data do banco, todas ligadas àquela linha. Desfazer desfaz a ligação e, se quiser, estorna os pagamentos (as contas voltam a ficar em aberto).',para:'esc'}]},
   {k:'2026-11-13fer-desfazer',data:'2026-11-13',t:'Férias: escolher as parcelas de cada um e desfazer a solicitação',itens:[
     {x:'RH › Férias: ao marcar colaboradores e clicar em “Solicitação para a contabilidade”, abre sempre uma janela com todos os marcados e as parcelas de cada um. A próxima parcela vem marcada; os botões “Só a próxima parcela”, “Todas as que faltam” e “Desmarcar tudo” ajudam, e você pode marcar uma por uma.'},
     {x:'Parcela já solicitada aparece com a data e o botão “Desfazer” (na janela da solicitação e na janela do período). Desfazendo, ela deixa de aparecer como “Solicitada” e pode ser solicitada de novo. O PDF que já foi para a contabilidade não muda.',para:'esc'}]},
