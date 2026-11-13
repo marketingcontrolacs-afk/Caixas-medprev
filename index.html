@@ -563,6 +563,12 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 .msmenu label:hover{background:var(--bg)}
 .msmenu input{width:auto;margin:0}
 .msmenu .msfoot{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);margin-top:4px;padding:6px 4px 2px}
+/* AVISO DE VERSÃO NOVA (13/11): faixa no alto quando o portal foi atualizado no servidor */
+#novaVersao{position:fixed;left:50%;right:auto;bottom:auto;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:200;margin:0;width:min(620px,calc(100vw - 32px));background:var(--warn-soft);color:var(--ink);border:2px solid var(--amber);border-radius:12px;box-shadow:var(--sh2);padding:12px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font:500 14.5px var(--body)}
+#novaVersao[popover]:not(:popover-open){display:none}
+#novaVersao .nvvt{flex:1 1 260px;min-width:0}#novaVersao .nvvt b{display:block;font-size:15.5px;margin-bottom:2px}
+#novaVersao .nvvb{display:flex;gap:8px;flex-wrap:wrap}
+#novaVersao .btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 </style>
 </head>
 <body>
@@ -12583,6 +12589,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13aviso-versao-nova',data:'2026-11-13',t:'Aviso quando sair versão nova do sistema',itens:[
+    {x:'Quando o sistema for atualizado, aparece no alto da tela a faixa “🔄 Saiu uma versão nova do sistema” com o botão “Atualizar agora”. Clique nele (salve antes o que estiver fazendo) e a página recarrega já na versão nova. Não precisa mais apertar Ctrl+F5. “Depois” esconde o aviso por 30 minutos.'}]},
   {k:'2026-11-13bol-validar-sempre',data:'2026-11-13',t:'Boletos e notas do cliente: botão sempre à vista',itens:[
     {x:'Gestão financeira › Contas a pagar: o botão “Boletos e notas do cliente para validar (N)” agora aparece sempre no alto, mesmo quando não há nada novo (fica com 0). Quando o cliente envia boleto ou nota em Rotina diária › Boletos e notas fiscais a pagar, o número sobe e o botão fica verde.',para:'esc'}]},
   {k:'2026-11-13competencia',data:'2026-11-13',t:'Competência já preenchida nas contas a pagar',itens:[
@@ -14380,6 +14388,55 @@ new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.no
 // período no modelo do Bom Controle em todas as telas com De/Até
 [['escIni','escFim'],['exIni','exFim'],['mIni','mFim'],['gtIni','gtFim',{vazio:true}],['relIni','relFim'],['gxIni','gxFim'],['gcIni','gcFim']].forEach(([a,b,o])=>perLigar(a,b,o));
 boot();
+})();
+</script>
+<!-- AVISO DE VERSÃO NOVA (Carol, 13/11): o portal confere sozinho, de tempos em tempos, se foi publicada uma versão nova
+     (compara a "impressão digital" do index.html no servidor, a ETag do Netlify). Se mudou, mostra esta faixa com "Atualizar agora",
+     que recarrega sem usar a cópia guardada no navegador (o mesmo que Ctrl+F5). Não precisa mexer em nada a cada atualização. -->
+<div id="novaVersao" role="alert" hidden>
+  <div class="nvvt"><b>🔄 Saiu uma versão nova do sistema</b>Clique em “Atualizar agora” para usar a versão mais recente. Se estiver no meio de um lançamento, salve antes.</div>
+  <div class="nvvb"><button type="button" class="btn pri" id="nvvAtualizar">Atualizar agora</button><button type="button" class="btn" id="nvvDepois">Depois</button></div>
+</div>
+<script>
+(function(){
+  const box=document.getElementById('novaVersao');
+  // popover fica por cima até das janelas abertas; navegador antigo usa a faixa comum
+  const temPop=typeof box.showPopover==='function';
+  if(temPop){box.setAttribute('popover','manual');box.hidden=false}
+  const url=()=>location.origin+location.pathname;
+  // "impressão digital" do arquivo no servidor: ETag (ou data de alteração), sem o final que muda com a compressão
+  const marca=r=>{const e=r.headers.get('etag');if(e)return e.replace(/^W\//,'').replace(/"/g,'').split('-')[0];return r.headers.get('last-modified')||''};
+  let base=null,ult=0,adiadoAte=0,aviso=false;
+  async function confere(forca){
+    if(!/^https?:/.test(location.protocol)||aviso)return;
+    const ag=Date.now();if(!forca&&ag-ult<60e3)return;ult=ag;
+    try{
+      const r=await fetch(url(),{method:'HEAD',cache:'no-store'});if(!r.ok)return;
+      const m=marca(r);if(!m)return;
+      if(base===null){base=m;return}
+      if(m!==base)mostra();
+    }catch(e){}
+  }
+  function mostra(){
+    if(Date.now()<adiadoAte)return;
+    aviso=true;
+    if(temPop){try{box.showPopover()}catch(e){}}else box.hidden=false;
+  }
+  function esconde(){aviso=false;if(temPop){try{box.hidePopover()}catch(e){}}else box.hidden=true}
+  document.getElementById('nvvAtualizar').onclick=async function(){
+    this.disabled=true;this.textContent='Atualizando…';
+    // busca o arquivo novo direto do servidor (troca a cópia guardada) e recarrega a página
+    try{await fetch(url(),{cache:'reload'})}catch(e){}
+    try{if(window.caches)for(const k of await caches.keys())await caches.delete(k)}catch(e){}
+    location.reload();
+  };
+  // "Depois": esconde por 30 minutos e então avisa de novo
+  document.getElementById('nvvDepois').onclick=()=>{esconde();adiadoAte=Date.now()+30*60e3;setTimeout(()=>confere(true),30*60e3+1e3)};
+  confere(true);
+  setInterval(confere,5*60e3);                                                        // a cada 5 minutos
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')confere()}); // ao voltar para a aba
+  window.addEventListener('focus',()=>confere());
+  window.addEventListener('online',()=>confere(true));
 })();
 </script>
 </body>
