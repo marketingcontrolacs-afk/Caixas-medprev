@@ -1195,7 +1195,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewRH" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Férias</h1><p class="sub" id="fSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="expgrp" id="fRel" data-exp="fer"><details class="expdd"><summary class="btn" title="Relatório de férias dos colaboradores marcados na lista (sem ninguém marcado, sai a lista toda)">Relatório ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button><button type="button" data-expf="print">Imprimir</button></div></details></span><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="fRel" data-exp="fer"><details class="expdd"><summary class="btn" title="Relatório de férias dos colaboradores marcados na lista (sem ninguém marcado, sai a lista toda)">Relatório ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button><button type="button" data-expf="print">Imprimir</button></div></details></span><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><select id="fSolQual" hidden title="Quais parcelas vão na solicitação em lote" aria-label="Quais parcelas solicitar" style="width:auto"><option value="todas">Todas as parcelas que faltam</option><option value="prox">Só a próxima parcela</option></select><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
     </div>
     <div class="card block" id="fImpRes" hidden style="margin-top:16px"></div>
     <div class="tiles" id="fTiles"></div>
@@ -3993,7 +3993,7 @@ function ferAlertas(r){
 }
 async function renderRH(){
   const lista=empresasDe('rh'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[];
-  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
+  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fSolQual').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
   $('fImport').hidden=!e;
   $('fSub').textContent=e?'Períodos aquisitivos, saldos e prazos de cada colaborador. O cliente informa a programação e o escritório confere.'
     :'Veja as férias que estão para vencer e informe a programação de cada colaborador.';
@@ -4037,12 +4037,15 @@ function fSelBar(){const vis=[...document.querySelectorAll('#fBody [data-fsel]')
   [...FSEL].forEach(id=>{if(!vis.includes(id))FSEL.delete(id)});
   const n=FSEL.size,sol=FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)).length,prop=[...FSEL].filter(id=>FPROG[id]?.status==='Proposta').length;
   $('fRel').querySelector('summary').textContent=n?`Relatório (${n} ${n===1?'marcado':'marcados'}) ▾`:'Relatório ▾';
-  $('fSol').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
+  $('fSol').hidden=$('fSolQual').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
   $('fAprov').hidden=!(ehEsc()&&prop);$('fAprov').textContent=`Aprovar marcadas (${prop})`;
   const all=$('fSelAll');if(all){all.checked=n>0&&n===vis.length;all.indeterminate=n>0&&n<vis.length;all.disabled=!vis.length}}
 $('fBody').addEventListener('change',ev=>{const c=ev.target.closest('[data-fsel]');if(!c)return;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel);fSelBar()});
 $('fHead').addEventListener('change',ev=>{if(ev.target.id!=='fSelAll')return;document.querySelectorAll('#fBody [data-fsel]').forEach(c=>{c.checked=ev.target.checked;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel)});fSelBar()});
-$('fSol').onclick=()=>gerarSolFerias(FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)));
+// em lote (Carol, 13/11): "Todas as parcelas que faltam" ou "Só a próxima parcela" (a mais próxima ainda não solicitada;
+// se a 1ª já foi solicitada, vem só a 2ª)
+const ferSolProx=r=>{const p=FPROG[r.id],ps=(p&&FPARC[p.id]||[]).filter(q=>!ferSolDe(r,q)).sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio))||a.ordem-b.ordem);return ps.length?[ps[0].ordem]:null};
+$('fSol').onclick=()=>gerarSolFerias(FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)),$('fSolQual').value==='prox'?ferSolProx:undefined);
 $('fAprov').onclick=async ev=>{const ids=[...FSEL].map(id=>FPROG[id]).filter(p=>p?.status==='Proposta').map(p=>p.id);if(!ids.length)return;
   if(!confirm(`Aprovar ${ids.length} programaç${ids.length===1?'ão':'ões'} de férias?`))return;
   ev.target.disabled=true;const {error}=await sb.from('ferias_programacoes').update({status:'Aprovada',aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()}).in('id',ids);ev.target.disabled=false;
@@ -4121,7 +4124,7 @@ function solFerD(r,p,fu,sel){
 async function gerarSolFerias(rs,sel){
   const m=DOCMOD.find(x=>x.k==='ferias_contab'),its=rs.map(r=>({r,p:FPROG[r.id]})).filter(o=>o.p);if(!its.length)return;
   const {data:fus}=await sb.from('funcionarios').select('*').in('id',its.map(o=>o.r.funcionario_id));
-  const Ds=its.map(o=>{const pd=ferSolPend(o.r),tem=(FPARC[o.p.id]||[]).length;return solFerD(o.r,o.p,(fus||[]).find(f=>f.id===o.r.funcionario_id),sel||(tem&&pd.length<tem?pd:null))});
+  const Ds=its.map(o=>{const pd=ferSolPend(o.r),tem=(FPARC[o.p.id]||[]).length;const sl=typeof sel==='function'?sel(o.r):sel;return solFerD(o.r,o.p,(fus||[]).find(f=>f.id===o.r.funcionario_id),sl||(tem&&pd.length<tem?pd:null))});
   if(!docImprime(m,Ds))return;
   const nao=its.filter(o=>o.p.status!=='Aprovada').length;
   if(nao)toast(`Atenção: ${nao===1?'1 programação ainda não foi aprovada':nao+' programações ainda não foram aprovadas'} pelo escritório.`);
@@ -4151,11 +4154,16 @@ async function salvarFerias(status){
     if(r.direito-r.ja_gozados-venda-ps.reduce((s,x)=>s+x.dias,0)<0)return erro('Venda mais gozo passam do direito do período. Confira os dias.');
     if(!p&&!venda&&!ps.length&&!e)return erro('Informe os dias vendidos ou as datas de gozo.');
     if(status==='Aprovada'&&!venda&&!ps.length)return erro('Não há programação para aprovar.');
+    if(p&&!venda&&!ps.length&&!status&&!confirm('Sem dias vendidos e sem datas: apagar a programação deste período? Ele volta a ficar sem programação.'))return;
   }
   bts.forEach(b=>$(b).disabled=true);
   try{
     if(e){const {error}=await sb.from('ferias_periodos').update({obs:$('feObs').value.trim()||null}).eq('id',r.id);if(error)throw error}
     const nota=e?$('feNota').value.trim()||null:undefined;
+    // tirou a venda e todas as datas (Carol, 13/11: lançada por engano): apaga a programação, sem deixar
+    // "A conferir" / "Faltam N dias sem data"; o período volta a mostrar "lançar férias"
+    if(edita&&p&&!venda&&!ps.length&&!status){const {error}=await sb.from('ferias_programacoes').delete().eq('id',p.id);if(error)throw error;
+      dlgFer.close();toast('Programação apagada');renderRH();return}
     if(edita&&(p||venda||ps.length)){
       const fora=venda-Math.min(venda,Math.floor(r.direito/3)),dados={venda_total:venda,obs:$('feProgObs').value.trim()||null};
       if(e)dados.nota_escritorio=nota;else dados.status='Proposta';
@@ -12703,6 +12711,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-13ferias-proxima',data:'2026-11-13',t:'Férias: solicitação só da próxima parcela e programação apagada de verdade',itens:[
+    {x:'RH › Férias: ao marcar vários colaboradores, escolha ao lado do botão “Solicitação para a contabilidade” entre “Todas as parcelas que faltam” e “Só a próxima parcela”. Com “Só a próxima”, quem tem férias divididas sai só com a parcela mais próxima; se a 1ª já foi solicitada, vem a 2ª.',mods:['rh']},
+    {x:'Se a programação foi lançada por engano, tire os dias vendidos e as datas e salve: a programação é apagada e o período volta a mostrar “lançar férias”, sem o aviso “Faltam N dias sem data”.',mods:['rh']}]},
   {k:'2026-11-13nota-servico',data:'2026-11-13',t:'Leitura da nota fiscal: número e descrição do serviço',itens:[
     {x:'Boletos e notas a pagar: ao anexar a nota fiscal (PDF ou foto), o sistema preenche o nº da nota e a descrição do serviço em “Do que se trata”. Se já houver uma descrição escrita, a do serviço vai para Observação.',mods:['pagar']},
     {x:'Pode anexar o boleto e a nota fiscal juntos (selecione os dois arquivos de uma vez). O sistema separa pelo nome do arquivo (ex.: “03.11 Boleto Prevence.pdf” vira Boleto e “03.11 NF 2203 Prevence.pdf” vira Nota fiscal) e lê os dois. Vale também nos anexos de Contas a pagar.'},
