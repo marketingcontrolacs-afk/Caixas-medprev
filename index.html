@@ -1195,7 +1195,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <section id="viewRH" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Férias</h1><p class="sub" id="fSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="expgrp" id="fRel" data-exp="fer"><details class="expdd"><summary class="btn" title="Relatório de férias dos colaboradores marcados na lista (sem ninguém marcado, sai a lista toda)">Relatório ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button><button type="button" data-expf="print">Imprimir</button></div></details></span><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><select id="fSolQual" hidden title="Quais parcelas vão na solicitação em lote" aria-label="Quais parcelas solicitar" style="width:auto"><option value="todas">Todas as parcelas que faltam</option><option value="prox">Só a próxima parcela</option></select><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="fRel" data-exp="fer"><details class="expdd"><summary class="btn" title="Relatório de férias dos colaboradores marcados na lista (sem ninguém marcado, sai a lista toda)">Relatório ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button><button type="button" data-expf="print">Imprimir</button></div></details></span><button class="btn" id="fAprov" hidden>Aprovar marcadas</button><button class="btn primary" id="fSol" hidden>Solicitação para a contabilidade</button><label class="f">Mostrar<select id="fFiltro"><option value="todos">Todos os colaboradores</option><option value="pend">Pendências</option><option value="fora">Afastados e desligados</option></select></label><span class="btn fotobtn" id="fImport" hidden>Importar planilha<input type="file" id="fImportFile" accept=".xlsx" aria-label="Importar a planilha de controle de férias"></span></div>
     </div>
     <div class="card block" id="fImpRes" hidden style="margin-top:16px"></div>
     <div class="tiles" id="fTiles"></div>
@@ -1331,6 +1331,11 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="db"><div class="fields" id="tcFields"></div><div id="tcRes"></div><p class="err" id="tcErr" hidden></p></div>
     <div class="df"><button type="button" class="btn ghost" id="tcDel" hidden>Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="tcClose">Fechar</button><button type="submit" class="btn primary" id="tcSave">Salvar conferência</button></div>
   </form>
+</dialog>
+<dialog id="dlgFerQual" style="max-width:520px">
+  <div class="dh"><h2>Quais parcelas vão para a contabilidade?</h2></div>
+  <div class="db"><p style="margin:0 0 8px" id="fqTxt"></p><p class="note" style="margin:0">Com “Só a próxima parcela”, cada colaborador sai só com a parcela mais próxima que ainda não foi solicitada. Se a 1ª já foi, vem a 2ª.</p></div>
+  <div class="df"><button class="btn ghost" id="fqCancel">Cancelar</button><span class="spacer"></span><button class="btn" id="fqTodas">Todas as parcelas</button><button class="btn primary" id="fqProx">Só a próxima parcela</button></div>
 </dialog>
 <dialog id="dlgFer">
   <div class="dh"><h2 id="feTitle"></h2><span class="spacer"></span><span id="feChip"></span></div>
@@ -4009,7 +4014,7 @@ function ferAlertas(r){
 }
 async function renderRH(){
   const lista=empresasDe('rh'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[];
-  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fSolQual').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
+  const e=ehEsc(),vazio=t=>{$('fSol').hidden=$('fAprov').hidden=true;$('fHead').innerHTML='';$('fBody').innerHTML=`<tr><td class="l ${t[1]||'muted'}">${t[0]}</td></tr>`;$('fTiles').innerHTML='';$('fNote').textContent=''};
   $('fImport').hidden=!e;
   $('fSub').textContent=e?'Períodos aquisitivos, saldos e prazos de cada colaborador. O cliente informa a programação e o escritório confere.'
     :'Veja as férias que estão para vencer e informe a programação de cada colaborador.';
@@ -4053,7 +4058,7 @@ function fSelBar(){const vis=[...document.querySelectorAll('#fBody [data-fsel]')
   [...FSEL].forEach(id=>{if(!vis.includes(id))FSEL.delete(id)});
   const n=FSEL.size,sol=FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)).length,prop=[...FSEL].filter(id=>FPROG[id]?.status==='Proposta').length;
   $('fRel').querySelector('summary').textContent=n?`Relatório (${n} ${n===1?'marcado':'marcados'}) ▾`:'Relatório ▾';
-  $('fSol').hidden=$('fSolQual').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
+  $('fSol').hidden=!sol;$('fSol').textContent=`Solicitação para a contabilidade (${sol})`;
   $('fAprov').hidden=!(ehEsc()&&prop);$('fAprov').textContent=`Aprovar marcadas (${prop})`;
   const all=$('fSelAll');if(all){all.checked=n>0&&n===vis.length;all.indeterminate=n>0&&n<vis.length;all.disabled=!vis.length}}
 $('fBody').addEventListener('change',ev=>{const c=ev.target.closest('[data-fsel]');if(!c)return;c.checked?FSEL.add(c.dataset.fsel):FSEL.delete(c.dataset.fsel);fSelBar()});
@@ -4061,7 +4066,14 @@ $('fHead').addEventListener('change',ev=>{if(ev.target.id!=='fSelAll')return;doc
 // em lote (Carol, 13/11): "Todas as parcelas que faltam" ou "Só a próxima parcela" (a mais próxima ainda não solicitada;
 // se a 1ª já foi solicitada, vem só a 2ª)
 const ferSolProx=r=>{const p=FPROG[r.id],ps=(p&&FPARC[p.id]||[]).filter(q=>!ferSolDe(r,q)).sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio))||a.ordem-b.ordem);return ps.length?[ps[0].ordem]:null};
-$('fSol').onclick=()=>gerarSolFerias(FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)),$('fSolQual').value==='prox'?ferSolProx:undefined);
+// Carol, 13/11 17h: o seletor ao lado do botão passava despercebido; quando alguém marcado tem mais de uma parcela
+// por solicitar, o portal pergunta numa janela (Só a próxima parcela / Todas as parcelas)
+$('fSol').onclick=()=>{const rs=FER.filter(r=>FSEL.has(r.id)&&ferPodeSol(r)),div=rs.filter(r=>ferSolPend(r).length>1);
+  if(!div.length)return gerarSolFerias(rs);
+  $('fqTxt').textContent=`${div.length===1?'1 colaborador marcado tem':div.length+' colaboradores marcados têm'} férias divididas ainda não solicitadas (${div.slice(0,4).map(r=>r.nome.split(' ')[0]).join(', ')}${div.length>4?'…':''}).`;
+  $('fqProx').onclick=()=>{dlgFerQual.close();gerarSolFerias(rs,ferSolProx)};$('fqTodas').onclick=()=>{dlgFerQual.close();gerarSolFerias(rs)};
+  dlgFerQual.showModal()};
+$('fqCancel').onclick=()=>dlgFerQual.close();
 $('fAprov').onclick=async ev=>{const ids=[...FSEL].map(id=>FPROG[id]).filter(p=>p?.status==='Proposta').map(p=>p.id);if(!ids.length)return;
   if(!confirm(`Aprovar ${ids.length} programaç${ids.length===1?'ão':'ões'} de férias?`))return;
   ev.target.disabled=true;const {error}=await sb.from('ferias_programacoes').update({status:'Aprovada',aprovado_por:ME.user_id,aprovado_em:new Date().toISOString()}).in('id',ids);ev.target.disabled=false;
@@ -12729,8 +12741,8 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
-  {k:'2026-11-13ferias-proxima',data:'2026-11-13',t:'Férias: só a próxima parcela, programação apagada de verdade, observações no relatório e aviso de login vencido',itens:[
-    {x:'RH › Férias: ao marcar vários colaboradores, escolha ao lado do botão “Solicitação para a contabilidade” entre “Todas as parcelas que faltam” e “Só a próxima parcela”. Com “Só a próxima”, quem tem férias divididas sai só com a parcela mais próxima; se a 1ª já foi solicitada, vem a 2ª.',mods:['rh']},
+  {k:'2026-11-13ferias-proxima2',data:'2026-11-13',t:'Férias: só a próxima parcela, programação apagada de verdade, observações no relatório e aviso de login vencido',itens:[
+    {x:'RH › Férias: ao marcar vários colaboradores e clicar em “Solicitação para a contabilidade”, se alguém tiver férias divididas o portal pergunta: “Só a próxima parcela” ou “Todas as parcelas”. Com “Só a próxima”, quem tem férias divididas sai só com a parcela mais próxima; se a 1ª já foi solicitada, vem a 2ª.',mods:['rh']},
     {x:'Se a programação foi lançada por engano, tire os dias vendidos e as datas e salve: a programação é apagada e o período volta a mostrar “lançar férias”, sem o aviso “Faltam N dias sem data”.',mods:['rh']},
     {x:'Relatório de férias (Excel, PDF e Imprimir): a coluna Observações traz a observação do período, a da programação, a nota do escritório e as pendências, com mais espaço no PDF.',mods:['rh']},
     {x:'Login vencido: se a sessão expirar (por exemplo, computador parado muito tempo), o portal volta para a tela de entrar com o aviso “Sua sessão expirou”, em vez de mostrar as telas vazias. Depois de entrar, os dados aparecem normalmente.'}]},
