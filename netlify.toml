@@ -1,0 +1,11 @@
+# Publicação do portal no Netlify (13/11/2026)
+# O site é a própria pasta do repositório (sem montagem). O comando só grava versao.txt com o código
+# do commit publicado; o portal confere esse arquivo para mostrar o aviso "Saiu uma versão nova do sistema".
+[build]
+  publish = "."
+  command = "echo \"${COMMIT_REF:-$(date +%s)}\" > versao.txt"
+
+[[headers]]
+  for = "/versao.txt"
+  [headers.values]
+    Cache-Control = "no-cache, no-store"

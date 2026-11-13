@@ -14475,13 +14475,22 @@ boot();
   // "impressão digital" do arquivo no servidor: ETag (ou data de alteração), sem o final que muda com a compressão
   const marca=r=>{const e=r.headers.get('etag');if(e)return e.replace(/^W\//,'').replace(/"/g,'').split('-')[0];return r.headers.get('last-modified')||''};
   let base=null,ult=0,adiadoAte=0,aviso=false;
+  // 1º: versao.txt, que o Netlify grava sozinho a cada publicação (código do commit, ver netlify.toml);
+  // se não existir, usa a ETag/data do index.html
+  const pasta=()=>location.origin+location.pathname.replace(/[^/]*$/,'');
+  async function marcaAtual(){
+    try{const r=await fetch(pasta()+'versao.txt?t='+Date.now(),{cache:'no-store'});
+      if(r.ok&&!/html/i.test(r.headers.get('content-type')||'')){const t=(await r.text()).trim();if(t&&t.length<200)return 'v:'+t}}catch(e){}
+    const r=await fetch(url(),{method:'HEAD',cache:'no-store'});if(!r.ok)return '';
+    const m=marca(r);return m?'e:'+m:'';
+  }
   async function confere(forca){
     if(!/^https?:/.test(location.protocol)||aviso)return;
-    const ag=Date.now();if(!forca&&ag-ult<60e3)return;ult=ag;
+    const ag=Date.now();if(!forca&&ag-ult<20e3)return;ult=ag;
     try{
-      const r=await fetch(url(),{method:'HEAD',cache:'no-store'});if(!r.ok)return;
-      const m=marca(r);if(!m)return;
-      if(base===null){base=m;return}
+      const m=await marcaAtual();if(!m)return;
+      if(base===null){base=m;window.__versaoPortal=m;return}
+      if(m.slice(0,2)!==base.slice(0,2)){base=m;return}   // mudou o jeito de conferir: só troca a referência
       if(m!==base)mostra();
     }catch(e){}
   }
@@ -14501,7 +14510,7 @@ boot();
   // "Depois": esconde por 30 minutos e então avisa de novo
   document.getElementById('nvvDepois').onclick=()=>{esconde();adiadoAte=Date.now()+30*60e3;setTimeout(()=>confere(true),30*60e3+1e3)};
   confere(true);
-  setInterval(confere,5*60e3);                                                        // a cada 5 minutos
+  setInterval(confere,2*60e3);                                                        // a cada 2 minutos
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')confere()}); // ao voltar para a aba
   window.addEventListener('focus',()=>confere());
   window.addEventListener('online',()=>confere(true));
