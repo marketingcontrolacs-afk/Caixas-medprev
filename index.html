@@ -1042,6 +1042,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <button type="button" role="tab" data-tab="ctlcli">Clientes</button>
       <button type="button" role="tab" data-tab="ctlcont">Contratos e reajustes</button>
       <button type="button" role="tab" data-tab="ctlfin">Financeiro</button>
+      <button type="button" role="tab" data-tab="ctlnfse">Notas fiscais</button>
       <button type="button" role="tab" data-tab="ctlserv">Serviços</button>
       <button type="button" role="tab" data-tab="ctldocs">Documentos</button>
     </div>
@@ -1626,7 +1627,7 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
-const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin'];
+const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
 const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 // permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
@@ -1769,6 +1770,8 @@ const NAV=[
   {k:'ctlcont',t:'Contratos e reajustes',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
   // financeiro só da Controlacs: mensalidades dos contratos, outras receitas e despesas (Carol, 05/11)
   {k:'ctlfin',t:'Financeiro da Controlacs',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
+  // NFS-e pelo emissor nacional, direto na API do governo (Carol, 14/11; v131)
+  {k:'ctlnfse',t:'Notas fiscais (NFS-e)',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
   {k:'ctlcli',t:'Clientes',g:'Controlacs',s:'Cadastros',ok:ehAdm},
   {k:'ctlserv',t:'Serviços',g:'Controlacs',s:'Cadastros',ok:ehAdm},
   {k:'ctldocs',t:'Documentos e contratos assinados',g:'Controlacs',s:'Cadastros',ok:ehAdm},
@@ -11998,7 +12001,7 @@ async function agCarrega(){
 // Os prints usam empresas e pessoas fictícias. Feito por partes: as telas que ainda não têm explicação ficam listadas no fim.
 // ---------- Gestão da Controlacs (v104): clientes, serviços, contratos, reajustes e documentos da própria Controlacs ----------
 // só a Master vê e grava (RLS eh_admin nas tabelas ctl_* e no bucket "controlacs"). Carol, 05/11: "uma coisa à parte que só eu tivesse acesso"
-const CTL={cli:[],serv:[],cont:[],reaj:[],docs:[],lanc:[],ass:[],assOk:false,assVer:0,dlg:null};
+const CTL={cli:[],serv:[],cont:[],reaj:[],docs:[],lanc:[],ass:[],assOk:false,assVer:0,dlg:null,ns:[],nsEmit:[],nsOk:false};
 const CTSIT={
   ctlcli:{prospecto:['c-none','Prospecto'],ativo:['c-ok','Ativo'],suspenso:['c-warn','Suspenso'],encerrado:['c-none','Encerrado']},
   ctlcont:{proposta:['c-none','Proposta'],vigente:['c-ok','Vigente'],suspenso:['c-warn','Suspenso'],encerrado:['c-none','Encerrado']}};
@@ -12026,6 +12029,9 @@ async function ctCarrega(){
   [CTL.cli,CTL.serv,CTL.cont,CTL.reaj,CTL.docs,CTL.lanc]=r.map(x=>x.data||[]);
   // assinaturas pela Autentique (v105); sem a v105 o resto do módulo continua funcionando
   const a=await sb.from('ctl_assinaturas').select('*').order('criado_em',{ascending:false});CTL.assOk=!a.error;CTL.ass=a.data||[];
+  // NFS-e (v131); sem a v131 o resto continua funcionando
+  const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em').order('criado_em',{ascending:false})]);
+  CTL.nsOk=!ne.error&&!nn.error;CTL.nsEmit=ne.data||[];CTL.ns=nn.data||[];
 }
 // número vermelho no menu: reajustes atrasados ou próximos, contratos terminando e documentos vencendo
 async function ctlBadge(){
@@ -12037,15 +12043,15 @@ function ctBadgeCalc(){
   const n=CTL.cont.filter(c=>ctReaj(c)==='atrasado'||ctReaj(c)==='proximo'||ctFim(c)).length+CTL.docs.filter(ctDocVence).length+CTL.lanc.filter(l=>l.tipo==='receita'&&ctLSit(l)==='atrasado').length;
   if((NAVBADGE.ctlpainel||0)!==n){NAVBADGE.ctlpainel=n;renderNav()}
 }
-const CTSITBOX={ctlfin:{aberto:'Em aberto',atrasado:'Atrasados (todos os meses)',pago:'Pagos e recebidos'},ctlcli:CTSIT.ctlcli,ctlcont:CTSIT.ctlcont,ctlserv:{ativo:'Ativos',inativo:'Inativos'},ctldocs:CTDOC};
+const CTSITBOX={ctlnfse:{emitida:'Emitidas',cancelada:'Canceladas',rejeitada:'Recusadas (não viraram nota)'},ctlfin:{aberto:'Em aberto',atrasado:'Atrasados (todos os meses)',pago:'Pagos e recebidos'},ctlcli:CTSIT.ctlcli,ctlcont:CTSIT.ctlcont,ctlserv:{ativo:'Ativos',inativo:'Inativos'},ctldocs:CTDOC};
 async function renderCtl(){
   document.querySelectorAll('#tabsCtl button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===VIEW));
   const box=CTSITBOX[VIEW];$('ctBar').hidden=VIEW==='ctlpainel';$('ctSitBox').firstChild.textContent=VIEW==='ctldocs'?'Tipo':'Situação';
   if(box&&$('ctSit').dataset.t!==VIEW){$('ctSit').innerHTML=`<option value="">${VIEW==='ctldocs'?'Todos':'Todas'}</option>`+ctOpts(box,'');$('ctSit').dataset.t=VIEW;
     if(VIEW==='ctlcli')$('ctSit').value='ativo';if(VIEW==='ctlcont')$('ctSit').value='vigente';if(VIEW==='ctlserv')$('ctSit').value='ativo'}
-  $('ctMesBox').hidden=$('ctTipoBox').hidden=VIEW!=='ctlfin';if(!$('ctMes').value)$('ctMes').value=TODAY.slice(0,7);
-  $('ctBusca').placeholder={ctlfin:'Buscar descrição, cliente ou categoria',ctlcli:'Buscar por nome, CNPJ/CPF ou contato',ctlcont:'Buscar por contrato ou cliente',ctlserv:'Buscar serviço',ctldocs:'Buscar documento ou cliente'}[VIEW]||'Buscar';
-  $('ctAcoes').innerHTML={ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
+  $('ctMesBox').hidden=VIEW!=='ctlfin'&&VIEW!=='ctlnfse';$('ctTipoBox').hidden=VIEW!=='ctlfin';if(!$('ctMes').value)$('ctMes').value=TODAY.slice(0,7);
+  $('ctBusca').placeholder={ctlnfse:'Buscar por número, tomador, CNPJ, descrição, valor ou data',ctlfin:'Buscar descrição, cliente ou categoria',ctlcli:'Buscar por nome, CNPJ/CPF ou contato',ctlcont:'Buscar por contrato ou cliente',ctlserv:'Buscar serviço',ctldocs:'Buscar documento ou cliente'}[VIEW]||'Buscar';
+  $('ctAcoes').innerHTML={ctlnfse:'<button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
   $('ctConteudo').innerHTML='<p class="note">Carregando…</p>';
   try{await ctCarrega()}catch(e){console.error(e);$('ctConteudo').innerHTML=`<div class="alerta bad"><b>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Esta área precisa da atualização v104 do banco.':'Erro ao carregar.'}</b><span>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Rode o SQL “v104 - Gestao da Controlacs” no Supabase e atualize a página.':'Verifique a internet e tente de novo.'}</span></div>`;return}
   ctDesenha();ctBadgeCalc();
@@ -12082,6 +12088,7 @@ function ctDesenha(){
         docs.map(d=>`<tr data-ctdoc="${d.id}"><td class="l"><b>${esc(d.nome)}</b></td><td class="l">${esc(ctCli(d.cliente_id)?.nome||'')}</td><td>${esc(CTDOC[d.tipo]||d.tipo)}</td><td><span class="chip ${ctDias(d.validade)<0?'c-bad':'c-warn'}">${dBR(d.validade)}</span></td></tr>`).join(''),
         'Nenhum documento vencendo.')}`;
     $('ctNote').textContent='O aviso do reajuste aparece a partir do número de dias escolhido em cada contrato (padrão 30). O número vermelho no menu soma reajustes, contratos terminando e documentos vencendo.';
+  }else if(VIEW==='ctlnfse'){nsDesenha(b,sit,tem);
   }else if(VIEW==='ctlfin'){
     const mes=$('ctMes').value||TODAY.slice(0,7),tp=$('ctTipo').value,cn=l=>ctCli(l.cliente_id)?.nome||'';
     const doMes=CTL.lanc.filter(l=>l.vencimento.startsWith(mes));
@@ -12101,7 +12108,7 @@ function ctDesenha(){
         l.sort((x,y)=>x.vencimento>y.vencimento?1:x.vencimento<y.vencimento?-1:x.tipo.localeCompare(y.tipo))
         .map(x=>{const st=ctLSit(x);return `<tr data-ctlanc="${x.id}"><td>${dBR(x.vencimento)}</td><td class="l"><span class="chip ${x.tipo==='receita'?'c-ok':'c-none'}">${x.tipo==='receita'?'Receita':'Despesa'}</span> <b>${esc(x.descricao)}</b></td><td class="l">${esc(cn(x))}</td><td class="l">${esc(x.categoria||'')}</td><td class="${x.tipo==='despesa'?'neg':''}">${x.tipo==='despesa'?'−':''}${fm(x.pago_em?x.valor_pago??x.valor:x.valor)}</td>
           <td>${st==='pago'?`<span class="chip c-done">${x.tipo==='receita'?'Recebido':'Pago'} ${dBR(x.pago_em)}</span>`:st==='atrasado'?'<span class="chip c-bad">Atrasado</span>':'<span class="chip c-warn">Em aberto</span>'}</td>
-          <td>${st==='pago'?'':`<button type="button" class="btn small" data-ctbx="${x.id}">${x.tipo==='receita'?'Recebido':'Pago'} hoje</button>`}</td></tr>`}).join(''),
+          <td>${x.tipo==='receita'?nsLancBtn(x):''}${st==='pago'?'':`<button type="button" class="btn small" data-ctbx="${x.id}">${x.tipo==='receita'?'Recebido':'Pago'} hoje</button>`}</td></tr>`}).join(''),
         doMes.length||sit==='atrasado'?'Nenhum lançamento com estes filtros.':'Nenhum lançamento neste mês.')}`;
     $('ctNote').textContent='Clique no lançamento para corrigir, informar outra data ou valor de pagamento, ou estornar a baixa. Estas contas são só da Controlacs e não aparecem na Gestão financeira das empresas.';
   }else if(VIEW==='ctlcli'){
@@ -12134,6 +12141,7 @@ function ctDesenha(){
 $('ctBusca').oninput=ctDesenha;$('ctSit').onchange=ctDesenha;$('ctMes').onchange=ctDesenha;$('ctTipo').onchange=ctDesenha;
 $('tabsCtl').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&b.dataset.tab!==VIEW)go(b.dataset.tab)});
 $('ctAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-ctnovo]');if(!b)return;const t=b.dataset.ctnovo;
+  if(t==='nfcfg')return nsAbreCfg();if(t==='nfemit')return nsAbreEmit();
   if(t==='gerar')return ctGera(b);if(t==='receita'||t==='despesa')return ctAbreLanc(null,t);
   if(t==='cli')ctAbreCli(null);else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
 async function ctBaixa(id){const d=CTL.docs.find(x=>x.id===id);if(!d?.caminho)return;
@@ -12142,6 +12150,9 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#viewCtl,#dlgCtl'))return;
   const bx=e.target.closest('[data-ctbaixa]');if(bx){e.preventDefault();e.stopPropagation();return ctBaixa(bx.dataset.ctbaixa)}
   if(e.target.closest('[data-ctassat]')){e.stopPropagation();return ctAssAtualiza(e.target.closest('[data-ctassat]'))}
+  const nse=e.target.closest('[data-nsemit]');if(nse){e.stopPropagation();return nsAbreEmit(CTL.lanc.find(x=>x.id===nse.dataset.nsemit))}
+  const nsv=e.target.closest('[data-nsver]');if(nsv&&!e.target.closest('button:not([data-nsver]),input,select')){e.preventDefault();e.stopPropagation();return nsAbreNota(CTL.ns.find(x=>x.id===nsv.dataset.nsver))}
+  const nsc=e.target.closest('[data-nscanc]');if(nsc){e.stopPropagation();return nsAbreCanc(CTL.ns.find(x=>x.id===nsc.dataset.nscanc))}
   const bxl=e.target.closest('[data-ctbx]');if(bxl){e.stopPropagation();return ctBaixaHoje(bxl)}
   const rj=e.target.closest('[data-ctreaj]');if(rj){e.stopPropagation();return ctAbreCont(CTL.cont.find(c=>c.id===rj.dataset.ctreaj),true)}
   if(e.target.closest('#ctdFoot'))return;
@@ -12283,6 +12294,242 @@ function ctAbreLanc(x,tipo){
     (x?ctBtn('excluir','Excluir','ghost'):'')+(x?.pago_em?ctBtn('estornar','Estornar a baixa','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
   if(!x)$('ct_nome').focus();
 }
+// ---- NFS-e pelo emissor nacional (Carol, 14/11; v131). Emite, cancela e consulta pela função "nfse" do Supabase:
+// o certificado A1 fica no cofre do Supabase e nunca passa pelo navegador. Vale para qualquer empresa com cadastro fiscal.
+const NSSIT={enviando:['c-warn','Enviando'],emitida:['c-ok','Emitida'],rejeitada:['c-bad','Recusada'],cancelada:['c-none','Cancelada'],descartada:['c-none','Descartada']};
+const NSAMB={1:'Produção (vale de verdade)',2:'Teste (produção restrita)'};
+const NSSN={1:'Não optante do Simples',2:'MEI',3:'Simples Nacional (ME/EPP)'};
+const NSCANC={1:'Erro na emissão',2:'Serviço não prestado',9:'Outros'};
+const nsSo=v=>String(v??'').replace(/\D/g,'');
+const nsDoc=v=>{const d=nsSo(v);return d.length===14?d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):d.length===11?d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/,'$1.$2.$3-$4'):String(v||'')};
+const nsTrib=c=>{const d=nsSo(c);return d.length===6?d.slice(0,2)+'.'+d.slice(2,4)+'.'+d.slice(4):d};
+const nsChip=n=>{const x=NSSIT[n.situacao]||['c-none',n.situacao];return `<span class="chip ${x[0]}">${x[1]}</span>`};
+const nsAmbChip=a=>Number(a)===2?'<span class="chip c-warn" title="Nota de teste: não vale como nota fiscal">Teste</span>':'';
+const nsEmitDe=id=>CTL.nsEmit.find(e=>e.id===id);
+const nsData=n=>(n.emitida_em||n.criado_em||'').slice(0,10);
+async function nsFn(body){
+  const {data,error}=await sb.functions.invoke('nfse',{body});
+  if(error){let j=null;try{j=await error.context.json()}catch(e){}const er=new Error(j?.erro||error.message||'Falha na comunicação');er.lista=j?.erros||[];er.notaId=j?.nota_id;er.falta=j?.falta;throw er}
+  return data;
+}
+const nsErrLista=e=>esc(e.message)+(e.lista?.length?'<br>'+e.lista.map(x=>`• ${x.codigo?'['+esc(x.codigo)+'] ':''}${esc(x.descricao)}`).join('<br>'):'');
+// botão "Emitir NF" na receita do Financeiro, ou o número da nota já emitida
+function nsLancBtn(x){
+  if(!CTL.nsOk||!CTL.nsEmit.length)return '';
+  const n=CTL.ns.find(n=>n.ctl_lancamento_id===x.id&&n.situacao==='emitida');
+  if(n)return `<a href="#" class="chip c-ok" data-nsver="${n.id}" title="Ver a nota fiscal" style="margin-right:6px">NF ${esc(n.numero_nfse||'')}${Number(n.ambiente)===2?' (teste)':''}</a>`;
+  return `<button type="button" class="btn small" data-nsemit="${x.id}" style="margin-right:6px">Emitir NF</button>`;
+}
+function nsDesenha(b,sit,tem){
+  const tab=(head,rows,vazio)=>`<div class="card tablebox"><table><thead><tr>${head}</tr></thead><tbody>${rows||`<tr><td class="l muted" colspan="10">${vazio}</td></tr>`}</tbody></table></div>`;
+  if(!CTL.nsOk){$('ctConteudo').innerHTML='<div class="alerta bad"><b>Esta área precisa da atualização v131 do banco.</b><span>Rode o SQL “v131 - Notas fiscais NFS-e nacional” no Supabase e atualize a página.</span></div>';$('ctNote').textContent='';return}
+  const mes=$('ctMes').value||TODAY.slice(0,7),[a,m]=mes.split('-');
+  const doMes=CTL.ns.filter(n=>nsData(n).startsWith(mes));
+  const l=doMes.filter(n=>(sit?n.situacao===sit:n.situacao!=='descartada')&&tem(n.numero_nfse,n.tomador_nome,n.tomador_doc,nsDoc(n.tomador_doc),n.descricao,n.chave,nsTrib(n.ctribnac),fm(n.valor),String(n.valor).replace('.',','),dBR(nsData(n)),dBR(n.competencia),NSSIT[n.situacao]?.[1],Number(n.ambiente)===2?'teste':'produção',nsEmitDe(n.emitente_id)?.nome));
+  const em=doMes.filter(n=>n.situacao==='emitida'),rej=CTL.ns.filter(n=>n.situacao==='rejeitada');
+  const teste=CTL.nsEmit.filter(e=>Number(e.ambiente)===2);
+  $('ctConteudo').innerHTML=`${teste.length?`<div class="alerta"><b>Modo TESTE ligado para ${teste.map(e=>esc(e.nome)).join(', ')}.</b><span>As notas vão para a produção restrita do emissor nacional e não valem como nota fiscal. Quando o teste der certo, troque para Produção em “Dados fiscais”.</span></div>`:''}
+    <div class="tiles">
+      <div class="card tile"><div class="k">Notas emitidas em ${MESES[m-1]}/${a}</div><div class="v">${em.length}</div><div class="n">${em.filter(n=>Number(n.ambiente)===2).length} de teste</div></div>
+      <div class="card tile"><div class="k">Valor das notas do mês</div><div class="v">${fm(em.filter(n=>Number(n.ambiente)===1).reduce((s,n)=>s+(Number(n.valor)||0),0))}</div><div class="n">só as de produção</div></div>
+      <div class="card tile"><div class="k">Canceladas no mês</div><div class="v">${doMes.filter(n=>n.situacao==='cancelada').length}</div><div class="n">${fm(doMes.filter(n=>n.situacao==='cancelada').reduce((s,n)=>s+(Number(n.valor)||0),0))}</div></div>
+      <div class="card tile"><div class="k">Recusadas para conferir</div><div class="v ${rej.length?'neg':''}">${rej.length}</div><div class="n">todos os meses</div></div></div>
+    ${!CTL.nsEmit.length?'<div class="alerta"><b>Comece pelos “Dados fiscais”.</b><span>Cadastre a empresa que emite (CNPJ, cidade, regime e o serviço padrão).</span></div>':''}
+    ${tab('<th>Emissão</th><th>Nº NFS-e</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th>Situação</th><th></th>',
+      l.map(n=>`<tr data-nsver="${n.id}"><td>${dBR(nsData(n))}</td><td><b>${esc(n.numero_nfse||'—')}</b>${n.ambiente==2?' '+nsAmbChip(2):''}</td><td>${dBR(n.competencia)}</td><td class="l">${esc(n.tomador_nome||'')}</td><td class="l">${esc(nsDoc(n.tomador_doc))}</td><td class="l">${esc((n.descricao||'').slice(0,90))}</td><td>${fm(n.valor)}</td><td>${nsChip(n)}</td>
+        <td>${n.situacao==='emitida'?`<button type="button" class="btn small ghost" data-nscanc="${n.id}">Cancelar</button>`:''}</td></tr>`).join(''),
+      doMes.length?'Nenhuma nota com estes filtros.':'Nenhuma nota emitida neste mês.')}`;
+  $('ctNote').textContent='Clique na nota para ver, imprimir, baixar o XML ou cancelar. A busca acha por qualquer coluna (número, tomador, CNPJ, descrição, valor ou data). As notas emitidas no site nacional não aparecem aqui.';
+}
+// ---- emitir ----
+function nsAbreEmit(lanc,base){
+  if(!CTL.nsOk)return toast('Rode a atualização v131 do banco antes.');
+  if(!CTL.nsEmit.length)return nsAbreCfg();
+  const cli=ctCli(lanc?.cliente_id||base?.tomador?.cliente_id),tm=base?.tomador||cli?.extra?.nfse||{};
+  const e=nsEmitDe(base?.emitente_id)||CTL.nsEmit[0],sv=e.servico||{},end=tm.end||{};
+  const comp=base?.competencia||lanc?.competencia||(lanc?.vencimento||TODAY).slice(0,10);
+  ctMostra('nsemit',{lanc,base},'Emitir NFS-e',Number(e.ambiente)===2?'<span class="chip c-warn">Modo teste</span>':'<span class="chip c-ok">Produção</span>',
+    `${Number(e.ambiente)===2?'<div class="alerta" style="margin:0 0 10px"><b>Nota de TESTE.</b><span>Vai para a produção restrita do emissor nacional e não vale como nota fiscal.</span></div>':''}
+    <div class="fields">
+    <label class="f wide">Empresa que emite<select id="ns_emit">${CTL.nsEmit.filter(x=>x.ativo!==false).map(x=>`<option value="${x.id}"${x.id===e.id?' selected':''}>${esc(x.nome)} · ${esc(nsDoc(x.cnpj))} · ${esc(x.municipio||'')}</option>`).join('')}</select></label>
+    <label class="f wide">Cliente (preenche o tomador)<select id="ns_cli"><option value="">Digitar os dados abaixo</option>${CTL.cli.map(c=>`<option value="${c.id}"${c.id===(cli?.id||base?.tomador?.cliente_id)?' selected':''}>${esc(c.nome)}${c.cnpj_cpf?' · '+esc(c.cnpj_cpf):''}</option>`).join('')}</select></label>
+    <label class="f">CNPJ ou CPF do tomador *<input id="ns_doc" inputmode="numeric" value="${esc(nsDoc(tm.doc||cli?.cnpj_cpf||''))}"></label>
+    <label class="f">Nome ou razão social *<input id="ns_nome" maxlength="300" value="${esc(tm.nome||cli?.razao_social||cli?.nome||'')}"></label>
+    <label class="f">E-mail do tomador<input id="ns_email" type="email" value="${esc(tm.email||cli?.email||'')}"></label>
+    <label class="f">Inscrição municipal do tomador<input id="ns_im" value="${esc(tm.im||'')}"></label>
+    <details class="f wide"${end.cep?' open':''}><summary>Endereço do tomador (opcional)</summary><div class="fields" style="margin-top:8px">
+      <label class="f">CEP<input id="ns_cep" inputmode="numeric" value="${esc(end.cep||'')}"></label>
+      <label class="f">Código IBGE da cidade<input id="ns_cmun" inputmode="numeric" placeholder="Ex.: 4205407 (Florianópolis)" value="${esc(end.cMun||'')}"></label>
+      <label class="f wide">Rua<input id="ns_lgr" value="${esc(end.xLgr||'')}"></label>
+      <label class="f">Número<input id="ns_nro" value="${esc(end.nro||'')}"></label>
+      <label class="f">Complemento<input id="ns_cpl" value="${esc(end.xCpl||'')}"></label>
+      <label class="f">Bairro<input id="ns_bairro" value="${esc(end.xBairro||'')}"></label></div></details>
+    <label class="f">Serviço (código nacional)<input id="ns_trib" value="${esc(nsTrib(base?.ctribnac||sv.cTribNac))}" title="Código de tributação nacional, ex.: 17.01.01"></label>
+    <label class="f">Competência *<input type="date" id="ns_comp" value="${esc(comp)}"></label>
+    <label class="f">Valor do serviço *<input class="money" inputmode="decimal" id="ns_valor" value="${showMoney(base?.valor??lanc?.valor)}"></label>
+    <label class="f wide">Descrição do serviço *<textarea id="ns_desc" rows="3" maxlength="2000">${esc(base?.descricao||lanc?.descricao||sv.xDescServ||'')}</textarea></label>
+    <label class="f wide">Informações complementares (opcional)<textarea id="ns_info" rows="2" maxlength="2000"></textarea></label></div>
+    <p class="note" style="margin:0">${esc(NSSN[e.op_simp_nac]||'')}: o ISS e os tributos federais são pagos no DAS, então a nota sai sem destaque de imposto, como a nº 13 emitida no site nacional.${lanc?` Fica ligada à receita “${esc(lanc.descricao)}”.`:''}</p>`,
+    ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nsemite',Number(e.ambiente)===2?'Emitir nota de teste':'Emitir NFS-e','primary'));
+  $('ns_cli').onchange=()=>{const c=ctCli($('ns_cli').value);if(!c)return;const f=c.extra?.nfse||{};
+    $('ns_doc').value=nsDoc(f.doc||c.cnpj_cpf||'');$('ns_nome').value=f.nome||c.razao_social||c.nome||'';$('ns_email').value=f.email||c.email||'';$('ns_im').value=f.im||'';
+    const d=f.end||{};$('ns_cep').value=d.cep||'';$('ns_cmun').value=d.cMun||'';$('ns_lgr').value=d.xLgr||'';$('ns_nro').value=d.nro||'';$('ns_cpl').value=d.xCpl||'';$('ns_bairro').value=d.xBairro||''};
+  $('ns_emit').onchange=()=>nsAbreEmit(lanc,{...(base||{}),emitente_id:$('ns_emit').value});
+  if(!$('ns_doc').value)$('ns_doc').focus();
+}
+async function nsEmite(bt){
+  const {lanc,base}=CTL.dlg.obj||{},doc=nsSo(ctV('ns_doc')),valor=parseMoney($('ns_valor').value),e=nsEmitDe($('ns_emit').value);
+  if(doc.length!==14&&doc.length!==11)return ctErr('Confira o CNPJ (14 números) ou CPF (11 números) do tomador.');
+  if(!ctV('ns_nome'))return ctErr('Informe o nome ou a razão social do tomador.');
+  if(!(valor>0))return ctErr('Informe o valor do serviço.');
+  if(!ctV('ns_comp'))return ctErr('Informe a competência.');
+  if(!ctV('ns_desc'))return ctErr('Descreva o serviço.');
+  const trib=nsSo(ctV('ns_trib'));if(trib.length!==6)return ctErr('O código do serviço tem 6 números (ex.: 17.01.01).');
+  const end={cep:nsSo(ctV('ns_cep')),cMun:nsSo(ctV('ns_cmun')),xLgr:ctV('ns_lgr'),nro:ctV('ns_nro'),xCpl:ctV('ns_cpl'),xBairro:ctV('ns_bairro')};
+  if((end.cep||end.cMun||end.xLgr)&&!(end.cep.length===8&&end.cMun.length===7&&end.xLgr))return ctErr('Endereço do tomador: preencha CEP (8 números), código IBGE da cidade (7 números) e rua, ou deixe tudo em branco.');
+  const tomador={doc,nome:ctV('ns_nome'),email:ctV('ns_email'),im:ctV('ns_im'),cliente_id:$('ns_cli').value||null,...(end.cep?{end}:{})};
+  const teste=Number(e.ambiente)===2;
+  if(!confirm(`${teste?'Emitir nota de TESTE (não vale)':'Emitir NFS-e'} de ${fm(valor)} para ${tomador.nome}?${teste?'':' Depois de emitida, só dá para corrigir cancelando e emitindo outra.'}`))return;
+  bt.disabled=true;bt.textContent='Emitindo…';
+  try{
+    const r=await nsFn({acao:'emitir',emitente_id:e.id,tomador,valor,competencia:ctV('ns_comp'),descricao:ctV('ns_desc'),info_compl:ctV('ns_info')||undefined,servico:{cTribNac:trib},ctl_lancamento_id:lanc?.id||base?.ctl_lancamento_id||null});
+    // guarda os dados fiscais do tomador no cliente, para a próxima nota (só acrescenta em "extra")
+    const c=ctCli(tomador.cliente_id);if(c){const extra={...(c.extra||{}),nfse:{doc,nome:tomador.nome,email:tomador.email,im:tomador.im,...(end.cep?{end}:{})}};await sb.from('ctl_clientes').update({extra}).eq('id',c.id);c.extra=extra}
+    toast(`NFS-e ${r.numero_nfse?'nº '+r.numero_nfse+' ':''}emitida${teste?' (teste)':''}`);
+    await ctCarrega().catch(()=>{});ctDesenha();nsAbreNota(CTL.ns.find(n=>n.id===r.nota_id));
+  }catch(er){
+    bt.disabled=false;bt.textContent=teste?'Emitir nota de teste':'Emitir NFS-e';
+    $('ctdErr').innerHTML=nsErrLista(er);$('ctdErr').hidden=false;
+    if(er.falta)$('ctdErr').insertAdjacentHTML('beforeend','<br>'+NSFALTA);
+    await ctCarrega().catch(()=>{});if(VIEW==='ctlnfse')ctDesenha();
+  }
+}
+const NSFALTA=`<span>Para a senha do certificado: no Supabase, abra <a href="https://supabase.com/dashboard/project/qlopcclhswtbgrupfhyy/functions/secrets" target="_blank" rel="noopener">Edge Functions › Secrets</a>, clique em <b>Add new secret</b>, em Name escreva <b>NFSE_SENHA_</b> seguido do CNPJ só com números, em Value a senha, e salve.</span>`;
+// ---- ver a nota ----
+function nsAbreNota(n){
+  if(!n)return;const e=nsEmitDe(n.emitente_id),tm=n.tomador||{};
+  const lin=(k,v)=>v?`<div><span class="muted" style="font-size:12px">${k}</span><br>${v}</div>`:'';
+  ctMostra('nsver',n,n.numero_nfse?`NFS-e nº ${n.numero_nfse}`:'Tentativa de emissão',nsChip(n)+' '+nsAmbChip(n.ambiente),
+    `<div class="fields" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+      ${lin('Emitente',esc(e?.nome||''))}${lin('Emitida em',n.emitida_em?dtBR(n.emitida_em):'')}${lin('Competência',dBR(n.competencia))}${lin('Valor',fm(n.valor))}
+      ${lin('Tomador',esc(n.tomador_nome||''))}${lin('CNPJ/CPF',esc(nsDoc(n.tomador_doc)))}${lin('Serviço',esc(nsTrib(n.ctribnac)))}${lin('DPS',esc(n.serie+' / '+n.ndps))}
+      ${lin('Ambiente',esc(NSAMB[n.ambiente]||''))}${lin('Chave de acesso',n.chave?`<code style="font-size:11px;word-break:break-all">${esc(n.chave)}</code>`:'')}</div>
+    ${lin('Descrição',esc(n.descricao||''))}
+    ${n.situacao==='rejeitada'||n.situacao==='descartada'?`<div class="alerta bad" style="margin-top:10px"><b>O emissor nacional recusou.</b><span>${(n.erros||[]).map(x=>`${x.codigo?'['+esc(x.codigo)+'] ':''}${esc(x.descricao)}`).join('<br>')||'Sem detalhe.'}</span></div>`:''}
+    ${n.situacao==='cancelada'?`<div class="alerta" style="margin-top:10px"><b>Cancelada em ${dtBR(n.cancelada_em)}.</b><span>Motivo: ${esc(NSCANC[String(n.cancel_motivo||'').slice(0,1)]||'')} — ${esc(String(n.cancel_motivo||'').replace(/^\d+ - /,''))}</span></div>`:''}
+    ${n.alertas?.length?`<p class="note">Avisos do emissor: ${n.alertas.map(a=>esc(a.Descricao||a.descricao||JSON.stringify(a))).join('; ')}</p>`:''}`,
+    (n.situacao==='emitida'?ctBtn('nscancabre','Cancelar NFS-e','ghost'):'')+
+    (n.situacao==='rejeitada'?ctBtn('nsdescarta','Descartar','ghost')+ctBtn('nsdenovo','Corrigir e tentar de novo'):'')+
+    (n.situacao==='descartada'?ctBtn('nsvolta','Desfazer o descarte','ghost'):'')+
+    '<span class="spacer"></span>'+
+    (n.chave?ctBtn('nsxml','Baixar XML','ghost')+ctBtn('nsimprime','Imprimir'):'')+ctBtn('fechar','Fechar','ghost'));
+}
+function nsAbreCanc(n){
+  if(!n)return;
+  ctMostra('nscanc',n,`Cancelar NFS-e nº ${n.numero_nfse||''}`,nsAmbChip(n.ambiente),
+    `<div class="alerta bad" style="margin:0 0 10px"><b>O cancelamento vai para o emissor nacional e não tem volta.</b><span>Se a nota saiu com algum dado errado, cancele e emita outra. ${esc(n.tomador_nome||'')} · ${fm(n.valor)} · competência ${dBR(n.competencia)}.</span></div>
+    <div class="fields"><label class="f wide">Motivo *<select id="ns_mot"><option value="">Escolha</option>${ctOpts(NSCANC,'')}</select></label>
+    <label class="f wide">Explique (mínimo 15 letras) *<textarea id="ns_mtxt" rows="3" maxlength="255" placeholder="Ex.: Valor do serviço informado errado; será emitida nova nota."></textarea></label></div>`,
+    ctBtn('nsvoltanota','Voltar','ghost')+'<span class="spacer"></span>'+ctBtn('nscancela','Cancelar a NFS-e','primary'));
+}
+// impressão simples (o download do DANFSe pela API do governo foi desligado em 2026; a consulta oficial fica no site nacional)
+async function nsImprime(n){
+  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();const x=data?.xml_nfse||'',tg=t=>(x.match(new RegExp(`<${t}>([^<]*)</${t}>`))||[])[1]||'';
+  const e=nsEmitDe(n.emitente_id)||{},w=window.open('','_blank');if(!w)return toast('Libere as janelas (pop-up) para imprimir.');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>NFS-e ${esc(n.numero_nfse||'')}</title><style>body{font:13px Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0}table{border-collapse:collapse;width:100%;margin-top:10px}td{border:1px solid #999;padding:6px;vertical-align:top}.k{font-size:10px;color:#555;text-transform:uppercase}.t{background:#eee;font-weight:bold}</style>
+  <h1>Documento auxiliar da NFS-e${Number(n.ambiente)===2?' — TESTE, SEM VALOR FISCAL':''}</h1><p>Município: ${esc(e.municipio||'')} - ${esc(e.uf||'')}${n.situacao==='cancelada'?' · <b>NOTA CANCELADA</b>':''}</p>
+  <table><tr><td colspan="3"><div class="k">Chave de acesso</div>${esc(n.chave||'')}</td></tr>
+  <tr><td><div class="k">Número da NFS-e</div><b>${esc(n.numero_nfse||'')}</b></td><td><div class="k">Competência</div>${dBR(n.competencia)}</td><td><div class="k">Emissão</div>${n.emitida_em?dtBR(n.emitida_em):''}</td></tr>
+  <tr><td colspan="3" class="t">Prestador</td></tr><tr><td><div class="k">CNPJ</div>${esc(nsDoc(e.cnpj))}</td><td colspan="2"><div class="k">Nome</div>${esc(e.razao_social||e.nome||'')}</td></tr>
+  <tr><td colspan="3"><div class="k">Endereço</div>${esc([e.logradouro,e.numero,e.bairro,e.municipio].filter(Boolean).join(', '))} · ${esc(e.email||'')}</td></tr>
+  <tr><td colspan="3" class="t">Tomador</td></tr><tr><td><div class="k">CNPJ/CPF</div>${esc(nsDoc(n.tomador_doc))}</td><td colspan="2"><div class="k">Nome</div>${esc(n.tomador_nome||'')}</td></tr>
+  <tr><td colspan="3" class="t">Serviço</td></tr><tr><td><div class="k">Código nacional</div>${esc(nsTrib(n.ctribnac))}</td><td colspan="2"><div class="k">Descrição</div>${esc(n.descricao||'')}</td></tr>
+  <tr><td colspan="2"><div class="k">Valor do serviço</div><b>${fm(n.valor)}</b></td><td><div class="k">Valor líquido</div><b>${fm(tg('vLiq')||n.valor)}</b></td></tr></table>
+  <p style="font-size:11px;margin-top:14px">Confira a autenticidade em www.nfse.gov.br, Consulta pública, com a chave de acesso acima.</p><script>print()<\/script>`);w.document.close();
+}
+async function nsXml(n){
+  const {data,error}=await sb.from('nfse_notas').select('xml_nfse,cancel_xml').eq('id',n.id).single();if(error||!data?.xml_nfse)return toast('XML não encontrado.');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.xml_nfse],{type:'application/xml'}));a.download=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}.xml`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+// ---- dados fiscais da empresa que emite (uma por empresa; vale para todas) ----
+function nsAbreCfg(id){
+  const e=id==='nova'?null:(nsEmitDe(id)||CTL.nsEmit[0]||null),sv=e?.servico||{},ib=e?.ibscbs||{};
+  ctMostra('nscfg',e,'Dados fiscais da NFS-e',e?nsAmbChip(e.ambiente):'',
+    `<div class="fields">
+    <label class="f wide">Empresa<select id="nc_qual">${CTL.nsEmit.map(x=>`<option value="${x.id}"${x.id===e?.id?' selected':''}>${esc(x.nome)} · ${esc(nsDoc(x.cnpj))}</option>`).join('')}<option value="nova"${!e?' selected':''}>+ Cadastrar outra empresa…</option></select></label>
+    <label class="f">Nome curto *<input id="nc_nome" value="${esc(e?.nome||'')}"></label>
+    <label class="f">CNPJ *<input id="nc_cnpj" value="${esc(nsDoc(e?.cnpj||''))}"${e?' readonly title="Para outro CNPJ, cadastre outra empresa"':''}></label>
+    <label class="f wide">Razão social<input id="nc_razao" value="${esc(e?.razao_social||'')}"></label>
+    <label class="f">Empresa no portal (se for cliente)<select id="nc_cli"><option value="">— (a própria Controlacs)</option>${(typeof CLIENTES!=='undefined'?CLIENTES:[]).map(c=>`<option value="${c.id}"${c.id===e?.cliente_id?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>
+    <label class="f">Inscrição municipal<input id="nc_im" value="${esc(e?.im||'')}" placeholder="Vazio se a prefeitura não exige"></label>
+    <label class="f">Cidade<input id="nc_mun" value="${esc(e?.municipio||'')}"></label>
+    <label class="f">Código IBGE da cidade *<input id="nc_cmun" inputmode="numeric" value="${esc(e?.cod_mun_ibge||'')}" placeholder="Palhoça = 4211900"></label>
+    <label class="f">UF<input id="nc_uf" maxlength="2" value="${esc(e?.uf||'SC')}"></label>
+    <label class="f">CEP<input id="nc_cep" value="${esc(e?.cep||'')}"></label>
+    <label class="f wide">Rua<input id="nc_lgr" value="${esc(e?.logradouro||'')}"></label>
+    <label class="f">Número<input id="nc_nro" value="${esc(e?.numero||'')}"></label>
+    <label class="f">Bairro<input id="nc_bairro" value="${esc(e?.bairro||'')}"></label>
+    <label class="f">Telefone<input id="nc_fone" value="${esc(e?.fone||'')}"></label>
+    <label class="f">E-mail<input id="nc_email" value="${esc(e?.email||'')}"></label>
+    <label class="f">Regime<select id="nc_sn">${ctOpts(NSSN,String(e?.op_simp_nac||3))}</select></label>
+    <label class="f wide"><b>Serviço padrão</b></label>
+    <label class="f">Código nacional do serviço *<input id="nc_trib" value="${esc(nsTrib(sv.cTribNac||''))}" placeholder="17.01.01"></label>
+    <label class="f">Código NBS<input id="nc_nbs" value="${esc(sv.cNBS||'')}" placeholder="114011900"></label>
+    <label class="f wide">Descrição padrão<input id="nc_desc" value="${esc(sv.xDescServ||'')}"></label>
+    <label class="f wide"><b>Reforma tributária (IBS/CBS)</b><span class="muted" style="font-size:12px">Como na nota nº 13: indicador 100301, CST 000, classificação 000001.</span></label>
+    <label class="f">Informar IBS/CBS<select id="nc_ibs"><option value="1"${ib.usar?' selected':''}>Sim</option><option value=""${!ib.usar?' selected':''}>Não</option></select></label>
+    <label class="f">Indicador da operação<input id="nc_ind" value="${esc(ib.cIndOp||'100301')}"></label>
+    <label class="f">CST<input id="nc_cst" value="${esc(ib.CST||'000')}"></label>
+    <label class="f">Classificação tributária<input id="nc_class" value="${esc(ib.cClassTrib||'000001')}"></label>
+    <label class="f wide"><b>Onde emitir</b></label>
+    <label class="f wide">Ambiente<select id="nc_amb">${ctOpts(NSAMB,String(e?.ambiente||2))}</select></label>
+    <label class="f">Série da DPS<input id="nc_serie" value="${esc(e?.serie||'1')}" title="A série 70000 é a do site nacional. O portal usa outra para os números não baterem."></label>
+    <label class="f">Próximo número da DPS<input id="nc_prox" inputmode="numeric" value="${esc(e?.proximo_ndps||1)}"></label></div>
+    <div class="card" style="padding:10px 12px;margin-top:12px;display:grid;gap:6px"><b>Certificado digital A1</b><span class="muted" style="font-size:13px">Fica guardado criptografado no cofre do Supabase, nunca no navegador nem no GitHub. A senha fica em Edge Functions › Secrets com o nome NFSE_SENHA_${esc(nsSo(e?.cnpj)||'CNPJ')}.</span><div id="nc_teste"></div><div>${e?ctBtn('nstesta','Testar certificado e conexão'):''}</div></div>`,
+    ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nssalvacfg','Salvar','primary'));
+  $('nc_qual').onchange=()=>nsAbreCfg($('nc_qual').value);
+}
+async function nsSalvaCfg(bt){
+  const e=CTL.dlg.obj,cnpj=nsSo(ctV('nc_cnpj')),trib=nsSo(ctV('nc_trib')),amb=Number($('nc_amb').value);
+  if(!ctV('nc_nome'))return ctErr('Informe o nome curto.');if(cnpj.length!==14)return ctErr('O CNPJ tem 14 números.');
+  if(nsSo(ctV('nc_cmun')).length!==7)return ctErr('O código IBGE da cidade tem 7 números (Palhoça = 4211900).');
+  if(trib.length!==6)return ctErr('O código do serviço tem 6 números (ex.: 17.01.01).');
+  if(amb===1&&Number(e?.ambiente)!==1&&!confirm('Trocar para PRODUÇÃO? A partir de agora as notas emitidas pelo portal valem de verdade.'))return;
+  const r={nome:ctV('nc_nome'),razao_social:ctNull('nc_razao'),cnpj,cliente_id:$('nc_cli').value||null,im:ctNull('nc_im'),municipio:ctNull('nc_mun'),cod_mun_ibge:nsSo(ctV('nc_cmun')),uf:ctV('nc_uf').toUpperCase()||null,
+    cep:nsSo(ctV('nc_cep'))||null,logradouro:ctNull('nc_lgr'),numero:ctNull('nc_nro'),bairro:ctNull('nc_bairro'),fone:nsSo(ctV('nc_fone'))||null,email:ctNull('nc_email'),op_simp_nac:Number($('nc_sn').value),
+    servico:{...(e?.servico||{}),cTribNac:trib,cNBS:nsSo(ctV('nc_nbs'))||undefined,xDescServ:ctV('nc_desc')||undefined},
+    ibscbs:{usar:!!$('nc_ibs').value,cIndOp:nsSo(ctV('nc_ind')),CST:nsSo(ctV('nc_cst')),cClassTrib:nsSo(ctV('nc_class'))},
+    ambiente:amb,serie:nsSo(ctV('nc_serie'))||'1',proximo_ndps:Math.max(1,parseInt(nsSo(ctV('nc_prox'))||'1')),atualizado_em:new Date().toISOString()};
+  bt.disabled=true;
+  const q=e?sb.from('nfse_emitentes').update(r).eq('id',e.id):sb.from('nfse_emitentes').insert(r);
+  const {data,error}=await q.select().single();bt.disabled=false;
+  if(error)return ctErr(/duplicate|unique/i.test(error.message)?'Este CNPJ já está cadastrado.':'Não foi possível salvar: '+error.message);
+  toast('Dados fiscais salvos');await ctCarrega().catch(()=>{});ctDesenha();nsAbreCfg(data.id);
+}
+async function nsAcao(act,bt){
+  const n=CTL.dlg?.obj;
+  if(act==='nsemite')return nsEmite(bt);
+  if(act==='nssalvacfg')return nsSalvaCfg(bt);
+  if(act==='nstesta'){bt.disabled=true;$('nc_teste').innerHTML='<span class="muted">Testando…</span>';
+    try{const r=await nsFn({acao:'testar',emitente_id:n.id});$('nc_teste').innerHTML=`<span class="chip c-ok">Certificado ok</span> ${esc(r.certificado)} · válido até ${dBR(r.valido_ate.slice(0,10))}<br><span class="muted">Conexão com o emissor nacional (${esc(NSAMB[r.ambiente])}): ${esc(r.conexao)}</span>`}
+    catch(e){$('nc_teste').innerHTML=`<div class="alerta bad" style="margin:0"><b>${nsErrLista(e)}</b>${e.falta?NSFALTA:''}</div>`}
+    return bt.disabled=false}
+  if(act==='nscancabre')return nsAbreCanc(n);
+  if(act==='nsvoltanota')return nsAbreNota(n);
+  if(act==='nsimprime')return nsImprime(n);
+  if(act==='nsxml')return nsXml(n);
+  if(act==='nsdenovo')return nsAbreEmit(CTL.lanc.find(x=>x.id===n.ctl_lancamento_id),n);
+  if(act==='nsdescarta'||act==='nsvolta'){
+    const {error}=await sb.from('nfse_notas').update({situacao:act==='nsdescarta'?'descartada':'rejeitada'}).eq('id',n.id);if(error)return fail(error);
+    n.situacao=act==='nsdescarta'?'descartada':'rejeitada';toast(act==='nsdescarta'?'Tentativa descartada (dá para desfazer)':'Descarte desfeito');ctDesenha();return nsAbreNota(n)}
+  if(act==='nscancela'){
+    const mot=$('ns_mot').value,txt=ctV('ns_mtxt');if(!mot)return ctErr('Escolha o motivo.');if(txt.length<15)return ctErr('Explique o motivo com pelo menos 15 letras.');
+    if(!confirm(`Cancelar a NFS-e nº ${n.numero_nfse||''} de ${fm(n.valor)}? Não tem volta.`))return;
+    bt.disabled=true;
+    try{await nsFn({acao:'cancelar',nota_id:n.id,motivo:mot,texto:txt});toast('NFS-e cancelada');await ctCarrega().catch(()=>{});ctDesenha();return nsAbreNota(CTL.ns.find(x=>x.id===n.id))}
+    catch(e){bt.disabled=false;$('ctdErr').innerHTML=nsErrLista(e);$('ctdErr').hidden=false}
+  }
+}
 // ---- assinatura eletrônica pela Autentique (função "autentique" no Supabase; a chave fica só no servidor) ----
 const CTASSIT={pendente:['c-none','Ainda não abriu'],visualizou:['c-warn','Abriu, falta assinar'],assinou:['c-ok','Assinou'],recusou:['c-bad','Recusou']};
 function ctAssChip(a){const l=a.signatarios||[],n=l.filter(x=>x.situacao==='assinou').length;
@@ -12359,6 +12606,7 @@ async function ctUpload(f){
 async function ctAcao(act,bt){
   const {tipo,obj}=CTL.dlg||{};
   if(act==='fechar')return dlgCtl.close();
+  if(act.startsWith('ns'))return nsAcao(act,bt);
   if(act==='novocont')return ctAbreCont(null,false,obj.id);
   if(act==='novodoc')return ctAbreDoc(null,tipo==='cli'?{cliente_id:obj.id}:{cliente_id:obj.cliente_id,contrato_id:obj.id});
   if(act==='assenvia')return ctAbreAss(obj);
@@ -12689,6 +12937,16 @@ const MANUAL=[
 <li>Plano gratuito da Autentique: PDF de até 5 MB e o limite de documentos por mês da sua conta. Cada envio usa 1 documento.</li>
 <li>Primeira vez: o portal mostra como ligar a sua conta (gerar a chave em Perfil › Chaves de API da Autentique e colar no Supabase como <b>AUTENTIQUE_TOKEN</b>). A chave fica só no servidor.</li>
 </ol>`},
+    {k:'ctlnfse',t:'Notas fiscais (NFS-e)',img:'ctlnfse.png',
+      txt:`<p>Emite a nota fiscal de serviço (NFS-e) direto no emissor nacional do governo, sem passar pelo site. Só a Master vê. O certificado digital A1 fica guardado criptografado no Supabase, nunca no navegador.</p>
+<ol>
+<li>Uma vez só: em <b>Dados fiscais</b>, confira CNPJ, cidade (código IBGE), regime e o serviço padrão. Clique em <b>Testar certificado e conexão</b>. Para outra empresa emitir, escolha <b>+ Cadastrar outra empresa</b>.</li>
+<li>Enquanto o <b>Ambiente</b> estiver em <b>Teste</b>, as notas vão para a produção restrita e não valem. Quando o teste der certo, troque para <b>Produção</b>.</li>
+<li>Para emitir: <b>+ Emitir NFS-e</b>, ou o botão <b>Emitir NF</b> na receita do Financeiro (a nota fica ligada à receita). Escolha o cliente, confira o tomador, a competência, o valor e a descrição e clique em Emitir.</li>
+<li>Se o emissor recusar, a tentativa aparece como <b>Recusada</b> com o motivo. Use <b>Corrigir e tentar de novo</b> ou <b>Descartar</b> (o descarte também tem <b>Desfazer</b>).</li>
+<li>Para desfazer uma nota emitida: abra a nota e clique em <b>Cancelar NFS-e</b>, com o motivo. O cancelamento vai para o emissor nacional e não tem volta; para corrigir, cancele e emita outra.</li>
+<li>Na nota: <b>Imprimir</b> e <b>Baixar XML</b>. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
+</ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
 <ol>
@@ -12887,6 +13145,9 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-14nfse',data:'2026-11-14',t:'Notas fiscais (NFS-e) pelo emissor nacional',itens:[
+    {x:'Controlacs › Notas fiscais: emite a NFS-e direto no emissor nacional, sem abrir o site do governo. Também pelo botão “Emitir NF” na receita do Financeiro.',para:'master'},
+    {x:'Cada nota pode ser impressa, baixada em XML ou cancelada (com o motivo). Busca por qualquer coluna. Começa em modo Teste, que não vale como nota; a troca para Produção fica em “Dados fiscais”.',para:'master'}]},
   {k:'2026-11-13repasses-juntos',data:'2026-11-13',t:'Repasses pagos juntos numa linha só e Relatório de repasses',itens:[
     {x:'Gestão financeira › Contas a pagar: os repasses pagos juntos no mesmo dia (ex.: remessa que o banco mostra numa linha só) aparecem numa linha só, com a soma, os nomes dos parceiros e a etiqueta “🔗 N lançamentos juntos · ▼ detalhar”. Clique na linha para ver cada repasse; clique de novo para esconder. A caixa de seleção da linha marca todos os repasses dela.',para:'esc',mods:['gfpagar']},
     {x:'Extrato da conta: os repasses pagos juntos no mesmo dia também ficam numa linha só, com a soma e os nomes das clínicas, como no extrato do banco. Clique na linha para detalhar.',para:'esc',mods:['gfext']},
