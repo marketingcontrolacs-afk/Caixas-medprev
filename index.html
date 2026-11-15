@@ -757,7 +757,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <label class="f mvf" hidden>Tipo<select id="mvTipo"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="transf">Transferências</option><option value="aporte">Aportes</option></select></label>
       <label class="f mvf gtf" hidden>Cliente ou fornecedor<input id="mvPessoa" list="mvPesList" autocomplete="off" style="max-width:200px"><datalist id="mvPesList"></datalist></label>
       <label class="f mvf" hidden>Categoria<select id="mvCat"></select></label>
-      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option><option value="validar">A validar (histórico)</option></select></label>
+      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option><option value="validar">A validar (histórico)</option><option value="tarefa">Com tarefa de conferência</option></select></label>
       <label class="f mvf gtf" hidden>Valor de<input id="mvVmin" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <label class="f mvf gtf" hidden>até<input id="mvVmax" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <input id="gtBusca" placeholder="Buscar" style="max-width:240px">
@@ -767,7 +767,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <span class="expgrp" id="gtExp" data-exp="gt"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span>
     </div>
     <div class="cal" id="gtCal" hidden></div>
-    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small" data-mb="tarefa" title="Gera uma tarefa ligada a estes lançamentos para conferir e validar">📋 Gerar tarefa para conferir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
     <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
     <p class="note" id="gtNote"></p>
@@ -7754,7 +7754,7 @@ function mvFiltra(L){
     if(TP.length&&!TP.some(tp=>tp==='transf'||tp==='aporte'?x.nat===tp:x.tipo===tp&&x.nat!=='transf'))return false;
     if(pe&&!chave(x.pessoa).includes(pe))return false;
     if(CAT.length&&!CAT.some(cat=>cat==='-'?!x.categoria&&x.nat!=='transf':x.categoria===cat))return false;
-    if(ST.length&&!ST.some(st=>st==='validar'?x.ref.validar:st==='revisar'?x.ref.cat_revisar:st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
+    if(ST.length&&!ST.some(st=>st==='tarefa'?!!MV.tlm?.get(x.id)?.some(l=>!l.validado_em):st==='validar'?x.ref.validar:st==='revisar'?x.ref.cat_revisar:st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
     if(ini&&x.data<ini||fim&&x.data>fim)return false;
     if(vn>0&&x.valor<vn||vx>0&&x.valor>vx)return false;
     return !q||buscaCasa($('gtBusca').value,[x.pessoa,x.descricao,x.documento,x.categoria,mvSt(x)[1],typeof contaNome==='function'?contaNome(x.conta_id):''],[x.valor],[x.data])});
@@ -7763,14 +7763,14 @@ const MVST={aberto:['c-none','Em aberto'],atrasado:['c-bad','Atrasado'],concilia
 const mvSt=x=>MVST[x.st]||['c-done',x.tipo==='entrada'?'Recebido':'Pago'];
 const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tipo==='entrada'?'Entrada':'Saída';
 function mvDesenha(){
-  const L=mvLinhas();GT.mvL=L;mvOpcoes(L);
+  const L=mvLinhas();GT.mvL=L;mvOpcoes(L);tlMapaSe();
   // datas no formato AAAA-MM-DD: comparar o texto direto dá a mesma ordem e é bem mais rápido que localeCompare
   const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*((a.data<b.data?-1:a.data>b.data?1:0)||(a.k==='t')-(b.k==='t')));
   const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>cnm.get(id)||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${faClip(x.k==='t'?x.id:x.ref?.titulo_id||x.id)}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l">${stIc(x.k==='m',x.k==='m'&&x.st==='conciliado',x.tipo!=='entrada')}<span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}${tlChips(x.id)}</td><td class="l">${esc(x.documento)||mu('—')}${faClip(x.k==='t'?x.id:x.ref?.titulo_id||x.id)}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l">${stIc(x.k==='m',x.k==='m'&&x.st==='conciliado',x.tipo!=='entrada')}<span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
     +(rows.length>MV.lim?`<tr><td></td><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
     ||`<tr><td></td><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
   const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
@@ -7837,6 +7837,7 @@ function mvBulk(){
 }
 $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
   if(a==='limpa'){MV.sel.clear();return gtDesenha()}
+  if(a==='tarefa')return tlGerar(mvSelRows());
   if(a==='cat')return mvTrocaAbre(mvSelRows());
   if(a==='valida'){const ids=mvSelRows().filter(x=>x.k==='m'&&x.ref.validar).map(x=>x.id);if(!ids.length)return;
     if(!confirm(`Marcar ${ids.length} ${ids.length===1?'lançamento':'lançamentos'} como ${ids.length===1?'validado':'validados'}?`))return;
@@ -11778,7 +11779,7 @@ async function abrirTarefa(t){
   $('tdChip').innerHTML=t?(t.cliente_id?`<span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:'')+(t.interna&&e?'<span class="chip c-none">🔒 Interna</span>':''):'';
   const d=pode?'':' disabled',sel=(id,ops,v)=>`<select id="${id}"${d}>${ops.map(([k,n])=>`<option value="${k}"${k===v?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
   let h='';
-  if(!t){const ls=e?empresasDe('tarefas'):tLancaEm(),cv=escCli.value;
+  if(!t){const ls=e?empresasDe('tarefas'):tLancaEm(),cv=TL_NOVO?.cli||escCli.value;
     h+=`<label class="f">Empresa<select id="td_cli">${e?'<option value="">Interna da Controlacs (sem empresa)</option>':''}${ls.map(c=>`<option value="${c.id}"${c.id===cv?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
   h+=`<div class="fields"><label class="f wide">Título *<input id="td_titulo" value="${esc(t?.titulo||'')}" maxlength="160" placeholder="Ex.: enviar extrato de setembro"${d}></label>
     <label class="f wide">Descrição<textarea id="td_desc" rows="3"${d}>${esc(t?.descricao||'')}</textarea></label>
@@ -11796,6 +11797,7 @@ async function abrirTarefa(t){
     h+=`<div class="alerta" style="margin:0"><b>Ciente da conclusão: ${n} de ${ev.length}</b><span class="note">Todos os envolvidos confirmam que viram a tarefa concluída.</span>
       <div class="chk">${ev.map(x=>{const c=tCienteDe(t,x.id);return `<span>${c?'✅':'⏳'} ${esc(x.nome)} <span class="muted">(${x.papeis.join(', ')})${c?' · '+dtBR(c.ciente_em):''}</span></span>`}).join('')}</div>
       ${me&&!eu?'<div><button type="button" class="btn small primary" data-act="ciente">Dar ciente</button></div>':''}</div>`}
+  h+=tlBox(t);
   if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
     ${pode?`<div style="display:grid;gap:8px;margin-top:10px"><textarea id="td_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
       <div class="row" style="gap:10px;align-items:center"><input type="file" id="td_file" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF">
@@ -11809,7 +11811,7 @@ async function abrirTarefa(t){
   if(t&&!t.cliente_id&&ib)ib.hidden=true;
   // responsável e executor: escolhidos pelo nome entre a equipe e os usuários da empresa da tarefa
   if($('td_respBox')){
-    const pessoas=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,ps=await tPessoas(cli),rv=$('td_resp')?.value??(t?t.responsavel||'':ME.user_id),xv=$('td_exec')?.value??(t?.executor||'');
+    const pessoas=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,ps=await tPessoas(cli),rv=$('td_resp')?.value??(t?t.responsavel||'':ME.user_id),xv=$('td_exec')?.value??(t?.executor||(!t&&TL_NOVO?.exec)||'');
       $('td_respBox').innerHTML=selPessoa('td_resp',ps,rv,'Ninguém',d);$('td_execBox').innerHTML=selPessoa('td_exec',ps,xv,'Ninguém ainda',d);
       // mais executores e validadores (quem precisa da informação, ex.: para uma conciliação)
       if($('td_partBox')){const marc=pp=>$('td_partBox').dataset.ok?pickLer('td_'+pp):(t?.tarefa_participantes||[]).filter(x=>x.papel===pp).map(x=>x.user_id);
@@ -11837,6 +11839,7 @@ async function abrirTarefa(t){
   }
   if(!dlgTar.open)dlgTar.showModal();
   if(t)tConversa(t);else $('td_titulo').focus();
+  if(t)tlCarrega(t);
 }
 async function tConversa(t){
   const {data,error}=await sb.from('tarefa_comentarios').select('*').eq('tarefa_id',t.id).order('criado_em');
@@ -11870,6 +11873,7 @@ async function tAcao(act,btn){
       const {data,error}=t?await sb.from('tarefas').update(r).eq('id',t.id).select().single():await sb.from('tarefas').insert(r).select().single();
       if(error)throw error;
       if(!t)await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:data.id},{onConflict:'user_id,tarefa_id'});
+      if(!t&&TL_NOVO)await tlVincula(data,TL_NOVO);
       if(e&&window.V85T&&$('td_partBox')?.dataset.ok){const ex=$('td_exec').value,vs=pickLer('td_validador'),xs=pickLer('td_executor').filter(u=>u!==ex&&!vs.includes(u)),vv=vs.filter(u=>u!==ex);
         const {error:e3}=await sb.from('tarefa_participantes').delete().eq('tarefa_id',data.id);if(e3)throw e3;
         const rows=[...xs.map(u=>({tarefa_id:data.id,user_id:u,papel:'executor'})),...vv.map(u=>({tarefa_id:data.id,user_id:u,papel:'validador'}))];
@@ -11930,6 +11934,116 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(!
   const alvo=b.dataset.pk==='grupo'?b.closest('.pkg'):pk,bs=[...alvo.querySelectorAll('input')],v=b.dataset.pk==='nenhum'?false:b.dataset.pk==='todos'?true:bs.some(x=>!x.checked);
   bs.forEach(x=>pk.querySelectorAll(`input[value="${x.value}"]`).forEach(y=>y.checked=v))});
 document.addEventListener('change',e=>{const x=e.target;if(x.type==='checkbox'&&x.closest('.pick'))x.closest('.pick').querySelectorAll(`input[value="${x.value}"]`).forEach(y=>y.checked=x.checked)});
+
+// =====================================================================
+// LANÇAMENTOS LIGADOS A TAREFAS (v135, Carol 15/11/2026): na Movimentação financeira o operador marca um ou
+// mais lançamentos com problema e gera uma tarefa para a Carol conferir e validar. A tarefa mostra os
+// lançamentos (e abre cada um) e o lançamento mostra a tarefa. Vale para todas as empresas.
+// Tudo com desfazer: "Desvincular" só marca removido_em; "Validar" guarda o aviso antigo em validar_antes.
+let TL_NOVO=null;   // lançamentos da tarefa que está sendo criada: {cli, exec, itens}
+const tlTem=async()=>{if(window.V135===undefined){const {error}=await sb.from('tarefa_lancamentos').select('id').limit(1);window.V135=!error}return window.V135};
+dlgTar.addEventListener('close',()=>{TL_NOVO=null});
+// vínculos ativos dos lançamentos da tela (busca de novo quando a empresa ou os dados mudam)
+function tlMapaSe(){
+  if(MV.tlK===GT.key)return;MV.tlK=GT.key;
+  (async()=>{if(!await tlTem())return;
+    const {data,error}=await sb.from('tarefa_lancamentos').select('id,tarefa_id,mov_id,titulo_id,validado_em,tarefas(titulo,status,arquivada)').is('removido_em',null);
+    if(error)return console.error(error);
+    const ids=new Set([...(GT.todos||[]).map(m=>m.id),...(GT.lista||[]).map(t=>t.id)]),m=new Map();
+    (data||[]).forEach(l=>{const k=l.mov_id||l.titulo_id;if(!l.tarefas||l.tarefas.arquivada||!k||!ids.has(k))return;(m.get(k)||m.set(k,[]).get(k)).push(l)});
+    MV.tlm=m;if(GT.modo==='gfmov'&&VIEW==='gfmov')mvDesenha()})();
+}
+function tlChips(id){
+  const ls=MV.tlm?.get(id);if(!ls)return '';const col=k=>TCOLS.find(c=>c[0]===k)?.[1]||k;
+  return ls.map(l=>`<br><span class="chip ${l.validado_em||l.tarefas.status==='concluida'?'c-done':'c-warn'}" data-tlt="${l.tarefa_id}" style="white-space:normal;text-align:left;cursor:pointer" title="Abrir a tarefa">📋 Tarefa: ${esc(l.tarefas.titulo)} · ${l.validado_em?'✓ validado':esc(col(l.tarefas.status))}</span>`).join('');
+}
+// clicar no selo da tarefa abre a tarefa (e não o lançamento)
+$('gtBody').addEventListener('click',e=>{const c=e.target.closest('[data-tlt]');if(!c)return;e.stopImmediatePropagation();e.preventDefault();tlAbreTarefa(c.dataset.tlt)},true);
+async function tlAbreTarefa(id){
+  await tVersoes();
+  const {data,error}=await sb.from('tarefas').select('*'+(window.V31?', tarefa_usuarios(user_id)':'')+T_SEL_EXTRA()).eq('id',id).maybeSingle();
+  if(error)return fail(error,'Não foi possível abrir a tarefa');
+  if(!data)return alert('Você não tem acesso a esta tarefa, ou ela foi excluída.');
+  abrirTarefa(data);
+}
+// Movimentação › marcar lançamentos › "📋 Gerar tarefa para conferir"
+async function tlGerar(ls){
+  if(!ls.length)return;
+  if(!await tlTem())return alert('Falta rodar no Supabase a atualização v135 (lançamentos ligados a tarefas).');
+  const cs=[...new Set(ls.map(x=>x.ref.cliente_id).filter(Boolean))];
+  if(cs.length!==1)return alert('Marque lançamentos de uma empresa só para gerar a tarefa (cada tarefa é de uma empresa).');
+  const d=ehEsc()?await dirUsuarios():null,adm=d?.equipe.find(u=>u.admin);
+  const itens=ls.map(x=>({cliente_id:cs[0],mov_id:x.k==='m'?x.id:null,titulo_id:x.k==='t'?x.id:null,
+    resumo:[dBR(x.data),mvNat(x)+' '+fm(x.valor),x.pessoa||x.descricao||'sem fornecedor ou cliente',contaNome(x.conta_id)||'',x.documento?'doc. '+x.documento:'',x.ref.validar?'A validar: '+x.ref.validar:''].filter(Boolean).join(' · ')}));
+  TL_NOVO={cli:cs[0],exec:adm?.id||'',itens};
+  await abrirTarefa(null);
+  const x=ls[0];
+  $('td_titulo').value=(ls.length===1?`Conferir lançamento: ${x.pessoa||x.descricao||mvNat(x)} ${fm(x.valor)} em ${dBR(x.data)}`:`Conferir ${ls.length} lançamentos`).slice(0,160);
+  $('td_desc').value='O que está errado: ';$('td_desc').focus();
+}
+function tlBox(t){
+  if(!t&&TL_NOVO){const n=TL_NOVO.itens.length;
+    return `<div class="alerta" style="margin:0;display:block"><b>📎 ${n===1?'Lançamento ligado a esta tarefa':n+' lançamentos ligados a esta tarefa'}</b>
+      <ul style="margin:6px 0;padding-left:18px">${TL_NOVO.itens.map(i=>`<li>${esc(i.resumo)}</li>`).join('')}</ul>
+      <span class="note">Escreva na descrição o que está errado. A tarefa abre o lançamento, e o lançamento mostra a tarefa na Movimentação financeira.</span></div>`}
+  return t?'<div id="td_lancBox" hidden></div>':'';
+}
+async function tlCarrega(t){
+  const box=$('td_lancBox');if(!box||!await tlTem())return;
+  const {data,error}=await sb.from('tarefa_lancamentos').select('*').eq('tarefa_id',t.id).order('criado_em');
+  if(TARDLG?.id!==t.id||!$('td_lancBox'))return;
+  if(error||!data?.length){box.hidden=true;return}
+  const mids=data.filter(l=>l.mov_id).map(l=>l.mov_id),tids=data.filter(l=>l.titulo_id).map(l=>l.titulo_id);
+  const [{data:ms},{data:ts}]=await Promise.all([mids.length?sb.from('fin_movimentos').select('id,validar').in('id',mids):{data:[]},tids.length?sb.from('fin_titulos').select('id').in('id',tids):{data:[]}]);
+  const mm=new Map((ms||[]).map(m=>[m.id,m])),tt=new Set((ts||[]).map(x=>x.id)),e=ehEsc();
+  const b=(act,id,txt,cl)=>`<button type="button" class="btn small ${cl||''}" data-tl="${act}" data-id="${id}">${txt}</button>`;
+  const at=data.filter(l=>!l.removido_em),rm=data.filter(l=>l.removido_em);
+  box.innerHTML=`<h3 style="margin-bottom:6px">📎 Lançamentos ligados a esta tarefa (${at.length})</h3><div style="display:grid;gap:8px">${at.map(l=>{
+      const m=l.mov_id?mm.get(l.mov_id):null,some=l.mov_id?!m:l.titulo_id?!tt.has(l.titulo_id):true;
+      const st=l.validado_em?`<span class="chip c-done">✓ Validado em ${dtBR(l.validado_em)}${l.validado_por?' por '+esc(nomeDe(l.validado_por)):''}</span>`
+        :some?'<span class="chip c-none">O lançamento foi apagado</span>':m?.validar?`<span class="chip c-warn" style="white-space:normal">⚠ A validar: ${esc(m.validar)}</span>`:'<span class="chip c-warn">Aguardando conferência</span>';
+      return `<div class="card" style="padding:10px 12px;display:grid;gap:8px;margin:0"><div>${esc(l.resumo||'')}</div><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">${st}<span class="spacer"></span>${some?'':b('abrir',l.id,'Abrir o lançamento')}${e?(l.validado_em?b('desvalida',l.id,'Desfazer validação','ghost'):some?'':b('valida',l.id,'✓ Validar','primary'))+b('remove',l.id,'Desvincular','ghost'):''}</div></div>`}).join('')||'<p class="note" style="margin:0">Nenhum lançamento ligado.</p>'}
+    ${rm.length?`<p class="note" style="margin:0">${rm.map(l=>`Desvinculado em ${dtBR(l.removido_em)}: ${esc(l.resumo||'')} ${e?b('volta',l.id,'Desfazer','ghost'):''}`).join('<br>')}</p>`:''}</div>
+    ${e&&at.length?'<p class="note" style="margin:0">✓ Validar tira o aviso “A validar” do lançamento. Desfazer validação devolve o aviso como estava.</p>':''}`;
+  box._ls=data;box.hidden=false;
+}
+async function tlAbreLanc(l){
+  const cli=l.cliente_id,id=l.mov_id||l.titulo_id,k=l.mov_id?'m':'t';
+  if(!cli||!escCli.querySelector(`option[value="${cli}"]`))return alert('Você não tem acesso à empresa deste lançamento.');
+  dlgTar.close();
+  if(escCli.value!==cli){escCli.value=cli;guardaEmp()}
+  GT.key='';go('gfmov');
+  const ok=()=>GT.modo==='gfmov'&&(k==='m'?GT.todos:GT.lista)?.some(x=>x.id===id&&x.cliente_id===cli);
+  for(let i=0;i<50&&!ok();i++)await new Promise(r=>setTimeout(r,300));
+  if(!ok())return toast('Não achei o lançamento. Ele pode ter sido apagado ou baixado.');
+  mvAbre({dataset:{mv:k+':'+id}});
+}
+async function tlVincula(tar,N){
+  const {error}=await sb.from('tarefa_lancamentos').insert(N.itens.map(i=>({...i,tarefa_id:tar.id})));if(error)throw error;
+  MV.tlK=null;MV.sel.clear();if(VIEW==='gfmov')mvDesenha();
+}
+$('tdBody').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-tl]');if(!b)return;const t=TARDLG,l=($('td_lancBox')?._ls||[]).find(x=>x.id===b.dataset.id);if(!t||!l)return;
+  const a=b.dataset.tl;if(a==='abrir')return tlAbreLanc(l);
+  const agora=new Date().toISOString(),up=async r=>{const {error}=await sb.from('tarefa_lancamentos').update(r).eq('id',l.id);if(error)throw error};
+  b.disabled=true;
+  try{
+    if(a==='valida'){let antes=null;
+      if(l.mov_id){const {data:m,error:e0}=await sb.from('fin_movimentos').select('validar').eq('id',l.mov_id).maybeSingle();if(e0)throw e0;antes=m?.validar||null;
+        if(antes){const {error:e1}=await sb.from('fin_movimentos').update({validar:null}).eq('id',l.mov_id);if(e1)throw e1}}
+      await up({validado_em:agora,validado_por:ME.user_id,validar_antes:antes});toast('Lançamento validado');
+    }else if(a==='desvalida'){
+      if(l.mov_id&&l.validar_antes){const {error:e1}=await sb.from('fin_movimentos').update({validar:l.validar_antes}).eq('id',l.mov_id);if(e1)throw e1}
+      await up({validado_em:null,validado_por:null,validar_antes:null});toast('Validação desfeita');
+    }else if(a==='remove'){
+      if(!confirm('Desvincular este lançamento da tarefa? O lançamento não muda, e dá para desfazer.'))return;
+      await up({removido_em:agora,removido_por:ME.user_id});toast('Lançamento desvinculado');
+    }else if(a==='volta'){await up({removido_em:null,removido_por:null});toast('Lançamento ligado de novo')}
+    MV.tlK=null;if(VIEW==='gfmov'){if(a.includes('valida'))GT.key='';renderGT()}
+    await tlCarrega(t);
+  }catch(err){console.error(err);tdErr('Não foi possível. '+(err.message||'Verifique a internet e tente de novo.'))}
+  finally{b.disabled=false}
+});
 
 // =====================================================================
 // AVISOS E NOTÍCIAS
@@ -13171,6 +13285,10 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-15tarlanc',data:'2026-11-15',t:'Lançamento com problema vira tarefa para conferir',itens:[
+    {x:'Na Movimentação financeira, marque um ou mais lançamentos com problema e clique em “📋 Gerar tarefa para conferir”. A tarefa já vem com os lançamentos, para a Carol conferir e validar.',mods:['gfmov']},
+    {x:'O lançamento mostra a tarefa ligada a ele (clique no selo para abrir a tarefa), e a tarefa tem “Abrir o lançamento”. Na Situação, filtre “Com tarefa de conferência”.',mods:['gfmov','tarefas']},
+    {x:'Dentro da tarefa: ✓ Validar (tira o aviso “A validar”), Desfazer validação e Desvincular, que também dá para desfazer.',para:'esc'}]},
   {k:'2026-11-15topo',data:'2026-11-15',t:'Novos ícones no canto direito do topo',itens:[
     {x:'Contabilidade, Comunicação, Controlacs, Configurações (engrenagem) e Ajuda (?) saíram da faixa de módulos e agora ficam no canto direito do topo, ao lado do seu nome. É só clicar no ícone para abrir as mesmas telas de antes; nada mudou dentro delas.'},
     {x:'O Manual do sistema agora fica em Ajuda › Manual do sistema (antes ficava em Configurações).'}]},
