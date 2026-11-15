@@ -12459,19 +12459,87 @@ function nsAbreCanc(n){
     ctBtn('nsvoltanota','Voltar','ghost')+'<span class="spacer"></span>'+ctBtn('nscancela','Cancelar a NFS-e','primary'));
 }
 // impressão simples (o download do DANFSe pela API do governo foi desligado em 2026; a consulta oficial fica no site nacional)
+// ---- DANFSe (documento auxiliar da NFS-e) no padrão da NT 008/2026, montado a partir do XML autorizado ----
+// A API do governo que gerava o PDF foi suspensa em 08/2026; a NT 008 manda o sistema emissor gerar o documento a partir do XML.
+let NS_QR=null;
+const nsQrLib=()=>NS_QR||(NS_QR=new Promise((ok,erro)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';s.onload=()=>ok(window.QRCode);s.onerror=()=>{NS_QR=null;erro(new Error('qr'))};document.head.appendChild(s)}));
+async function nsQrDataUri(txt){
+  try{const Q=await nsQrLib(),d=document.createElement('div');new Q(d,{text:txt,width:160,height:160,correctLevel:Q.CorrectLevel.M});
+    const c=d.querySelector('canvas');return c?c.toDataURL('image/png'):(d.querySelector('img')?.src||'')}catch(_){return ''}
+}
+function nsDanfseHtml(xml,n,qr){
+  const doc=new DOMParser().parseFromString(xml||'<x/>','application/xml');
+  const q=(sel,raiz=doc)=>{for(const p of sel.split('|')){let el=raiz;for(const t of p.split('/')){el=el&&[...el.children].find(c=>c.localName===t)}if(el)return el}return null};
+  const v=(sel,raiz)=>(q(sel,raiz)?.textContent||'').trim();
+  const inf=q('NFSe/infNFSe'),dps=q('DPS/infDPS',inf),pr=q('prest',dps),to=q('toma',dps),em=q('emit',inf),sv=q('serv',dps),vl=q('valores',dps),vn=q('valores',inf);
+  const chave=(inf?.getAttribute('Id')||'').replace(/^NFS/,'')||n.chave||'';
+  const amb=v('tpAmb',dps)||String(n.ambiente||''),canc=n.situacao==='cancelada';
+  const din=x=>x===''?'—':'R$ '+Number(x).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pct=x=>x===''?'—':Number(x).toLocaleString('pt-BR',{maximumFractionDigits:4})+'%';
+  const dh=x=>x?x.slice(8,10)+'/'+x.slice(5,7)+'/'+x.slice(0,4)+(x.length>10?' '+x.slice(11,16):''):'—';
+  const docF=x=>nsDoc(x)||'—';
+  const fone=x=>{const d=nsSo(x);return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:d};
+  const cep=x=>{const d=nsSo(x);return d.length===8?d.slice(0,5)+'-'+d.slice(5):d};
+  const ender=(r)=>{if(!r)return '—';const en=q('end',r)||q('enderNac',r)||r;const nac=q('endNac',en);
+    return [v('xLgr',en),v('nro',en),v('xCpl',en),v('xBairro',en)].filter(Boolean).join(', ')+(nac||q('cMun',en)?` · CEP ${cep(v('CEP',nac||en))}`:'')||'—'};
+  const SN={1:'Não optante',2:'Optante - Microempreendedor Individual (MEI)',3:'Optante - Microempresa ou Empresa de Pequeno Porte (ME/EPP)'};
+  const TRIB={1:'Operação tributável',2:'Imunidade',3:'Exportação de serviço',4:'Não incidência'};
+  const RET={1:'Não retido',2:'Retido pelo tomador',3:'Retido pelo intermediário'};
+  const c=(k,val,cls='',span=1)=>`<td class="${cls}"${span>1?` colspan="${span}"`:''}><div class="k">${k}</div><div class="v">${esc(val||'—')}</div></td>`;
+  const e=nsEmitDe(n.emitente_id)||{};
+  const ib=q('IBSCBS',inf),ibv=q('valores',ib),tot=q('totCIBS',ib);
+  const vTotTrib=q('trib/totTrib',vl);
+  const aprox=vTotTrib?(v('vTotTrib/vTotTribFed',vTotTrib)!==''?`Valor aproximado dos tributos (Lei 12.741/2012): federais ${din(v('vTotTrib/vTotTribFed',vTotTrib))}, estaduais ${din(v('vTotTrib/vTotTribEst',vTotTrib))}, municipais ${din(v('vTotTrib/vTotTribMun',vTotTrib))}.`:v('pTotTribSN',vTotTrib)?`Percentual aproximado dos tributos do Simples Nacional (Lei 12.741/2012): ${pct(v('pTotTribSN',vTotTrib))}.`:''):'';
+  const tomBloco=to?`<tr>${c('CNPJ / CPF',docF(v('CNPJ|CPF',to)))}${c('Inscrição municipal',v('IM',to))}${c('Telefone',fone(v('fone',to)))}</tr>
+      <tr>${c('Nome / Razão social',v('xNome',to),'',2)}${c('E-mail',v('email',to))}</tr><tr>${c('Endereço',ender(to),'',3)}</tr>`
+    :`<tr><td colspan="3"><div class="v">TOMADOR DO SERVIÇO NÃO IDENTIFICADO NA NFS-e</div></td></tr>`;
+  const ibBloco=ib?`<table><tr><th colspan="4">IBS / CBS (Reforma Tributária)</th></tr>
+      <tr>${c('Base de cálculo',din(v('vBC',ibv)))}${c('Alíquota IBS estadual',pct(v('uf/pIBSUF',ibv)))}${c('Alíquota IBS municipal',pct(v('mun/pIBSMun',ibv)))}${c('Alíquota CBS',pct(v('fed/pCBS',ibv)))}</tr>
+      <tr>${c('Valor IBS',din(v('gIBS/vIBSTot',tot)))}${c('Valor CBS',din(v('gCBS/vCBS',tot)))}${c('Local de incidência',v('xLocalidadeIncid',ib))}${c('Valor total da NFS-e + IBS/CBS',din(v('vTotNF',tot)),'cinza')}</tr></table>`:'';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>DANFSe ${esc(v('nNFSe',inf)||n.numero_nfse||'')}</title><style>
+@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font:10px Arial,Helvetica,sans-serif;color:#000;margin:0;padding:8px;position:relative}
+.top{display:grid;grid-template-columns:1fr auto;gap:10px;border:1px solid #000;padding:8px}.top h1{font-size:15px;margin:0 0 2px}.top .s{font-size:11px}
+.jur{color:#b00;font-weight:bold;font-size:12px;margin-top:4px}.qr{display:flex;gap:8px;align-items:center;max-width:300px}.qr img{width:1.9cm;height:1.9cm}.qr p{font-size:7px;margin:0}
+table{width:100%;border-collapse:collapse;margin-top:4px;table-layout:fixed}th{background:#e6e6e6;text-align:left;font-size:10px;padding:3px 5px;border:1px solid #000;text-transform:uppercase}
+td{border:1px solid #000;padding:3px 5px;vertical-align:top}.k{font-size:7.5px;text-transform:uppercase;color:#333}.v{font-family:"Microsoft Sans Serif",Arial,sans-serif;font-size:10px;word-break:break-word;white-space:pre-wrap}
+.cinza{background:#e6e6e6}.cinza .v{font-weight:bold;font-size:12px}
+.marca{position:fixed;top:40%;left:0;right:0;text-align:center;font-size:90px;font-weight:bold;color:rgba(200,0,0,.18);transform:rotate(-25deg);pointer-events:none}
+.bar{margin:10px 0;display:flex;gap:8px}.bar button{font:13px Arial;padding:8px 14px;cursor:pointer}@media print{.bar{display:none}}
+</style></head><body>
+${canc?'<div class="marca">CANCELADA</div>':''}
+<div class="bar"><button onclick="print()">Imprimir / Salvar em PDF</button><span style="align-self:center;color:#555">Para salvar em PDF, escolha “Salvar como PDF” na janela de impressão.</span></div>
+<div class="top"><div><h1>DANFSe v2.0 · Documento Auxiliar da NFS-e</h1><div class="s">Município emissor: ${esc(v('xLocEmi',inf)||e.municipio||'')}${e.uf?' - '+esc(e.uf):''}</div>
+  ${amb==='2'?'<div class="jur">NFS-e SEM VALIDADE JURÍDICA (ambiente de teste)</div>':''}${canc?'<div class="jur">NFS-e CANCELADA</div>':''}</div>
+  <div class="qr">${qr?`<img src="${qr}" alt="QR Code">`:''}<p>A autenticidade desta NFS-e pode ser verificada pela leitura deste código QR ou pela consulta da chave de acesso no portal nacional da NFS-e (www.nfse.gov.br).</p></div></div>
+<table><tr><th colspan="4">Identificação da NFS-e</th></tr>
+  <tr>${c('Chave de acesso',chave,'',4)}</tr>
+  <tr>${c('Número da NFS-e',v('nNFSe',inf)||n.numero_nfse)}${c('Competência',dh(v('dCompet',dps)))}${c('Data e hora da emissão da NFS-e',dh(v('dhProc',inf)))}${c('Número / série da DPS',(v('nDPS',dps)||'')+' / '+(v('serie',dps)||''))}</tr>
+  <tr>${c('Data e hora da emissão da DPS',dh(v('dhEmi',dps)))}${c('Situação',canc?'Cancelada':'Normal')}${c('Local da prestação',v('xLocPrestacao',inf))}${c('Local de incidência do ISSQN',v('xLocIncid',inf))}</tr></table>
+<table><tr><th colspan="3">Prestador / Emitente</th></tr>
+  <tr>${c('CNPJ / CPF',docF(v('CNPJ|CPF',em)||v('CNPJ|CPF',pr)))}${c('Inscrição municipal',v('IM',em)||v('IM',pr))}${c('Telefone',fone(v('fone',em)||v('fone',pr)))}</tr>
+  <tr>${c('Nome / Razão social',v('xNome',em)||e.razao_social)}${c('E-mail',(v('email',em)||v('email',pr)).toLowerCase())}${c('Regime (Simples Nacional)',SN[v('regTrib/opSimpNac',pr)]||'')}</tr>
+  <tr><td colspan="3"><div class="k">Endereço</div><div class="v">${esc(ender(em))}${v('enderNac/UF',em)?' · '+esc(v('xLocEmi',inf))+' - '+esc(v('enderNac/UF',em)):''}</div></td></tr></table>
+<table><tr><th colspan="3">Tomador do serviço</th></tr>${tomBloco}</table>
+<table><tr><th colspan="2">Serviço prestado</th></tr>
+  <tr>${c('Código de tributação nacional',nsTrib(v('cServ/cTribNac',sv))+(v('xTribNac',inf)?' - '+v('xTribNac',inf):''))}${c('Código NBS',v('cServ/cNBS',sv)+(v('xNBS',inf)?' - '+v('xNBS',inf):''))}</tr>
+  <tr><td colspan="2"><div class="k">Descrição do serviço</div><div class="v">${esc(v('cServ/xDescServ',sv)||n.descricao||'')}</div></td></tr></table>
+<table><tr><th colspan="4">Tributação municipal (ISSQN)</th></tr>
+  <tr>${c('Tributação do ISSQN',TRIB[v('trib/tribMun/tribISSQN',vl)]||'')}${c('Retenção do ISSQN',RET[v('trib/tribMun/tpRetISSQN',vl)]||'')}${c('Base de cálculo',din(v('vBC',vn)))}${c('Alíquota / Valor do ISSQN',v('pAliqAplic',vn)?pct(v('pAliqAplic',vn))+' / '+din(v('vISSQN',vn)):(v('regTrib/opSimpNac',pr)==='3'?'Recolhido pelo Simples Nacional':'—'))}</tr></table>
+<table><tr><th colspan="4">Valores da NFS-e</th></tr>
+  <tr>${c('Valor do serviço',din(v('vServPrest/vServ',vl)))}${c('Desconto incondicionado',din(v('vDescCondIncond/vDescIncond',vl)))}${c('Total de retenções',din(v('vTotalRet',vn)))}${c('Valor líquido da NFS-e',din(v('vLiq',vn)),'cinza')}</tr></table>
+${ibBloco}
+<table><tr><th>Informações complementares</th></tr><tr><td><div class="v">${esc([v('serv/infoCompl/xInfComp',dps),aprox].filter(Boolean).join('\n')||'—')}</div></td></tr></table>
+<p style="font-size:8px;margin-top:6px">Documento gerado pelo Portal Controlacs a partir do XML autorizado da NFS-e, no padrão da NT 008/2026 (DANFSe v2.0).</p>
+</body></html>`;
+}
 async function nsImprime(n){
-  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();const x=data?.xml_nfse||'',tg=t=>(x.match(new RegExp(`<${t}>([^<]*)</${t}>`))||[])[1]||'';
-  const e=nsEmitDe(n.emitente_id)||{},w=window.open('','_blank');if(!w)return toast('Libere as janelas (pop-up) para imprimir.');
-  w.document.write(`<!doctype html><meta charset="utf-8"><title>NFS-e ${esc(n.numero_nfse||'')}</title><style>body{font:13px Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0}table{border-collapse:collapse;width:100%;margin-top:10px}td{border:1px solid #999;padding:6px;vertical-align:top}.k{font-size:10px;color:#555;text-transform:uppercase}.t{background:#eee;font-weight:bold}</style>
-  <h1>Documento auxiliar da NFS-e${Number(n.ambiente)===2?' — TESTE, SEM VALOR FISCAL':''}</h1><p>Município: ${esc(e.municipio||'')} - ${esc(e.uf||'')}${n.situacao==='cancelada'?' · <b>NOTA CANCELADA</b>':''}</p>
-  <table><tr><td colspan="3"><div class="k">Chave de acesso</div>${esc(n.chave||'')}</td></tr>
-  <tr><td><div class="k">Número da NFS-e</div><b>${esc(n.numero_nfse||'')}</b></td><td><div class="k">Competência</div>${dBR(n.competencia)}</td><td><div class="k">Emissão</div>${n.emitida_em?dtBR(n.emitida_em):''}</td></tr>
-  <tr><td colspan="3" class="t">Prestador</td></tr><tr><td><div class="k">CNPJ</div>${esc(nsDoc(e.cnpj))}</td><td colspan="2"><div class="k">Nome</div>${esc(e.razao_social||e.nome||'')}</td></tr>
-  <tr><td colspan="3"><div class="k">Endereço</div>${esc([e.logradouro,e.numero,e.bairro,e.municipio].filter(Boolean).join(', '))} · ${esc(e.email||'')}</td></tr>
-  <tr><td colspan="3" class="t">Tomador</td></tr><tr><td><div class="k">CNPJ/CPF</div>${esc(nsDoc(n.tomador_doc))}</td><td colspan="2"><div class="k">Nome</div>${esc(n.tomador_nome||'')}</td></tr>
-  <tr><td colspan="3" class="t">Serviço</td></tr><tr><td><div class="k">Código nacional</div>${esc(nsTrib(n.ctribnac))}</td><td colspan="2"><div class="k">Descrição</div>${esc(n.descricao||'')}</td></tr>
-  <tr><td colspan="2"><div class="k">Valor do serviço</div><b>${fm(n.valor)}</b></td><td><div class="k">Valor líquido</div><b>${fm(tg('vLiq')||n.valor)}</b></td></tr></table>
-  <p style="font-size:11px;margin-top:14px">Confira a autenticidade em www.nfse.gov.br, Consulta pública, com a chave de acesso acima.</p><script>print()<\/script>`);w.document.close();
+  const w=window.open('','_blank');if(!w)return toast('Libere as janelas (pop-up) para imprimir.');
+  w.document.write('<p style="font:14px Arial;padding:20px">Montando o documento da nota…</p>');
+  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();
+  if(!data?.xml_nfse){w.close();return toast('XML da nota não encontrado.')}
+  const chave=(data.xml_nfse.match(/Id="NFS(\d{50})"/)||[])[1]||n.chave||'';
+  const qr=chave?await nsQrDataUri(`https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=${chave}`):'';
+  w.document.open();w.document.write(nsDanfseHtml(data.xml_nfse,n,qr));w.document.close();
 }
 async function nsXml(n){
   const {data,error}=await sb.from('nfse_notas').select('xml_nfse,cancel_xml').eq('id',n.id).single();if(error||!data?.xml_nfse)return toast('XML não encontrado.');
@@ -12482,11 +12550,11 @@ function nsAbreLote(){
   const ini=TODAY.slice(0,8)+'01';
   ctMostra('nslote',{},'Baixar XMLs das notas','',
     `<div class="fields"><label class="f">De<input type="date" id="nl_ini" value="${ini}"></label><label class="f">Até<input type="date" id="nl_fim" value="${TODAY}"></label>
-    <label class="f">Empresa que emitiu<select id="nl_emp"><option value="">Todas</option>${CTL.nsEmit.map(e=>`<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></label>
+    <label class="f">Empresa que emitiu<select id="nl_emp"><option value="">Todas as empresas</option>${CTL.nsEmit.map(e=>`<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></label>
     <label class="f">Situação<select id="nl_sit"><option value="">Emitidas e canceladas</option><option value="emitida">Só emitidas</option><option value="cancelada">Só canceladas</option></select></label>
     <label class="f">Período pela data de<select id="nl_por"><option value="emissao">Emissão</option><option value="competencia">Competência</option></select></label>
     <label class="f">Ambiente<select id="nl_amb"><option value="1">Produção (valem como nota)</option><option value="2">Teste</option><option value="">Todos</option></select></label></div>
-    <p class="muted" style="font-size:13px;margin:8px 0 0">Baixa um arquivo .zip com o XML de cada nota (e o XML do cancelamento, quando houver) e uma planilha com a lista das notas. Pronto para mandar à contabilidade.</p>`,
+    <p class="muted" style="font-size:13px;margin:8px 0 0">Baixa um arquivo .zip com uma pasta por empresa, o XML de cada nota (e o XML do cancelamento, quando houver) e uma planilha com a lista das notas. Pronto para mandar à contabilidade.</p>`,
     ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nslote','Baixar','primary'));
 }
 let NS_ZIP=null;
@@ -12502,8 +12570,10 @@ async function nsBaixaLote(bt){
     q=por==='competencia'?q.gte('competencia',ini).lte('competencia',fim):q.gte('emitida_em',ini+'T00:00:00-03:00').lte('emitida_em',fim+'T23:59:59-03:00');
     const {data,error}=await q.order('emitida_em');if(error)throw error;
     if(!data.length){bt.disabled=false;bt.textContent=txt;return ctErr('Nenhuma nota nesse período com esses filtros.')}
-    const JSZip=await nsZipLib(),zip=new JSZip(),pasta=zip.folder('xml');
-    for(const n of data){const nome=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}`;if(n.xml_nfse)pasta.file(nome+'.xml',n.xml_nfse);if(n.cancel_xml)pasta.file(nome+'_cancelamento.xml',n.cancel_xml)}
+    const JSZip=await nsZipLib(),zip=new JSZip();
+    // uma pasta por empresa que emitiu (facilita mandar para a contabilidade)
+    const pastaDe=n=>{const e=nsEmitDe(n.emitente_id)||{};return zip.folder(`${String(e.nome||'Empresa').replace(/[\\/:*?"<>|]+/g,' ').trim()} ${nsSo(e.cnpj)}`.trim())};
+    for(const n of data){const nome=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}`,pasta=pastaDe(n);if(n.xml_nfse)pasta.file(nome+'.xml',n.xml_nfse);if(n.cancel_xml)pasta.file(nome+'_cancelamento.xml',n.cancel_xml)}
     const linhas=data.map(n=>({'Empresa':nsEmitDe(n.emitente_id)?.nome||'','Nº NFS-e':n.numero_nfse||'','Emissão':n.emitida_em?dtBR(n.emitida_em):'','Competência':dBR(n.competencia),'Tomador':n.tomador_nome||'','CNPJ/CPF':nsDoc(n.tomador_doc),'Descrição':n.descricao||'','Código do serviço':nsTrib(n.ctribnac),'Valor':Number(n.valor)||0,'Situação':NSSIT[n.situacao]?.[1]||n.situacao,'Cancelada em':n.cancelada_em?dtBR(n.cancelada_em):'','Motivo do cancelamento':n.cancel_motivo||'','Ambiente':Number(n.ambiente)===2?'Teste':'Produção','Chave de acesso':n.chave}));
     const ws=XLSX.utils.json_to_sheet(linhas),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Notas');
     zip.file('lista-de-notas.xlsx',XLSX.write(wb,{type:'array',bookType:'xlsx'}));
@@ -13008,7 +13078,7 @@ const MANUAL=[
 <li>Para emitir: <b>+ Emitir NFS-e</b>, ou o botão <b>Emitir NF</b> na receita do Financeiro (a nota fica ligada à receita). Escolha o cliente, confira o tomador, a competência, o valor e a descrição e clique em Emitir.</li>
 <li>Se o emissor recusar, a tentativa aparece como <b>Recusada</b> com o motivo. Use <b>Corrigir e tentar de novo</b> ou <b>Descartar</b> (o descarte também tem <b>Desfazer</b>).</li>
 <li>Para desfazer uma nota emitida: abra a nota e clique em <b>Cancelar NFS-e</b>, com o motivo. O cancelamento vai para o emissor nacional e não tem volta; para corrigir, cancele e emita outra.</li>
-<li>Na nota: <b>Imprimir</b> e <b>Baixar XML</b>. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
+<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
 </ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
@@ -13210,7 +13280,8 @@ async function agBadge(){
 const NOVIDADES=[
   {k:'2026-11-15nfse-envio',data:'2026-11-15',t:'Notas fiscais (NFS-e): envio ligado',itens:[
     {x:'Controlacs › Notas fiscais e o botão “Emitir NF” já enviam a nota direto ao emissor nacional e trazem o número da NFS-e na hora. O aviso “envio ainda em preparação” saiu. O cancelamento também é feito pelo portal.',para:'master'},
-    {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista. Pronto para mandar à contabilidade.',para:'master'}]},
+    {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista, com uma pasta por empresa quando escolher “Todas as empresas”. Pronto para mandar à contabilidade.',para:'master'},
+    {x:'O botão “Imprimir” da nota agora abre o DANFSe no modelo oficial novo (NT 008/2026), com QR Code de autenticidade, dados do prestador e do tomador, ISSQN, IBS/CBS e valor líquido. Use “Imprimir / Salvar em PDF” para gerar o PDF e mandar ao cliente.',para:'master'}]},
   {k:'2026-11-15topo',data:'2026-11-15',t:'Novos ícones no canto direito do topo',itens:[
     {x:'Contabilidade, Comunicação, Controlacs, Configurações (engrenagem) e Ajuda (?) saíram da faixa de módulos e agora ficam no canto direito do topo, ao lado do seu nome. É só clicar no ícone para abrir as mesmas telas de antes; nada mudou dentro delas.'},
     {x:'O Manual do sistema agora fica em Ajuda › Manual do sistema (antes ficava em Configurações).'}]},
