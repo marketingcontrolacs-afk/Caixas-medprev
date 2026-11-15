@@ -495,7 +495,7 @@ body.lg header.top .logo{visibility:hidden}
 .agdias{display:flex;gap:6px;flex-wrap:wrap}.agdias label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;cursor:pointer;font-size:13px}
 @media (max-width:880px){.aggrid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:520px){.agsem{gap:3px}.agsem .dw{font-size:10px}.agsem .dn{font-size:15px}.agsem .dc{font-size:10px}.agit{grid-template-columns:auto 40px minmax(0,1fr);}.agit .acts{grid-column:2/-1}}
-/* Manual do sistema (Configurações › Manual do sistema, todos os usuários) */
+/* Manual do sistema (Ajuda › Manual do sistema, todos os usuários) */
 .mnwrap{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;align-items:start;margin-top:14px}
 .mnidx{position:sticky;top:12px;padding:12px;max-height:calc(100vh - 40px);overflow:auto}
 .mnidx h3{font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 6px 4px}
@@ -12021,7 +12021,7 @@ async function agCarrega(){
   AGCONC=agConc(AGR,b.data||[]);
   return null;
 }
-// ---------- Manual do sistema (Configurações › Manual do sistema, Carol 04/11) ----------
+// ---------- Manual do sistema (Ajuda › Manual do sistema; era Configurações até 15/11) ----------
 // REGRA: toda melhoria ou atualização visível também atualiza o MANUAL (texto e, se a tela mudou, o print em manual/).
 // k = tela do NAV (o item só aparece para quem tem a tela liberada); k começando com '_' aparece para todos.
 // Os prints usam empresas e pessoas fictícias. Feito por partes: as telas que ainda não têm explicação ficam listadas no fim.
@@ -12354,7 +12354,7 @@ function nsDesenha(b,sit,tem){
   const l=doMes.filter(n=>(sit?n.situacao===sit:n.situacao!=='descartada')&&tem(n.numero_nfse,n.tomador_nome,n.tomador_doc,nsDoc(n.tomador_doc),n.descricao,n.chave,nsTrib(n.ctribnac),fm(n.valor),String(n.valor).replace('.',','),dBR(nsData(n)),dBR(n.competencia),NSSIT[n.situacao]?.[1],Number(n.ambiente)===2?'teste':'produção',nsEmitDe(n.emitente_id)?.nome));
   const em=doMes.filter(n=>n.situacao==='emitida'),rej=CTL.ns.filter(n=>n.situacao==='rejeitada');
   const teste=CTL.nsEmit.filter(e=>Number(e.ambiente)===2);
-  $('ctConteudo').innerHTML=`${teste.length?`<div class="alerta"><b>Modo TESTE ligado para ${teste.map(e=>esc(e.nome)).join(', ')}.</b><span>As notas vão para a produção restrita do emissor nacional e não valem como nota fiscal. Quando o teste der certo, troque para Produção em “Dados fiscais”.</span></div>`:''}
+  $('ctConteudo').innerHTML=`<div class="alerta"><b>Envio ao emissor nacional ainda em preparação.</b><span>As telas já estão prontas, mas o portal ainda não envia a nota sozinho: falta ligar o servidor de envio (o site do governo bloqueia o envio direto pelo Supabase). Por enquanto, emita a nota pelo site do emissor nacional. Se tentar emitir aqui, o portal mostra o erro e nada é enviado.</span></div>${teste.length?`<div class="alerta"><b>Modo TESTE ligado para ${teste.map(e=>esc(e.nome)).join(', ')}.</b><span>As notas vão para a produção restrita do emissor nacional e não valem como nota fiscal. Quando o teste der certo, troque para Produção em “Dados fiscais”.</span></div>`:''}
     <div class="tiles">
       <div class="card tile"><div class="k">Notas emitidas em ${MESES[m-1]}/${a}</div><div class="v">${em.length}</div><div class="n">${em.filter(n=>Number(n.ambiente)===2).length} de teste</div></div>
       <div class="card tile"><div class="k">Valor das notas do mês</div><div class="v">${fm(em.filter(n=>Number(n.ambiente)===1).reduce((s,n)=>s+(Number(n.valor)||0),0))}</div><div class="n">só as de produção</div></div>
@@ -12375,7 +12375,7 @@ function nsAbreEmit(lanc,base){
   const e=nsEmitDe(base?.emitente_id)||CTL.nsEmit[0],sv=e.servico||{},end=tm.end||{};
   const comp=base?.competencia||lanc?.competencia||(lanc?.vencimento||TODAY).slice(0,10);
   ctMostra('nsemit',{lanc,base},'Emitir NFS-e',Number(e.ambiente)===2?'<span class="chip c-warn">Modo teste</span>':'<span class="chip c-ok">Produção</span>',
-    `${Number(e.ambiente)===2?'<div class="alerta" style="margin:0 0 10px"><b>Nota de TESTE.</b><span>Vai para a produção restrita do emissor nacional e não vale como nota fiscal.</span></div>':''}
+    `<div class="alerta" style="margin:0 0 10px"><b>Envio ainda em preparação.</b><span>O portal ainda não envia a nota ao emissor nacional. Se clicar em emitir, aparece o erro e nada é enviado.</span></div>${Number(e.ambiente)===2?'<div class="alerta" style="margin:0 0 10px"><b>Nota de TESTE.</b><span>Vai para a produção restrita do emissor nacional e não vale como nota fiscal.</span></div>':''}
     <div class="fields">
     <label class="f wide">Empresa que emite<select id="ns_emit">${CTL.nsEmit.filter(x=>x.ativo!==false).map(x=>`<option value="${x.id}"${x.id===e.id?' selected':''}>${esc(x.nome)} · ${esc(nsDoc(x.cnpj))} · ${esc(x.municipio||'')}</option>`).join('')}</select></label>
     <label class="f wide">Cliente (preenche o tomador)<select id="ns_cli"><option value="">Digitar os dados abaixo</option>${CTL.cli.map(c=>`<option value="${c.id}"${c.id===(cli?.id||base?.tomador?.cliente_id)?' selected':''}>${esc(c.nome)}${c.cnpj_cpf?' · '+esc(c.cnpj_cpf):''}</option>`).join('')}</select></label>
@@ -12719,12 +12719,12 @@ const MANUAL=[
       txt:`<p>Entre com o seu e-mail e a sua senha. Deixe marcado <b>Lembrar meu login e senha neste aparelho</b> e, quando o navegador ou o celular perguntar, toque em <b>Salvar senha</b>: nas próximas vezes o e-mail e a senha já aparecem preenchidos (a senha fica guardada no próprio navegador/celular, não no portal). Em computador de uso compartilhado, desmarque a opção e não salve a senha. No alto da tela ficam a <b>Empresa</b>, os <b>módulos</b> e o caminho da tela aberta.</p>
 <ol>
 <li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas. Se houver <b>grupos de empresas</b> (Configurações › Cadastro de empresas), aparecem também as opções <b>Grupo: …</b>, que somam só as empresas do grupo; a matriz com filiais vira um grupo sozinha.</li>
-<li><b>Módulos:</b> Dashboard, Rotina diária, Gestão financeira, Contabilidade, RH, Comunicação e Configurações. Passe o mouse (ou clique) num módulo para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
+<li><b>Módulos:</b> na faixa de módulos ficam Dashboard, Rotina diária, Gestão financeira e RH. No <b>canto direito do topo</b>, ao lado do seu nome, ficam os ícones <b>Contabilidade</b>, <b>Comunicação</b>, <b>Controlacs</b> (só a Master), <b>Configurações</b> (engrenagem) e <b>Ajuda</b> (?, com este manual). Passe o mouse (ou clique) num módulo ou num ícone para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
 <li><b>Exportar e Imprimir:</b> nas telas com lista de lançamentos, o botão <b>Exportar</b> gera o arquivo em <b>Excel</b> ou <b>PDF</b> e o botão <b>Imprimir</b> abre a impressão. Sai só o que está na tela: filtre primeiro (situação, empresa, período, busca) e depois exporte. Os filtros usados aparecem no alto do relatório.</li>
 <li><b>Esconder o resumo:</b> nas telas com quadros de resumo no alto (totais, pendentes, conciliadas…), clique em <b>▲ Esconder resumo</b> para recolher os quadros e ver mais da lista. Para ver de novo, clique em <b>▼ Mostrar resumo</b>. O portal lembra a escolha de cada tela neste aparelho.</li>
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
-<li><b>No celular:</b> o alto da tela fica mais compacto (logo, nome e Sair numa linha e a empresa logo abaixo). Os módulos ficam numa faixa que corre para o lado com o dedo. Nas janelas, o texto rola e os botões (como <b>Visualizei</b>, Salvar e Cancelar) ficam sempre fixos embaixo.</li>
+<li><b>No celular:</b> o alto da tela fica mais compacto (logo, nome e Sair numa linha e a empresa logo abaixo, com os ícones de Contabilidade, Comunicação, Controlacs, Configurações e Ajuda ao lado). Os módulos ficam numa faixa que corre para o lado com o dedo. Nas janelas, o texto rola e os botões (como <b>Visualizei</b>, Salvar e Cancelar) ficam sempre fixos embaixo.</li>
 <li><b>Campos que puxam de um cadastro</b> (categoria, fornecedor, cliente, conta, colaborador e outros): clique e <b>digite</b> parte do nome ou o <b>código</b>. A lista mostra só o que combina; toque ou use as setas e Enter para escolher. Funciona igual no computador e no celular. As categorias aparecem com o código do plano de contas (ex.: <i>2.01 · Aluguel</i>) e os clientes e fornecedores com o código do cadastro.</li>
 <li><b>Atalho na tela de início:</b> para abrir o portal como um aplicativo, com o ícone do C da Controlacs, no iPhone use Safari › Compartilhar › <b>Adicionar à Tela de Início</b>; no Android, Chrome › menu ⋮ › <b>Adicionar à tela inicial</b>. Se o atalho antigo mostra outro ícone, apague-o e salve de novo.</li>
 </ol>
@@ -12964,7 +12964,7 @@ const MANUAL=[
 <li>Primeira vez: o portal mostra como ligar a sua conta (gerar a chave em Perfil › Chaves de API da Autentique e colar no Supabase como <b>AUTENTIQUE_TOKEN</b>). A chave fica só no servidor.</li>
 </ol>`},
     {k:'ctlnfse',t:'Notas fiscais (NFS-e)',img:'ctlnfse.png',
-      txt:`<p>Emite a nota fiscal de serviço (NFS-e) direto no emissor nacional do governo, sem passar pelo site. Só a Master vê. O certificado digital A1 fica guardado criptografado no Supabase, nunca no navegador.</p>
+      txt:`<p>Emite a nota fiscal de serviço (NFS-e) direto no emissor nacional do governo, sem passar pelo site. Só a Master vê. <b>Atenção:</b> o envio automático ainda está em preparação (falta ligar o servidor de envio); até lá, emita pelo site do emissor nacional. O certificado digital A1 fica guardado criptografado no Supabase, nunca no navegador.</p>
 <ol>
 <li>Uma vez só: em <b>Dados fiscais</b>, confira CNPJ, cidade (código IBGE), regime e o serviço padrão. Clique em <b>Testar certificado e conexão</b>. Para outra empresa emitir, escolha <b>+ Cadastrar outra empresa</b>.</li>
 <li>Enquanto o <b>Ambiente</b> estiver em <b>Teste</b>, as notas vão para a produção restrita e não valem. Quando o teste der certo, troque para <b>Produção</b>.</li>
@@ -12990,7 +12990,7 @@ const MANUAL=[
     {k:'ctldocs',t:'Documentos e contratos assinados',
       txt:`<p>Todos os documentos guardados: contratos, aditivos, propostas, procurações, distratos e outros, com o cliente, o contrato e a validade. Clique no nome do arquivo para abrir. Os arquivos ficam numa área separada, que só a Master acessa.</p>
 <p>Use <b>+ Novo documento</b> para enviar (PDF, Word, Excel ou foto, até 20 MB). Com validade preenchida, o documento aparece no Painel 30 dias antes de vencer.</p>`}]},
-  {g:'Configurações',itens:[
+  {g:'Ajuda',itens:[
     {k:'manual',t:'Manual do sistema',
       txt:`<p>Este manual. Ele é atualizado a cada melhoria do portal. Use a busca no alto para achar um assunto, e clique numa imagem para abri-la em tamanho maior.</p>`}]},
 ];
@@ -13171,8 +13171,11 @@ async function agBadge(){
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
 const NOVIDADES=[
+  {k:'2026-11-15topo',data:'2026-11-15',t:'Novos ícones no canto direito do topo',itens:[
+    {x:'Contabilidade, Comunicação, Controlacs, Configurações (engrenagem) e Ajuda (?) saíram da faixa de módulos e agora ficam no canto direito do topo, ao lado do seu nome. É só clicar no ícone para abrir as mesmas telas de antes; nada mudou dentro delas.'},
+    {x:'O Manual do sistema agora fica em Ajuda › Manual do sistema (antes ficava em Configurações).'}]},
   {k:'2026-11-14nfse',data:'2026-11-14',t:'Notas fiscais (NFS-e) pelo emissor nacional',itens:[
-    {x:'Controlacs › Notas fiscais: emite a NFS-e direto no emissor nacional, sem abrir o site do governo. Também pelo botão “Emitir NF” na receita do Financeiro.',para:'master'},
+    {x:'Controlacs › Notas fiscais: tela para emitir a NFS-e direto no emissor nacional, sem abrir o site do governo. Também pelo botão “Emitir NF” na receita do Financeiro. ATENÇÃO: o envio automático ainda está em preparação; por enquanto, continue emitindo pelo site do emissor nacional.',para:'master'},
     {x:'Cada nota pode ser impressa, baixada em XML ou cancelada (com o motivo). Busca por qualquer coluna. Começa em modo Teste, que não vale como nota; a troca para Produção fica em “Dados fiscais”.',para:'master'}]},
   {k:'2026-11-13repasses-juntos',data:'2026-11-13',t:'Repasses pagos juntos numa linha só e Relatório de repasses',itens:[
     {x:'Gestão financeira › Contas a pagar: os repasses pagos juntos no mesmo dia (ex.: remessa que o banco mostra numa linha só) aparecem numa linha só, com a soma, os nomes dos parceiros e a etiqueta “🔗 N lançamentos juntos · ▼ detalhar”. Clique na linha para ver cada repasse; clique de novo para esconder. A caixa de seleção da linha marca todos os repasses dela.',para:'esc',mods:['gfpagar']},
