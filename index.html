@@ -571,6 +571,11 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 #novaVersao .btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 /* Controlacs, Configurações e Ajuda no canto direito do topo, ao lado do nome (Carol, 15/11) */
 .topmods{display:flex;gap:4px;align-items:center}
+/* perfil Controlacs (Carol, 15/11): faixa de módulos com o botão de voltar ao Portal do Cliente */
+.modbtn.modvolta{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.modbtn.modvolta:hover{filter:brightness(1.08)}
+.ctlperfil{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--brand);white-space:nowrap}.ctlperfil svg{width:18px;height:18px}
+@media (max-width:700px){.modbtn.modvolta span{display:inline}.ctlperfil{display:none}}
 .topmods[hidden]{display:none}
 .topbtn{display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid transparent;background:transparent;color:rgba(255,255,255,.85);font:600 11px var(--body);padding:5px 9px;border-radius:10px;cursor:pointer;white-space:nowrap;position:relative;transition:background .15s}
 .topbtn svg{width:21px;height:21px}
@@ -1714,6 +1719,7 @@ const ICO={
   m_esc:'<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
   m_ctl:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M11 13v2h2v-2"/>',
   engr:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  volta:'<path d="M19 12H5M11 18l-6-6 6-6"/>',
   ajuda:'<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
@@ -1824,10 +1830,19 @@ function renderNav(){
   const tops=TOPMODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n)));
   $('topmods').hidden=!tops.length;
   $('topmods').innerHTML=tops.map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
-    return `<button type="button" class="topbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('');
+    return `<button type="button" class="topbtn" data-mod="${m.g}"${m.g==='Controlacs'?'':' aria-haspopup="true"'} aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('');
   $('mega').classList.toggle('dir',TOPMODS.some(t=>t.g===MEGA.g));
+  // perfil Controlacs: o ícone Controlacs entra direto na gestão da Controlacs e a faixa de módulos
+  // vira o botão "Voltar para o Portal do Cliente" (Carol, 15/11)
+  const ctl=String(VIEW||'').startsWith('ctl');document.body.classList.toggle('perfilctl',ctl);
+  const lg=$('logo').querySelector('small');if(lg)lg.textContent=ctl?'Gestão Controlacs':'Portal do Cliente';
+  if(ctl)$('nav').innerHTML=`<button type="button" class="modbtn modvolta" data-volta="1" title="Voltar para o Portal do Cliente">${svgI('volta')}<span>Voltar para o Portal do Cliente</span></button><span class="modsep" aria-hidden="true"></span><span class="ctlperfil">${svgI('m_ctl')}Perfil Controlacs</span>`+(atual?`<span class="crumb">Controlacs › <b>${esc(atual.t)}</b></span>`:'');
   if(MEGA.g)megaDesenha();
 }
+// última tela do Portal do Cliente, para o botão "Voltar" do perfil Controlacs
+let PORTAL_VOLTA=null;
+function voltaPortal(){const itens=navItens().filter(n=>!n.k.startsWith('ctl'));
+  const v=itens.some(n=>n.k===PORTAL_VOLTA)?PORTAL_VOLTA:itens.some(n=>n.k==='gfdash')?'gfdash':itens[0]?.k;if(v)go(v)}
 function megaDesenha(){
   const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&n.k!=='gfdash'&&!n.aba);
   if(!itens.length)return megaFecha();
@@ -1837,7 +1852,7 @@ function megaDesenha(){
 function megaAbre(g){clearTimeout(MEGA.t);if(MEGA.g===g)return;MEGA.g=g;$('mega').hidden=false;renderNav()}
 function megaFecha(){clearTimeout(MEGA.t);if(!MEGA.g)return;MEGA.g=null;$('mega').hidden=true;renderNav()}
 const PASSA=matchMedia('(hover:hover) and (pointer:fine)');
-$('nav').addEventListener('click',e=>{const h=e.target.closest('[data-home]');if(h){megaFecha();return go(h.dataset.home)}
+$('nav').addEventListener('click',e=>{if(e.target.closest('[data-volta]')){megaFecha();return voltaPortal()}const h=e.target.closest('[data-home]');if(h){megaFecha();return go(h.dataset.home)}
   const b=e.target.closest('[data-mod]');if(!b)return;const g=b.dataset.mod;
   if(MEGA.g===g&&!(PASSA.matches&&MEGA.aberto>Date.now()-400))megaFecha();else{megaAbre(g);$('mega').querySelector('.megaitem')?.focus({preventScroll:true})}});
 $('nav').addEventListener('mouseover',e=>{const b=e.target.closest('[data-mod]');if(b&&PASSA.matches&&MEGA.g!==b.dataset.mod){megaAbre(b.dataset.mod);MEGA.aberto=Date.now()}});
@@ -1845,6 +1860,7 @@ $('modrow').addEventListener('mouseleave',()=>{if(PASSA.matches)MEGA.t=setTimeou
 $('modrow').addEventListener('mouseenter',()=>clearTimeout(MEGA.t));
 $('mega').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b){megaFecha();go(b.dataset.v)}});
 $('topmods').addEventListener('click',e=>{const b=e.target.closest('[data-mod]');if(!b)return;const g=b.dataset.mod;
+  if(g==='Controlacs'){megaFecha();if(!String(VIEW||'').startsWith('ctl'))go('ctlpainel');return}
   if(MEGA.g===g)megaFecha();else{megaAbre(g);$('mega').querySelector('.megaitem')?.focus({preventScroll:true})}});
 document.addEventListener('pointerdown',e=>{if(MEGA.g&&!$('modrow').contains(e.target)&&!$('topmods').contains(e.target))megaFecha()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MEGA.g){const g=MEGA.g;megaFecha();$('nav').querySelector(`[data-mod="${g}"]`)?.focus()}});
@@ -1949,7 +1965,7 @@ function limpaFiltros(){
   NFP.cli=null;   // Notas fiscais › repasses pagos: volta para a empresa escolhida no alto
 }
 // ajusta: filtro que o link já quer aplicar (ex.: "a validar" do Dashboard), depois da limpeza
-function go(v,ajusta){if(!eqPode(v))return;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
+function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ctl'))PORTAL_VOLTA=VIEW;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
 // a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
 // tela única de Parceiros: Cadastro e contas, Repasse da semana e Notas fiscais em abas (Carol, 04/11)
 // cada aba é a tela de antes; quem só tem o cadastro (o cliente) não vê a barra de abas
