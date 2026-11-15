@@ -569,6 +569,20 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 #novaVersao .nvvt{flex:1 1 260px;min-width:0}#novaVersao .nvvt b{display:block;font-size:15.5px;margin-bottom:2px}
 #novaVersao .nvvb{display:flex;gap:8px;flex-wrap:wrap}
 #novaVersao .btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+/* Controlacs, Configurações e Ajuda no canto direito do topo, ao lado do nome (Carol, 15/11) */
+.topmods{display:flex;gap:4px;align-items:center}
+.topmods[hidden]{display:none}
+.topbtn{display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid transparent;background:transparent;color:rgba(255,255,255,.85);font:600 11px var(--body);padding:5px 9px;border-radius:10px;cursor:pointer;white-space:nowrap;position:relative;transition:background .15s}
+.topbtn svg{width:21px;height:21px}
+.topbtn:hover{background:rgba(255,255,255,.14);color:#fff}
+.topbtn[aria-current="true"]{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:#fff}
+.topbtn[aria-expanded="true"]{background:#fff;color:var(--brand)}
+.topbtn .nbadge{position:absolute;top:0;right:2px;min-width:16px;text-align:center;font-size:10px;font-weight:700;background:var(--bad);color:#fff;border-radius:999px;padding:1px 4px}
+.megapop.dir{left:auto;right:max(16px,env(safe-area-inset-right,0px));min-width:300px;max-width:min(720px,calc(100vw - 32px))}
+.topmods:not([hidden])+.who{padding-left:12px;border-left:1px solid rgba(255,255,255,.25)}
+@media (max-width:700px){.topbtn span:not(.nbadge){display:none}.topbtn{padding:5px 6px}.topbtn svg{width:19px;height:19px}.megapop.dir{left:0;right:0;max-width:none}.topmods:not([hidden])+.who{padding-left:0;border-left:0}
+  /* no celular: logo, nome e Sair na 1ª linha; os três ícones ao lado da empresa na 2ª */
+  .topmods{order:9;gap:2px}.topin:has(.topmods:not([hidden])) .ctxbar{order:10;flex:1 1 calc(100% - 140px);min-width:0}}
 </style>
 </head>
 <body>
@@ -577,6 +591,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="logo" id="logo"><span class="chip-logo"><img src="logo.png" alt="Controlacs Gestão Empresarial"></span><small>Portal do Cliente</small></div>
     <div class="ctxbar" id="ctxbar" hidden><span>Empresa</span><select id="escCli" aria-label="Empresa"></select></div>
     <span class="spacer"></span>
+    <nav class="topmods" id="topmods" aria-label="Controlacs, Configurações e Ajuda" hidden></nav>
     <div class="who" id="who" hidden></div>
     <button class="btn small" id="btnSair" hidden>Sair</button>
   </div>
@@ -1697,6 +1712,8 @@ const ICO={
   m_com:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/>',
   m_esc:'<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
   m_ctl:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M11 13v2h2v-2"/>',
+  engr:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  ajuda:'<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
 const NAV=[
@@ -1773,12 +1790,14 @@ const NAV=[
   {k:'ctlserv',t:'Serviços',g:'Controlacs',s:'Cadastros',ok:ehAdm},
   {k:'ctldocs',t:'Documentos e contratos assinados',g:'Controlacs',s:'Cadastros',ok:ehAdm},
   // manual com prints e explicação de cada tela, para todos os usuários (Carol, 04/11). Toda melhoria atualiza também o MANUAL
-  {k:'manual',t:'Manual do sistema',g:'Configurações',s:'Ajuda',ok:()=>!!ME},
+  {k:'manual',t:'Manual do sistema',g:'Ajuda',s:'Ajuda',ok:()=>!!ME},
   // Configurações › Fornecedores (Bom Controle) foi unificado em Gestão financeira › Clientes e fornecedores (Carol, 04/11)
 ];
 const NAVBADGE={};
 // módulos no topo (um ícone cada); as seções e as telas abrem num painel, como no Bom Controle
 const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'cfg'}];
+// Controlacs, Configurações e Ajuda saem da faixa de módulos e ficam no canto direito do topo, ao lado do nome (Carol, 15/11)
+const TOPMODS=[{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'engr'},{g:'Ajuda',i:'ajuda'}];
 const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado','Ajuda'];
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
@@ -1796,9 +1815,14 @@ function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
   // atalho do Dashboard no início dos módulos (Carol, 30/10); ele não aparece mais dentro da Gestão financeira (Carol, 03/11)
   const noGrp=n=>n.k!=='gfdash'&&!n.aba;
-  $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n))).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
+  $('nav').innerHTML=(dash?`<button type="button" class="modbtn modhome" data-home="gfdash"${naDash?' aria-current="true"':''} title="Dashboard da empresa">${svgI('gfdash')}<span>Dashboard</span></button><span class="modsep" aria-hidden="true"></span>`:'')+MODS.filter(m=>!TOPMODS.some(t=>t.g===m.g)&&itens.some(n=>navGrp(n)===m.g&&noGrp(n))).map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
     return `<button type="button" class="modbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.c||m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('')
     +(atual?`<span class="crumb">${naDash?'<b>Dashboard</b>':`${navGrp(atual)} › <b>${esc(atual.t)}</b>`}</span>`:'');
+  const tops=TOPMODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n)));
+  $('topmods').hidden=!tops.length;
+  $('topmods').innerHTML=tops.map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
+    return `<button type="button" class="topbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('');
+  $('mega').classList.toggle('dir',TOPMODS.some(t=>t.g===MEGA.g));
   if(MEGA.g)megaDesenha();
 }
 function megaDesenha(){
@@ -1817,7 +1841,9 @@ $('nav').addEventListener('mouseover',e=>{const b=e.target.closest('[data-mod]')
 $('modrow').addEventListener('mouseleave',()=>{if(PASSA.matches)MEGA.t=setTimeout(megaFecha,300)});
 $('modrow').addEventListener('mouseenter',()=>clearTimeout(MEGA.t));
 $('mega').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b){megaFecha();go(b.dataset.v)}});
-document.addEventListener('pointerdown',e=>{if(MEGA.g&&!$('modrow').contains(e.target))megaFecha()});
+$('topmods').addEventListener('click',e=>{const b=e.target.closest('[data-mod]');if(!b)return;const g=b.dataset.mod;
+  if(MEGA.g===g)megaFecha();else{megaAbre(g);$('mega').querySelector('.megaitem')?.focus({preventScroll:true})}});
+document.addEventListener('pointerdown',e=>{if(MEGA.g&&!$('modrow').contains(e.target)&&!$('topmods').contains(e.target))megaFecha()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MEGA.g){const g=MEGA.g;megaFecha();$('nav').querySelector(`[data-mod="${g}"]`)?.focus()}});
 // empresas que a pessoa vê em pelo menos um módulo: a lista do topo traz sempre todas,
 // sem filtrar pelo módulo aberto (Carol, 29/10)
