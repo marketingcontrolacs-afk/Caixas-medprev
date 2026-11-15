@@ -270,6 +270,20 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .kcard .m{display:flex;gap:6px 12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.kcard .m .late{color:var(--bad);font-weight:700}
 .kcard .m .new{color:var(--bad);font-weight:700}
 .kchips{display:flex;gap:4px;flex-wrap:wrap}.kchips .chip{font-size:11px;padding:2px 7px}
+/* CRM da Controlacs (Carol, 15/11): funil com 7 etapas, follow-ups, histórico e propostas */
+.kanban.crmfunil{grid-template-columns:repeat(7,minmax(184px,1fr))}
+.crmsoma{font-size:12px;color:var(--muted);margin:-4px 4px 2px}
+#crmBar{flex-wrap:wrap;align-items:flex-end}#dlgCrm{width:min(860px,calc(100vw - 32px))}#crmBar[hidden]{display:none}#crmMaisF{display:none}@media (max-width:700px){#crmMaisF{display:inline-flex}#crmBar:not(.aberto) .crmf{display:none!important}}.crmlix{display:flex;align-items:center;gap:6px;font-size:14px;padding:0 4px 10px;white-space:nowrap}.crmlix input{width:auto}
+.crmvis{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}.crmvis button{border:0;background:var(--surface);color:var(--muted);font:600 13px var(--body);padding:8px 12px;cursor:pointer}
+.crmvis button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink)}
+.crmh{font-size:14px;margin:18px 0 6px}
+.crmadd{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.crmadd input:not([type=date]){flex:1;min-width:180px}.crmadd input[type=date]{max-width:160px}.crmadd select{max-width:160px}
+.crmlista{display:grid;gap:4px}.crmit{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+.crmit .tx{overflow-wrap:anywhere}.crmit .ac{display:flex;gap:4px;align-items:center}.crmit.feito .tx{text-decoration:line-through;color:var(--muted)}
+.crmservs{display:flex;flex-wrap:wrap;gap:6px}.crmsv{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:13px}.crmsv input[type=checkbox]{width:auto}.crmsv .money{width:96px;padding:4px 6px}
+#crmUndo{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;display:flex;gap:12px;align-items:center;background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:12px;box-shadow:var(--sh1);max-width:calc(100vw - 32px)}
+#crmUndo[hidden]{display:none}#crmUndo .btn{background:var(--surface);color:var(--ink)}
+@media (max-width:900px){.kanban.crmfunil{grid-template-columns:repeat(7,minmax(78vw,1fr))}.crmit{grid-template-columns:1fr auto}.crmit>span:first-child{grid-column:1/-1}}
 @media (max-width:900px){.kanban{grid-template-columns:repeat(4,minmax(78vw,1fr));scroll-snap-type:x mandatory}.kcol{scroll-snap-align:start}}
 .conv{display:grid;gap:8px;max-height:46vh;overflow:auto;padding-right:2px}
 .msg{border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:grid;gap:3px;font-size:14px}
@@ -571,6 +585,11 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 #novaVersao .btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 /* Controlacs, Configurações e Ajuda no canto direito do topo, ao lado do nome (Carol, 15/11) */
 .topmods{display:flex;gap:4px;align-items:center}
+/* perfil Controlacs (Carol, 15/11): faixa de módulos com o botão de voltar ao Portal do Cliente */
+.modbtn.modvolta{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.modbtn.modvolta:hover{filter:brightness(1.08)}
+.ctlperfil{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--brand);white-space:nowrap}.ctlperfil svg{width:18px;height:18px}
+@media (max-width:700px){.modbtn.modvolta span{display:inline}.ctlperfil{display:none}}
 .topmods[hidden]{display:none}
 .topbtn{display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid transparent;background:transparent;color:rgba(255,255,255,.85);font:600 11px var(--body);padding:5px 9px;border-radius:10px;cursor:pointer;white-space:nowrap;position:relative;transition:background .15s}
 .topbtn svg{width:21px;height:21px}
@@ -757,7 +776,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <label class="f mvf" hidden>Tipo<select id="mvTipo"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="transf">Transferências</option><option value="aporte">Aportes</option></select></label>
       <label class="f mvf gtf" hidden>Cliente ou fornecedor<input id="mvPessoa" list="mvPesList" autocomplete="off" style="max-width:200px"><datalist id="mvPesList"></datalist></label>
       <label class="f mvf" hidden>Categoria<select id="mvCat"></select></label>
-      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option><option value="validar">A validar (histórico)</option></select></label>
+      <label class="f mvf" hidden>Situação<select id="mvSit"><option value="">Todas</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasado</option><option value="pendente">Em aberto e atrasado</option><option value="pago">Pago ou recebido</option><option value="conciliado">Conciliado</option><option value="naoconc">Pago e não conciliado</option><option value="revisar">Categoria a revisar</option><option value="validar">A validar (histórico)</option><option value="tarefa">Com tarefa de conferência</option></select></label>
       <label class="f mvf gtf" hidden>Valor de<input id="mvVmin" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <label class="f mvf gtf" hidden>até<input id="mvVmax" class="money" inputmode="decimal" placeholder="0,00" style="max-width:110px"></label>
       <input id="gtBusca" placeholder="Buscar" style="max-width:240px">
@@ -767,7 +786,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <span class="expgrp" id="gtExp" data-exp="gt"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span>
     </div>
     <div class="cal" id="gtCal" hidden></div>
-    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small" data-mb="tarefa" title="Gera uma tarefa ligada a estes lançamentos para conferir e validar">📋 Gerar tarefa para conferir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
     <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table></div>
     <p class="note" id="gtNote"></p>
@@ -1054,6 +1073,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     </div>
     <div class="tabs" role="tablist" id="tabsCtl">
       <button type="button" role="tab" data-tab="ctlpainel">Painel</button>
+      <button type="button" role="tab" data-tab="ctlcrm">CRM</button>
       <button type="button" role="tab" data-tab="ctlcli">Clientes</button>
       <button type="button" role="tab" data-tab="ctlcont">Contratos e reajustes</button>
       <button type="button" role="tab" data-tab="ctlfin">Financeiro</button>
@@ -1062,6 +1082,23 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <button type="button" role="tab" data-tab="ctldocs">Documentos</button>
     </div>
     <div class="toolbar" id="ctBar"><label class="f" id="ctMesBox" hidden>Mês<input type="month" id="ctMes"></label><label class="f" id="ctTipoBox" hidden>Tipo<select id="ctTipo"><option value="">Receitas e despesas</option><option value="receita">Receitas</option><option value="despesa">Despesas</option></select></label><input id="ctBusca" placeholder="Buscar" style="max-width:280px"><label class="f" id="ctSitBox">Situação<select id="ctSit"><option value="">Todas</option></select></label></div>
+    <!-- CRM (v133): filtros de todas as colunas e busca em todos os campos (Carol, 15/11) -->
+    <div class="toolbar" id="crmBar" hidden>
+      <div class="crmvis" id="crmVis" role="group" aria-label="Visão"><button type="button" data-vis="funil">Funil</button><button type="button" data-vis="lista">Lista</button><button type="button" data-vis="fups">Follow-ups</button><button type="button" data-vis="props">Propostas</button></div>
+      <input type="search" id="crmBusca" placeholder="Buscar por qualquer campo, valor ou data" style="max-width:260px" aria-label="Buscar">
+      <button type="button" class="btn ghost" id="crmMaisF" aria-expanded="false">Filtros</button>
+      <label class="crmf f" id="crmEtBox">Etapa<select id="crmEt"><option value="abertas">Em aberto</option><option value="">Todas</option><option value="novo">Novo lead</option><option value="contato">Primeiro contato</option><option value="reuniao">Reunião / diagnóstico</option><option value="proposta">Proposta enviada</option><option value="negociacao">Negociação</option><option value="ganho">Ganho</option><option value="perdido">Perdido</option></select></label>
+      <label class="crmf f">Empresa ou contato<input id="crmEmp" style="max-width:170px"></label>
+      <label class="crmf f">Origem<select id="crmOrig"><option value="">Todas</option></select></label>
+      <label class="crmf f">Serviço<select id="crmServ"><option value="">Todos</option></select></label>
+      <label class="crmf f">Follow-up<select id="crmFup"><option value="">Todos</option><option value="atrasado">Atrasados</option><option value="hoje">Hoje</option><option value="semana">Até 7 dias</option><option value="sem">Sem follow-up</option></select></label>
+      <label class="crmf f">Valor de<input id="crmVmin" class="money" inputmode="decimal" placeholder="0,00" style="max-width:100px"></label>
+      <label class="crmf f">até<input id="crmVmax" class="money" inputmode="decimal" placeholder="0,00" style="max-width:100px"></label>
+      <label class="crmf f">Criada de<input type="date" id="crmIni"></label>
+      <label class="crmf f">até<input type="date" id="crmFim"></label>
+      <label class="crmf crmlix"><input type="checkbox" id="crmLixo"> Lixeira</label>
+      <button type="button" class="crmf btn ghost" id="crmLimpa">Limpar filtros</button>
+    </div>
     <div id="ctConteudo"></div>
     <p class="note" id="ctNote"></p>
   </section>
@@ -1421,6 +1458,11 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   <div class="db" id="ctdBody"></div>
   <div class="df" id="ctdFoot"></div>
 </dialog>
+<dialog id="dlgCrm">
+  <div class="dh"><h2 id="crmTitle"></h2><span class="spacer"></span><span id="crmChip" class="chips"></span></div>
+  <div class="db" id="crmBody"></div>
+  <div class="df" id="crmFoot"></div>
+</dialog>
 <dialog id="dlgProj">
   <div class="dh"><h2 id="pdTitle"></h2><span class="spacer"></span><span id="pdChip" class="chips"></span></div>
   <div class="db" id="pdBody"></div>
@@ -1512,6 +1554,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
   </form>
 </dialog>
 <div class="toast" id="toast" hidden></div>
+<div id="crmUndo" role="status" aria-live="polite" hidden></div>
 
 <script>
 (function(){
@@ -1642,7 +1685,7 @@ const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
-const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
+const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcrm','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
 const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 // permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
@@ -1714,6 +1757,7 @@ const ICO={
   m_esc:'<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
   m_ctl:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M11 13v2h2v-2"/>',
   engr:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  volta:'<path d="M19 12H5M11 18l-6-6 6-6"/>',
   ajuda:'<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
   cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
 };
@@ -1784,6 +1828,8 @@ const NAV=[
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   // Gestão da Controlacs: clientes, serviços, contratos, reajustes e documentos da própria Controlacs; só a Master (Carol, 05/11; v104)
   {k:'ctlpainel',t:'Painel e avisos de reajuste',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
+  // CRM: leads de clientes de BPO, funil, follow-ups e propostas (Carol, 15/11; v133)
+  {k:'ctlcrm',t:'CRM (leads e propostas)',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
   {k:'ctlcont',t:'Contratos e reajustes',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
   // financeiro só da Controlacs: mensalidades dos contratos, outras receitas e despesas (Carol, 05/11)
   {k:'ctlfin',t:'Financeiro da Controlacs',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
@@ -1813,7 +1859,7 @@ function serveEmp(n){
 }
 const navItens=()=>NAV.filter(n=>n.ok()&&eqPode(n.k)&&serveEmp(n));
 const svgI=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
-const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gfext'?'Tesouraria: lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':n.k==='repasse'?'Alterações de conta e parceiros novos para conferir':n.k==='ctlpainel'?'Reajustes chegando, contratos terminando ou documentos vencendo':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
+const navBadge=n=>NAVBADGE[n.k]?`<span class="nbadge" title="${n.k==='tesouraria'?'Empresas sem conferência física há mais de 7 dias':n.k==='gfext'?'Tesouraria: lançamentos alterados pelo cliente depois da revisão':n.k==='projetos'?(ehAdm()?'Pedidos para validar ou com mensagem nova':'Seus pedidos com resposta nova'):n.k==='ctbexp'?'Empresas com o portal da contabilidade ainda não configurado':n.k==='repasse'?'Alterações de conta e parceiros novos para conferir':n.k==='ctlpainel'?'Reajustes chegando, contratos terminando ou documentos vencendo':n.k==='ctlcrm'?'Follow-ups do CRM atrasados ou para hoje':'Com novidade'}">${NAVBADGE[n.k]}</span>`:'';
 function renderNav(){
   const itens=navItens(),atual=itens.find(n=>n.k===VIEW),dash=itens.some(n=>n.k==='gfdash'),naDash=VIEW==='gfdash';
   // atalho do Dashboard no início dos módulos (Carol, 30/10); ele não aparece mais dentro da Gestão financeira (Carol, 03/11)
@@ -1824,10 +1870,19 @@ function renderNav(){
   const tops=TOPMODS.filter(m=>itens.some(n=>navGrp(n)===m.g&&noGrp(n)));
   $('topmods').hidden=!tops.length;
   $('topmods').innerHTML=tops.map(m=>{const nb=itens.filter(n=>navGrp(n)===m.g).reduce((x,n)=>x+(NAVBADGE[n.k]||0),0);
-    return `<button type="button" class="topbtn" data-mod="${m.g}" aria-haspopup="true" aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('');
+    return `<button type="button" class="topbtn" data-mod="${m.g}"${m.g==='Controlacs'?'':' aria-haspopup="true"'} aria-controls="mega" aria-expanded="${MEGA.g===m.g}"${atual&&!naDash&&navGrp(atual)===m.g?' aria-current="true"':''} title="${m.g}">${svgI(m.i)}<span>${m.g}</span>${nb?`<span class="nbadge">${nb}</span>`:''}</button>`}).join('');
   $('mega').classList.toggle('dir',TOPMODS.some(t=>t.g===MEGA.g));
+  // perfil Controlacs: o ícone Controlacs entra direto na gestão da Controlacs e a faixa de módulos
+  // vira o botão "Voltar para o Portal do Cliente" (Carol, 15/11)
+  const ctl=String(VIEW||'').startsWith('ctl');document.body.classList.toggle('perfilctl',ctl);
+  const lg=$('logo').querySelector('small');if(lg)lg.textContent=ctl?'Gestão Controlacs':'Portal do Cliente';
+  if(ctl)$('nav').innerHTML=`<button type="button" class="modbtn modvolta" data-volta="1" title="Voltar para o Portal do Cliente">${svgI('volta')}<span>Voltar para o Portal do Cliente</span></button><span class="modsep" aria-hidden="true"></span><span class="ctlperfil">${svgI('m_ctl')}Perfil Controlacs</span>`+(atual?`<span class="crumb">Controlacs › <b>${esc(atual.t)}</b></span>`:'');
   if(MEGA.g)megaDesenha();
 }
+// última tela do Portal do Cliente, para o botão "Voltar" do perfil Controlacs
+let PORTAL_VOLTA=null;
+function voltaPortal(){const itens=navItens().filter(n=>!n.k.startsWith('ctl'));
+  const v=itens.some(n=>n.k===PORTAL_VOLTA)?PORTAL_VOLTA:itens.some(n=>n.k==='gfdash')?'gfdash':itens[0]?.k;if(v)go(v)}
 function megaDesenha(){
   const itens=navItens().filter(n=>navGrp(n)===MEGA.g&&n.k!=='gfdash'&&!n.aba);
   if(!itens.length)return megaFecha();
@@ -1837,7 +1892,7 @@ function megaDesenha(){
 function megaAbre(g){clearTimeout(MEGA.t);if(MEGA.g===g)return;MEGA.g=g;$('mega').hidden=false;renderNav()}
 function megaFecha(){clearTimeout(MEGA.t);if(!MEGA.g)return;MEGA.g=null;$('mega').hidden=true;renderNav()}
 const PASSA=matchMedia('(hover:hover) and (pointer:fine)');
-$('nav').addEventListener('click',e=>{const h=e.target.closest('[data-home]');if(h){megaFecha();return go(h.dataset.home)}
+$('nav').addEventListener('click',e=>{if(e.target.closest('[data-volta]')){megaFecha();return voltaPortal()}const h=e.target.closest('[data-home]');if(h){megaFecha();return go(h.dataset.home)}
   const b=e.target.closest('[data-mod]');if(!b)return;const g=b.dataset.mod;
   if(MEGA.g===g&&!(PASSA.matches&&MEGA.aberto>Date.now()-400))megaFecha();else{megaAbre(g);$('mega').querySelector('.megaitem')?.focus({preventScroll:true})}});
 $('nav').addEventListener('mouseover',e=>{const b=e.target.closest('[data-mod]');if(b&&PASSA.matches&&MEGA.g!==b.dataset.mod){megaAbre(b.dataset.mod);MEGA.aberto=Date.now()}});
@@ -1845,6 +1900,7 @@ $('modrow').addEventListener('mouseleave',()=>{if(PASSA.matches)MEGA.t=setTimeou
 $('modrow').addEventListener('mouseenter',()=>clearTimeout(MEGA.t));
 $('mega').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b){megaFecha();go(b.dataset.v)}});
 $('topmods').addEventListener('click',e=>{const b=e.target.closest('[data-mod]');if(!b)return;const g=b.dataset.mod;
+  if(g==='Controlacs'){megaFecha();if(!String(VIEW||'').startsWith('ctl'))go('ctlpainel');return}
   if(MEGA.g===g)megaFecha();else{megaAbre(g);$('mega').querySelector('.megaitem')?.focus({preventScroll:true})}});
 document.addEventListener('pointerdown',e=>{if(MEGA.g&&!$('modrow').contains(e.target)&&!$('topmods').contains(e.target))megaFecha()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&MEGA.g){const g=MEGA.g;megaFecha();$('nav').querySelector(`[data-mod="${g}"]`)?.focus()}});
@@ -1949,7 +2005,7 @@ function limpaFiltros(){
   NFP.cli=null;   // Notas fiscais › repasses pagos: volta para a empresa escolhida no alto
 }
 // ajusta: filtro que o link já quer aplicar (ex.: "a validar" do Dashboard), depois da limpeza
-function go(v,ajusta){if(!eqPode(v))return;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
+function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ctl'))PORTAL_VOLTA=VIEW;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
 // a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
 // tela única de Parceiros: Cadastro e contas, Repasse da semana e Notas fiscais em abas (Carol, 04/11)
 // cada aba é a tela de antes; quem só tem o cadastro (o cliente) não vê a barra de abas
@@ -7754,7 +7810,7 @@ function mvFiltra(L){
     if(TP.length&&!TP.some(tp=>tp==='transf'||tp==='aporte'?x.nat===tp:x.tipo===tp&&x.nat!=='transf'))return false;
     if(pe&&!chave(x.pessoa).includes(pe))return false;
     if(CAT.length&&!CAT.some(cat=>cat==='-'?!x.categoria&&x.nat!=='transf':x.categoria===cat))return false;
-    if(ST.length&&!ST.some(st=>st==='validar'?x.ref.validar:st==='revisar'?x.ref.cat_revisar:st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
+    if(ST.length&&!ST.some(st=>st==='tarefa'?!!MV.tlm?.get(x.id)?.some(l=>!l.validado_em):st==='validar'?x.ref.validar:st==='revisar'?x.ref.cat_revisar:st===x.st||st==='pendente'&&(x.st==='aberto'||x.st==='atrasado')||st==='pago'&&(x.st==='pago'||x.st==='conciliado')||st==='naoconc'&&x.st==='pago'))return false;
     if(ini&&x.data<ini||fim&&x.data>fim)return false;
     if(vn>0&&x.valor<vn||vx>0&&x.valor>vx)return false;
     return !q||buscaCasa($('gtBusca').value,[x.pessoa,x.descricao,x.documento,x.categoria,mvSt(x)[1],typeof contaNome==='function'?contaNome(x.conta_id):''],[x.valor],[x.data])});
@@ -7763,14 +7819,14 @@ const MVST={aberto:['c-none','Em aberto'],atrasado:['c-bad','Atrasado'],concilia
 const mvSt=x=>MVST[x.st]||['c-done',x.tipo==='entrada'?'Recebido':'Pago'];
 const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tipo==='entrada'?'Entrada':'Saída';
 function mvDesenha(){
-  const L=mvLinhas();GT.mvL=L;mvOpcoes(L);
+  const L=mvLinhas();GT.mvL=L;mvOpcoes(L);tlMapaSe();
   // datas no formato AAAA-MM-DD: comparar o texto direto dá a mesma ordem e é bem mais rápido que localeCompare
   const rows=mvFiltra(L).sort((a,b)=>(MV.asc?1:-1)*((a.data<b.data?-1:a.data>b.data?1:0)||(a.k==='t')-(b.k==='t')));
   const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>cnm.get(id)||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id));
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="mvTodos" title="Selecionar todos os ${rows.length} lançamentos do filtro"${todosSel?' checked':''}></th><th class="click" id="mvOrd" title="Inverter a ordem">Data ${MV.asc?'▲':'▼'}</th><th class="l">Tipo</th><th class="l">Conta</th><th class="l">Fornecedor ou cliente</th><th class="l">Descrição</th><th class="l">Documento</th><th>Entrada</th><th>Saída</th><th class="l">Situação</th></tr>`;
-  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}</td><td class="l">${esc(x.documento)||mu('—')}${faClip(x.k==='t'?x.id:x.ref?.titulo_id||x.id)}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l">${stIc(x.k==='m',x.k==='m'&&x.st==='conciliado',x.tipo!=='entrada')}<span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
+  $('gtBody').innerHTML=rows.slice(0,MV.lim).map(x=>{const s=mvSt(x);const kk=x.k+':'+x.id;return `<tr class="click${MV.sel.has(kk)?' sel':''}" data-mv="${kk}" tabindex="0"><td><input type="checkbox" data-mvsel="${kk}"${MV.sel.has(kk)?' checked':''} aria-label="Selecionar"></td><td>${dBR(x.data)}</td><td class="l"><span class="${x.nat==='transf'?'muted':x.tipo==='entrada'?'pos':'neg'}">${mvNat(x)}</span></td><td class="l">${esc(cn(x.conta_id))||mu('—')}</td><td class="l"><b>${esc(x.pessoa)||mu('—')}</b></td><td class="l">${esc(x.descricao)||mu('—')}${x.categoria?`<br>${mu(esc(x.categoria))}`:''}${x.ref.validar?`<br><span class="chip c-warn" style="white-space:normal;text-align:left" title="${esc(x.ref.validar)}">⚠ A validar: ${esc(x.ref.validar)}</span>`:''}${tlChips(x.id)}</td><td class="l">${esc(x.documento)||mu('—')}${faClip(x.k==='t'?x.id:x.ref?.titulo_id||x.id)}${x.parc?`<br>${mu('parcela '+x.parc)}`:''}</td><td class="pos">${x.tipo==='entrada'?fm(x.valor):''}</td><td class="neg">${x.tipo==='saida'?fm(x.valor):''}</td><td class="l">${stIc(x.k==='m',x.k==='m'&&x.st==='conciliado',x.tipo!=='entrada')}<span class="chip ${s[0]}">${s[1]}</span>${x.k==='t'&&x.ref.previsto?`<br><span class="chip c-warn">${prevTxt(x.ref)}</span>`:''}${x.ref.cat_revisar?'<br><span class="chip c-warn" title="A categoria foi inativada (estorno ou devolução). Escolha a categoria certa: o estorno usa a mesma categoria da venda ou da despesa.">Revisar categoria</span>':''}</td></tr>`}).join('')
     +(rows.length>MV.lim?`<tr><td></td><td class="l" colspan="9"><button class="btn ghost" id="mvMais">Mostrar mais ${Math.min(300,rows.length-MV.lim)} de ${rows.length-MV.lim} restantes</button></td></tr>`:'')
     ||`<tr><td></td><td class="l muted" colspan="9">${L.length?'Nada neste filtro.':'Nenhum lançamento nesta empresa ainda.'}</td></tr>`;
   const sv=f=>r2(rows.filter(f).reduce((a,x)=>a+x.valor,0)),fora=x=>x.nat!=='transf'||$('mvConta').value,qt=l=>l.length+(l.length===1?' lançamento':' lançamentos');
@@ -7837,6 +7893,7 @@ function mvBulk(){
 }
 $('mvBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-mb]');if(!b)return;const a=b.dataset.mb;
   if(a==='limpa'){MV.sel.clear();return gtDesenha()}
+  if(a==='tarefa')return tlGerar(mvSelRows());
   if(a==='cat')return mvTrocaAbre(mvSelRows());
   if(a==='valida'){const ids=mvSelRows().filter(x=>x.k==='m'&&x.ref.validar).map(x=>x.id);if(!ids.length)return;
     if(!confirm(`Marcar ${ids.length} ${ids.length===1?'lançamento':'lançamentos'} como ${ids.length===1?'validado':'validados'}?`))return;
@@ -11778,7 +11835,7 @@ async function abrirTarefa(t){
   $('tdChip').innerHTML=t?(t.cliente_id?`<span class="chip c-done">${esc(CLIENTES.find(c=>c.id===t.cliente_id)?.nome||'')}</span>`:'')+(t.interna&&e?'<span class="chip c-none">🔒 Interna</span>':''):'';
   const d=pode?'':' disabled',sel=(id,ops,v)=>`<select id="${id}"${d}>${ops.map(([k,n])=>`<option value="${k}"${k===v?' selected':''}>${esc(n)}</option>`).join('')}</select>`;
   let h='';
-  if(!t){const ls=e?empresasDe('tarefas'):tLancaEm(),cv=escCli.value;
+  if(!t){const ls=e?empresasDe('tarefas'):tLancaEm(),cv=TL_NOVO?.cli||escCli.value;
     h+=`<label class="f">Empresa<select id="td_cli">${e?'<option value="">Interna da Controlacs (sem empresa)</option>':''}${ls.map(c=>`<option value="${c.id}"${c.id===cv?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
   h+=`<div class="fields"><label class="f wide">Título *<input id="td_titulo" value="${esc(t?.titulo||'')}" maxlength="160" placeholder="Ex.: enviar extrato de setembro"${d}></label>
     <label class="f wide">Descrição<textarea id="td_desc" rows="3"${d}>${esc(t?.descricao||'')}</textarea></label>
@@ -11796,6 +11853,7 @@ async function abrirTarefa(t){
     h+=`<div class="alerta" style="margin:0"><b>Ciente da conclusão: ${n} de ${ev.length}</b><span class="note">Todos os envolvidos confirmam que viram a tarefa concluída.</span>
       <div class="chk">${ev.map(x=>{const c=tCienteDe(t,x.id);return `<span>${c?'✅':'⏳'} ${esc(x.nome)} <span class="muted">(${x.papeis.join(', ')})${c?' · '+dtBR(c.ciente_em):''}</span></span>`}).join('')}</div>
       ${me&&!eu?'<div><button type="button" class="btn small primary" data-act="ciente">Dar ciente</button></div>':''}</div>`}
+  h+=tlBox(t);
   if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
     ${pode?`<div style="display:grid;gap:8px;margin-top:10px"><textarea id="td_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
       <div class="row" style="gap:10px;align-items:center"><input type="file" id="td_file" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF">
@@ -11809,7 +11867,7 @@ async function abrirTarefa(t){
   if(t&&!t.cliente_id&&ib)ib.hidden=true;
   // responsável e executor: escolhidos pelo nome entre a equipe e os usuários da empresa da tarefa
   if($('td_respBox')){
-    const pessoas=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,ps=await tPessoas(cli),rv=$('td_resp')?.value??(t?t.responsavel||'':ME.user_id),xv=$('td_exec')?.value??(t?.executor||'');
+    const pessoas=async()=>{const cli=t?t.cliente_id:$('td_cli')?.value,ps=await tPessoas(cli),rv=$('td_resp')?.value??(t?t.responsavel||'':ME.user_id),xv=$('td_exec')?.value??(t?.executor||(!t&&TL_NOVO?.exec)||'');
       $('td_respBox').innerHTML=selPessoa('td_resp',ps,rv,'Ninguém',d);$('td_execBox').innerHTML=selPessoa('td_exec',ps,xv,'Ninguém ainda',d);
       // mais executores e validadores (quem precisa da informação, ex.: para uma conciliação)
       if($('td_partBox')){const marc=pp=>$('td_partBox').dataset.ok?pickLer('td_'+pp):(t?.tarefa_participantes||[]).filter(x=>x.papel===pp).map(x=>x.user_id);
@@ -11837,6 +11895,7 @@ async function abrirTarefa(t){
   }
   if(!dlgTar.open)dlgTar.showModal();
   if(t)tConversa(t);else $('td_titulo').focus();
+  if(t)tlCarrega(t);
 }
 async function tConversa(t){
   const {data,error}=await sb.from('tarefa_comentarios').select('*').eq('tarefa_id',t.id).order('criado_em');
@@ -11870,6 +11929,7 @@ async function tAcao(act,btn){
       const {data,error}=t?await sb.from('tarefas').update(r).eq('id',t.id).select().single():await sb.from('tarefas').insert(r).select().single();
       if(error)throw error;
       if(!t)await sb.from('tarefa_leituras').upsert({user_id:ME.user_id,tarefa_id:data.id},{onConflict:'user_id,tarefa_id'});
+      if(!t&&TL_NOVO)await tlVincula(data,TL_NOVO);
       if(e&&window.V85T&&$('td_partBox')?.dataset.ok){const ex=$('td_exec').value,vs=pickLer('td_validador'),xs=pickLer('td_executor').filter(u=>u!==ex&&!vs.includes(u)),vv=vs.filter(u=>u!==ex);
         const {error:e3}=await sb.from('tarefa_participantes').delete().eq('tarefa_id',data.id);if(e3)throw e3;
         const rows=[...xs.map(u=>({tarefa_id:data.id,user_id:u,papel:'executor'})),...vv.map(u=>({tarefa_id:data.id,user_id:u,papel:'validador'}))];
@@ -11930,6 +11990,116 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(!
   const alvo=b.dataset.pk==='grupo'?b.closest('.pkg'):pk,bs=[...alvo.querySelectorAll('input')],v=b.dataset.pk==='nenhum'?false:b.dataset.pk==='todos'?true:bs.some(x=>!x.checked);
   bs.forEach(x=>pk.querySelectorAll(`input[value="${x.value}"]`).forEach(y=>y.checked=v))});
 document.addEventListener('change',e=>{const x=e.target;if(x.type==='checkbox'&&x.closest('.pick'))x.closest('.pick').querySelectorAll(`input[value="${x.value}"]`).forEach(y=>y.checked=x.checked)});
+
+// =====================================================================
+// LANÇAMENTOS LIGADOS A TAREFAS (v135, Carol 15/11/2026): na Movimentação financeira o operador marca um ou
+// mais lançamentos com problema e gera uma tarefa para a Carol conferir e validar. A tarefa mostra os
+// lançamentos (e abre cada um) e o lançamento mostra a tarefa. Vale para todas as empresas.
+// Tudo com desfazer: "Desvincular" só marca removido_em; "Validar" guarda o aviso antigo em validar_antes.
+let TL_NOVO=null;   // lançamentos da tarefa que está sendo criada: {cli, exec, itens}
+const tlTem=async()=>{if(window.V135===undefined){const {error}=await sb.from('tarefa_lancamentos').select('id').limit(1);window.V135=!error}return window.V135};
+dlgTar.addEventListener('close',()=>{TL_NOVO=null});
+// vínculos ativos dos lançamentos da tela (busca de novo quando a empresa ou os dados mudam)
+function tlMapaSe(){
+  if(MV.tlK===GT.key)return;MV.tlK=GT.key;
+  (async()=>{if(!await tlTem())return;
+    const {data,error}=await sb.from('tarefa_lancamentos').select('id,tarefa_id,mov_id,titulo_id,validado_em,tarefas(titulo,status,arquivada)').is('removido_em',null);
+    if(error)return console.error(error);
+    const ids=new Set([...(GT.todos||[]).map(m=>m.id),...(GT.lista||[]).map(t=>t.id)]),m=new Map();
+    (data||[]).forEach(l=>{const k=l.mov_id||l.titulo_id;if(!l.tarefas||l.tarefas.arquivada||!k||!ids.has(k))return;(m.get(k)||m.set(k,[]).get(k)).push(l)});
+    MV.tlm=m;if(GT.modo==='gfmov'&&VIEW==='gfmov')mvDesenha()})();
+}
+function tlChips(id){
+  const ls=MV.tlm?.get(id);if(!ls)return '';const col=k=>TCOLS.find(c=>c[0]===k)?.[1]||k;
+  return ls.map(l=>`<br><span class="chip ${l.validado_em||l.tarefas.status==='concluida'?'c-done':'c-warn'}" data-tlt="${l.tarefa_id}" style="white-space:normal;text-align:left;cursor:pointer" title="Abrir a tarefa">📋 Tarefa: ${esc(l.tarefas.titulo)} · ${l.validado_em?'✓ validado':esc(col(l.tarefas.status))}</span>`).join('');
+}
+// clicar no selo da tarefa abre a tarefa (e não o lançamento)
+$('gtBody').addEventListener('click',e=>{const c=e.target.closest('[data-tlt]');if(!c)return;e.stopImmediatePropagation();e.preventDefault();tlAbreTarefa(c.dataset.tlt)},true);
+async function tlAbreTarefa(id){
+  await tVersoes();
+  const {data,error}=await sb.from('tarefas').select('*'+(window.V31?', tarefa_usuarios(user_id)':'')+T_SEL_EXTRA()).eq('id',id).maybeSingle();
+  if(error)return fail(error,'Não foi possível abrir a tarefa');
+  if(!data)return alert('Você não tem acesso a esta tarefa, ou ela foi excluída.');
+  abrirTarefa(data);
+}
+// Movimentação › marcar lançamentos › "📋 Gerar tarefa para conferir"
+async function tlGerar(ls){
+  if(!ls.length)return;
+  if(!await tlTem())return alert('Falta rodar no Supabase a atualização v135 (lançamentos ligados a tarefas).');
+  const cs=[...new Set(ls.map(x=>x.ref.cliente_id).filter(Boolean))];
+  if(cs.length!==1)return alert('Marque lançamentos de uma empresa só para gerar a tarefa (cada tarefa é de uma empresa).');
+  const d=ehEsc()?await dirUsuarios():null,adm=d?.equipe.find(u=>u.admin);
+  const itens=ls.map(x=>({cliente_id:cs[0],mov_id:x.k==='m'?x.id:null,titulo_id:x.k==='t'?x.id:null,
+    resumo:[dBR(x.data),mvNat(x)+' '+fm(x.valor),x.pessoa||x.descricao||'sem fornecedor ou cliente',contaNome(x.conta_id)||'',x.documento?'doc. '+x.documento:'',x.ref.validar?'A validar: '+x.ref.validar:''].filter(Boolean).join(' · ')}));
+  TL_NOVO={cli:cs[0],exec:adm?.id||'',itens};
+  await abrirTarefa(null);
+  const x=ls[0];
+  $('td_titulo').value=(ls.length===1?`Conferir lançamento: ${x.pessoa||x.descricao||mvNat(x)} ${fm(x.valor)} em ${dBR(x.data)}`:`Conferir ${ls.length} lançamentos`).slice(0,160);
+  $('td_desc').value='O que está errado: ';$('td_desc').focus();
+}
+function tlBox(t){
+  if(!t&&TL_NOVO){const n=TL_NOVO.itens.length;
+    return `<div class="alerta" style="margin:0;display:block"><b>📎 ${n===1?'Lançamento ligado a esta tarefa':n+' lançamentos ligados a esta tarefa'}</b>
+      <ul style="margin:6px 0;padding-left:18px">${TL_NOVO.itens.map(i=>`<li>${esc(i.resumo)}</li>`).join('')}</ul>
+      <span class="note">Escreva na descrição o que está errado. A tarefa abre o lançamento, e o lançamento mostra a tarefa na Movimentação financeira.</span></div>`}
+  return t?'<div id="td_lancBox" hidden></div>':'';
+}
+async function tlCarrega(t){
+  const box=$('td_lancBox');if(!box||!await tlTem())return;
+  const {data,error}=await sb.from('tarefa_lancamentos').select('*').eq('tarefa_id',t.id).order('criado_em');
+  if(TARDLG?.id!==t.id||!$('td_lancBox'))return;
+  if(error||!data?.length){box.hidden=true;return}
+  const mids=data.filter(l=>l.mov_id).map(l=>l.mov_id),tids=data.filter(l=>l.titulo_id).map(l=>l.titulo_id);
+  const [{data:ms},{data:ts}]=await Promise.all([mids.length?sb.from('fin_movimentos').select('id,validar').in('id',mids):{data:[]},tids.length?sb.from('fin_titulos').select('id').in('id',tids):{data:[]}]);
+  const mm=new Map((ms||[]).map(m=>[m.id,m])),tt=new Set((ts||[]).map(x=>x.id)),e=ehEsc();
+  const b=(act,id,txt,cl)=>`<button type="button" class="btn small ${cl||''}" data-tl="${act}" data-id="${id}">${txt}</button>`;
+  const at=data.filter(l=>!l.removido_em),rm=data.filter(l=>l.removido_em);
+  box.innerHTML=`<h3 style="margin-bottom:6px">📎 Lançamentos ligados a esta tarefa (${at.length})</h3><div style="display:grid;gap:8px">${at.map(l=>{
+      const m=l.mov_id?mm.get(l.mov_id):null,some=l.mov_id?!m:l.titulo_id?!tt.has(l.titulo_id):true;
+      const st=l.validado_em?`<span class="chip c-done">✓ Validado em ${dtBR(l.validado_em)}${l.validado_por?' por '+esc(nomeDe(l.validado_por)):''}</span>`
+        :some?'<span class="chip c-none">O lançamento foi apagado</span>':m?.validar?`<span class="chip c-warn" style="white-space:normal">⚠ A validar: ${esc(m.validar)}</span>`:'<span class="chip c-warn">Aguardando conferência</span>';
+      return `<div class="card" style="padding:10px 12px;display:grid;gap:8px;margin:0"><div>${esc(l.resumo||'')}</div><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">${st}<span class="spacer"></span>${some?'':b('abrir',l.id,'Abrir o lançamento')}${e?(l.validado_em?b('desvalida',l.id,'Desfazer validação','ghost'):some?'':b('valida',l.id,'✓ Validar','primary'))+b('remove',l.id,'Desvincular','ghost'):''}</div></div>`}).join('')||'<p class="note" style="margin:0">Nenhum lançamento ligado.</p>'}
+    ${rm.length?`<p class="note" style="margin:0">${rm.map(l=>`Desvinculado em ${dtBR(l.removido_em)}: ${esc(l.resumo||'')} ${e?b('volta',l.id,'Desfazer','ghost'):''}`).join('<br>')}</p>`:''}</div>
+    ${e&&at.length?'<p class="note" style="margin:0">✓ Validar tira o aviso “A validar” do lançamento. Desfazer validação devolve o aviso como estava.</p>':''}`;
+  box._ls=data;box.hidden=false;
+}
+async function tlAbreLanc(l){
+  const cli=l.cliente_id,id=l.mov_id||l.titulo_id,k=l.mov_id?'m':'t';
+  if(!cli||!escCli.querySelector(`option[value="${cli}"]`))return alert('Você não tem acesso à empresa deste lançamento.');
+  dlgTar.close();
+  if(escCli.value!==cli){escCli.value=cli;guardaEmp()}
+  GT.key='';go('gfmov');
+  const ok=()=>GT.modo==='gfmov'&&(k==='m'?GT.todos:GT.lista)?.some(x=>x.id===id&&x.cliente_id===cli);
+  for(let i=0;i<50&&!ok();i++)await new Promise(r=>setTimeout(r,300));
+  if(!ok())return toast('Não achei o lançamento. Ele pode ter sido apagado ou baixado.');
+  mvAbre({dataset:{mv:k+':'+id}});
+}
+async function tlVincula(tar,N){
+  const {error}=await sb.from('tarefa_lancamentos').insert(N.itens.map(i=>({...i,tarefa_id:tar.id})));if(error)throw error;
+  MV.tlK=null;MV.sel.clear();if(VIEW==='gfmov')mvDesenha();
+}
+$('tdBody').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-tl]');if(!b)return;const t=TARDLG,l=($('td_lancBox')?._ls||[]).find(x=>x.id===b.dataset.id);if(!t||!l)return;
+  const a=b.dataset.tl;if(a==='abrir')return tlAbreLanc(l);
+  const agora=new Date().toISOString(),up=async r=>{const {error}=await sb.from('tarefa_lancamentos').update(r).eq('id',l.id);if(error)throw error};
+  b.disabled=true;
+  try{
+    if(a==='valida'){let antes=null;
+      if(l.mov_id){const {data:m,error:e0}=await sb.from('fin_movimentos').select('validar').eq('id',l.mov_id).maybeSingle();if(e0)throw e0;antes=m?.validar||null;
+        if(antes){const {error:e1}=await sb.from('fin_movimentos').update({validar:null}).eq('id',l.mov_id);if(e1)throw e1}}
+      await up({validado_em:agora,validado_por:ME.user_id,validar_antes:antes});toast('Lançamento validado');
+    }else if(a==='desvalida'){
+      if(l.mov_id&&l.validar_antes){const {error:e1}=await sb.from('fin_movimentos').update({validar:l.validar_antes}).eq('id',l.mov_id);if(e1)throw e1}
+      await up({validado_em:null,validado_por:null,validar_antes:null});toast('Validação desfeita');
+    }else if(a==='remove'){
+      if(!confirm('Desvincular este lançamento da tarefa? O lançamento não muda, e dá para desfazer.'))return;
+      await up({removido_em:agora,removido_por:ME.user_id});toast('Lançamento desvinculado');
+    }else if(a==='volta'){await up({removido_em:null,removido_por:null});toast('Lançamento ligado de novo')}
+    MV.tlK=null;if(VIEW==='gfmov'){if(a.includes('valida'))GT.key='';renderGT()}
+    await tlCarrega(t);
+  }catch(err){console.error(err);tdErr('Não foi possível. '+(err.message||'Verifique a internet e tente de novo.'))}
+  finally{b.disabled=false}
+});
 
 // =====================================================================
 // AVISOS E NOTÍCIAS
@@ -12058,6 +12228,8 @@ async function ctCarrega(){
   // NFS-e (v131); sem a v131 o resto continua funcionando
   const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em').order('criado_em',{ascending:false})]);
   CTL.nsOk=!ne.error&&!nn.error;CTL.nsEmit=ne.data||[];CTL.ns=nn.data||[];
+  // CRM (v133); sem a v133 o resto continua funcionando
+  await crmCarrega().catch(()=>{CRM.ok=false});
 }
 // número vermelho no menu: reajustes atrasados ou próximos, contratos terminando e documentos vencendo
 async function ctlBadge(){
@@ -12067,23 +12239,25 @@ async function ctlBadge(){
 }
 function ctBadgeCalc(){
   const n=CTL.cont.filter(c=>ctReaj(c)==='atrasado'||ctReaj(c)==='proximo'||ctFim(c)).length+CTL.docs.filter(ctDocVence).length+CTL.lanc.filter(l=>l.tipo==='receita'&&ctLSit(l)==='atrasado').length;
+  const nc=crmBadgeN();if((NAVBADGE.ctlcrm||0)!==nc){NAVBADGE.ctlcrm=nc;if((NAVBADGE.ctlpainel||0)===n)renderNav()}
   if((NAVBADGE.ctlpainel||0)!==n){NAVBADGE.ctlpainel=n;renderNav()}
 }
 const CTSITBOX={ctlnfse:{emitida:'Emitidas',cancelada:'Canceladas',rejeitada:'Recusadas (não viraram nota)'},ctlfin:{aberto:'Em aberto',atrasado:'Atrasados (todos os meses)',pago:'Pagos e recebidos'},ctlcli:CTSIT.ctlcli,ctlcont:CTSIT.ctlcont,ctlserv:{ativo:'Ativos',inativo:'Inativos'},ctldocs:CTDOC};
 async function renderCtl(){
   document.querySelectorAll('#tabsCtl button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===VIEW));
-  const box=CTSITBOX[VIEW];$('ctBar').hidden=VIEW==='ctlpainel';$('ctSitBox').firstChild.textContent=VIEW==='ctldocs'?'Tipo':'Situação';
+  const box=CTSITBOX[VIEW];$('ctBar').hidden=VIEW==='ctlpainel'||VIEW==='ctlcrm';$('crmBar').hidden=VIEW!=='ctlcrm';$('ctSitBox').firstChild.textContent=VIEW==='ctldocs'?'Tipo':'Situação';
   if(box&&$('ctSit').dataset.t!==VIEW){$('ctSit').innerHTML=`<option value="">${VIEW==='ctldocs'?'Todos':'Todas'}</option>`+ctOpts(box,'');$('ctSit').dataset.t=VIEW;
     if(VIEW==='ctlcli')$('ctSit').value='ativo';if(VIEW==='ctlcont')$('ctSit').value='vigente';if(VIEW==='ctlserv')$('ctSit').value='ativo'}
   $('ctMesBox').hidden=VIEW!=='ctlfin'&&VIEW!=='ctlnfse';$('ctTipoBox').hidden=VIEW!=='ctlfin';if(!$('ctMes').value)$('ctMes').value=TODAY.slice(0,7);
   $('ctBusca').placeholder={ctlnfse:'Buscar por número, tomador, CNPJ, descrição, valor ou data',ctlfin:'Buscar descrição, cliente ou categoria',ctlcli:'Buscar por nome, CNPJ/CPF ou contato',ctlcont:'Buscar por contrato ou cliente',ctlserv:'Buscar serviço',ctldocs:'Buscar documento ou cliente'}[VIEW]||'Buscar';
-  $('ctAcoes').innerHTML={ctlnfse:'<button class="btn" data-ctnovo="nfxml">Baixar XMLs</button><button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
+  $('ctAcoes').innerHTML={ctlcrm:'<button class="btn primary" data-ctnovo="crmnova">+ Nova oportunidade</button>',ctlnfse:'<button class="btn" data-ctnovo="nfxml">Baixar XMLs</button><button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
   $('ctConteudo').innerHTML='<p class="note">Carregando…</p>';
   try{await ctCarrega()}catch(e){console.error(e);$('ctConteudo').innerHTML=`<div class="alerta bad"><b>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Esta área precisa da atualização v104 do banco.':'Erro ao carregar.'}</b><span>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Rode o SQL “v104 - Gestao da Controlacs” no Supabase e atualize a página.':'Verifique a internet e tente de novo.'}</span></div>`;return}
   ctDesenha();ctBadgeCalc();
   if(CTL.assOk&&CTL.ass.some(a=>a.status==='enviado')&&Date.now()-CTL.assVer>6e5){CTL.assVer=Date.now();ctAssAtualiza(null,true)}
 }
 function ctDesenha(){
+  if(VIEW==='ctlcrm'){crmOpcoes();return crmDesenha()}
   const b=$('ctBusca').value.trim().toLowerCase(),sit=$('ctSit').value,tem=(...x)=>!b||x.some(v=>String(v||'').toLowerCase().includes(b));
   const tab=(head,rows,vazio)=>`<div class="card tablebox"><table><thead><tr>${head}</tr></thead><tbody>${rows||`<tr><td class="l muted" colspan="9">${vazio}</td></tr>`}</tbody></table></div>`;
   const vig=CTL.cont.filter(c=>c.situacao==='vigente');
@@ -12167,6 +12341,7 @@ function ctDesenha(){
 $('ctBusca').oninput=ctDesenha;$('ctSit').onchange=ctDesenha;$('ctMes').onchange=ctDesenha;$('ctTipo').onchange=ctDesenha;
 $('tabsCtl').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&b.dataset.tab!==VIEW)go(b.dataset.tab)});
 $('ctAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-ctnovo]');if(!b)return;const t=b.dataset.ctnovo;
+  if(t==='crmnova')return crmAbre(null);
   if(t==='nfxml')return nsAbreLote();if(t==='nfcfg')return nsAbreCfg();if(t==='nfemit')return nsAbreEmit();
   if(t==='gerar')return ctGera(b);if(t==='receita'||t==='despesa')return ctAbreLanc(null,t);
   if(t==='cli')ctAbreCli(null);else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
@@ -13102,11 +13277,28 @@ const MANUAL=[
   {g:'Gestão da Controlacs (só a Master)',itens:[
     {k:'ctlpainel',t:'Painel e avisos de reajuste',img:'ctlpainel.png',
       txt:`<p>A área de gestão da própria Controlacs: os seus clientes, os serviços que você presta, os contratos, os reajustes e os documentos. <b>Só a Master vê</b> esta área; a equipe e os clientes não têm acesso, nem aos arquivos.</p>
+<p>Para entrar, clique no ícone <b>Controlacs</b> no canto direito do topo: o portal abre direto o <b>perfil Controlacs</b>. Para sair, use o botão <b>← Voltar para o Portal do Cliente</b>, no lugar da faixa de módulos; ele volta para a última tela em que você estava.</p>
 <ul>
 <li>No alto: clientes ativos, contratos vigentes, receita mensal contratada (soma dos contratos vigentes) e reajustes nos próximos 60 dias.</li>
 <li><b>Reajustes atrasados ou chegando:</b> os contratos com reajuste vencido (vermelho) ou dentro do prazo de aviso do contrato (amarelo), com o valor reajustado calculado. Clique em <b>Aplicar reajuste</b> para registrar.</li>
 <li><b>Contratos terminando</b> e <b>Documentos vencendo</b> (validade nos próximos 30 dias).</li>
 <li>O número vermelho no menu <b>Controlacs</b> soma esses avisos.</li>
+</ul>`},
+    {k:'ctlcrm',t:'CRM (leads e propostas)',img:'ctlcrm.png',
+      txt:`<p>O CRM guarda as empresas interessadas nos serviços da Controlacs, do primeiro contato até virar cliente. <b>Só a Master vê.</b></p>
+<ol>
+<li>Clique em <b>+ Nova oportunidade</b>: nome da empresa, contato, telefone, de onde veio (origem), os serviços de interesse e o valor mensal estimado. Já marque o primeiro follow-up (a data do próximo contato).</li>
+<li><b>Funil:</b> cada coluna é uma etapa. <b>Arraste o cartão</b> para a etapa nova (no celular, abra o cartão e troque a etapa). Embaixo aparece o aviso com <b>Desfazer</b>.</li>
+<li>Dentro da oportunidade: <b>Próximos contatos (follow-ups)</b> com data e o que fazer (botão <b>Feito</b>, com Desfazer); <b>Histórico</b> de ligações, WhatsApp, e-mails, reuniões e anotações; e <b>Propostas</b>.</li>
+<li><b>Proposta:</b> número automático, serviços e valores, validade (padrão 15 dias), arquivo e o botão <b>Imprimir / PDF</b>. Ao salvar como <i>Enviada</i>, a oportunidade vai para “Proposta enviada”; como <i>Aceita</i>, o portal pergunta se marca como ganho.</li>
+<li><b>Ganho!</b>: pode cadastrar a empresa como cliente da Controlacs na hora (aba Clientes) e depois usar <b>Criar contrato</b>, que abre o contrato já preenchido. <b>Desfazer conversão</b> apaga o cliente se ele ainda não tiver contrato, documento nem lançamento.</li>
+<li><b>Perdido:</b> o portal pergunta o motivo, para você ver depois por que perdeu.</li>
+</ol>
+<ul>
+<li>No alto: oportunidades abertas e o valor mensal no funil, a previsão ponderada (valor × chance da etapa), follow-ups atrasados, ganhos do mês e a taxa de conversão dos últimos 12 meses.</li>
+<li>Visões <b>Funil</b>, <b>Lista</b>, <b>Follow-ups</b> e <b>Propostas</b>. Filtros por etapa, empresa ou contato, origem, serviço, follow-up, valor e data de criação; a busca acha por qualquer campo, valor ou data.</li>
+<li><b>Excluir</b> manda para a <b>Lixeira</b> (marque “Lixeira” nos filtros); de lá dá para <b>Restaurar</b> ou excluir de vez.</li>
+<li>O número vermelho no ícone Controlacs soma os follow-ups atrasados ou para hoje.</li>
 </ul>`},
     {k:'ctlcont',t:'Contratos e reajustes',
       txt:`<ol>
@@ -13331,7 +13523,358 @@ async function agBadge(){
 // até ela clicar em "Visualizei" (gravado em novidades_vistas, v76; o escritório vê quem já viu, em Avisos).
 // Para avisar uma atualização nova, acrescente no COMEÇO da lista. para: 'esc' só o escritório; mods: só quem vê algum desses módulos.
 // =====================================================================
+// ---------- CRM da Controlacs (v133; Carol, 15/11): leads de clientes de BPO, funil, follow-ups e propostas ----------
+// Aba "CRM" dentro da Gestão da Controlacs; só a Master (RLS eh_admin, como as outras tabelas ctl_*).
+// REGRA: tudo tem Desfazer (mudança de etapa, follow-up feito, exclusão, conversão em cliente, proposta apagada).
+const CRM={ok:false,op:[],at:[],pr:[],vis:'funil',dlg:null,drag:null,undo:null};
+const CRMET={novo:['Novo lead',10],contato:['Primeiro contato',20],reuniao:['Reunião / diagnóstico',40],proposta:['Proposta enviada',60],negociacao:['Negociação',80],ganho:['Ganho',100],perdido:['Perdido',0]};
+const CRMABERTA=['novo','contato','reuniao','proposta','negociacao'];
+const CRMORIG=['Indicação de cliente','Indicação de parceiro','Site','Instagram','Google','WhatsApp','LinkedIn','Evento','Ligação ativa','Outro'];
+const CRMATV={ligacao:'📞 Ligação',whatsapp:'💬 WhatsApp',email:'✉️ E-mail',reuniao:'🤝 Reunião',visita:'🚗 Visita',nota:'📝 Anotação',etapa:'➜ Etapa',tarefa:'⏰ Follow-up'};
+const CRMPROP={rascunho:['c-none','Rascunho'],enviada:['c-warn','Enviada'],aceita:['c-ok','Aceita'],recusada:['c-bad','Recusada']};
+const CRMPERDA=['Preço','Escolheu outro escritório','Ficou com o contador atual','Não respondeu','Sem orçamento agora','Não era o perfil','Outro'];
+const crmEtChip=e=>{const c={ganho:'c-ok',perdido:'c-bad',negociacao:'c-warn',proposta:'c-warn'}[e]||'c-done';return `<span class="chip ${c}">${esc(CRMET[e]?.[0]||e)}</span>`};
+const crmMon=v=>v==null||v===''?'':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const crmNul=x=>Object.fromEntries(Object.entries(x).map(([k,v])=>[k,v===undefined?null:v]));
+const crmProb=o=>o.probabilidade!=null?o.probabilidade:(CRMET[o.etapa]?.[1]??0);
+async function crmCarrega(){
+  const [a,b,c]=await Promise.all([sb.from('ctl_crm_oportunidades').select('*').order('criado_em',{ascending:false}),sb.from('ctl_crm_atividades').select('*').order('quando',{ascending:false}),sb.from('ctl_crm_propostas').select('*').order('criado_em',{ascending:false})]);
+  CRM.ok=!(a.error||b.error||c.error);CRM.op=a.data||[];CRM.at=b.data||[];CRM.pr=c.data||[];
+}
+// follow-ups em aberto da oportunidade, do mais antigo para o mais novo
+const crmFups=id=>CRM.at.filter(x=>x.oportunidade_id===id&&x.tipo==='tarefa'&&!x.feito_em).sort((x,y)=>(x.data_prevista||'9')>(y.data_prevista||'9')?1:-1);
+const crmProx=o=>crmFups(o.id)[0]||null;
+const crmFupSit=d=>!d?'sem':d<TODAY?'atrasado':d===TODAY?'hoje':ctDias(d)<=7?'semana':'depois';
+function crmFupChip(f,curto){if(!f)return '<span class="muted">—</span>';const s=crmFupSit(f.data_prevista),d=f.data_prevista?dBR(f.data_prevista):'sem data';
+  const txt=curto?'':` <span class="muted">${esc(f.texto||'')}</span>`;
+  return s==='atrasado'?`<span class="chip c-bad">Atrasado · ${d}</span>${txt}`:s==='hoje'?`<span class="chip c-warn">Hoje</span>${txt}`:`<span class="chip c-none">${d}</span>${txt}`}
+const crmServTxt=o=>(o.servicos||[]).map(s=>s.nome).join(', ');
+// quantos follow-ups atrasados ou para hoje (número vermelho no menu)
+const crmBadgeN=()=>CRM.ok?CRM.op.filter(o=>!o.excluido_em&&CRMABERTA.includes(o.etapa)&&(s=>s==='atrasado'||s==='hoje')(crmFupSit(crmProx(o)?.data_prevista))).length:0;
+// ---- aviso com "Desfazer" (8 segundos) ----
+function crmAviso(txt,desfaz){const el=$('crmUndo');clearTimeout(CRM.undoT);CRM.undo=desfaz||null;
+  el.innerHTML=`<span>${esc(txt)}</span>${desfaz?'<button type="button" class="btn small" data-crmdesfaz="1">Desfazer</button>':''}`;el.hidden=false;
+  CRM.undoT=setTimeout(()=>{el.hidden=true;CRM.undo=null},desfaz?9000:3200)}
+$('crmUndo').addEventListener('click',async e=>{if(!e.target.closest('[data-crmdesfaz]')||!CRM.undo)return;const f=CRM.undo;CRM.undo=null;$('crmUndo').hidden=true;
+  try{await f()}catch(x){return fail(x,'Não foi possível desfazer')}await crmRecarrega();toast('Desfeito')});
+async function crmRecarrega(){try{await crmCarrega()}catch(e){}if(VIEW==='ctlcrm')crmDesenha();ctBadgeCalc();if(CRM.dlg&&dlgCrm.open){const o=CRM.op.find(x=>x.id===CRM.dlg.id);if(o)crmAbre(o,CRM.dlg.parte);else dlgCrm.close()}}
+async function crmLog(id,tipo,texto,extra){return sb.from('ctl_crm_atividades').insert({oportunidade_id:id,tipo,texto,extra:extra||{}}).select().single()}
+// ---- filtros (todas as colunas) e busca em todos os campos ----
+function crmFiltra(semEt){
+  const q=$('crmBusca').value,et=$('crmEt').value,orig=$('crmOrig').value,sv=$('crmServ').value,fu=$('crmFup').value,emp=chave($('crmEmp').value),
+    vmin=parseMoney($('crmVmin').value),vmax=parseMoney($('crmVmax').value),ini=$('crmIni').value,fim=$('crmFim').value,lix=$('crmLixo').checked;
+  return CRM.op.filter(o=>{
+    if(lix!==!!o.excluido_em)return false;
+    if(semEt){}else if(et==='abertas'?!CRMABERTA.includes(o.etapa):et&&o.etapa!==et)return false;
+    if(orig&&(o.origem||'')!==orig)return false;
+    if(sv&&!(o.servicos||[]).some(s=>s.nome===sv))return false;
+    if(emp&&!chave([o.empresa,o.contato,o.cnpj_cpf].join(' ')).includes(emp))return false;
+    if(vmin!=null&&!isNaN(vmin)&&(+o.valor_mensal||0)<vmin)return false;
+    if(vmax!=null&&!isNaN(vmax)&&(+o.valor_mensal||0)>vmax)return false;
+    const cr=String(o.criado_em||'').slice(0,10);if(ini&&cr<ini)return false;if(fim&&cr>fim)return false;
+    const p=crmProx(o);if(fu){const s=crmFupSit(p?.data_prevista);if(fu==='sem'?!!p:fu==='semana'?!(s==='hoje'||s==='semana'||s==='atrasado'):s!==fu)return false}
+    const ats=CRM.at.filter(x=>x.oportunidade_id===o.id),prs=CRM.pr.filter(x=>x.oportunidade_id===o.id);
+    return buscaCasa(q,[o.empresa,o.cnpj_cpf,o.segmento,o.cidade,o.contato,o.cargo,o.telefone,o.email,o.origem,CRMET[o.etapa]?.[0],crmServTxt(o),o.obs,o.motivo_perda,...ats.map(x=>x.texto),...prs.map(x=>x.numero)],
+      [o.valor_mensal,o.valor_implantacao,...prs.map(x=>x.valor_mensal)],[String(o.criado_em||'').slice(0,10),o.ganho_em,o.perdido_em,p?.data_prevista])});
+}
+function crmOpcoes(){
+  const orig=[...new Set([...CRMORIG,...CRM.op.map(o=>o.origem).filter(Boolean)])],sv=[...new Set([...CTL.serv.map(s=>s.nome),...CRM.op.flatMap(o=>(o.servicos||[]).map(s=>s.nome))])].sort();
+  const pr=(id,todos,l)=>{const el=$(id),v=el.value;el.innerHTML=`<option value="">${todos}</option>`+l.map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('')};
+  pr('crmOrig','Todas',orig);pr('crmServ','Todos',sv);
+}
+function crmDesenha(){
+  const box=$('ctConteudo');
+  if(!CRM.ok){box.innerHTML=`<div class="alerta bad"><b>O CRM precisa da atualização v133 do banco.</b><span>Rode o SQL “v133 - CRM da Controlacs” no Supabase e atualize a página. O resto da Gestão da Controlacs continua funcionando.</span></div>`;$('ctNote').textContent='';return}
+  document.querySelectorAll('#crmVis button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.vis===CRM.vis));
+  $('crmEtBox').hidden=CRM.vis==='funil';
+  const viv=CRM.op.filter(o=>!o.excluido_em),ab=viv.filter(o=>CRMABERTA.includes(o.etapa)),mes=TODAY.slice(0,7);
+  const ganhMes=viv.filter(o=>o.etapa==='ganho'&&String(o.ganho_em||'').startsWith(mes)),ano=ctMeses(TODAY,-12);
+  const g12=viv.filter(o=>o.etapa==='ganho'&&(o.ganho_em||'')>=ano).length,p12=viv.filter(o=>o.etapa==='perdido'&&(o.perdido_em||'')>=ano).length;
+  const fups=ab.map(crmProx).filter(Boolean),atr=fups.filter(f=>crmFupSit(f.data_prevista)==='atrasado').length,hj=fups.filter(f=>crmFupSit(f.data_prevista)==='hoje').length;
+  const tiles=`<div class="tiles">
+    <div class="card tile"><div class="k">Oportunidades abertas</div><div class="v">${ab.length}</div><div class="n">${fm(ab.reduce((a,o)=>a+(+o.valor_mensal||0),0))} por mês no funil</div></div>
+    <div class="card tile"><div class="k">Previsão ponderada</div><div class="v">${fm(ab.reduce((a,o)=>a+(+o.valor_mensal||0)*crmProb(o)/100,0))}</div><div class="n">valor mensal × chance da etapa</div></div>
+    <div class="card tile"><div class="k">Follow-ups</div><div class="v ${atr?'neg':''}">${atr} atrasado${atr===1?'':'s'}</div><div class="n">${hj} para hoje</div></div>
+    <div class="card tile"><div class="k">Ganhos em ${MESES[+mes.slice(5)-1]}</div><div class="v">${ganhMes.length}</div><div class="n">${fm(ganhMes.reduce((a,o)=>a+(+o.valor_mensal||0),0))} por mês a mais</div></div>
+    <div class="card tile"><div class="k">Conversão (12 meses)</div><div class="v">${g12+p12?Math.round(g12*100/(g12+p12))+'%':'—'}</div><div class="n">${g12} ganho(s) · ${p12} perdido(s)</div></div></div>`;
+  const l=crmFiltra(),lix=$('crmLixo').checked;
+  const vazio=!viv.length&&!lix?`<div class="alerta"><b>Comece cadastrando a primeira oportunidade.</b><span>Use “+ Nova oportunidade” para cada empresa interessada no BPO: quem é o contato, de onde veio, quais serviços quer e quanto pagaria por mês. Depois arraste o cartão pelas etapas do funil e marque os próximos contatos (follow-ups).</span></div>`:'';
+  const tab=(head,rows,vz)=>`<div class="card tablebox"><table><thead><tr>${head}</tr></thead><tbody>${rows||`<tr><td class="l muted" colspan="10">${vz}</td></tr>`}</tbody></table></div>`;
+  let corpo='';
+  if(CRM.vis==='funil'&&!lix){
+    crmFiltra.cache=crmFiltra(true);
+    corpo=`<div class="kanban crmfunil" id="crmBoard">${Object.keys(CRMET).map(e=>{const lista=crmFiltraEt(e);return `<div class="kcol" data-crmcol="${e}"><h3>${esc(CRMET[e][0])}<span class="n">${lista.length}</span></h3><div class="crmsoma">${fm(lista.reduce((a,o)=>a+(+o.valor_mensal||0),0))}/mês</div><div class="klist">${lista.map(crmCard).join('')||'<p class="note" style="margin:4px">Arraste um cartão para cá.</p>'}</div></div>`}).join('')}</div>`;crmFiltra.cache=null;
+  }else if(CRM.vis==='fups'){
+    const fs=CRM.at.filter(x=>x.tipo==='tarefa'&&!x.feito_em&&l.some(o=>o.id===x.oportunidade_id)).sort((x,y)=>(x.data_prevista||'9')>(y.data_prevista||'9')?1:-1);
+    corpo=tab('<th>Quando</th><th class="l">O que fazer</th><th class="l">Empresa</th><th class="l">Contato</th><th>Etapa</th><th></th>',
+      fs.map(f=>{const o=CRM.op.find(x=>x.id===f.oportunidade_id);return `<tr data-crmop="${o.id}"><td>${crmFupChip(f,true)}</td><td class="l">${esc(f.texto||'')}</td><td class="l"><b>${esc(o.empresa)}</b></td><td class="l">${esc(o.contato||'')}${o.telefone?`<br><span class="muted">${esc(o.telefone)}</span>`:''}</td><td>${crmEtChip(o.etapa)}</td><td><button type="button" class="btn small primary" data-crmfeito="${f.id}">Feito</button> <button type="button" class="btn small ghost" data-crmadia="${f.id}" title="Passa para amanhã">Amanhã</button></td></tr>`}).join(''),
+      'Nenhum follow-up em aberto com estes filtros.');
+  }else if(CRM.vis==='props'){
+    const ps=CRM.pr.filter(p=>l.some(o=>o.id===p.oportunidade_id));
+    corpo=tab('<th class="l">Proposta</th><th class="l">Empresa</th><th>Situação</th><th>Enviada em</th><th>Validade</th><th>Mensal</th><th>Implantação</th><th>Arquivo</th>',
+      ps.map(p=>{const o=CRM.op.find(x=>x.id===p.oportunidade_id),venc=p.situacao==='enviada'&&p.validade&&p.validade<TODAY;return `<tr data-crmop="${o.id}" data-crmprop="${p.id}"><td class="l"><b>${esc(p.numero||'Sem número')}</b><br><span class="muted">${esc((p.servicos||[]).map(s=>s.nome).join(', '))}</span></td><td class="l">${esc(o.empresa)}</td><td><span class="chip ${CRMPROP[p.situacao][0]}">${CRMPROP[p.situacao][1]}</span></td><td>${p.enviada_em?dBR(p.enviada_em):'—'}</td><td>${p.validade?(venc?`<span class="chip c-bad">Venceu ${dBR(p.validade)}</span>`:dBR(p.validade)):'—'}</td><td>${fm(p.valor_mensal)}</td><td>${p.valor_implantacao?fm(p.valor_implantacao):'—'}</td><td>${p.caminho?`<a href="#" data-crmarq="${p.id}">📎 ${esc(p.nome_arquivo||'abrir')}</a>`:'<span class="muted">—</span>'}</td></tr>`}).join(''),
+      'Nenhuma proposta com estes filtros. As propostas são criadas dentro de cada oportunidade.');
+  }else{
+    corpo=tab('<th class="l">Empresa</th><th class="l">Contato</th><th class="l">Origem</th><th>Etapa</th><th class="l">Serviços</th><th>Valor mensal</th><th>Próximo follow-up</th><th>Criado em</th>'+(lix?'<th></th>':''),
+      l.slice().sort((x,y)=>Object.keys(CRMET).indexOf(x.etapa)-Object.keys(CRMET).indexOf(y.etapa)||x.empresa.localeCompare(y.empresa)).map(o=>`<tr data-crmop="${o.id}"><td class="l"><b>${esc(o.empresa)}</b>${o.segmento||o.cidade?`<br><span class="muted">${esc([o.segmento,o.cidade].filter(Boolean).join(' · '))}</span>`:''}</td><td class="l">${esc(o.contato||'')}${o.telefone?`<br><span class="muted">${esc(o.telefone)}</span>`:''}</td><td class="l">${esc(o.origem||'')}</td><td>${crmEtChip(o.etapa)}</td><td class="l">${esc(crmServTxt(o))}</td><td>${o.valor_mensal!=null?fm(o.valor_mensal):'—'}</td><td>${crmFupChip(crmProx(o),true)}</td><td>${dBR(String(o.criado_em).slice(0,10))}</td>${lix?`<td><button type="button" class="btn small" data-crmrest="${o.id}">Restaurar</button></td>`:''}</tr>`).join(''),
+      lix?'A lixeira está vazia.':'Nenhuma oportunidade com estes filtros.');
+  }
+  box.innerHTML=tiles+vazio+(lix&&CRM.vis==='funil'?'<p class="note">A lixeira aparece em lista.</p>':'')+corpo;
+  $('ctNote').textContent=lix?'Oportunidades excluídas. “Restaurar” devolve para o funil, com o histórico. Dentro da oportunidade dá para excluir de vez.':
+    CRM.vis==='funil'?'Arraste o cartão para mudar de etapa (no celular, abra o cartão e escolha a etapa). Toda mudança pode ser desfeita no aviso que aparece embaixo.':
+    CRM.vis==='fups'?'“Feito” marca o follow-up como feito e grava no histórico; dá para desfazer. Abra a linha para ver a oportunidade.':
+    'Clique na linha para abrir a oportunidade. A busca acha por qualquer campo: empresa, contato, telefone, e-mail, serviço, anotações, valor ou data.';
+}
+// no funil, cada coluna mostra só a sua etapa; Ganho e Perdido mostram os últimos 90 dias (o resto fica na Lista)
+function crmFiltraEt(e){const l=crmFiltra.cache||crmFiltra(true);const lim=ctMeses(TODAY,-3);
+  return l.filter(o=>o.etapa===e&&(e!=='ganho'||(o.ganho_em||'')>=lim)&&(e!=='perdido'||(o.perdido_em||'')>=lim)).sort((x,y)=>((crmProx(x)?.data_prevista)||'9')>((crmProx(y)?.data_prevista)||'9')?1:-1)}
+function crmCard(o){const p=crmProx(o),s=crmFupSit(p?.data_prevista);
+  return `<button type="button" class="kcard crmcard${s==='atrasado'?' novo':''}" draggable="true" data-crmop="${o.id}">
+    <span class="t">${esc(o.empresa)}</span>
+    <span class="m">${o.contato?`<span>👤 ${esc(o.contato)}</span>`:''}${o.valor_mensal!=null?`<span><b>${fm(o.valor_mensal)}</b>/mês</span>`:''}${o.origem?`<span>${esc(o.origem)}</span>`:''}</span>
+    ${(o.servicos||[]).length?`<span class="kchips">${o.servicos.map(x=>`<span class="chip c-none">${esc(x.nome)}</span>`).join('')}</span>`:''}
+    <span class="m">${p?`<span class="${s==='atrasado'?'late':''}">⏰ ${s==='hoje'?'Hoje':p.data_prevista?dBR(p.data_prevista):'sem data'} · ${esc(p.texto||'')}</span>`:o.etapa==='ganho'||o.etapa==='perdido'?(o.etapa==='perdido'&&o.motivo_perda?`<span>${esc(o.motivo_perda)}</span>`:''):'<span class="late">Sem próximo contato</span>'}</span></button>`}
+// ---- mudar de etapa (arrastar, ou escolher dentro da oportunidade), com Desfazer ----
+async function crmMuda(o,et,extra){
+  if(!o||o.etapa===et)return;
+  if(et==='ganho')return crmGanho(o);
+  if(et==='perdido')return crmPerde(o);
+  const antes={etapa:o.etapa,etapa_anterior:o.etapa_anterior,ganho_em:o.ganho_em,perdido_em:o.perdido_em,motivo_perda:o.motivo_perda};
+  const up={etapa:et,etapa_anterior:o.etapa,atualizado_em:new Date().toISOString(),...(extra||{})};
+  if(o.etapa==='ganho'||o.etapa==='perdido')Object.assign(up,{ganho_em:null,perdido_em:null,motivo_perda:null});
+  const {error}=await sb.from('ctl_crm_oportunidades').update(up).eq('id',o.id);if(error)return fail(error);
+  const lg=await crmLog(o.id,'etapa',`${CRMET[o.etapa][0]} → ${CRMET[et][0]}`);
+  await crmRecarrega();
+  crmAviso(`“${o.empresa}” foi para ${CRMET[et][0]}.`,async()=>{await sb.from('ctl_crm_oportunidades').update(crmNul(antes)).eq('id',o.id);if(lg.data)await sb.from('ctl_crm_atividades').delete().eq('id',lg.data.id)});
+}
+async function crmPerde(o){
+  const m=prompt(`Por que “${o.empresa}” foi perdida?\n\nEx.: ${CRMPERDA.join(', ')}.`,o.motivo_perda||'');if(m===null)return;
+  const antes={etapa:o.etapa,etapa_anterior:o.etapa_anterior,perdido_em:o.perdido_em,motivo_perda:o.motivo_perda};
+  const {error}=await sb.from('ctl_crm_oportunidades').update({etapa:'perdido',etapa_anterior:o.etapa,perdido_em:TODAY,ganho_em:null,motivo_perda:m.trim()||null,atualizado_em:new Date().toISOString()}).eq('id',o.id);if(error)return fail(error);
+  const lg=await crmLog(o.id,'etapa',`${CRMET[o.etapa][0]} → Perdido${m.trim()?': '+m.trim():''}`);
+  await crmRecarrega();
+  crmAviso(`“${o.empresa}” marcada como perdida.`,async()=>{await sb.from('ctl_crm_oportunidades').update(crmNul(antes)).eq('id',o.id);if(lg.data)await sb.from('ctl_crm_atividades').delete().eq('id',lg.data.id)});
+}
+// ganho: pode cadastrar a empresa como cliente da Controlacs na hora (aba Clientes); depois "Criar contrato" abre o contrato já preenchido
+async function crmGanho(o){
+  const jaCli=o.ctl_cliente_id&&ctCli(o.ctl_cliente_id);
+  if(!confirm(`Marcar “${o.empresa}” como GANHO?`))return;
+  const cad=!jaCli&&confirm(`Cadastrar “${o.empresa}” como cliente da Controlacs agora (aba Clientes)?\n\nOK = cadastrar o cliente\nCancelar = só marcar como ganho`);
+  let cli=null;
+  if(cad){const r=await sb.from('ctl_clientes').insert({nome:o.empresa,cnpj_cpf:o.cnpj_cpf,contato:o.contato,telefone:o.telefone,email:o.email,situacao:'ativo',cliente_desde:TODAY,obs:'Cadastrado pelo CRM'+(o.origem?' (origem: '+o.origem+')':'')}).select().single();
+    if(r.error)return fail(r.error,'Não foi possível cadastrar o cliente');cli=r.data}
+  const antes={etapa:o.etapa,etapa_anterior:o.etapa_anterior,ganho_em:o.ganho_em,perdido_em:o.perdido_em,motivo_perda:o.motivo_perda,ctl_cliente_id:o.ctl_cliente_id};
+  const {error}=await sb.from('ctl_crm_oportunidades').update({etapa:'ganho',etapa_anterior:o.etapa,ganho_em:TODAY,perdido_em:null,motivo_perda:null,...(cli?{ctl_cliente_id:cli.id}:{}),atualizado_em:new Date().toISOString()}).eq('id',o.id);
+  if(error){if(cli)await sb.from('ctl_clientes').delete().eq('id',cli.id);return fail(error)}
+  const lg=await crmLog(o.id,'etapa',`${CRMET[o.etapa][0]} → Ganho${cli?' (cadastrado como cliente)':''}`);
+  await ctCarrega().catch(()=>{});await crmRecarrega();
+  crmAviso(`“${o.empresa}” ganha!${cli?' Cliente cadastrado.':''}`,async()=>{await sb.from('ctl_crm_oportunidades').update(crmNul(antes)).eq('id',o.id);if(cli)await sb.from('ctl_clientes').delete().eq('id',cli.id);if(lg.data)await sb.from('ctl_crm_atividades').delete().eq('id',lg.data.id);await ctCarrega().catch(()=>{})});
+}
+// desfaz a conversão em cliente mais tarde: apaga o cliente só se ele ainda não tem contrato, documento nem lançamento
+async function crmDesfazConv(o){
+  const c=ctCli(o.ctl_cliente_id);if(!c)return;
+  const usado=CTL.cont.some(x=>x.cliente_id===c.id)||CTL.docs.some(x=>x.cliente_id===c.id)||CTL.lanc.some(x=>x.cliente_id===c.id);
+  if(!confirm(usado?`O cliente “${c.nome}” já tem contrato, documento ou lançamento, então ele CONTINUA cadastrado.\n\nA oportunidade volta para ${CRMET[o.etapa_anterior||'negociacao'][0]} e deixa de apontar para o cliente. Continuar?`
+    :`Desfazer a conversão? O cliente “${c.nome}” é apagado da aba Clientes e a oportunidade volta para ${CRMET[o.etapa_anterior||'negociacao'][0]}.`))return;
+  const {error}=await sb.from('ctl_crm_oportunidades').update({etapa:o.etapa_anterior&&o.etapa_anterior!=='ganho'?o.etapa_anterior:'negociacao',ganho_em:null,ctl_cliente_id:null,atualizado_em:new Date().toISOString()}).eq('id',o.id);if(error)return fail(error);
+  if(!usado)await sb.from('ctl_clientes').delete().eq('id',c.id);
+  await crmLog(o.id,'etapa','Conversão em cliente desfeita');
+  await ctCarrega().catch(()=>{});await crmRecarrega();toast('Conversão desfeita');
+}
+// abre o contrato novo já com o cliente, o nome, o valor e os serviços da oportunidade
+function crmContrato(o){dlgCrm.close();go('ctlcont');setTimeout(()=>{ctAbreCont(null);const st=(id,v)=>{const el=$(id);if(el&&v!=null)el.value=v};
+  st('ct_cli',o.ctl_cliente_id);st('ct_titulo','BPO '+o.empresa);st('ct_ini',TODAY);st('ct_valor',o.valor_mensal!=null?String(o.valor_mensal).replace('.',','):'');
+  (o.servicos||[]).forEach(s=>{const c=$('ct_servs')?.querySelector(`[data-ctsv="${s.id}"]`);if(c){c.checked=true;const v=$('ct_servs').querySelector(`[data-ctsvv="${s.id}"]`);if(v&&s.valor!=null)v.value=String(s.valor).replace('.',',')}})},400)}
+// ---- janela da oportunidade ----
+const dlgCrm=$('dlgCrm');
+const crmErr=x=>{const el=$('crmErr');if(el){el.textContent=x;el.hidden=false}};
+const crmServBox=(sel)=>`<div class="crmservs" id="cr_servs">${CTL.serv.filter(s=>s.ativo||sel.some(x=>x.id===s.id)).map(s=>{const x=sel.find(y=>y.id===s.id);return `<label class="crmsv"><input type="checkbox" data-crsv="${s.id}"${x?' checked':''}> ${esc(s.nome)}<input class="money" data-crsvv="${s.id}" placeholder="${s.valor_padrao!=null?esc(fm(s.valor_padrao)):'valor'}" value="${x?esc(crmMon(x.valor)):''}"></label>`}).join('')||'<p class="note" style="margin:0">Cadastre os serviços na aba Serviços para marcar aqui.</p>'}</div>`;
+function crmServLe(){return [...$('cr_servs').querySelectorAll('[data-crsv]:checked')].map(c=>{const s=CTL.serv.find(x=>x.id===c.dataset.crsv),v=parseMoney($('cr_servs').querySelector(`[data-crsvv="${c.dataset.crsv}"]`).value);return {id:s.id,nome:s.nome,valor:v==null||isNaN(v)?(s.valor_padrao??null):v}})}
+function crmAbre(o,parte){
+  CRM.dlg={id:o?.id||null,parte:parte||null};const v=k=>esc(o?.[k]??'');
+  $('crmTitle').textContent=o?o.empresa:'Nova oportunidade';$('crmChip').innerHTML=o?crmEtChip(o.etapa)+(o.excluido_em?' <span class="chip c-bad">Na lixeira</span>':''):'';
+  if(parte==='prop')return crmAbreProp(o,CRM.pr.find(p=>p.id===CRM.dlg.prop)||null);
+  const ats=o?CRM.at.filter(x=>x.oportunidade_id===o.id):[],fups=ats.filter(x=>x.tipo==='tarefa').sort((x,y)=>(!!x.feito_em-!!y.feito_em)||((x.data_prevista||'9')>(y.data_prevista||'9')?1:-1)),hist=ats.filter(x=>x.tipo!=='tarefa'),prs=o?CRM.pr.filter(p=>p.oportunidade_id===o.id):[];
+  const cli=o?.ctl_cliente_id&&ctCli(o.ctl_cliente_id);
+  $('crmBody').innerHTML=`<div class="fields">
+    <label class="f wide">Empresa *<input id="cr_emp" maxlength="160" value="${v('empresa')}" placeholder="Nome da empresa interessada"></label>
+    <label class="f">CNPJ/CPF<input id="cr_doc" value="${v('cnpj_cpf')}"></label>
+    <label class="f">Segmento<input id="cr_seg" list="crmSegList" value="${v('segmento')}" placeholder="Ex.: Clínica, Comércio"><datalist id="crmSegList">${[...new Set(CRM.op.map(x=>x.segmento).filter(Boolean))].map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
+    <label class="f">Cidade<input id="cr_cid" value="${v('cidade')}"></label>
+    <label class="f">Contato (pessoa)<input id="cr_cont" value="${v('contato')}"></label>
+    <label class="f">Cargo<input id="cr_cargo" value="${v('cargo')}" placeholder="Ex.: Sócio, Gerente"></label>
+    <label class="f">Telefone / WhatsApp<input id="cr_tel" value="${v('telefone')}"></label>
+    <label class="f">E-mail<input type="email" id="cr_email" value="${v('email')}"></label>
+    <label class="f">Origem<select id="cr_orig"><option value="">—</option>${[...new Set([...CRMORIG,o?.origem].filter(Boolean))].map(x=>`<option${x===o?.origem?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+    <label class="f">Etapa<select id="cr_et">${ctOpts(Object.fromEntries(Object.entries(CRMET).map(([k,x])=>[k,x[0]])),o?.etapa||'novo')}</select></label>
+    <label class="f">Valor mensal estimado<input id="cr_val" class="money" inputmode="decimal" value="${esc(crmMon(o?.valor_mensal))}" placeholder="0,00"></label>
+    <label class="f">Implantação (uma vez)<input id="cr_impl" class="money" inputmode="decimal" value="${esc(crmMon(o?.valor_implantacao))}" placeholder="0,00"></label>
+    <label class="f">Chance de fechar (%)<input id="cr_prob" type="number" min="0" max="100" value="${o?.probabilidade??''}" placeholder="${CRMET[o?.etapa||'novo'][1]} (da etapa)"></label>
+    <div class="f wide"><span>Serviços de interesse</span>${crmServBox(o?.servicos||[])}</div>
+    <label class="f wide">Anotações<textarea id="cr_obs" rows="3">${v('obs')}</textarea></label>
+    ${o?.etapa==='perdido'?`<label class="f wide">Motivo da perda<input id="cr_mot" value="${v('motivo_perda')}"></label>`:''}
+    ${!o?`<label class="f">Primeiro follow-up<input type="date" id="cr_fdata" value="${ctMeses(TODAY,0)}"></label><label class="f">O que fazer<input id="cr_ftxt" value="Fazer o primeiro contato"></label>`:''}
+  </div>
+  ${cli?`<div class="alerta" style="margin-top:12px"><b>Virou cliente: ${esc(cli.nome)}</b><span>Está na aba Clientes${CTL.cont.some(x=>x.cliente_id===cli.id)?' e já tem contrato':''}.</span></div>`:''}
+  ${o?`<h3 class="crmh">Próximos contatos (follow-ups)</h3>
+  <div class="crmadd"><input type="date" id="cr_fd" value="${ctMeses(TODAY,0)}" aria-label="Data"><input id="cr_ft" placeholder="O que fazer (ex.: ligar para saber da proposta)" aria-label="O que fazer"><button type="button" class="btn small primary" data-cract="fupadd">+ Follow-up</button></div>
+  <div class="crmlista">${fups.map(f=>`<div class="crmit${f.feito_em?' feito':''}"><span>${f.feito_em?`<span class="chip c-ok">Feito ${dtBR(f.feito_em)}</span>`:crmFupChip(f,true)}</span><span class="tx">${esc(f.texto||'')}</span><span class="ac">${f.feito_em?`<button type="button" class="btn small ghost" data-cract="fupdesf" data-id="${f.id}">Desfazer</button>`:`<button type="button" class="btn small" data-cract="fupok" data-id="${f.id}">Feito</button>`}<button type="button" class="iconbtn" data-cract="atdel" data-id="${f.id}" title="Apagar" aria-label="Apagar">✕</button></span></div>`).join('')||'<p class="note" style="margin:0">Nenhum follow-up. Marque sempre o próximo contato para nada ficar esquecido.</p>'}</div>
+  <h3 class="crmh">Histórico de contatos</h3>
+  <div class="crmadd"><select id="cr_at" aria-label="Tipo">${['ligacao','whatsapp','email','reuniao','visita','nota'].map(k=>`<option value="${k}">${CRMATV[k]}</option>`).join('')}</select><input id="cr_atx" placeholder="Como foi o contato" aria-label="Como foi o contato"><button type="button" class="btn small" data-cract="atadd">Registrar</button></div>
+  <div class="crmlista">${hist.map(a=>`<div class="crmit"><span class="muted">${dtBR(a.quando)}</span><span class="tx"><b>${CRMATV[a.tipo]||a.tipo}</b> ${esc(a.texto||'')}</span><span class="ac">${a.tipo==='etapa'?'':`<button type="button" class="iconbtn" data-cract="atdel" data-id="${a.id}" title="Apagar" aria-label="Apagar">✕</button>`}</span></div>`).join('')||'<p class="note" style="margin:0">Nada registrado ainda.</p>'}</div>
+  <h3 class="crmh">Propostas</h3>
+  <div class="crmlista">${prs.map(p=>`<div class="crmit" data-cract="propabre" data-id="${p.id}" style="cursor:pointer"><span><span class="chip ${CRMPROP[p.situacao][0]}">${CRMPROP[p.situacao][1]}</span></span><span class="tx"><b>${esc(p.numero||'Sem número')}</b> · ${fm(p.valor_mensal)}/mês${p.valor_implantacao?' + '+fm(p.valor_implantacao)+' de implantação':''}${p.validade?` · válida até ${dBR(p.validade)}`:''}</span><span class="ac">›</span></div>`).join('')||'<p class="note" style="margin:0">Nenhuma proposta.</p>'}</div>
+  <button type="button" class="btn small" data-cract="propnova" style="margin-top:6px">+ Nova proposta</button>`:''}
+  <p class="err" id="crmErr" hidden></p>`;
+  const b=(a,t,c)=>`<button type="button" class="btn ${c||''}" data-cract="${a}">${t}</button>`;
+  $('crmFoot').innerHTML=o?.excluido_em?b('excvez','Excluir de vez','danger')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+b('restaura','Restaurar','primary')
+    :(o?b('excluir','Excluir','ghost danger'):'')+(o&&CRMABERTA.includes(o.etapa)?b('perde','Perdido','ghost')+b('ganha','Ganho!',''):'')+(o?.ctl_cliente_id&&cli?b('desconv','Desfazer conversão','ghost')+b('contrato','Criar contrato',''):'')+(o?.etapa==='ganho'&&!cli?b('ganha','Cadastrar como cliente',''):'')
+    +'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+b('salvar',o?'Salvar':'Criar oportunidade','primary');
+  if(!dlgCrm.open)dlgCrm.showModal();
+}
+function crmPropNum(){const a=TODAY.slice(0,4),n=CRM.pr.filter(p=>String(p.numero||'').startsWith('P-'+a+'-')).map(p=>+String(p.numero).split('-')[2]||0);return `P-${a}-${String((Math.max(0,...n))+1).padStart(3,'0')}`}
+function crmAbreProp(o,p){
+  CRM.dlg={id:o.id,parte:'prop',prop:p?.id||null};$('crmTitle').textContent=(p?'Proposta '+(p.numero||''):'Nova proposta')+' · '+o.empresa;
+  $('crmChip').innerHTML=p?`<span class="chip ${CRMPROP[p.situacao][0]}">${CRMPROP[p.situacao][1]}</span>`:'';
+  const sv=p?.servicos||o.servicos||[];
+  $('crmBody').innerHTML=`<div class="fields">
+    <label class="f">Número<input id="cp_num" value="${esc(p?.numero||crmPropNum())}"></label>
+    <label class="f">Situação<select id="cp_sit">${ctOpts(Object.fromEntries(Object.entries(CRMPROP).map(([k,x])=>[k,x[1]])),p?.situacao||'rascunho')}</select></label>
+    <label class="f">Enviada em<input type="date" id="cp_env" value="${p?.enviada_em||''}"></label>
+    <label class="f">Válida até<input type="date" id="cp_val" value="${p?.validade||''}"></label>
+    <div class="f wide"><span>Serviços da proposta (o valor mensal vira a soma)</span>${crmServBox(sv)}</div>
+    <label class="f">Valor mensal<input id="cp_men" class="money" inputmode="decimal" value="${esc(crmMon(p?.valor_mensal??o.valor_mensal))}"></label>
+    <label class="f">Implantação (uma vez)<input id="cp_imp" class="money" inputmode="decimal" value="${esc(crmMon(p?.valor_implantacao??o.valor_implantacao))}"></label>
+    <label class="f wide">Arquivo da proposta (PDF)${p?.caminho?` · <a href="#" data-crmarq="${p.id}">📎 ${esc(p.nome_arquivo||'abrir')}</a>`:''}<input type="file" id="cp_arq" accept=".pdf,.doc,.docx,image/*"></label>
+    <label class="f wide">Condições e observações<textarea id="cp_obs" rows="3" placeholder="Ex.: início em 01/12, reajuste anual pelo IPCA">${esc(p?.obs||'')}</textarea></label>
+  </div><p class="err" id="crmErr" hidden></p>`;
+  if(!p)$('cp_val').value=isoLocal(new Date(dObj(TODAY).getTime()+15*864e5));
+  const b=(a,t,c)=>`<button type="button" class="btn ${c||''}" data-cract="${a}">${t}</button>`;
+  $('crmFoot').innerHTML=(p?b('propdel','Apagar proposta','ghost danger'):'')+b('propimp','Imprimir / PDF','ghost')+'<span class="spacer"></span>'+b('voltar','Voltar','ghost')+b('propsalva','Salvar proposta','primary');
+  if(!dlgCrm.open)dlgCrm.showModal();
+}
+// soma dos serviços marcados vai para o valor mensal
+dlgCrm.addEventListener('input',e=>{if(!e.target.closest('#cr_servs'))return;const alvo=$('cp_men')||$('cr_val');if(!alvo)return;const l=crmServLe();if(l.length&&l.every(s=>s.valor!=null))alvo.value=crmMon(r2(l.reduce((a,s)=>a+(+s.valor||0),0)))});
+function crmImprime(o,p){
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
+  const sv=p.servicos||[];
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Proposta ${esc(p.numero||'')} · ${esc(o.empresa)}</title><style>
+    body{font:13px system-ui,Arial,sans-serif;color:#1b2a2a;margin:28px;max-width:760px}img{height:46px}h1{font-size:20px;margin:18px 0 2px;color:#0f5c57}p{margin:0 0 10px}.m{color:#555}
+    table{border-collapse:collapse;width:100%;margin:12px 0}th,td{border:1px solid #cfd8d8;padding:7px 9px;text-align:left}th{background:#0f5c57;color:#fff;font-weight:600}.n{text-align:right;white-space:nowrap;width:160px}tfoot td{font-weight:700;background:#e3eded}@page{size:A4;margin:16mm}</style></head><body>
+    <img src="${location.origin}/logo.png" alt="Controlacs"><h1>Proposta comercial ${esc(p.numero||'')}</h1>
+    <p class="m">Para <b>${esc(o.empresa)}</b>${o.contato?' · A/C '+esc(o.contato):''}${o.cnpj_cpf?' · '+esc(o.cnpj_cpf):''}</p>
+    <p class="m">Emitida em ${dBR(p.enviada_em||TODAY)}${p.validade?' · válida até '+dBR(p.validade):''}</p>
+    <table><thead><tr><th>Serviço</th><th class="n">Valor mensal</th></tr></thead><tbody>${sv.map(s=>`<tr><td>${esc(s.nome)}</td><td class="n">${s.valor!=null?fm(s.valor):'—'}</td></tr>`).join('')||'<tr><td>BPO financeiro</td><td class="n">—</td></tr>'}</tbody>
+    <tfoot><tr><td>Total mensal</td><td class="n">${fm(p.valor_mensal)}</td></tr>${p.valor_implantacao?`<tr><td>Implantação (uma vez)</td><td class="n">${fm(p.valor_implantacao)}</td></tr>`:''}</tfoot></table>
+    ${p.obs?`<p><b>Condições:</b> ${esc(p.obs).replace(/\n/g,'<br>')}</p>`:''}
+    <p class="m" style="margin-top:28px">Controlacs Gestão Empresarial</p>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.close();
+}
+async function crmArq(id){const p=CRM.pr.find(x=>x.id===id);if(!p?.caminho)return;
+  const {data,error}=await sb.storage.from('controlacs').createSignedUrl(p.caminho,3600);if(error)return fail(error,'Não foi possível abrir o arquivo');window.open(data.signedUrl,'_blank','noopener')}
+dlgCrm.addEventListener('click',async e=>{
+  const aq=e.target.closest('[data-crmarq]');if(aq){e.preventDefault();return crmArq(aq.dataset.crmarq)}
+  const bt=e.target.closest('[data-cract]');if(!bt)return;const act=bt.dataset.cract,o=CRM.op.find(x=>x.id===CRM.dlg?.id)||null,id=bt.dataset.id;
+  if(act==='fechar')return dlgCrm.close();
+  if(act==='voltar')return crmAbre(o);
+  if(act==='propnova')return crmAbreProp(o,null);
+  if(act==='propabre')return crmAbreProp(o,CRM.pr.find(p=>p.id===id));
+  if(act==='ganha'){if(o.etapa==='ganho'){const r=await sb.from('ctl_clientes').insert({nome:o.empresa,cnpj_cpf:o.cnpj_cpf,contato:o.contato,telefone:o.telefone,email:o.email,situacao:'ativo',cliente_desde:TODAY,obs:'Cadastrado pelo CRM'}).select().single();if(r.error)return fail(r.error);
+      await sb.from('ctl_crm_oportunidades').update({ctl_cliente_id:r.data.id}).eq('id',o.id);await ctCarrega().catch(()=>{});await crmRecarrega();
+      return crmAviso('Cliente cadastrado.',async()=>{await sb.from('ctl_crm_oportunidades').update({ctl_cliente_id:null}).eq('id',o.id);await sb.from('ctl_clientes').delete().eq('id',r.data.id);await ctCarrega().catch(()=>{})})}
+    return crmGanho(o)}
+  if(act==='perde')return crmPerde(o);
+  if(act==='desconv')return crmDesfazConv(o);
+  if(act==='contrato')return crmContrato(o);
+  if(act==='excluir'){if(!confirm(`Mandar “${o.empresa}” para a lixeira? Dá para restaurar depois.`))return;
+    const {error}=await sb.from('ctl_crm_oportunidades').update({excluido_em:new Date().toISOString()}).eq('id',o.id);if(error)return fail(error);
+    dlgCrm.close();await crmRecarrega();return crmAviso(`“${o.empresa}” foi para a lixeira.`,()=>sb.from('ctl_crm_oportunidades').update({excluido_em:null}).eq('id',o.id))}
+  if(act==='restaura'){const {error}=await sb.from('ctl_crm_oportunidades').update({excluido_em:null}).eq('id',o.id);if(error)return fail(error);dlgCrm.close();await crmRecarrega();return toast('Restaurada')}
+  if(act==='excvez'){if(!confirm(`Excluir “${o.empresa}” de vez, com o histórico, os follow-ups e as propostas? Isto não dá para desfazer.`))return;
+    const arqs=CRM.pr.filter(p=>p.oportunidade_id===o.id).map(p=>p.caminho).filter(Boolean);
+    const {error}=await sb.from('ctl_crm_oportunidades').delete().eq('id',o.id);if(error)return fail(error,'Não foi possível excluir');
+    if(arqs.length)await sb.storage.from('controlacs').remove(arqs).catch(()=>{});dlgCrm.close();await crmRecarrega();return toast('Excluída')}
+  if(act==='fupadd'){const d=$('cr_fd').value,t=$('cr_ft').value.trim();if(!t)return crmErr('Escreva o que fazer no follow-up.');
+    const {error}=await sb.from('ctl_crm_atividades').insert({oportunidade_id:o.id,tipo:'tarefa',texto:t,data_prevista:d||null,quando:new Date().toISOString()});if(error)return fail(error);await crmRecarrega();return toast('Follow-up marcado')}
+  if(act==='fupok')return crmFeito(id);
+  if(act==='fupdesf'){const {error}=await sb.from('ctl_crm_atividades').update({feito_em:null}).eq('id',id);if(error)return fail(error);await crmRecarrega();return toast('Follow-up reaberto')}
+  if(act==='atadd'){const t=$('cr_atx').value.trim();if(!t)return crmErr('Escreva como foi o contato.');
+    const {error}=await crmLog(o.id,$('cr_at').value,t);if(error)return fail(error);await crmRecarrega();return toast('Contato registrado')}
+  if(act==='atdel'){const a=CRM.at.find(x=>x.id===id);if(!a)return;const {error}=await sb.from('ctl_crm_atividades').delete().eq('id',id);if(error)return fail(error);
+    await crmRecarrega();const {id:_,...copia}=a;return crmAviso('Apagado.',()=>sb.from('ctl_crm_atividades').insert({...copia,id:a.id}))}
+  if(act==='propdel'){const p=CRM.pr.find(x=>x.id===CRM.dlg.prop);if(!p||!confirm(`Apagar a proposta ${p.numero||''}?`))return;
+    const {error}=await sb.from('ctl_crm_propostas').delete().eq('id',p.id);if(error)return fail(error);CRM.dlg.parte=null;await crmRecarrega();crmAbre(CRM.op.find(x=>x.id===o.id));
+    return crmAviso('Proposta apagada.',()=>sb.from('ctl_crm_propostas').insert(p))}
+  if(act==='propimp'){const sv=crmServLe(),men=parseMoney($('cp_men').value),imp=parseMoney($('cp_imp').value);
+    return crmImprime(o,{numero:$('cp_num').value.trim(),enviada_em:$('cp_env').value||null,validade:$('cp_val').value||null,servicos:sv,valor_mensal:isNaN(men)?null:men,valor_implantacao:isNaN(imp)?null:imp,obs:$('cp_obs').value.trim()})}
+  if(act==='propsalva'){
+    const men=parseMoney($('cp_men').value),imp=parseMoney($('cp_imp').value);if(men==null||isNaN(men))return crmErr('Informe o valor mensal.');if(imp!=null&&isNaN(imp))return crmErr('Valor da implantação inválido.');
+    const sit=$('cp_sit').value,p=CRM.pr.find(x=>x.id===CRM.dlg.prop);
+    const row={oportunidade_id:o.id,numero:$('cp_num').value.trim()||null,situacao:sit,enviada_em:$('cp_env').value||(sit!=='rascunho'&&!p?.enviada_em?TODAY:p?.enviada_em||null),validade:$('cp_val').value||null,servicos:crmServLe(),valor_mensal:men,valor_implantacao:imp,obs:$('cp_obs').value.trim()||null,atualizado_em:new Date().toISOString()};
+    const f=$('cp_arq').files[0];bt.disabled=true;if(f){try{Object.assign(row,await ctUpload(f))}catch(x){bt.disabled=false;return crmErr(x.message)}}
+    const r=p?await sb.from('ctl_crm_propostas').update(row).eq('id',p.id).select().single():await sb.from('ctl_crm_propostas').insert(row).select().single();bt.disabled=false;if(r.error)return fail(r.error);
+    if(!p||p.situacao!==sit)await crmLog(o.id,'nota',`Proposta ${row.numero||''}: ${CRMPROP[sit][1].toLowerCase()}`);
+    CRM.dlg.parte=null;await crmRecarrega();toast('Proposta salva');
+    const at=CRM.op.find(x=>x.id===o.id);
+    // proposta enviada leva a oportunidade para "Proposta enviada"; aceita pergunta se marca como ganho
+    if(sit==='enviada'&&['novo','contato','reuniao'].includes(at.etapa))return crmMuda(at,'proposta',{valor_mensal:at.valor_mensal??men});
+    if(sit==='aceita'&&CRMABERTA.includes(at.etapa))return crmGanho(at);
+    return}
+  if(act!=='salvar')return;
+  const emp=$('cr_emp').value.trim();if(!emp)return crmErr('Informe o nome da empresa.');
+  const val=parseMoney($('cr_val').value),impl=parseMoney($('cr_impl').value);if(val!=null&&isNaN(val))return crmErr('Valor mensal inválido.');if(impl!=null&&isNaN(impl))return crmErr('Valor da implantação inválido.');
+  const doc=$('cr_doc').value.trim(),dup=CRM.op.find(x=>x.id!==o?.id&&!x.excluido_em&&(chave(x.empresa)===chave(emp)||(doc&&String(x.cnpj_cpf||'').replace(/\D/g,'')===doc.replace(/\D/g,''))));
+  if(dup&&!confirm(`Já existe a oportunidade “${dup.empresa}” (${CRMET[dup.etapa][0]}) com este nome ou CNPJ/CPF. Salvar mesmo assim?`))return;
+  const pb=$('cr_prob').value;
+  const row={empresa:emp,cnpj_cpf:doc||null,segmento:$('cr_seg').value.trim()||null,cidade:$('cr_cid').value.trim()||null,contato:$('cr_cont').value.trim()||null,cargo:$('cr_cargo').value.trim()||null,telefone:$('cr_tel').value.trim()||null,email:$('cr_email').value.trim()||null,
+    origem:$('cr_orig').value||null,servicos:crmServLe(),valor_mensal:val,valor_implantacao:impl,probabilidade:pb===''?null:Math.max(0,Math.min(100,+pb)),obs:$('cr_obs').value.trim()||null,atualizado_em:new Date().toISOString()};
+  if($('cr_mot'))row.motivo_perda=$('cr_mot').value.trim()||null;
+  const et=$('cr_et').value;bt.disabled=true;
+  if(!o){row.etapa=et;if(et==='ganho')row.ganho_em=TODAY;if(et==='perdido')row.perdido_em=TODAY;
+    const r=await sb.from('ctl_crm_oportunidades').insert(row).select().single();bt.disabled=false;if(r.error)return fail(r.error);
+    const ft=$('cr_ftxt')?.value.trim();if(ft)await sb.from('ctl_crm_atividades').insert({oportunidade_id:r.data.id,tipo:'tarefa',texto:ft,data_prevista:$('cr_fdata').value||null});
+    await crmRecarrega();crmAbre(CRM.op.find(x=>x.id===r.data.id));return crmAviso(`Oportunidade “${emp}” criada.`,()=>sb.from('ctl_crm_oportunidades').delete().eq('id',r.data.id))}
+  const antes=Object.fromEntries(Object.keys(row).map(k=>[k,o[k]]));
+  const {error}=await sb.from('ctl_crm_oportunidades').update(row).eq('id',o.id);bt.disabled=false;if(error)return fail(error);
+  if(et!==o.etapa){await crmRecarrega();return crmMuda(CRM.op.find(x=>x.id===o.id),et)}
+  await crmRecarrega();crmAviso('Oportunidade salva.',()=>sb.from('ctl_crm_oportunidades').update(crmNul(antes)).eq('id',o.id));
+});
+async function crmFeito(id){const f=CRM.at.find(x=>x.id===id);if(!f)return;
+  const {error}=await sb.from('ctl_crm_atividades').update({feito_em:new Date().toISOString()}).eq('id',id);if(error)return fail(error);
+  await crmRecarrega();const o=CRM.op.find(x=>x.id===f.oportunidade_id);
+  crmAviso(`Follow-up feito${o&&CRMABERTA.includes(o.etapa)&&!crmProx(o)?'. Marque o próximo contato':''}.`,()=>sb.from('ctl_crm_atividades').update({feito_em:null}).eq('id',id))}
+// ---- tela: filtros, visões e funil (arrastar) ----
+['crmBusca','crmEmp','crmVmin','crmVmax'].forEach(id=>$(id).addEventListener('input',()=>{crmFiltra.cache=null;crmDesenha()}));
+['crmEt','crmOrig','crmServ','crmFup','crmIni','crmFim','crmLixo'].forEach(id=>$(id).addEventListener('change',()=>{crmFiltra.cache=null;crmDesenha()}));
+$('crmMaisF').onclick=()=>{const a=$('crmBar').classList.toggle('aberto');$('crmMaisF').setAttribute('aria-expanded',a)};
+$('crmLimpa').onclick=()=>{['crmBusca','crmEmp','crmVmin','crmVmax','crmIni','crmFim','crmOrig','crmServ','crmFup'].forEach(id=>$(id).value='');$('crmEt').value='abertas';$('crmLixo').checked=false;crmDesenha()};
+$('crmVis').addEventListener('click',e=>{const b=e.target.closest('[data-vis]');if(!b)return;CRM.vis=b.dataset.vis;try{localStorage.setItem('crmVis',CRM.vis)}catch(x){}crmDesenha()});
+try{CRM.vis=localStorage.getItem('crmVis')||'funil'}catch(e){}
+$('ctConteudo').addEventListener('click',async e=>{if(VIEW!=='ctlcrm')return;
+  const aq=e.target.closest('[data-crmarq]');if(aq){e.preventDefault();e.stopPropagation();return crmArq(aq.dataset.crmarq)}
+  const fe=e.target.closest('[data-crmfeito]');if(fe){e.stopPropagation();fe.disabled=true;return crmFeito(fe.dataset.crmfeito)}
+  const ad=e.target.closest('[data-crmadia]');if(ad){e.stopPropagation();const f=CRM.at.find(x=>x.id===ad.dataset.crmadia),antes=f.data_prevista,novo=isoLocal(new Date(dObj(TODAY).getTime()+864e5));
+    const {error}=await sb.from('ctl_crm_atividades').update({data_prevista:novo}).eq('id',f.id);if(error)return fail(error);await crmRecarrega();return crmAviso('Passou para amanhã.',()=>sb.from('ctl_crm_atividades').update({data_prevista:antes}).eq('id',f.id))}
+  const rs=e.target.closest('[data-crmrest]');if(rs){e.stopPropagation();const {error}=await sb.from('ctl_crm_oportunidades').update({excluido_em:null}).eq('id',rs.dataset.crmrest);if(error)return fail(error);await crmRecarrega();return toast('Restaurada')}
+  const r=e.target.closest('[data-crmop]');if(!r)return;const o=CRM.op.find(x=>x.id===r.dataset.crmop);
+  if(r.dataset.crmprop){CRM.dlg={id:o.id,parte:'prop',prop:r.dataset.crmprop};return crmAbre(o,'prop')}
+  crmAbre(o)});
+$('ctConteudo').addEventListener('dragstart',e=>{const c=e.target.closest?.('.crmcard');if(!c)return;CRM.drag=c.dataset.crmop;c.classList.add('drag');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',CRM.drag)}catch(x){}});
+$('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.classList.remove('drag');document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x.classList.remove('over'))});
+$('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
+$('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-15tarlanc',data:'2026-11-15',t:'Lançamento com problema vira tarefa para conferir',itens:[
+    {x:'Na Movimentação financeira, marque um ou mais lançamentos com problema e clique em “📋 Gerar tarefa para conferir”. A tarefa já vem com os lançamentos, para a Carol conferir e validar.',mods:['gfmov']},
+    {x:'O lançamento mostra a tarefa ligada a ele (clique no selo para abrir a tarefa), e a tarefa tem “Abrir o lançamento”. Na Situação, filtre “Com tarefa de conferência”.',mods:['gfmov','tarefas']},
+    {x:'Dentro da tarefa: ✓ Validar (tira o aviso “A validar”), Desfazer validação e Desvincular, que também dá para desfazer.',para:'esc'}]},
+  {k:'2026-11-15perfilctl',data:'2026-11-15',t:'Perfil Controlacs',itens:[
+    {x:'O ícone Controlacs, no canto direito do topo, agora entra direto na Gestão da Controlacs. Nessa área, a faixa de módulos dá lugar ao botão “← Voltar para o Portal do Cliente”, que leva de volta à última tela em que você estava.',para:'master'}]},
+  {k:'2026-11-15crm',data:'2026-11-15',t:'CRM na Gestão da Controlacs',itens:[
+    {x:'Controlacs › CRM: as empresas interessadas no BPO (leads) num funil com as etapas Novo lead, Primeiro contato, Reunião, Proposta enviada, Negociação, Ganho e Perdido. Arraste o cartão para mudar de etapa; toda mudança tem “Desfazer”.',para:'master'},
+    {x:'Em cada oportunidade: contato, origem, serviços de interesse, valor mensal estimado, follow-ups (próximos contatos com data), histórico de ligações, WhatsApp, e-mails e reuniões, e as propostas (com PDF para imprimir). O número vermelho no ícone Controlacs mostra os follow-ups atrasados ou para hoje.',para:'master'},
+    {x:'Ao ganhar, a empresa pode virar cliente da Controlacs na hora e o botão “Criar contrato” abre o contrato já preenchido. Visões Funil, Lista, Follow-ups e Propostas, com filtro por coluna e busca por qualquer campo, valor ou data.',para:'master'}]},
   {k:'2026-11-15nfse-envio',data:'2026-11-15',t:'Notas fiscais (NFS-e): envio ligado',itens:[
     {x:'Controlacs › Notas fiscais e o botão “Emitir NF” já enviam a nota direto ao emissor nacional e trazem o número da NFS-e na hora. O aviso “envio ainda em preparação” saiu. O cancelamento também é feito pelo portal.',para:'master'},
     {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista, com uma pasta por empresa quando escolher “Todas as empresas”. Pronto para mandar à contabilidade.',para:'master'},
