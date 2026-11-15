@@ -12077,7 +12077,7 @@ async function renderCtl(){
     if(VIEW==='ctlcli')$('ctSit').value='ativo';if(VIEW==='ctlcont')$('ctSit').value='vigente';if(VIEW==='ctlserv')$('ctSit').value='ativo'}
   $('ctMesBox').hidden=VIEW!=='ctlfin'&&VIEW!=='ctlnfse';$('ctTipoBox').hidden=VIEW!=='ctlfin';if(!$('ctMes').value)$('ctMes').value=TODAY.slice(0,7);
   $('ctBusca').placeholder={ctlnfse:'Buscar por número, tomador, CNPJ, descrição, valor ou data',ctlfin:'Buscar descrição, cliente ou categoria',ctlcli:'Buscar por nome, CNPJ/CPF ou contato',ctlcont:'Buscar por contrato ou cliente',ctlserv:'Buscar serviço',ctldocs:'Buscar documento ou cliente'}[VIEW]||'Buscar';
-  $('ctAcoes').innerHTML={ctlnfse:'<button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
+  $('ctAcoes').innerHTML={ctlnfse:'<button class="btn" data-ctnovo="nfxml">Baixar XMLs</button><button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
   $('ctConteudo').innerHTML='<p class="note">Carregando…</p>';
   try{await ctCarrega()}catch(e){console.error(e);$('ctConteudo').innerHTML=`<div class="alerta bad"><b>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Esta área precisa da atualização v104 do banco.':'Erro ao carregar.'}</b><span>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Rode o SQL “v104 - Gestao da Controlacs” no Supabase e atualize a página.':'Verifique a internet e tente de novo.'}</span></div>`;return}
   ctDesenha();ctBadgeCalc();
@@ -12167,7 +12167,7 @@ function ctDesenha(){
 $('ctBusca').oninput=ctDesenha;$('ctSit').onchange=ctDesenha;$('ctMes').onchange=ctDesenha;$('ctTipo').onchange=ctDesenha;
 $('tabsCtl').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&b.dataset.tab!==VIEW)go(b.dataset.tab)});
 $('ctAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-ctnovo]');if(!b)return;const t=b.dataset.ctnovo;
-  if(t==='nfcfg')return nsAbreCfg();if(t==='nfemit')return nsAbreEmit();
+  if(t==='nfxml')return nsAbreLote();if(t==='nfcfg')return nsAbreCfg();if(t==='nfemit')return nsAbreEmit();
   if(t==='gerar')return ctGera(b);if(t==='receita'||t==='despesa')return ctAbreLanc(null,t);
   if(t==='cli')ctAbreCli(null);else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
 async function ctBaixa(id){const d=CTL.docs.find(x=>x.id===id);if(!d?.caminho)return;
@@ -12477,6 +12477,42 @@ async function nsXml(n){
   const {data,error}=await sb.from('nfse_notas').select('xml_nfse,cancel_xml').eq('id',n.id).single();if(error||!data?.xml_nfse)return toast('XML não encontrado.');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.xml_nfse],{type:'application/xml'}));a.download=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}.xml`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
+// ---- relatório: baixar os XMLs das notas de um período (zip com os XMLs + planilha com a lista) ----
+function nsAbreLote(){
+  const ini=TODAY.slice(0,8)+'01';
+  ctMostra('nslote',{},'Baixar XMLs das notas','',
+    `<div class="fields"><label class="f">De<input type="date" id="nl_ini" value="${ini}"></label><label class="f">Até<input type="date" id="nl_fim" value="${TODAY}"></label>
+    <label class="f">Empresa que emitiu<select id="nl_emp"><option value="">Todas</option>${CTL.nsEmit.map(e=>`<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></label>
+    <label class="f">Situação<select id="nl_sit"><option value="">Emitidas e canceladas</option><option value="emitida">Só emitidas</option><option value="cancelada">Só canceladas</option></select></label>
+    <label class="f">Período pela data de<select id="nl_por"><option value="emissao">Emissão</option><option value="competencia">Competência</option></select></label>
+    <label class="f">Ambiente<select id="nl_amb"><option value="1">Produção (valem como nota)</option><option value="2">Teste</option><option value="">Todos</option></select></label></div>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">Baixa um arquivo .zip com o XML de cada nota (e o XML do cancelamento, quando houver) e uma planilha com a lista das notas. Pronto para mandar à contabilidade.</p>`,
+    ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nslote','Baixar','primary'));
+}
+let NS_ZIP=null;
+const nsZipLib=()=>NS_ZIP||(NS_ZIP=new Promise((ok,erro)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';s.onload=()=>ok(window.JSZip);s.onerror=()=>{NS_ZIP=null;erro(new Error('Não foi possível carregar o compactador (zip). Confira a internet.'))};document.head.appendChild(s)}));
+async function nsBaixaLote(bt){
+  const ini=$('nl_ini').value,fim=$('nl_fim').value,emp=$('nl_emp').value,sit=$('nl_sit').value,por=$('nl_por').value,amb=$('nl_amb').value;
+  if(!ini||!fim||ini>fim)return ctErr('Escolha um período válido (a data inicial antes da final).');
+  bt.disabled=true;const txt=bt.textContent;bt.textContent='Preparando…';
+  try{
+    let q=sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,cancelada_em,cancel_motivo,tomador_nome,tomador_doc,descricao,ctribnac,valor,situacao,xml_nfse,cancel_xml')
+      .in('situacao',sit?[sit]:['emitida','cancelada']).not('chave','is',null);
+    if(emp)q=q.eq('emitente_id',emp);if(amb)q=q.eq('ambiente',Number(amb));
+    q=por==='competencia'?q.gte('competencia',ini).lte('competencia',fim):q.gte('emitida_em',ini+'T00:00:00-03:00').lte('emitida_em',fim+'T23:59:59-03:00');
+    const {data,error}=await q.order('emitida_em');if(error)throw error;
+    if(!data.length){bt.disabled=false;bt.textContent=txt;return ctErr('Nenhuma nota nesse período com esses filtros.')}
+    const JSZip=await nsZipLib(),zip=new JSZip(),pasta=zip.folder('xml');
+    for(const n of data){const nome=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}`;if(n.xml_nfse)pasta.file(nome+'.xml',n.xml_nfse);if(n.cancel_xml)pasta.file(nome+'_cancelamento.xml',n.cancel_xml)}
+    const linhas=data.map(n=>({'Empresa':nsEmitDe(n.emitente_id)?.nome||'','Nº NFS-e':n.numero_nfse||'','Emissão':n.emitida_em?dtBR(n.emitida_em):'','Competência':dBR(n.competencia),'Tomador':n.tomador_nome||'','CNPJ/CPF':nsDoc(n.tomador_doc),'Descrição':n.descricao||'','Código do serviço':nsTrib(n.ctribnac),'Valor':Number(n.valor)||0,'Situação':NSSIT[n.situacao]?.[1]||n.situacao,'Cancelada em':n.cancelada_em?dtBR(n.cancelada_em):'','Motivo do cancelamento':n.cancel_motivo||'','Ambiente':Number(n.ambiente)===2?'Teste':'Produção','Chave de acesso':n.chave}));
+    const ws=XLSX.utils.json_to_sheet(linhas),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Notas');
+    zip.file('lista-de-notas.xlsx',XLSX.write(wb,{type:'array',bookType:'xlsx'}));
+    const blob=await zip.generateAsync({type:'blob'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=`NFSe_XML_${ini}_a_${fim}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast(`${data.length} nota(s) no arquivo`);dlgCtl.close();
+  }catch(e){ctErr('Não foi possível baixar: '+(e.message||e))}
+  bt.disabled=false;bt.textContent=txt;
+}
 // ---- dados fiscais da empresa que emite (uma por empresa; vale para todas) ----
 function nsAbreCfg(id){
   const e=id==='nova'?null:(nsEmitDe(id)||CTL.nsEmit[0]||null),sv=e?.servico||{},ib=e?.ibscbs||{};
@@ -12544,6 +12580,7 @@ async function nsAcao(act,bt){
   if(act==='nsvoltanota')return nsAbreNota(n);
   if(act==='nsimprime')return nsImprime(n);
   if(act==='nsxml')return nsXml(n);
+  if(act==='nslote')return nsBaixaLote(bt);
   if(act==='nsdenovo')return nsAbreEmit(CTL.lanc.find(x=>x.id===n.ctl_lancamento_id),n);
   if(act==='nsdescarta'||act==='nsvolta'){
     const {error}=await sb.from('nfse_notas').update({situacao:act==='nsdescarta'?'descartada':'rejeitada'}).eq('id',n.id);if(error)return fail(error);
@@ -12964,7 +13001,7 @@ const MANUAL=[
 <li>Primeira vez: o portal mostra como ligar a sua conta (gerar a chave em Perfil › Chaves de API da Autentique e colar no Supabase como <b>AUTENTIQUE_TOKEN</b>). A chave fica só no servidor.</li>
 </ol>`},
     {k:'ctlnfse',t:'Notas fiscais (NFS-e)',img:'ctlnfse.png',
-      txt:`<p>Emite a nota fiscal de serviço (NFS-e) direto no emissor nacional do governo, sem passar pelo site. Só a Master vê. A nota sai na hora: o portal assina com o certificado e envia ao governo por um servidor próprio no Brasil. O certificado digital A1 fica guardado criptografado no Supabase, nunca no navegador.</p>
+      txt:`<p>Emite a nota fiscal de serviço (NFS-e) direto no emissor nacional do governo, sem passar pelo site. Só a Master vê. A nota sai na hora: o portal assina com o certificado e envia ao governo por um servidor próprio no Brasil. O botão “Baixar XMLs” baixa, de uma vez, os XMLs das notas de um período (em .zip, com uma planilha da lista). O certificado digital A1 fica guardado criptografado no Supabase, nunca no navegador.</p>
 <ol>
 <li>Uma vez só: em <b>Dados fiscais</b>, confira CNPJ, cidade (código IBGE), regime e o serviço padrão. Clique em <b>Testar certificado e conexão</b>. Para outra empresa emitir, escolha <b>+ Cadastrar outra empresa</b>.</li>
 <li>Enquanto o <b>Ambiente</b> estiver em <b>Teste</b>, as notas vão para a produção restrita e não valem. Quando o teste der certo, troque para <b>Produção</b>.</li>
@@ -13172,7 +13209,8 @@ async function agBadge(){
 // =====================================================================
 const NOVIDADES=[
   {k:'2026-11-15nfse-envio',data:'2026-11-15',t:'Notas fiscais (NFS-e): envio ligado',itens:[
-    {x:'Controlacs › Notas fiscais e o botão “Emitir NF” já enviam a nota direto ao emissor nacional e trazem o número da NFS-e na hora. O aviso “envio ainda em preparação” saiu. O cancelamento também é feito pelo portal.',para:'master'}]},
+    {x:'Controlacs › Notas fiscais e o botão “Emitir NF” já enviam a nota direto ao emissor nacional e trazem o número da NFS-e na hora. O aviso “envio ainda em preparação” saiu. O cancelamento também é feito pelo portal.',para:'master'},
+    {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista. Pronto para mandar à contabilidade.',para:'master'}]},
   {k:'2026-11-15topo',data:'2026-11-15',t:'Novos ícones no canto direito do topo',itens:[
     {x:'Contabilidade, Comunicação, Controlacs, Configurações (engrenagem) e Ajuda (?) saíram da faixa de módulos e agora ficam no canto direito do topo, ao lado do seu nome. É só clicar no ícone para abrir as mesmas telas de antes; nada mudou dentro delas.'},
     {x:'O Manual do sistema agora fica em Ajuda › Manual do sistema (antes ficava em Configurações).'}]},
