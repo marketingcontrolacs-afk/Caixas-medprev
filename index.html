@@ -12448,7 +12448,7 @@ function nsAbreNota(n){
     (n.situacao==='rejeitada'?ctBtn('nsdescarta','Descartar','ghost')+ctBtn('nsdenovo','Corrigir e tentar de novo'):'')+
     (n.situacao==='descartada'?ctBtn('nsvolta','Desfazer o descarte','ghost'):'')+
     '<span class="spacer"></span>'+
-    (n.chave?ctBtn('nsxml','Baixar XML','ghost')+ctBtn('nsimprime','Imprimir'):'')+ctBtn('fechar','Fechar','ghost'));
+    (n.chave?ctBtn('nsxml','Baixar XML','ghost')+ctBtn('nsemail','Enviar por e-mail','ghost')+ctBtn('nsimprime','Imprimir'):'')+ctBtn('fechar','Fechar','ghost'));
 }
 function nsAbreCanc(n){
   if(!n)return;
@@ -12544,6 +12544,58 @@ async function nsImprime(n){
 async function nsXml(n){
   const {data,error}=await sb.from('nfse_notas').select('xml_nfse,cancel_xml').eq('id',n.id).single();if(error||!data?.xml_nfse)return toast('XML não encontrado.');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.xml_nfse],{type:'application/xml'}));a.download=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}.xml`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+// ---- enviar a nota por e-mail ao cliente (PDF do DANFSe + XML), pela função "nfse-email" (Resend) ----
+let NS_H2P=null;
+// gera o PDF do DANFSe dentro de uma janela escondida (iframe), para o estilo da nota não mexer no portal
+async function nsPdfB64(n){
+  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();
+  if(!data?.xml_nfse)throw new Error('XML da nota não encontrado.');
+  const chave=(data.xml_nfse.match(/Id="NFS(\d{50})"/)||[])[1]||n.chave||'';
+  const qr=chave?await nsQrDataUri(`https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=${chave}`):'';
+  const f=document.createElement('iframe');f.style.cssText='position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0';document.body.appendChild(f);
+  try{
+    const d=f.contentDocument;d.open();d.write(nsDanfseHtml(data.xml_nfse,n,qr).replace('<div class="bar">','<div class="bar" style="display:none">'));d.close();
+    await new Promise((ok,erro)=>{const sc=d.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';sc.onload=ok;sc.onerror=()=>erro(new Error('Não foi possível carregar o gerador de PDF. Confira a internet.'));d.head.appendChild(sc)});
+    const m=d.querySelector('.marca');if(m)m.style.position='absolute';
+    const uri=await f.contentWindow.html2pdf().set({margin:8,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(d.body).outputPdf('datauristring');
+    return uri.replace(/^data:[^,]*,/,'');
+  }finally{f.remove()}
+}
+function nsEmailDe(n){
+  const doc=nsSo(n.tomador_doc),c=(CTL.cli||[]).find(x=>doc&&nsSo(x.cnpj_cpf)===doc);
+  return n.tomador?.email||c?.email||'';
+}
+function nsAbreEmail(n){
+  const e=nsEmitDe(n.emitente_id)||{},envios=n.extra?.emails||[];
+  const msg=`Olá,\n\nSegue a nota fiscal de serviço nº ${n.numero_nfse||''}, no valor de ${fm(n.valor)}, referente a ${n.descricao||'nossos serviços'}.\nO PDF (DANFSe) e o arquivo XML estão anexos.\n\nQualquer dúvida, estamos à disposição.\n\n${e.razao_social||e.nome||'Controlacs'}`;
+  ctMostra('nsemail',n,`Enviar a NFS-e nº ${n.numero_nfse||''} por e-mail`,nsChip(n)+' '+nsAmbChip(n.ambiente),
+    `${n.situacao==='cancelada'?'<div class="alerta bad" style="margin:0 0 10px"><b>Esta nota está cancelada.</b><span>Se enviar, o cliente recebe também o XML do cancelamento.</span></div>':''}
+    ${Number(n.ambiente)===2?'<div class="alerta" style="margin:0 0 10px"><b>Nota de teste.</b><span>Não vale como nota fiscal; o PDF sai com o aviso “sem validade jurídica”.</span></div>':''}
+    <div class="fields">
+    <label class="f wide">Para (e-mail do cliente) *<input id="ne_para" value="${esc(nsEmailDe(n))}" placeholder="cliente@empresa.com.br; outro@empresa.com.br"></label>
+    <label class="f wide">Com cópia<input id="ne_cc" value="${esc(e.email||'')}" placeholder="Opcional"></label>
+    <label class="f wide">Assunto<input id="ne_ass" value="${esc(`Nota fiscal de serviço nº ${n.numero_nfse||''} - ${e.razao_social||e.nome||''}`)}"></label>
+    <label class="f wide">Mensagem<textarea id="ne_msg" rows="8">${esc(msg)}</textarea></label>
+    <label class="f wide" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="ne_pdf" checked style="width:auto"> Anexar o PDF (DANFSe) além do XML</label></div>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">Sai de <b>notas@controlacs.com.br</b> com o nome da empresa que emitiu. Quando o cliente clicar em “Responder”, a resposta vai para ${esc(e.email||'o e-mail da empresa (cadastre em Dados fiscais)')}.</p>
+    ${envios.length?`<div class="f wide" style="margin-top:12px"><span>Já enviada</span><ul style="margin:4px 0 0;padding-left:18px">${envios.slice().reverse().map(x=>`<li>${dtBR(x.em)} para ${esc((x.para||[]).join(', '))}${x.cc?.length?' (cópia: '+esc(x.cc.join(', '))+')':''}</li>`).join('')}</ul></div>`:''}`,
+    ctBtn('nsvoltanota','Voltar','ghost')+'<span class="spacer"></span>'+ctBtn('nsenvia','Enviar e-mail','primary'));
+}
+async function nsEnviaEmail(bt){
+  const n=CTL.dlg?.obj;const para=ctV('ne_para');
+  if(!para)return ctErr('Informe o e-mail do cliente.');
+  if(!confirm(`Enviar a NFS-e nº ${n.numero_nfse||''} para ${para}? Depois de enviado, o e-mail não tem como ser desfeito.`))return;
+  bt.disabled=true;const txt=bt.textContent;
+  try{
+    let pdf='';if($('ne_pdf').checked){bt.textContent='Gerando o PDF…';pdf=await nsPdfB64(n)}
+    bt.textContent='Enviando…';
+    const {data,error}=await sb.functions.invoke('nfse-email',{body:{nota_id:n.id,para,cc:ctV('ne_cc'),assunto:ctV('ne_ass'),mensagem:$('ne_msg').value,pdf_b64:pdf}});
+    if(error){let j=null;try{j=await error.context.json()}catch(_){}throw new Error(j?.erro||error.message)}
+    n.extra={...(n.extra||{}),emails:[...(n.extra?.emails||[]),data.envio]};
+    toast('E-mail enviado');await ctCarrega().catch(()=>{});return nsAbreNota(CTL.ns.find(x=>x.id===n.id)||n);
+  }catch(e){ctErr('Não foi possível enviar: '+(e.message||e))}
+  bt.disabled=false;bt.textContent=txt;
 }
 // ---- relatório: baixar os XMLs das notas de um período (zip com os XMLs + planilha com a lista) ----
 function nsAbreLote(){
@@ -12650,6 +12702,8 @@ async function nsAcao(act,bt){
   if(act==='nsvoltanota')return nsAbreNota(n);
   if(act==='nsimprime')return nsImprime(n);
   if(act==='nsxml')return nsXml(n);
+  if(act==='nsemail')return nsAbreEmail(n);
+  if(act==='nsenvia')return nsEnviaEmail(bt);
   if(act==='nslote')return nsBaixaLote(bt);
   if(act==='nsdenovo')return nsAbreEmit(CTL.lanc.find(x=>x.id===n.ctl_lancamento_id),n);
   if(act==='nsdescarta'||act==='nsvolta'){
@@ -13078,7 +13132,7 @@ const MANUAL=[
 <li>Para emitir: <b>+ Emitir NFS-e</b>, ou o botão <b>Emitir NF</b> na receita do Financeiro (a nota fica ligada à receita). Escolha o cliente, confira o tomador, a competência, o valor e a descrição e clique em Emitir.</li>
 <li>Se o emissor recusar, a tentativa aparece como <b>Recusada</b> com o motivo. Use <b>Corrigir e tentar de novo</b> ou <b>Descartar</b> (o descarte também tem <b>Desfazer</b>).</li>
 <li>Para desfazer uma nota emitida: abra a nota e clique em <b>Cancelar NFS-e</b>, com o motivo. O cancelamento vai para o emissor nacional e não tem volta; para corrigir, cancele e emita outra.</li>
-<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
+<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. <b>Enviar por e-mail</b> manda o PDF e o XML ao cliente (confira o e-mail, a cópia e a mensagem antes; e-mail enviado não tem como desfazer, por isso o sistema pede confirmação). A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
 </ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
@@ -13281,7 +13335,8 @@ const NOVIDADES=[
   {k:'2026-11-15nfse-envio',data:'2026-11-15',t:'Notas fiscais (NFS-e): envio ligado',itens:[
     {x:'Controlacs › Notas fiscais e o botão “Emitir NF” já enviam a nota direto ao emissor nacional e trazem o número da NFS-e na hora. O aviso “envio ainda em preparação” saiu. O cancelamento também é feito pelo portal.',para:'master'},
     {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista, com uma pasta por empresa quando escolher “Todas as empresas”. Pronto para mandar à contabilidade.',para:'master'},
-    {x:'O botão “Imprimir” da nota agora abre o DANFSe no modelo oficial novo (NT 008/2026), com QR Code de autenticidade, dados do prestador e do tomador, ISSQN, IBS/CBS e valor líquido. Use “Imprimir / Salvar em PDF” para gerar o PDF e mandar ao cliente.',para:'master'}]},
+    {x:'O botão “Imprimir” da nota agora abre o DANFSe no modelo oficial novo (NT 008/2026), com QR Code de autenticidade, dados do prestador e do tomador, ISSQN, IBS/CBS e valor líquido. Use “Imprimir / Salvar em PDF” para gerar o PDF e mandar ao cliente.',para:'master'},
+    {x:'Novo botão “Enviar por e-mail” na nota: manda ao cliente o PDF (DANFSe) e o XML, de notas@controlacs.com.br, com o nome da empresa que emitiu. O e-mail do cliente vem do cadastro, dá para pôr cópia e mudar a mensagem, e a nota mostra quando e para quem já foi enviada.',para:'master'}]},
   {k:'2026-11-15topo',data:'2026-11-15',t:'Novos ícones no canto direito do topo',itens:[
     {x:'Contabilidade, Comunicação, Controlacs, Configurações (engrenagem) e Ajuda (?) saíram da faixa de módulos e agora ficam no canto direito do topo, ao lado do seu nome. É só clicar no ícone para abrir as mesmas telas de antes; nada mudou dentro delas.'},
     {x:'O Manual do sistema agora fica em Ajuda › Manual do sistema (antes ficava em Configurações).'}]},
