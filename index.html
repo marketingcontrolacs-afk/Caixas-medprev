@@ -1314,7 +1314,9 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
       <label class="f">Pagamento de<input id="adFIni" type="date"></label><label class="f">até<input id="adFFim" type="date"></label>
       <label class="f">Conta a pagar<select id="adFPg"><option value="">Todas</option><option value="aberta">Em aberto</option><option value="paga">Paga</option></select></label>
       <label class="f">Situação<select id="adFSit"><option value="ativo">Valendo</option><option value="desfeito">Desfeitos</option><option value="">Todos</option></select></label>
-      <button type="button" class="btn small ghost" id="adLimpa">Limpar filtros</button></div></div>
+      <button type="button" class="btn small ghost" id="adLimpa">Limpar filtros</button>
+      <span class="spacer"></span><button type="button" class="btn small" id="adRelPdf">Relatório de líquidos (PDF)</button><button type="button" class="btn small ghost" id="adRelXls">Excel</button></div>
+      <p class="note" style="margin:6px 0 0">O relatório de líquidos traz <b>todas as empresas</b> que você vê, separadas por empresa, com o nome e o valor de cada colaborador. Usa os filtros Folha e Pagamento de/até (sem filtro, sai tudo o que está valendo).</p></div>
     <div class="card tablebox"><table id="adTab"></table></div>
     <p class="note">Desfazer apaga a conta a pagar e o desconto da folha e devolve o adiantamento que estava na folha antes do recibo (o recibo continua no histórico como desfeito). Conta já paga: estorne o pagamento em Contas a pagar antes. Folha já enviada à contabilidade não pode ser alterada.</p>
   </section>
@@ -5564,6 +5566,35 @@ function adtoLista(){
       <td style="white-space:nowrap"><button type="button" class="btn small ghost" data-adp="${d.id}">Imprimir</button>${des?'':` <button type="button" class="btn small ghost" data-adx="${d.id}">Desfazer</button>`}</td></tr>`}).join('')
     ||'<tr><td class="l muted" colspan="8">Nenhum recibo com estes filtros.</td></tr>'}</tbody>${l.length?`<tfoot><tr><td></td><td class="l"><b>Total valendo</b></td><td><b>${fm(tot)}</b></td><td colspan="5"></td></tr></tfoot>`:''}`;
 }
+// relatório de líquidos (Carol, 16/11): por empresa, cada colaborador com o valor do adiantamento; todas as empresas visíveis
+async function adtoRelDados(){
+  const emps=empresasDe('adto',true),ids=emps.map(c=>c.id);if(!ids.length)return null;
+  const {data,error}=await sb.from('rh_documentos').select('*').in('cliente_id',ids).eq('modelo',ADTREC);if(error){fail(error,'Não foi possível montar o relatório');return null}
+  const cp=$('adFComp').value,ini=$('adFIni').value,fim=$('adFFim').value;
+  const ls=(data||[]).filter(d=>{const x=d.dados||{};return !x.desfeito_em&&(!cp||String(x.competencia||'').startsWith(cp))&&(!ini||(x.data_pgto||'')>=ini)&&(!fim||(x.data_pgto||'')<=fim)});
+  const g=emps.map(c=>({c,its:ls.filter(d=>d.cliente_id===c.id).sort((a,b)=>a.nome.localeCompare(b.nome)||String(a.dados.data_pgto).localeCompare(b.dados.data_pgto))})).filter(x=>x.its.length);
+  const per=[cp&&'Folha de '+mesTxt(cp),ini&&'pagamento desde '+dBR(ini),fim&&'até '+dBR(fim)].filter(Boolean).join(', ')||'todos os adiantamentos valendo';
+  return {g,per,tot:r2(ls.reduce((s,d)=>s+(+d.dados.valor||0),0)),n:ls.length};
+}
+$('adRelPdf').onclick=async()=>{const R=await adtoRelDados();if(!R)return;if(!R.n){toast('Nenhum adiantamento com estes filtros');return}
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de líquidos - Adiantamento salarial</title><style>
+    body{font:10.5pt Arial,Helvetica,sans-serif;color:#000;margin:0}h1{font-size:13pt;margin:0 0 2px}.sub{margin:0 0 14px;color:#444}h2{font-size:11pt;margin:16px 0 4px}
+    table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px 6px;text-align:left}th{background:#eee}.v{text-align:right;white-space:nowrap;width:110px}.d{width:90px}
+    tfoot td{font-weight:bold;background:#f6f6f6}.geral{margin-top:16px;font-size:11.5pt;font-weight:bold;text-align:right}section{page-break-inside:avoid}@page{size:A4;margin:14mm}</style></head><body>
+    <h1>Relatório de líquidos · Adiantamento salarial</h1><p class="sub">${esc(R.per)} · emitido em ${dBR(TODAY)}</p>
+    ${R.g.map(({c,its})=>`<section><h2>${esc(c.nome)}</h2><table><thead><tr><th>Colaborador</th><th class="d">Pagamento</th><th class="d">Folha</th><th class="v">Valor</th></tr></thead><tbody>${
+      its.map(d=>`<tr><td>${esc(d.nome)}</td><td class="d">${dBR(d.dados.data_pgto)}</td><td class="d">${esc(mesTxt(d.dados.competencia))}</td><td class="v">${fm(+d.dados.valor)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3">Total ${esc(c.nome)} (${its.length} ${its.length===1?'colaborador':'colaboradores'})</td><td class="v">${fm(r2(its.reduce((s,d)=>s+(+d.dados.valor||0),0)))}</td></tr></tfoot></table></section>`).join('')}
+    ${R.g.length>1?`<p class="geral">Total geral: ${fm(R.tot)}</p>`:''}
+    <script>window.onload=()=>setTimeout(()=>window.print(),200)<\/script></body></html>`);w.document.close()};
+$('adRelXls').onclick=async()=>{const R=await adtoRelDados();if(!R)return;if(!R.n){toast('Nenhum adiantamento com estes filtros');return}
+  const H=['Empresa','Colaborador','Pagamento','Folha','Valor'],rows=[];
+  R.g.forEach(({c,its})=>{its.forEach(d=>rows.push([c.nome,d.nome,dBR(d.dados.data_pgto),mesTxt(d.dados.competencia),+d.dados.valor]));
+    rows.push(['Total '+c.nome,'','','',r2(its.reduce((s,d)=>s+(+d.dados.valor||0),0))])});
+  if(R.g.length>1)rows.push(['Total geral','','','',R.tot]);
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=[{wch:34},{wch:36},{wch:12},{wch:16},{wch:14}];xTabela(ws,{money:[4],texto:[0,1]});
+  XLSX.utils.book_append_sheet(wb,ws,'Líquidos');XLSX.writeFile(wb,`Liquidos adiantamento salarial ${dBR(TODAY).replace(/\//g,'-')}.xlsx`)};
 ['adBusca','adFCol','adFComp','adFIni','adFFim','adFPg','adFSit'].forEach(id=>$(id).addEventListener(id==='adBusca'?'input':'change',adtoLista));
 $('adLimpa').onclick=()=>{['adBusca','adFCol','adFComp','adFIni','adFFim','adFPg'].forEach(id=>$(id).value='');$('adFSit').value='ativo';adtoLista()};
 $('adTab').addEventListener('click',async ev=>{
@@ -14005,6 +14036,7 @@ const NOVIDADES=[
   {k:'2026-11-16adto',data:'2026-11-16',t:'Recibo de adiantamento salarial',itens:[
     {x:'Nova tela RH › Adiantamento salarial: escolha o colaborador, o valor e a data do pagamento e clique em Gerar recibo. Sai o recibo para assinar, entra a conta a pagar (categoria Adto. de Salário) e o desconto na coluna Adiantamento da folha do mês.',mods:['adto']},
     {x:'Quem já tem adiantamento no cadastro (ex.: Oliveira) não fica com desconto em dobro: o recibo substitui o valor que estava na folha do mês.',mods:['adto','folha']},
+    {x:'Relatório de líquidos (PDF e Excel): separado por empresa, com o nome e o valor do adiantamento de cada colaborador, o total de cada empresa e o total geral. Filtra pela folha ou pelo período do pagamento.',mods:['adto']},
     {x:'Desfazer: tira a conta a pagar e o desconto da folha e devolve o adiantamento que estava antes. O recibo fica no histórico como desfeito, com filtros por colaborador, folha, data, conta paga ou em aberto e busca.',mods:['adto']}]},
   {k:'2026-11-15movbc',data:'2026-11-15',t:'Movimentação financeira, Contas a pagar e a receber no modelo do Bom Controle',itens:[
     {x:'As três telas ficaram no mesmo modelo: colunas Parcela, Empresa (em Todas as empresas), Tipo, data, Cliente/Fornecedor com a descrição embaixo, Categoria, Conta e Valor. A Movimentação mostra entradas e saídas juntas; Contas a pagar só as despesas; Contas a receber só as receitas.',mods:['gfmov','gfpagar','gfrec']},
