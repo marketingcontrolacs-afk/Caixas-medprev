@@ -541,6 +541,7 @@ body.lg header.top .logo{visibility:hidden}
 .mnsec h4{margin:14px 0 4px;font-size:15px}
 .mnimg{display:block;margin:12px 0 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-width:960px;cursor:zoom-in;background:var(--sunk)}
 .mnimg img{display:block;width:100%;height:auto}
+.mnvid{margin:12px 0 14px;max-width:960px}.mnvid video{display:block;width:100%;border-radius:10px;border:1px solid var(--line);background:#000}.mnvidt{margin:0 0 6px;font-weight:600}
 .mndica{background:var(--brand-soft);border-radius:10px;padding:10px 14px;margin:10px 0;max-width:80ch}
 .mnquem{font-size:13px;color:var(--muted);margin:0 0 6px}
 @media (max-width:820px){.mnwrap{grid-template-columns:minmax(0,1fr)}.mnidx{position:static;max-height:none}.mnsec{padding:16px}}
@@ -662,6 +663,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div style="min-width:0">
       <div class="alerta" id="tpBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
+      <div class="alerta" id="rotVisBanner" hidden style="margin:0 0 14px"></div>
       <div class="alerta" id="soVerBanner" hidden style="margin:0 0 14px"><b>Somente visualização</b><span>Você pode ver e baixar o que está nesta tela, mas não lançar, alterar ou excluir. Para isso, peça ao master para marcar “Executar” nesta ferramenta.</span></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
@@ -1289,6 +1291,37 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="row"><span class="spacer"></span><button class="btn primary" id="prSalvar">Salvar premiação</button></div>
     <p class="note">Deixe em branco quem não tem premiação no mês. Afastados não aparecem aqui. Depois que o escritório confere a folha, os valores ficam travados.</p>
   </section>
+  <!-- RH · RECIBO DE ADIANTAMENTO SALARIAL (Carol, 16/11): gera o recibo, a conta a pagar e o desconto na folha -->
+  <section id="viewAdto" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Adiantamento salarial</h1><p class="sub">Gere o recibo de adiantamento. Ao gerar, o sistema cria a conta a pagar (Gestão financeira › Contas a pagar) e o desconto na coluna Adiantamento da folha do mês.</p></div>
+    </div>
+    <div class="card block" style="margin-top:16px">
+      <div class="fields">
+        <label class="f wide">Colaborador<select id="adFunc"></select></label>
+        <label class="f">Valor (R$)<input id="adValor" class="money" placeholder="0,00"></label>
+        <label class="f">Data do pagamento<input id="adData" type="date"></label>
+        <label class="f">Desconto na folha de<select id="adComp"></select></label>
+        <label class="f wide">Observação (opcional)<input id="adObs" placeholder="Sai no recibo e na conta a pagar"></label>
+      </div>
+      <p class="note" id="adInfo" style="margin:8px 0 0"></p>
+      <p class="neg" id="adErr" hidden></p>
+      <div class="row"><span class="spacer"></span><button class="btn primary" id="adGerar">Gerar recibo</button></div>
+    </div>
+    <h3 style="margin-top:18px">Recibos gerados</h3>
+    <div class="card block"><div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+      <label class="f">Buscar<input id="adBusca" placeholder="Nome, valor, data…"></label>
+      <label class="f">Colaborador<select id="adFCol"><option value="">Todos</option></select></label>
+      <label class="f">Folha<select id="adFComp"><option value="">Todas</option></select></label>
+      <label class="f">Pagamento de<input id="adFIni" type="date"></label><label class="f">até<input id="adFFim" type="date"></label>
+      <label class="f">Conta a pagar<select id="adFPg"><option value="">Todas</option><option value="aberta">Em aberto</option><option value="paga">Paga</option></select></label>
+      <label class="f">Situação<select id="adFSit"><option value="ativo">Valendo</option><option value="desfeito">Desfeitos</option><option value="">Todos</option></select></label>
+      <button type="button" class="btn small ghost" id="adLimpa">Limpar filtros</button>
+      <span class="spacer"></span><button type="button" class="btn small" id="adRelPdf">Relatório de líquidos (PDF)</button><button type="button" class="btn small ghost" id="adRelXls">Excel</button></div>
+      <p class="note" style="margin:6px 0 0">O relatório de líquidos traz <b>todas as empresas</b> que você vê, separadas por empresa, com o nome e o valor de cada colaborador. Usa os filtros Folha e Pagamento de/até (sem filtro, sai tudo o que está valendo).</p></div>
+    <div class="card tablebox"><table id="adTab"></table></div>
+    <p class="note">Desfazer apaga a conta a pagar e o desconto da folha e devolve o adiantamento que estava na folha antes do recibo (o recibo continua no histórico como desfeito). Conta já paga: estorne o pagamento em Contas a pagar antes. Folha já enviada à contabilidade não pode ser alterada.</p>
+  </section>
   <!-- RH · ESPELHO DE PONTO (alimenta a folha e o pedido de benefícios) -->
   <section id="viewPonto" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -1702,6 +1735,11 @@ function anexoView(a,url,small){
 // ---------- sessão, acessos e menu ----------
 let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
+// Rotina diária com a visão do cliente (Carol, 16/11): a equipe Controlacs vê as telas do módulo exatamente como o cliente vê.
+// O botão no alto troca para a visão do escritório (Marcar como paga, conferências etc. continuam lá e na Gestão financeira).
+const ROT_V=['caixa','pagar','tesouraria','cartao'];let ROT_ESC=false;try{ROT_ESC=localStorage.getItem('rotVisEsc')==='1'}catch(e){}
+const rotCli=()=>ehEsc()&&!ROT_ESC&&ROT_V.includes(VIEW);
+const escR=()=>ehEsc()&&!rotCli();
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
@@ -1736,6 +1774,7 @@ const ICO={
   folha:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
   ponto:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
   ben:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  adto:'<path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M12 7v8M14.5 8.5h-3.2a1.5 1.5 0 0 0 0 3h1.4a1.5 1.5 0 0 1 0 3H9.5"/>',
   premio:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>',
   colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
   docs:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/><path d="M4 7v14h11"/>',
@@ -1831,6 +1870,7 @@ const NAV=[
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('folha')},
   {k:'ponto',t:'Espelho de ponto',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('ponto')},
   {k:'premio',t:'Premiação',g:'Recursos humanos',s:'Dia a dia',ok:()=>empresasDe('premio').length>0},
+  {k:'adto',t:'Adiantamento salarial',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('folha')},
   {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('beneficios')},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',s:'Cadastros',ok:()=>temAcesso('colab')},
   {k:'docs',t:'Documentos',g:'Recursos humanos',s:'Cadastros',ok:()=>temAcesso('colab')},
@@ -1955,7 +1995,7 @@ function empresasMod(m){
   // operador cliente com a Gestão financeira liberada: as empresas em que ele tem o acesso 'gestao' (Carol, 04/11)
   if(!ehEsc()&&TOOLMOD[m]==='gestao')return CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'gestao'));
   if(m.startsWith('ctb'))return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_financeiro!==false:temEm(c.id,'contabil')));
-  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'?'folha':m;
+  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'||m==='adto'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   // o cliente vê só as empresas em que tem a seção liberada (Benefícios é seção própria)
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':m==='ponto'?'ponto':mod)));
@@ -2061,8 +2101,8 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfdash','gfresumo','gffluxo','
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
-  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -2076,6 +2116,7 @@ function openView(){
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
   else if(VIEW==='docs'){$('viewDocs').hidden=false;initDocs()}
   else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
+  else if(VIEW==='adto'){$('viewAdto').hidden=false;initAdto()}
   else if(VIEW==='ponto'){$('viewPonto').hidden=false;initPonto()}
   else if(VIEW==='ben'){$('viewBen').hidden=false;initBen()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
@@ -2099,9 +2140,13 @@ function openView(){
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
   else if(VIEW.startsWith('ctl')){$('viewCtl').hidden=false;renderCtl()}
-  avBanner();tpBanner();soVerBanner();
+  avBanner();tpBanner();soVerBanner();rotBanner();
 }
 // aviso no alto da tela de quem só tem "Visualizar" nela
+function rotBanner(){const b=$('rotVisBanner');if(!b)return;const on=ehEsc()&&ROT_V.includes(VIEW);b.hidden=!on;if(!on)return;
+  b.innerHTML=rotCli()?'<b>👁 Visão do cliente</b><span>Você está vendo a Rotina diária exatamente como o cliente vê. <button type="button" class="btn small ghost" data-rotvis="esc">Ver como escritório</button></span>'
+    :'<b>Visão do escritório</b><span>Esta é a tela com as funções do escritório (marcar como paga, conferir, notas da conferência). <button type="button" class="btn small ghost" data-rotvis="cli">Ver como o cliente</button></span>'}
+$('rotVisBanner').addEventListener('click',e=>{const b=e.target.closest('[data-rotvis]');if(!b)return;ROT_ESC=b.dataset.rotvis==='esc';try{localStorage.setItem('rotVisEsc',ROT_ESC?'1':'0')}catch(x){}MOD=null;openView()});
 function soVerBanner(){$('soVerBanner').hidden=!VIEW||podeExec(VIEW)||telaSemEmp(VIEW)&&VIEW.startsWith('cfg')}
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);document.body.classList.toggle('lg',view==='loginForm'||view==='viewPend');$('modrow').hidden=view!=='app';if(view!=='app')megaFecha();
@@ -2185,7 +2230,7 @@ const nCx=c=>Math.max(1,Math.min(9,+(c&&c.caixas)||1));
 const cxNome=(c,f)=>nCx(c)>1||(f&&f.caixa>1)?'Caixa '+(f?f.caixa||1:1):'';
 const opCx=()=>+$('opCaixa').value||1;
 function initOp(cli){
-  OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!ehEsc();
+  OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!escR();
   const n=nCx(cli),atual=Math.min(opCx(),n);$('opCaixaBox').hidden=n<2;
   $('opCaixa').innerHTML=Array.from({length:n},(_,i)=>`<option value="${i+1}">Caixa ${i+1}</option>`).join('');$('opCaixa').value=atual;
   if(!$('opData').value)$('opData').value=TODAY;
@@ -3154,7 +3199,7 @@ const msgBanco=(e,v)=>/criar_usuario|trocar_senha|function/i.test(e.message||'')
 const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origin+location.pathname}\nE-mail: ${email}\nSenha: ${senha}`;
 // ---------- cadastro do usuário com permissões por ferramenta (Carol, 03/11) ----------
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
-const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
+const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
   gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
@@ -3402,7 +3447,8 @@ const MODCFG={
 };
 let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
 // envio simples dos boletos e notas a pagar: vale para quem não é do escritório, em todas as empresas
-const pagSimples=()=>MOD==='pagar'&&!ehEsc();
+  // cartão de crédito também (Carol, 16/11): o cliente só anexa a nota ou o cupom e diz do que se trata
+  const pagSimples=()=>(MOD==='pagar'||MOD==='cartao')&&!escR();
 const SIMP_DICA='Diga do que se trata a despesa: o que foi comprado ou qual serviço, de quem e de qual mês ou parcela, se souber. Isso ajuda a Controlacs a achar a conta certa.';
 const dBRv=s=>s?dBR(s):'—';
 const mFiltro=$('mFiltro');
@@ -3465,7 +3511,7 @@ async function renderMod(){
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':f==='todos'?'de tudo o que foi enviado':'no mês']];
   }else if(MOD==='cartao'){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':r.valor==null?'<span class="chip c-warn" title="A Controlacs confere com a fatura e completa o valor">Enviado · a Controlacs completa</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
     tiles=[['Compras do período',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
   }else{
@@ -3482,7 +3528,7 @@ async function renderMod(){
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   if(MOD==='tesouraria'&&!tod)renderTC(cli);else $('mConf').innerHTML='';
   pagMesDesenha();
-  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
+  $('mNote').textContent='Clique numa linha para ver os documentos'+(escR()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
 }
 $('mNovo').onclick=()=>openReg(null);
 // ---------- Contas do mês (checklist do cliente) ----------
@@ -3500,7 +3546,7 @@ const pagSt=t=>+t.pago>=+t.valor-0.005?['c-done','✓ Paga','pago']:t.origem_id|
 function pagMesDesenha(){
   const box=$('mPagMes');if(!box)return;
   if(MOD!=='pagar'||!PST.cli){box.innerHTML='';return}
-  if(PST.erro){box.innerHTML=ehEsc()?'<p class="note">Para o cliente ver as contas do mês aqui, rode a atualização v100 do banco.</p>':'';return}
+  if(PST.erro){box.innerHTML=escR()?'<p class="note">Para o cliente ver as contas do mês aqui, rode a atualização v100 do banco.</p>':'';return}
   const ls=PST.vis=MOD==='pagar'&&mFiltro.value==='falta'?PST.tits.filter(t=>pagSt(t)[2]==='falta'):PST.tits,st=ls.map(pagSt),n=k=>st.filter(x=>x[2]===k).length,pode=podeLancar(PST.cli,'pagar'),mesAt=PMES===TODAY.slice(0,7);
   box.innerHTML=`<div class="card" style="margin:14px 0"><div class="row" style="justify-content:space-between;align-items:center;gap:8px">
     <div><h2 style="margin:0">Contas do mês</h2><p class="sub" style="margin:2px 0 0">Tudo o que a Controlacs tem para pagar em ${mesTxt(PMES)}, inclusive o que chegou por e-mail. Conforme os pagamentos são feitos, a conta aparece como paga.</p></div>
@@ -3517,7 +3563,7 @@ $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if
 $('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
 const dlgReg=$('dlgReg');
 // o suprimento que vem do fechamento do caixa só muda pelo caixa
-const regEditavel=()=>{const cli=cliAtual();return !!cli&&podeLancar(cli.id,MOD)&&!(REG&&REG.conferido)&&!(REG&&REG.fechamento_id&&!ehEsc())};
+const regEditavel=()=>{const cli=cliAtual();return !!cli&&podeLancar(cli.id,MOD)&&!(REG&&REG.conferido)&&!(REG&&REG.fechamento_id&&!escR())};
 // depósito bancário: só data, valor, banco de destino e comprovante; a descrição é automática
 function ajustaDeposito(){
   const t=$('rFields').querySelector('[data-k="tipo"]'),dep=t&&t.value==='Depósito bancário';
@@ -3560,14 +3606,15 @@ async function openReg(r,pre){
     if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
     // boleto: colar a linha digitável (ou anexar o PDF) preenche valor e vencimento; a chave da NF-e vai junto, escondida
     if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
-    if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
+    if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="${MOD==='cartao'?'Ex.: material de escritório na papelaria; almoço com a equipe; peça para a impressora':'Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção'}"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
       :`<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${dis}></label>`;
   };
   // cliente nos boletos e notas a pagar: só anexa e diz do que se trata; o resto é opcional e a Controlacs completa (Carol, 04/11)
-  $('rFields').innerHTML=simp?`<p class="note wide" style="margin:0">Anexe o <b>boleto</b> e/ou a <b>nota fiscal</b> logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere, procura se a conta já está lançada (ou se é recorrente) e completa o resto.</p>`
+  $('rFields').innerHTML=simp?(MOD==='cartao'?`<p class="note wide" style="margin:0">Anexe a <b>nota fiscal</b> ou o <b>cupom</b> da compra logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere com a fatura do cartão e completa o resto.</p>`
+      :`<p class="note wide" style="margin:0">Anexe o <b>boleto</b> e/ou a <b>nota fiscal</b> logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere, procura se a conta já está lançada (ou se é recorrente) e completa o resto.</p>`)
     +campo(cfg.campos.find(c=>c[0]==='sobre'))
-    +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
+    +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">${MOD==='cartao'?'Outros dados da compra (opcional): data, fornecedor, nº da nota, valor, parcelas':'Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor'}</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
     :cfg.campos.map(campo).join('');
   // fornecedor: sugere os nomes do cadastro único de clientes e fornecedores (vale para todas as empresas; v101)
   pesListaLiga($('rFields'));
@@ -3575,12 +3622,12 @@ async function openReg(r,pre){
   const emps=empresasDe(MOD,true).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
-  $('rBaixa').innerHTML=(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
+  $('rBaixa').innerHTML=(escR()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
   if(MOD==='pagar'&&r?.origem==='beneficios')$('rFields').insertAdjacentHTML('afterbegin',`<div class="note wide" style="margin:0">Conta do pedido de benefícios de ${ymTxt(r.beneficio_comp.slice(0,7))}: pedido ${fm(r.valor_pedido)} + taxa do boleto ${fm(r.taxa_boleto)} = <b>${fm(+r.valor_pedido+(+r.taxa_boleto||0))}</b>.${r.boleto_alerta?` <span class="chip c-bad">${esc(r.boleto_alerta)}</span>`:''}</div>`);
   renderRateio(r,ed);ajustaDeposito();
   $('rErr').hidden=true;
-  $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||ehEsc()));
-  $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
+  $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||escR()));
+  $('rConf').hidden=!(escR()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
   await renderRDocs();renderRLiq();
   dlgReg.showModal();
 }
@@ -3612,6 +3659,7 @@ $('rForm').addEventListener('submit',async e=>{
   if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else delete row.conta_destino}
   const simp=pagSimples(),falta=!m&&cfg.campos.find(([k,,,req])=>(simp?k==='sobre':req)&&(row[k]==null||row[k]===''));
   if(falta)m=simp?'Escreva do que se trata esta despesa.':'Preencha: '+falta[1]+'.';
+  else if(simp&&MOD==='cartao'&&!row.data)row.data=TODAY;   // data da compra: se ficou em branco, vale a do envio
   else if(Number.isNaN(row.valor)||!(row.valor>0)&&!(simp&&row.valor==null))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
   else if(MOD!=='tesouraria'&&cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
   if(MOD==='pagar'){liqLer();const l=(RLIQ||[]).filter(x=>x.nome||x.valor);
@@ -3620,7 +3668,7 @@ $('rForm').addEventListener('submit',async e=>{
   if(!m&&$('rRat').innerHTML){const rt=lerRateio(row.valor);if(rt.erro)m=rt.erro;else row.rateio=rt.partes}
   if(!m&&MOD==='pagar'&&row.linha_digitavel){const rp=await boletoRepetido(boletoDe(row.linha_digitavel)||{linha:row.linha_digitavel},REG?.id);
     if(rp.length){const t='Este boleto já está lançado em outra conta: '+repetidoTxt(rp)+'.';
-      if(!ehEsc())m=t+' Confira se é o boleto certo desta empresa.';else if(!confirm(t+'\n\nSalvar mesmo assim?'))return}}
+      if(!escR())m=t+' Confira se é o boleto certo desta empresa.';else if(!confirm(t+'\n\nSalvar mesmo assim?'))return}}
   if(m){err.textContent=m;err.hidden=false;return}
   // tesouraria: nº da NF e comprovante não impedem salvar (Carol, 30/10): só avisa
   if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
@@ -3639,6 +3687,7 @@ $('rForm').addEventListener('submit',async e=>{
     if(e1&&/titulo_id|valor_previsto/.test(e1.message||'')){delete row.titulo_id;delete row.valor_previsto;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
     if(e1&&/liquidos/.test(e1.message||'')){delete row.liquidos;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single());if(!e1)toast('Conta salva sem o relatório de líquidos: rode a atualização v54 do banco.')}
     // banco ainda sem o v99: o envio simples precisa que fornecedor, nº, vencimento e valor possam ficar em branco
+    if(e1&&/not-null|null value/i.test(e1.message||'')&&MOD==='cartao'){err.textContent=ehEsc()?'Rode a atualização v137 do banco para salvar a nota do cartão sem fornecedor, nº ou valor.':'Preencha também o fornecedor, o nº da nota e o valor (em “Outros dados”). O envio só com o anexo será liberado em breve.';err.hidden=false;return}
     if(e1&&/not-null|null value/i.test(e1.message||'')&&MOD==='pagar'){err.textContent=ehEsc()?'Rode a atualização v99 do banco para salvar sem fornecedor, nº, vencimento ou valor.':'Preencha também o fornecedor, o nº da nota, o vencimento e o valor (em “Outros dados”). O envio só com o anexo será liberado em breve.';err.hidden=false;return}
     if(e1&&/BOLETO_REPETIDO/.test(e1.message||'')){err.textContent='Este boleto já está lançado em outra conta a pagar. Confira se é o boleto certo desta empresa.';err.hidden=false;return}
     if(e1)throw e1;
@@ -3954,7 +4003,7 @@ async function renderTC(cli){
   const {data,error}=await sb.from('tesouraria_conferencias').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).order('conferido_em',{ascending:false}).limit(30);
   if(MOD!=='tesouraria'||cliAtual()?.id!==cli.id)return;
   const box=$('mConf');
-  if(error){box.innerHTML=ehEsc()?'<div class="alerta"><b>Conferência física da tesouraria</b><span>Rode a atualização v41 no Supabase para ligar a conferência.</span></div>':'';return}
+  if(error){box.innerHTML=escR()?'<div class="alerta"><b>Conferência física da tesouraria</b><span>Rode a atualização v41 no Supabase para ligar a conferência.</span></div>':'';return}
   TCL=data||[];
   const ult=TCL[0],dias=tcDias(ult),btn=podeLancar(cli.id,'tesouraria')?`<button type="button" class="btn small${tcAtrasada(ult)?' primary':''}" id="tcNova">Conferir o dinheiro agora</button>`:'';
   let h=tcAtrasada(ult)
@@ -4046,7 +4095,7 @@ function tcAbrir(c){
     $('tcFields').innerHTML=`<div class="cmp wide" style="grid-column:1/-1"><div><span class="note">Dinheiro contado</span><br><b>${fm(c.valor_fisico)}</b></div><div><span class="note">Saldo do sistema na data</span><br><b>${fm(c.saldo_sistema)}</b></div><div><span class="note">Registrada em</span><br><b>${new Date(c.conferido_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</b></div></div>`+(c.obs?`<p class="wide" style="margin:0;grid-column:1/-1"><b>Observação:</b> ${esc(c.obs)}</p>`:'');
     $('tcRes').innerHTML=tcResHtml(Number(c.diferenca),(c.analise||'').split('\n').filter(Boolean));
     const meu=c.conferido_por===ME.user_id&&Date.now()-new Date(c.conferido_em).getTime()<864e5&&podeLancar(cli.id,'tesouraria');
-    $('tcDel').hidden=!(ehEsc()||meu);
+    $('tcDel').hidden=!(escR()||meu);
   }else{
     $('tcTitle').textContent='Conferência física da tesouraria';$('tcChip').innerHTML='';$('tcSave').hidden=false;$('tcDel').hidden=true;
     $('tcFields').innerHTML=`<label class="f">Data da contagem<input type="date" id="tcData" value="${TODAY}" max="${TODAY}"></label><label class="f">Dinheiro contado na tesouraria<input class="money" id="tcValor" inputmode="decimal" placeholder="0,00"></label><label class="f wide">Observação (opcional)<textarea id="tcObs" placeholder="Ex.: contado às 18h, junto com o envelope do depósito de amanhã"></textarea></label>`;
@@ -5436,6 +5485,151 @@ $('folGrid').addEventListener('click',async ev=>{
   toast(v?`Adiantamento de ${fm(v)} confirmado`:'Adiantamento excluído deste mês');renderFolha();
 });
 $('folGrid').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('.fin input'))ev.target.blur()});
+
+// RH › Adiantamento salarial (Carol, 16/11): escolhe o colaborador, o valor e a data do pagamento e gera o recibo.
+// Ao gerar: conta a pagar (fin_titulos, origem 'adiantamento'), desconto na coluna Adiantamento da folha (descrição ADTO,
+// então o adiantamento do cadastro deixa de entrar sozinho) e o recibo em rh_documentos (modelo 'recibo_adto').
+// O adiantamento que já estava confirmado na folha do mês (✓/✎/✗ da Oliveira) é SUBSTITUÍDO pelo recibo, sem duplicar,
+// e volta se o recibo for desfeito. Tudo fica em dados do rh_documentos (titulo_id, lanc_id, substituidos).
+let ADT={cli:null,func:[],docs:[],pagos:new Set(),st:{}};
+const ADTREC='recibo_adto';
+const adtoRecMod={t:'Recibo de adiantamento salarial',corpo:D=>{const E=D.emp,un=`${E.razao}${E.unidade?' - '+E.unidade.toUpperCase():''}`,v=+D.valor;return `
+  <div class="emp c"><b>${esc(un)}</b>${E.cnpj?`<br>CNPJ: ${esc(E.cnpj)}`:''}</div>
+  <h1>RECIBO DE ADIANTAMENTO SALARIAL</h1>
+  <p style="text-align:right"><b>Valor: ${fm(v)}</b></p>
+  <p>Recebi de <b>${esc(un)}</b>${E.cnpj?`, CNPJ ${esc(E.cnpj)}`:''}, a importância de <b>${fm(v)}</b> (${esc(extenso(v))}), referente a adiantamento salarial, paga em ${dBR(D.data_pgto)}, que será descontada na folha de pagamento de ${esc(mesTxt(D.competencia))}.</p>
+  ${D.obs?`<p>Observação: ${esc(D.obs)}</p>`:''}
+  <p class="id">Colaborador(a): <b>${esc(D.f.nome)}</b>${D.f.cpf?`<br>CPF: ${esc(D.f.cpf)}`:''}${D.f.cargo?`<br>Cargo: ${esc(D.f.cargo)}`:''}</p>
+  <p class="loc">${esc(E.cidade||'_______________')}${E.uf?'/'+esc(E.uf):''}, ${dExt(D.data_pgto)}.</p>
+  <div class="ass"><div><div class="lin"></div>${esc(D.f.nome)}</div></div>`}};
+const dExt=d=>{const [y,m,dd]=String(d).split('-');return `${+dd} de ${MESES[+m-1].toLowerCase()} de ${y}`};
+function initAdto(){
+  const ate=addDias(TODAY,62).slice(0,7);
+  if(!$('adComp').options.length)$('adComp').innerHTML=mesesOpts(ate);
+  if(!$('adData').value){$('adData').value=TODAY;$('adComp').value=TODAY.slice(0,7)}
+  renderAdto();
+}
+$('adData').onchange=()=>{const d=$('adData').value;if(d&&[...$('adComp').options].some(o=>o.value===d.slice(0,7)))$('adComp').value=d.slice(0,7);adtoInfo()};
+$('adComp').onchange=adtoInfo;$('adFunc').onchange=adtoInfo;
+async function renderAdto(){
+  const cli=cliAtual();ADT.cli=cli;
+  if(!cli){$('adFunc').innerHTML='';$('adTab').innerHTML='<tbody><tr><td class="l muted">Escolha uma empresa no alto.</td></tr></tbody>';return}
+  const [rf,rd]=await Promise.all([sb.from('funcionarios').select('id,nome,cpf,cargo,situacao,desligado_em,folha_fixos').eq('cliente_id',cli.id).order('nome'),
+    sb.from('rh_documentos').select('*').eq('cliente_id',cli.id).eq('modelo',ADTREC).order('criado_em',{ascending:false})]);
+  if(rf.error||rd.error){console.error(rf.error||rd.error);$('adTab').innerHTML='<tbody><tr><td class="l neg">Erro ao carregar. Verifique a internet e tente de novo.</td></tr></tbody>';return}
+  ADT.func=rf.data||[];ADT.docs=rd.data||[];
+  const tids=ADT.docs.map(d=>d.dados?.titulo_id).filter(Boolean);ADT.pagos=new Set();
+  if(tids.length){const {data}=await sb.from('fin_movimentos').select('titulo_id').in('titulo_id',tids);(data||[]).forEach(m=>ADT.pagos.add(m.titulo_id))}
+  const {data:ms}=await sb.from('folha_meses').select('competencia,status').eq('cliente_id',cli.id);ADT.st=Object.fromEntries((ms||[]).map(m=>[m.competencia.slice(0,7),m.status]));
+  const ativos=ADT.func.filter(f=>f.situacao!=='Desligado');
+  $('adFunc').innerHTML='<option value="">— escolha —</option>'+ativos.map(f=>`<option value="${f.id}">${esc(f.nome)}${f.cargo?' · '+esc(f.cargo):''}</option>`).join('');
+  const op=(id,l)=>{const el=$(id),v=el.value,pri=el.options[0].outerHTML;el.innerHTML=pri+l.map(([k,t])=>`<option value="${k}"${k===v?' selected':''}>${esc(t)}</option>`).join('')};
+  op('adFCol',[...new Map(ADT.docs.map(d=>[d.funcionario_id,d.nome])).entries()].sort((a,b)=>a[1].localeCompare(b[1])));
+  op('adFComp',[...new Set(ADT.docs.map(d=>d.dados?.competencia?.slice(0,7)).filter(Boolean))].sort().reverse().map(c=>[c,mesTxt(c)]));
+  adtoInfo();adtoLista();
+}
+function adtoInfo(){
+  const f=ADT.func.find(x=>x.id===$('adFunc').value),c=$('adComp').value,st=ADT.st[c]||'Aberta',fx=f&&ffNum(f,'adto_salarial'),t=[];
+  if(f&&fx)t.push(`${f.nome} tem adiantamento de ${fm(Math.min(fx,ADTO_MAX))} no cadastro: o recibo substitui esse valor na folha de ${mesTxt(c)} (não soma os dois).`);
+  if(c)t.push(st==='Enviada'?`A folha de ${mesTxt(c)} já foi enviada à contabilidade: escolha outro mês para o desconto.`:`Folha de ${mesTxt(c)}: ${st.toLowerCase()}.`);
+  $('adInfo').textContent=t.join(' ');
+  if(f&&!$('adValor').value&&fx)$('adValor').value=showMoney(Math.min(fx,ADTO_MAX));
+}
+async function adtoCategoria(cli){let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
+  const c=plano.find(x=>/^(adto\.?|adiantamento) (de )?sal/.test(chave(x.categoria)))||plano.find(x=>chave(x.categoria)==='salario');return c?.categoria||null}
+$('adGerar').onclick=async()=>{
+  const cli=ADT.cli,err=$('adErr'),b=$('adGerar');err.hidden=true;if(!cli)return;
+  const f=ADT.func.find(x=>x.id===$('adFunc').value),v=r2(parseMoney($('adValor').value)),dt=$('adData').value,ym=$('adComp').value,obs=$('adObs').value.trim();
+  const erro=m=>{err.textContent=m;err.hidden=false};
+  if(!f)return erro('Escolha o colaborador.');if(!(v>0))return erro('Informe o valor.');if(!dt)return erro('Informe a data do pagamento.');if(!ym)return erro('Escolha a folha do desconto.');
+  if((ADT.st[ym]||'Aberta')==='Enviada')return erro(`A folha de ${mesTxt(ym)} já foi enviada à contabilidade. Escolha o mês seguinte para o desconto.`);
+  if(v>ADTO_MAX&&!confirm(`O valor (${fm(v)}) passa do máximo de adiantamento (${fm(ADTO_MAX)}). Gerar mesmo assim?`))return;
+  const comp=ym+'-01';b.disabled=true;let tit=null,lanc=null;
+  try{
+    // adiantamento que já estava na folha do mês (confirmado/alterado/excluído pela tela da folha): sai, e volta no Desfazer
+    const {data:ex,error:e0}=await sb.from('folha_lancamentos').select('*').eq('cliente_id',cli.id).eq('competencia',comp).eq('funcionario_id',f.id).eq('coluna','adiantamento');if(e0)throw e0;
+    const subs=(ex||[]).filter(l=>(l.descricao||'').startsWith(ADTO)&&!/\(recibo/.test(l.descricao||''));
+    const cat=await adtoCategoria(cli);
+    ({data:tit}=await sb.from('fin_titulos').insert({cliente_id:cli.id,tipo:'pagar',pessoa_nome:f.nome,descricao:`Adiantamento salarial · folha ${mesTxt(ym)}`,categoria:cat,cat_revisar:!cat,
+      competencia:comp,vencimento:dt,valor:v,parcela:1,parcelas:1,origem:'adiantamento',obs:['Recibo de adiantamento salarial',obs].filter(Boolean).join(' · ')}).select('id').single().then(r=>{if(r.error)throw r.error;return r}));
+    ({data:lanc}=await sb.from('folha_lancamentos').insert({cliente_id:cli.id,competencia:comp,funcionario_id:f.id,coluna:'adiantamento',data:dt,quantidade:v,descricao:`${ADTO} (recibo de ${dBR(dt)})`}).select('id').single().then(r=>{if(r.error)throw r.error;return r}));
+    const E=docEmp(cli);if(!E.cidade){E.cidade=cli.municipio||'';E.uf=E.uf||cli.uf||''}const D={emp:E,f:{nome:f.nome,cpf:f.cpf||'',cargo:f.cargo||''},valor:v,data_pgto:dt,competencia:ym,obs,titulo_id:tit.id,lanc_id:lanc.id,substituidos:subs.map(({id,...r})=>r)};
+    const {error:e3}=await sb.from('rh_documentos').insert({cliente_id:cli.id,funcionario_id:f.id,modelo:ADTREC,nome:f.nome,dados:D});if(e3)throw e3;
+    if(subs.length){const {error:e4}=await sb.from('folha_lancamentos').delete().in('id',subs.map(l=>l.id));if(e4)console.error(e4)}
+    docImprime(adtoRecMod,D);
+    toast(`Recibo gerado: conta a pagar de ${fm(v)} e desconto na folha de ${mesTxt(ym)}${subs.length?' (substituiu o adiantamento que estava na folha)':''}`);
+    $('adValor').value='';$('adObs').value='';$('adFunc').value='';
+  }catch(e){
+    // não deixa pela metade: o que entrou sai
+    if(lanc)await sb.from('folha_lancamentos').delete().eq('id',lanc.id);if(tit)await sb.from('fin_titulos').delete().eq('id',tit.id);
+    fail(e,'Não foi possível gerar o recibo')}
+  b.disabled=false;renderAdto();
+};
+function adtoFiltra(){
+  const q=$('adBusca').value,col=$('adFCol').value,cp=$('adFComp').value,ini=$('adFIni').value,fim=$('adFFim').value,pg=$('adFPg').value,sit=$('adFSit').value;
+  return ADT.docs.filter(d=>{const x=d.dados||{},des=!!x.desfeito_em,pago=ADT.pagos.has(x.titulo_id);
+    if(sit==='ativo'&&des||sit==='desfeito'&&!des)return false;if(col&&d.funcionario_id!==col)return false;if(cp&&!String(x.competencia||'').startsWith(cp))return false;
+    if(ini&&(x.data_pgto||'')<ini||fim&&(x.data_pgto||'')>fim)return false;if(pg&&(des||(pg==='paga')!==pago))return false;
+    return buscaCasa(q,[d.nome,x.obs,x.competencia&&mesTxt(x.competencia),des?'desfeito':pago?'paga':'em aberto'],[x.valor],[x.data_pgto,String(d.criado_em).slice(0,10)])});
+}
+function adtoLista(){
+  const l=adtoFiltra(),tot=r2(l.filter(d=>!d.dados?.desfeito_em).reduce((s,d)=>s+(+d.dados?.valor||0),0));
+  $('adTab').innerHTML=`<thead><tr><th>Gerado em</th><th class="l">Colaborador</th><th>Valor</th><th>Pagamento</th><th>Folha</th><th>Conta a pagar</th><th>Situação</th><th></th></tr></thead><tbody>${
+    l.map(d=>{const x=d.dados||{},des=!!x.desfeito_em,pago=ADT.pagos.has(x.titulo_id);return `<tr${des?' class="muted"':''}><td>${dBR(String(d.criado_em).slice(0,10))}</td><td class="l"><b>${esc(d.nome)}</b>${x.obs?`<br><span class="note">${esc(x.obs)}</span>`:''}</td>
+      <td>${fm(+x.valor||0)}</td><td>${dBR(x.data_pgto)}</td><td>${x.competencia?mesTxt(x.competencia):''}</td><td>${des?'—':pago?'<span class="chip c-ok">Paga</span>':'<span class="chip c-warn">Em aberto</span>'}</td>
+      <td>${des?`<span class="chip">Desfeito em ${dBR(String(x.desfeito_em).slice(0,10))}</span>`:'<span class="chip c-done">Valendo</span>'}</td>
+      <td style="white-space:nowrap"><button type="button" class="btn small ghost" data-adp="${d.id}">Imprimir</button>${des?'':` <button type="button" class="btn small ghost" data-adx="${d.id}">Desfazer</button>`}</td></tr>`}).join('')
+    ||'<tr><td class="l muted" colspan="8">Nenhum recibo com estes filtros.</td></tr>'}</tbody>${l.length?`<tfoot><tr><td></td><td class="l"><b>Total valendo</b></td><td><b>${fm(tot)}</b></td><td colspan="5"></td></tr></tfoot>`:''}`;
+}
+// relatório de líquidos (Carol, 16/11): por empresa, cada colaborador com o valor do adiantamento; todas as empresas visíveis
+async function adtoRelDados(){
+  const emps=empresasDe('adto',true),ids=emps.map(c=>c.id);if(!ids.length)return null;
+  const {data,error}=await sb.from('rh_documentos').select('*').in('cliente_id',ids).eq('modelo',ADTREC);if(error){fail(error,'Não foi possível montar o relatório');return null}
+  const cp=$('adFComp').value,ini=$('adFIni').value,fim=$('adFFim').value;
+  const ls=(data||[]).filter(d=>{const x=d.dados||{};return !x.desfeito_em&&(!cp||String(x.competencia||'').startsWith(cp))&&(!ini||(x.data_pgto||'')>=ini)&&(!fim||(x.data_pgto||'')<=fim)});
+  const g=emps.map(c=>({c,its:ls.filter(d=>d.cliente_id===c.id).sort((a,b)=>a.nome.localeCompare(b.nome)||String(a.dados.data_pgto).localeCompare(b.dados.data_pgto))})).filter(x=>x.its.length);
+  const per=[cp&&'Folha de '+mesTxt(cp),ini&&'pagamento desde '+dBR(ini),fim&&'até '+dBR(fim)].filter(Boolean).join(', ')||'todos os adiantamentos valendo';
+  return {g,per,tot:r2(ls.reduce((s,d)=>s+(+d.dados.valor||0),0)),n:ls.length};
+}
+$('adRelPdf').onclick=async()=>{const R=await adtoRelDados();if(!R)return;if(!R.n){toast('Nenhum adiantamento com estes filtros');return}
+  const w=window.open('','_blank');if(!w){toast('Libere as janelas (pop-up) do portal para gerar o PDF');return}
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de líquidos - Adiantamento salarial</title><style>
+    body{font:10.5pt Arial,Helvetica,sans-serif;color:#000;margin:0}h1{font-size:13pt;margin:0 0 2px}.sub{margin:0 0 14px;color:#444}h2{font-size:11pt;margin:16px 0 4px}
+    table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px 6px;text-align:left}th{background:#eee}.v{text-align:right;white-space:nowrap;width:110px}.d{width:90px}
+    tfoot td{font-weight:bold;background:#f6f6f6}.geral{margin-top:16px;font-size:11.5pt;font-weight:bold;text-align:right}section{page-break-inside:avoid}@page{size:A4;margin:14mm}</style></head><body>
+    <h1>Relatório de líquidos · Adiantamento salarial</h1><p class="sub">${esc(R.per)} · emitido em ${dBR(TODAY)}</p>
+    ${R.g.map(({c,its})=>`<section><h2>${esc(c.nome)}</h2><table><thead><tr><th>Colaborador</th><th class="d">Pagamento</th><th class="d">Folha</th><th class="v">Valor</th></tr></thead><tbody>${
+      its.map(d=>`<tr><td>${esc(d.nome)}</td><td class="d">${dBR(d.dados.data_pgto)}</td><td class="d">${esc(mesTxt(d.dados.competencia))}</td><td class="v">${fm(+d.dados.valor)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3">Total ${esc(c.nome)} (${its.length} ${its.length===1?'colaborador':'colaboradores'})</td><td class="v">${fm(r2(its.reduce((s,d)=>s+(+d.dados.valor||0),0)))}</td></tr></tfoot></table></section>`).join('')}
+    ${R.g.length>1?`<p class="geral">Total geral: ${fm(R.tot)}</p>`:''}
+    <script>window.onload=()=>setTimeout(()=>window.print(),200)<\/script></body></html>`);w.document.close()};
+$('adRelXls').onclick=async()=>{const R=await adtoRelDados();if(!R)return;if(!R.n){toast('Nenhum adiantamento com estes filtros');return}
+  const H=['Empresa','Colaborador','Pagamento','Folha','Valor'],rows=[];
+  R.g.forEach(({c,its})=>{its.forEach(d=>rows.push([c.nome,d.nome,dBR(d.dados.data_pgto),mesTxt(d.dados.competencia),+d.dados.valor]));
+    rows.push(['Total '+c.nome,'','','',r2(its.reduce((s,d)=>s+(+d.dados.valor||0),0))])});
+  if(R.g.length>1)rows.push(['Total geral','','','',R.tot]);
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=[{wch:34},{wch:36},{wch:12},{wch:16},{wch:14}];xTabela(ws,{money:[4],texto:[0,1]});
+  XLSX.utils.book_append_sheet(wb,ws,'Líquidos');XLSX.writeFile(wb,`Liquidos adiantamento salarial ${dBR(TODAY).replace(/\//g,'-')}.xlsx`)};
+['adBusca','adFCol','adFComp','adFIni','adFFim','adFPg','adFSit'].forEach(id=>$(id).addEventListener(id==='adBusca'?'input':'change',adtoLista));
+$('adLimpa').onclick=()=>{['adBusca','adFCol','adFComp','adFIni','adFFim','adFPg'].forEach(id=>$(id).value='');$('adFSit').value='ativo';adtoLista()};
+$('adTab').addEventListener('click',async ev=>{
+  const p=ev.target.closest('[data-adp]'),x=ev.target.closest('[data-adx]');
+  if(p){const d=ADT.docs.find(r=>r.id===p.dataset.adp);if(d)docImprime(adtoRecMod,d.dados);return}
+  if(!x)return;const d=ADT.docs.find(r=>r.id===x.dataset.adx);if(!d)return;const D=d.dados||{};
+  if(ADT.pagos.has(D.titulo_id)){alert('Esta conta a pagar já foi paga. Estorne o pagamento em Gestão financeira › Contas a pagar e depois desfaça o recibo.');return}
+  const ym=String(D.competencia||'').slice(0,7);
+  if(ADT.st[ym]==='Enviada'){alert(`A folha de ${mesTxt(ym)} já foi enviada à contabilidade, então o desconto não pode mais sair dela.`);return}
+  if(!confirm(`Desfazer o recibo de ${fm(+D.valor)} de ${d.nome}?\n\nSai a conta a pagar e o desconto da folha de ${mesTxt(ym)}${D.substituidos?.length?', e volta o adiantamento que estava na folha antes':''}.`))return;
+  x.disabled=true;
+  try{
+    if(D.titulo_id){const {error}=await sb.from('fin_titulos').delete().eq('id',D.titulo_id);if(error)throw error}
+    if(D.lanc_id){const {error}=await sb.from('folha_lancamentos').delete().eq('id',D.lanc_id);if(error)throw error}
+    if(D.substituidos?.length){const {error}=await sb.from('folha_lancamentos').insert(D.substituidos);if(error)throw error}
+    const {error}=await sb.from('rh_documentos').update({dados:{...D,desfeito_em:new Date().toISOString(),desfeito_por:ME?.user_id||ME?.id||null}}).eq('id',d.id);if(error)throw error;
+    toast('Recibo desfeito: a conta a pagar e o desconto da folha saíram');
+  }catch(e){fail(e,'Não foi possível desfazer')}
+  renderAdto();
+});
 
 // RH › Premiação: o cliente preenche o valor do mês por colaborador; vira um lançamento da folha
 // (um por colaborador e coluna, trocado a cada salvamento). As colunas ficam em folha_modelo.premiacao,
@@ -7229,6 +7423,19 @@ const pPode=p=>p.cliente_id?podeLancar(p.cliente_id,'repasse'):ehEsc()||pLancaEm
 // empresa em que a alteração de conta ou o desconto foi pedido: a do topo, se tiver Parceiros nela
 const pEmp=()=>{const v=escCli.value;return v&&v!=='*'&&v!=='int'&&empresasDe('repasse').some(c=>c.id===v)?v:(pLancaEm()[0]||empresasDe('repasse')[0])?.id||null};
 const pOrNulo=ids=>`cliente_id.in.(${ids.join(',')}),cliente_id.is.null`;
+// EMPRESA DO DESCONTO E DA ALTERAÇÃO DE CONTA (Carol, 16/11): quem lança escolhe a empresa (nada vem do seletor do alto).
+// O desconto vale para o grupo do Repasse da empresa escolhida (ex.: Oliveira SJ vale para SJ, Biguaçu e Palhoça).
+let PGRUPOS=[];
+const pGrupoDe=id=>PGRUPOS.find(g=>(g.empresas||[]).includes(id))||null;
+const pEmpNome=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+const pEmpGrupoTxt=id=>{const g=pGrupoDe(id),o=(g?.empresas||[]).filter(x=>x!==id).map(pEmpNome).filter(Boolean);return o.length?`vale para o grupo ${g.nome}: ${[pEmpNome(id),...o].join(', ')}`:''};
+function pEmpSelect(id,titulo){
+  const ls=pLancaEm(),usados=new Set(),grp=[];
+  PGRUPOS.forEach(g=>{const es=ls.filter(c=>(g.empresas||[]).includes(c.id)&&!usados.has(c.id));if(es.length){es.forEach(c=>usados.add(c.id));grp.push([g.nome,es])}});
+  const resto=ls.filter(c=>!usados.has(c.id));if(resto.length)grp.push([grp.length?'Outras empresas':'',resto]);
+  const ops=es=>es.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  return `<label class="f wide">${titulo} *<select id="${id}"><option value="">Escolha a empresa</option>${grp.map(([n,es])=>n?`<optgroup label="${esc('Grupo '+n)}">${ops(es)}</optgroup>`:ops(es)).join('')}</select><span class="muted" id="${id}_g" style="font-weight:400;font-size:12px"></span></label>`}
+function pEmpLiga(id){const s=$(id);if(s)s.onchange=()=>{$(id+'_g').textContent=s.value?pEmpGrupoTxt(s.value)||'só nesta empresa':''}}
 // ---------- Gestão financeira › Cadastros (contas bancárias, clientes e fornecedores; v44) ----------
 // contas bancárias por empresa; clientes e fornecedores por empresa ou para todas (cliente_id vazio).
 // Os fornecedores começam com a lista do Bom Controle (fornecedor_bc = chave em fornecedores_bc).
@@ -9924,14 +10131,16 @@ async function ftAcao(a){
 }
 // notas do cartão enviadas pelo cliente (Financeiro › Cartão de crédito) que ainda não estão em nenhuma fatura
 $('ftImp').onclick=async()=>{
-  const c=FT.conta,cli=cliAtual(),ls=FT.notas;if(!c||!ls.length)return;
+  const c=FT.conta,cli=cliAtual(),semV=FT.notas.filter(r=>!(+r.valor>0)),ls=FT.notas.filter(r=>+r.valor>0);if(!c)return;
+  // envio simples do cliente: a nota sem valor fica esperando o escritório completar (Rotina diária › Cartão de crédito)
+  if(!ls.length)return toast(semV.length?`${semV.length===1?'A nota enviada está':'As notas enviadas estão'} sem valor. Abra em Rotina diária › Cartão de crédito, complete e traga de novo.`:'Nada para trazer.');
   const rows=[],fora=[];
   ls.forEach(r=>{const n=Math.max(1,r.parcelas||1),cada=Math.floor(r.valor/n*100)/100,f1=faturaDe(c,r.data),g=n>1?crypto.randomUUID():null;
     const ps=[...Array(n).keys()].map(i=>({cliente_id:cli.id,conta_id:c.id,tipo:'saida',data:somaMes(r.data,i),valor:i===n-1?r2(r.valor-cada*(n-1)):cada,fatura:somaMes(f1,i),parcela:i+1,parcelas:n,grupo_id:g,
-      pessoa_nome:r.fornecedor,documento:r.documento||null,categoria:r.categoria||null,descricao:r.obs||null,cartao_nota_id:r.id}));
+      pessoa_nome:r.fornecedor,documento:r.documento||null,categoria:r.categoria||null,descricao:r.obs||r.sobre||null,cartao_nota_id:r.id}));
     if(ps.some(x=>ftFechada(x.fatura)))fora.push(r);else rows.push(...ps)});
   if(!rows.length)return toast('As notas enviadas caem em faturas já fechadas. Lance à mão na fatura aberta.');
-  if(!confirm(`Trazer ${ls.length-fora.length} ${ls.length-fora.length===1?'nota enviada':'notas enviadas'} pelo cliente para o cartão ${c.nome}? Cada uma cai na fatura certa pela data da compra, com as parcelas.${fora.length?` ${fora.length} ficam de fora porque caem em fatura já fechada.`:''}`))return;
+  if(!confirm(`Trazer ${ls.length-fora.length} ${ls.length-fora.length===1?'nota enviada':'notas enviadas'} pelo cliente para o cartão ${c.nome}? Cada uma cai na fatura certa pela data da compra, com as parcelas.${fora.length?` ${fora.length} ficam de fora porque caem em fatura já fechada.`:''}${semV.length?` ${semV.length} ${semV.length===1?'fica':'ficam'} de fora porque o cliente mandou sem valor: complete em Rotina diária › Cartão de crédito.`:''}`))return;
   $('ftImp').disabled=true;
   const {error}=await sb.from('fin_movimentos').insert(rows);$('ftImp').disabled=false;
   if(error){console.error(error);return toast(v52(error)?v52Msg:'Não foi possível trazer as notas.')}
@@ -11567,11 +11776,12 @@ async function renderRep(){
     :'Cadastre os parceiros, avise quando um parceiro trocar de conta e informe os descontos a fazer no repasse.';
   $('pNovo').hidden=!pLancaEm().length;
   if(!ids.length){vazio('Nenhuma empresa liberada para repasses.');return}
-  const [r1,r2_,r3,r4]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
+  const [r1,r2_,r3,r4,r5]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
     sb.from('parceiro_alteracoes').select('*').eq('status','Pendente'),
     sb.from('repasse_descontos').select('*').in('cliente_id',ids).eq('status','Pendente').order('criado_em'),
-    sb.from('parceiro_alteracoes').select('*').eq('status','Aplicada').gte('resolvido_em',altDesde()).order('resolvido_em')]);
-  const err=r1.error||r2_.error||r3.error;
+    sb.from('parceiro_alteracoes').select('*').eq('status','Aplicada').gte('resolvido_em',altDesde()).order('resolvido_em'),
+    sb.from('repasse_grupos').select('id,nome,empresas').order('nome')]);
+  const err=r1.error||r2_.error||r3.error;PGRUPOS=r5?.data||[];
   if(err){console.error(err);vazio(err.code==='42P01'||/parceir|repasse/.test(err.message||'')?'Este módulo precisa da atualização v7 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
   PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PALTA={};(r4.data||[]).filter(altRecente).forEach(a=>PALTA[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
   const nomeCli=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Todas as empresas';
@@ -11635,10 +11845,12 @@ async function abrirParceiro(p,modo){
   }else if(modo==='alt'){
     h+=`<p class="note" style="margin:0">Informe a conta nova. O escritório confere e troca antes do próximo repasse; até lá, o pagamento continua na conta atual.</p>
       <div class="cmp">${cmpBox('Conta atual',p)}</div>${pCampos('pa',p,false,true)}
+      <div class="fields">${pEmpSelect('pa_emp','Empresa em que a troca foi pedida')}</div>
+      <p class="note" style="margin:0">O cadastro do parceiro é um só: a conta nova vale para ele em todas as empresas. A empresa escolhida aparece no aviso e no histórico.</p>
       <label class="f">Motivo ou quem pediu a troca *<textarea id="pa_motivo" rows="2" placeholder="Ex.: parceiro pediu por WhatsApp em 24/10 para receber na conta da empresa dele"></textarea></label>`;
   }else if(modo==='desc'){
     h+=`<p class="note" style="margin:0">O desconto fica em alerta para o escritório e sai do próximo repasse ${p?'de '+esc(p.nome):'do parceiro'}.</p>
-      <div class="fields">${p?'':`<label class="f wide">Parceiro *<select id="pd_parc">${pOpt(pDescaveis())}</select></label>`}<label class="f">Valor do desconto *<input class="money" id="pd_valor" inputmode="decimal" placeholder="0,00"></label>
+      <div class="fields">${p?'':`<label class="f wide">Parceiro *<select id="pd_parc">${pOpt(pDescaveis())}</select></label>`}${pEmpSelect('pd_emp','Empresa em que sai o desconto')}<label class="f">Valor do desconto *<input class="money" id="pd_valor" inputmode="decimal" placeholder="0,00"></label>
       <label class="f">Nº da guia *<input id="pd_guia" placeholder="guia que corresponde ao desconto"></label>
       <label class="f wide">Observação<textarea id="pd_motivo" rows="2" placeholder="Ex.: procedimento refeito sem cobrança"></textarea></label></div>`;
   }else{
@@ -11650,7 +11862,7 @@ async function abrirParceiro(p,modo){
       <div class="cmp" style="margin-top:6px">${cmpBox('Conta anterior',altA.anterior||{})}${cmpBox('Conta nova (em uso)',p)}</div>
       ${ehAdm()?`<div class="row" style="gap:8px"><button class="btn small primary" data-act="altConf" title="Marca como conferida em todas as empresas. Para dar OK empresa por empresa, use o Repasse de parceiros.">Conferido em todas as empresas</button>${altA.anterior?'<button class="btn small ghost" data-act="altDesfaz">Desfazer (voltar para a conta anterior)</button>':''}</div>`:''}
       <p class="note" style="margin:0">${e?'O aviso continua no Repasse de parceiros até a Master dar OK em cada empresa do grupo (ou marcar “Conferido em todas”).':'O escritório confere a conta nova antes do próximo repasse.'}</p></div>`;
-    if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
+    if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}${d.cliente_id?`<br><span class="muted">Empresa: ${esc(pEmpNome(d.cliente_id))}${pGrupoDe(d.cliente_id)?.empresas?.length>1?' (grupo '+esc(pGrupoDe(d.cliente_id).nome)+')':''}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
       ${e?'<p class="note" style="margin:6px 0 0">“Copiar” leva o texto do desconto para colar no comprovante.</p>':''}</div>`;
     h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
       ${p&&!editaCad?'<p class="note" style="margin:6px 0 0">Os dados já foram conferidos pelo escritório. Para trocar a conta, use “Informar alteração de conta”.</p>':''}
@@ -11673,7 +11885,7 @@ async function abrirParceiro(p,modo){
   }
   $('rpFoot').innerHTML=f;
   if(modo==='alt'&&!p)$('pa_parc').onchange=ev=>{const x=PARC.find(y=>y.id===ev.target.value);if(x){PVOLTA=true;abrirParceiro(x,'alt')}};
-  ['pa_parc','pd_parc'].forEach(pBuscaParc);
+  ['pa_parc','pd_parc'].forEach(pBuscaParc);['pa_emp','pd_emp'].forEach(pEmpLiga);
   if(!dlgRep.open)dlgRep.showModal();
   $('pa_parc_b')?.focus();$('pd_parc_b')?.focus();
 }
@@ -11723,16 +11935,18 @@ async function rpAcao(act,el){
       const o=lerCampos('pa',CONTAP);o.cpf_cnpj=o.titular_doc;delete o.titular_doc;o.motivo=$('pa_motivo').value.trim();
       if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta novos.');
       if(!o.motivo)return rpErr('Informe o motivo ou quem pediu a troca.');
+      const empA=$('pa_emp')?.value;if(!empA)return rpErr('Escolha a empresa em que a troca foi pedida.');
       if(CONTAK.every(k=>(o[k]||null)===(p[altK(k)]||null)))return rpErr('A conta nova está igual à atual.');
-      o.parceiro_id=p.id;o.cliente_id=p.cliente_id||pEmp();const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
+      o.parceiro_id=p.id;o.cliente_id=empA;const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
       PMODO=null;PVOLTA=false;return recarregar(e?'Alteração registrada. Aplique para trocar a conta.':'Alteração enviada ao escritório');
     }
     if(act==='salvarDesc'){
       const parc=p?p.id:$('pd_parc').value,valor=parseMoney($('pd_valor').value),obs=$('pd_motivo').value.trim(),guia=$('pd_guia').value.trim().replace(/^(guia\s*)?(n[º°o.]*\s*)?/i,'');
       if(!parc)return rpErr('Escolha o parceiro.');
+      const empD=$('pd_emp').value;if(!empD)return rpErr('Escolha a empresa em que sai o desconto.');
       if(!(valor>0))return rpErr('Informe o valor do desconto.');if(!guia)return rpErr('Informe o número da guia que corresponde ao desconto.');
       // a guia vai na referência; sem observação, o motivo é a própria guia
-      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:PARC.find(x=>x.id===parc)?.cliente_id||pEmp(),valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
+      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:empD,valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
       PMODO=null;PVOLTA=false;if(!p)PARCDLG=null;return recarregar('Desconto lançado');
     }
     if(['aplicar','recusar','altConf','altDesfaz'].includes(act)&&!ehAdm())return rpErr('Só a Master aplica, confere ou desfaz a alteração de conta.');
@@ -11743,7 +11957,7 @@ async function rpAcao(act,el){
     if(act==='recusar'){const {error}=await sb.from('parceiro_alteracoes').update({status:'Recusada',resolvido_em:new Date().toISOString(),resolvido_por:await me(),nota_escritorio:$('pa_nota')?.value.trim()||null}).eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Alteração recusada')}
     if(act==='cancAlt'){if(!confirm('Cancelar o pedido de alteração de conta?'))return;const {error}=await sb.from('parceiro_alteracoes').delete().eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Pedido cancelado')}
     // o desconto sai do valor da conta a pagar do repasse em aberto (Carol, 10/11); antes só marcava como feito
-    if(act==='descontado'){const ab=await descContasAbertas(d.parceiro_id);
+    if(act==='descontado'){const gE=d.cliente_id?(pGrupoDe(d.cliente_id)?.empresas||[d.cliente_id]):null,ab=(await descContasAbertas(d.parceiro_id)).filter(t=>!gE||gE.includes(t.cliente_id));
       if(ab.length){const t=ab[0];
         if(!confirm(`Tirar o desconto de ${fm(d.valor)} da conta a pagar do repasse em aberto?\n\n${t.pessoa_nome} · ${CLIENTES.find(c=>c.id===t.cliente_id)?.nome||''} · venc. ${dBR(t.vencimento)}\n${fm(t.valor)} − ${fm(d.valor)} = ${fm(r2(+t.valor-(+d.valor)))} a pagar.`))return;
         await descNaConta(d,t,+t.valor);return recarregar('Desconto feito: a conta a pagar ficou com o valor líquido')}
@@ -12736,7 +12950,7 @@ function nsAbreNota(n){
     (n.situacao==='rejeitada'?ctBtn('nsdescarta','Descartar','ghost')+ctBtn('nsdenovo','Corrigir e tentar de novo'):'')+
     (n.situacao==='descartada'?ctBtn('nsvolta','Desfazer o descarte','ghost'):'')+
     '<span class="spacer"></span>'+
-    (n.chave?ctBtn('nsxml','Baixar XML','ghost')+ctBtn('nsimprime','Imprimir'):'')+ctBtn('fechar','Fechar','ghost'));
+    (n.chave?ctBtn('nsxml','Baixar XML','ghost')+ctBtn('nsemail','Enviar por e-mail','ghost')+ctBtn('nsimprime','Imprimir'):'')+ctBtn('fechar','Fechar','ghost'));
 }
 function nsAbreCanc(n){
   if(!n)return;
@@ -12747,34 +12961,154 @@ function nsAbreCanc(n){
     ctBtn('nsvoltanota','Voltar','ghost')+'<span class="spacer"></span>'+ctBtn('nscancela','Cancelar a NFS-e','primary'));
 }
 // impressão simples (o download do DANFSe pela API do governo foi desligado em 2026; a consulta oficial fica no site nacional)
+// ---- DANFSe (documento auxiliar da NFS-e) no padrão da NT 008/2026, montado a partir do XML autorizado ----
+// A API do governo que gerava o PDF foi suspensa em 08/2026; a NT 008 manda o sistema emissor gerar o documento a partir do XML.
+let NS_QR=null;
+const nsQrLib=()=>NS_QR||(NS_QR=new Promise((ok,erro)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';s.onload=()=>ok(window.QRCode);s.onerror=()=>{NS_QR=null;erro(new Error('qr'))};document.head.appendChild(s)}));
+async function nsQrDataUri(txt){
+  try{const Q=await nsQrLib(),d=document.createElement('div');new Q(d,{text:txt,width:160,height:160,correctLevel:Q.CorrectLevel.M});
+    const c=d.querySelector('canvas');return c?c.toDataURL('image/png'):(d.querySelector('img')?.src||'')}catch(_){return ''}
+}
+function nsDanfseHtml(xml,n,qr){
+  const doc=new DOMParser().parseFromString(xml||'<x/>','application/xml');
+  const q=(sel,raiz=doc)=>{for(const p of sel.split('|')){let el=raiz;for(const t of p.split('/')){el=el&&[...el.children].find(c=>c.localName===t)}if(el)return el}return null};
+  const v=(sel,raiz)=>(q(sel,raiz)?.textContent||'').trim();
+  const inf=q('NFSe/infNFSe'),dps=q('DPS/infDPS',inf),pr=q('prest',dps),to=q('toma',dps),em=q('emit',inf),sv=q('serv',dps),vl=q('valores',dps),vn=q('valores',inf);
+  const chave=(inf?.getAttribute('Id')||'').replace(/^NFS/,'')||n.chave||'';
+  const amb=v('tpAmb',dps)||String(n.ambiente||''),canc=n.situacao==='cancelada';
+  const din=x=>x===''?'—':'R$ '+Number(x).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pct=x=>x===''?'—':Number(x).toLocaleString('pt-BR',{maximumFractionDigits:4})+'%';
+  const dh=x=>x?x.slice(8,10)+'/'+x.slice(5,7)+'/'+x.slice(0,4)+(x.length>10?' '+x.slice(11,16):''):'—';
+  const docF=x=>nsDoc(x)||'—';
+  const fone=x=>{const d=nsSo(x);return d.length===11?`(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`:d.length===10?`(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`:d};
+  const cep=x=>{const d=nsSo(x);return d.length===8?d.slice(0,5)+'-'+d.slice(5):d};
+  const ender=(r)=>{if(!r)return '—';const en=q('end',r)||q('enderNac',r)||r;const nac=q('endNac',en);
+    return [v('xLgr',en),v('nro',en),v('xCpl',en),v('xBairro',en)].filter(Boolean).join(', ')+(nac||q('cMun',en)?` · CEP ${cep(v('CEP',nac||en))}`:'')||'—'};
+  const SN={1:'Não optante',2:'Optante - Microempreendedor Individual (MEI)',3:'Optante - Microempresa ou Empresa de Pequeno Porte (ME/EPP)'};
+  const TRIB={1:'Operação tributável',2:'Imunidade',3:'Exportação de serviço',4:'Não incidência'};
+  const RET={1:'Não retido',2:'Retido pelo tomador',3:'Retido pelo intermediário'};
+  const c=(k,val,cls='',span=1)=>`<td class="${cls}"${span>1?` colspan="${span}"`:''}><div class="k">${k}</div><div class="v">${esc(val||'—')}</div></td>`;
+  const e=nsEmitDe(n.emitente_id)||{};
+  const ib=q('IBSCBS',inf),ibv=q('valores',ib),tot=q('totCIBS',ib);
+  const vTotTrib=q('trib/totTrib',vl);
+  const aprox=vTotTrib?(v('vTotTrib/vTotTribFed',vTotTrib)!==''?`Valor aproximado dos tributos (Lei 12.741/2012): federais ${din(v('vTotTrib/vTotTribFed',vTotTrib))}, estaduais ${din(v('vTotTrib/vTotTribEst',vTotTrib))}, municipais ${din(v('vTotTrib/vTotTribMun',vTotTrib))}.`:v('pTotTribSN',vTotTrib)?`Percentual aproximado dos tributos do Simples Nacional (Lei 12.741/2012): ${pct(v('pTotTribSN',vTotTrib))}.`:''):'';
+  const tomBloco=to?`<tr>${c('CNPJ / CPF',docF(v('CNPJ|CPF',to)))}${c('Inscrição municipal',v('IM',to))}${c('Telefone',fone(v('fone',to)))}</tr>
+      <tr>${c('Nome / Razão social',v('xNome',to),'',2)}${c('E-mail',v('email',to))}</tr><tr>${c('Endereço',ender(to),'',3)}</tr>`
+    :`<tr><td colspan="3"><div class="v">TOMADOR DO SERVIÇO NÃO IDENTIFICADO NA NFS-e</div></td></tr>`;
+  const ibBloco=ib?`<table><tr><th colspan="4">IBS / CBS (Reforma Tributária)</th></tr>
+      <tr>${c('Base de cálculo',din(v('vBC',ibv)))}${c('Alíquota IBS estadual',pct(v('uf/pIBSUF',ibv)))}${c('Alíquota IBS municipal',pct(v('mun/pIBSMun',ibv)))}${c('Alíquota CBS',pct(v('fed/pCBS',ibv)))}</tr>
+      <tr>${c('Valor IBS',din(v('gIBS/vIBSTot',tot)))}${c('Valor CBS',din(v('gCBS/vCBS',tot)))}${c('Local de incidência',v('xLocalidadeIncid',ib))}${c('Valor total da NFS-e + IBS/CBS',din(v('vTotNF',tot)),'cinza')}</tr></table>`:'';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>DANFSe ${esc(v('nNFSe',inf)||n.numero_nfse||'')}</title><style>
+@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font:10px Arial,Helvetica,sans-serif;color:#000;margin:0;padding:8px;position:relative}
+.top{display:grid;grid-template-columns:1fr auto;gap:10px;border:1px solid #000;padding:8px}.top h1{font-size:15px;margin:0 0 2px}.top .s{font-size:11px}
+.jur{color:#b00;font-weight:bold;font-size:12px;margin-top:4px}.qr{display:flex;gap:8px;align-items:center;max-width:300px}.qr img{width:1.9cm;height:1.9cm}.qr p{font-size:7px;margin:0}
+table{width:100%;border-collapse:collapse;margin-top:4px;table-layout:fixed}th{background:#e6e6e6;text-align:left;font-size:10px;padding:3px 5px;border:1px solid #000;text-transform:uppercase}
+td{border:1px solid #000;padding:3px 5px;vertical-align:top}.k{font-size:7.5px;text-transform:uppercase;color:#333}.v{font-family:"Microsoft Sans Serif",Arial,sans-serif;font-size:10px;word-break:break-word;white-space:pre-wrap}
+.cinza{background:#e6e6e6}.cinza .v{font-weight:bold;font-size:12px}
+.marca{position:fixed;top:40%;left:0;right:0;text-align:center;font-size:90px;font-weight:bold;color:rgba(200,0,0,.18);transform:rotate(-25deg);pointer-events:none}
+.bar{margin:10px 0;display:flex;gap:8px}.bar button{font:13px Arial;padding:8px 14px;cursor:pointer}@media print{.bar{display:none}}
+</style></head><body>
+${canc?'<div class="marca">CANCELADA</div>':''}
+<div class="bar"><button onclick="print()">Imprimir / Salvar em PDF</button><span style="align-self:center;color:#555">Para salvar em PDF, escolha “Salvar como PDF” na janela de impressão.</span></div>
+<div class="top"><div><h1>DANFSe v2.0 · Documento Auxiliar da NFS-e</h1><div class="s">Município emissor: ${esc(v('xLocEmi',inf)||e.municipio||'')}${e.uf?' - '+esc(e.uf):''}</div>
+  ${amb==='2'?'<div class="jur">NFS-e SEM VALIDADE JURÍDICA (ambiente de teste)</div>':''}${canc?'<div class="jur">NFS-e CANCELADA</div>':''}</div>
+  <div class="qr">${qr?`<img src="${qr}" alt="QR Code">`:''}<p>A autenticidade desta NFS-e pode ser verificada pela leitura deste código QR ou pela consulta da chave de acesso no portal nacional da NFS-e (www.nfse.gov.br).</p></div></div>
+<table><tr><th colspan="4">Identificação da NFS-e</th></tr>
+  <tr>${c('Chave de acesso',chave,'',4)}</tr>
+  <tr>${c('Número da NFS-e',v('nNFSe',inf)||n.numero_nfse)}${c('Competência',dh(v('dCompet',dps)))}${c('Data e hora da emissão da NFS-e',dh(v('dhProc',inf)))}${c('Número / série da DPS',(v('nDPS',dps)||'')+' / '+(v('serie',dps)||''))}</tr>
+  <tr>${c('Data e hora da emissão da DPS',dh(v('dhEmi',dps)))}${c('Situação',canc?'Cancelada':'Normal')}${c('Local da prestação',v('xLocPrestacao',inf))}${c('Local de incidência do ISSQN',v('xLocIncid',inf))}</tr></table>
+<table><tr><th colspan="3">Prestador / Emitente</th></tr>
+  <tr>${c('CNPJ / CPF',docF(v('CNPJ|CPF',em)||v('CNPJ|CPF',pr)))}${c('Inscrição municipal',v('IM',em)||v('IM',pr))}${c('Telefone',fone(v('fone',em)||v('fone',pr)))}</tr>
+  <tr>${c('Nome / Razão social',v('xNome',em)||e.razao_social)}${c('E-mail',(v('email',em)||v('email',pr)).toLowerCase())}${c('Regime (Simples Nacional)',SN[v('regTrib/opSimpNac',pr)]||'')}</tr>
+  <tr><td colspan="3"><div class="k">Endereço</div><div class="v">${esc(ender(em))}${v('enderNac/UF',em)?' · '+esc(v('xLocEmi',inf))+' - '+esc(v('enderNac/UF',em)):''}</div></td></tr></table>
+<table><tr><th colspan="3">Tomador do serviço</th></tr>${tomBloco}</table>
+<table><tr><th colspan="2">Serviço prestado</th></tr>
+  <tr>${c('Código de tributação nacional',nsTrib(v('cServ/cTribNac',sv))+(v('xTribNac',inf)?' - '+v('xTribNac',inf):''))}${c('Código NBS',v('cServ/cNBS',sv)+(v('xNBS',inf)?' - '+v('xNBS',inf):''))}</tr>
+  <tr><td colspan="2"><div class="k">Descrição do serviço</div><div class="v">${esc(v('cServ/xDescServ',sv)||n.descricao||'')}</div></td></tr></table>
+<table><tr><th colspan="4">Tributação municipal (ISSQN)</th></tr>
+  <tr>${c('Tributação do ISSQN',TRIB[v('trib/tribMun/tribISSQN',vl)]||'')}${c('Retenção do ISSQN',RET[v('trib/tribMun/tpRetISSQN',vl)]||'')}${c('Base de cálculo',din(v('vBC',vn)))}${c('Alíquota / Valor do ISSQN',v('pAliqAplic',vn)?pct(v('pAliqAplic',vn))+' / '+din(v('vISSQN',vn)):(v('regTrib/opSimpNac',pr)==='3'?'Recolhido pelo Simples Nacional':'—'))}</tr></table>
+<table><tr><th colspan="4">Valores da NFS-e</th></tr>
+  <tr>${c('Valor do serviço',din(v('vServPrest/vServ',vl)))}${c('Desconto incondicionado',din(v('vDescCondIncond/vDescIncond',vl)))}${c('Total de retenções',din(v('vTotalRet',vn)))}${c('Valor líquido da NFS-e',din(v('vLiq',vn)),'cinza')}</tr></table>
+${ibBloco}
+<table><tr><th>Informações complementares</th></tr><tr><td><div class="v">${esc([v('serv/infoCompl/xInfComp',dps),aprox].filter(Boolean).join('\n')||'—')}</div></td></tr></table>
+<p style="font-size:8px;margin-top:6px">Documento gerado pelo Portal Controlacs a partir do XML autorizado da NFS-e, no padrão da NT 008/2026 (DANFSe v2.0).</p>
+</body></html>`;
+}
 async function nsImprime(n){
-  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();const x=data?.xml_nfse||'',tg=t=>(x.match(new RegExp(`<${t}>([^<]*)</${t}>`))||[])[1]||'';
-  const e=nsEmitDe(n.emitente_id)||{},w=window.open('','_blank');if(!w)return toast('Libere as janelas (pop-up) para imprimir.');
-  w.document.write(`<!doctype html><meta charset="utf-8"><title>NFS-e ${esc(n.numero_nfse||'')}</title><style>body{font:13px Arial,sans-serif;margin:24px;color:#111}h1{font-size:18px;margin:0}table{border-collapse:collapse;width:100%;margin-top:10px}td{border:1px solid #999;padding:6px;vertical-align:top}.k{font-size:10px;color:#555;text-transform:uppercase}.t{background:#eee;font-weight:bold}</style>
-  <h1>Documento auxiliar da NFS-e${Number(n.ambiente)===2?' — TESTE, SEM VALOR FISCAL':''}</h1><p>Município: ${esc(e.municipio||'')} - ${esc(e.uf||'')}${n.situacao==='cancelada'?' · <b>NOTA CANCELADA</b>':''}</p>
-  <table><tr><td colspan="3"><div class="k">Chave de acesso</div>${esc(n.chave||'')}</td></tr>
-  <tr><td><div class="k">Número da NFS-e</div><b>${esc(n.numero_nfse||'')}</b></td><td><div class="k">Competência</div>${dBR(n.competencia)}</td><td><div class="k">Emissão</div>${n.emitida_em?dtBR(n.emitida_em):''}</td></tr>
-  <tr><td colspan="3" class="t">Prestador</td></tr><tr><td><div class="k">CNPJ</div>${esc(nsDoc(e.cnpj))}</td><td colspan="2"><div class="k">Nome</div>${esc(e.razao_social||e.nome||'')}</td></tr>
-  <tr><td colspan="3"><div class="k">Endereço</div>${esc([e.logradouro,e.numero,e.bairro,e.municipio].filter(Boolean).join(', '))} · ${esc(e.email||'')}</td></tr>
-  <tr><td colspan="3" class="t">Tomador</td></tr><tr><td><div class="k">CNPJ/CPF</div>${esc(nsDoc(n.tomador_doc))}</td><td colspan="2"><div class="k">Nome</div>${esc(n.tomador_nome||'')}</td></tr>
-  <tr><td colspan="3" class="t">Serviço</td></tr><tr><td><div class="k">Código nacional</div>${esc(nsTrib(n.ctribnac))}</td><td colspan="2"><div class="k">Descrição</div>${esc(n.descricao||'')}</td></tr>
-  <tr><td colspan="2"><div class="k">Valor do serviço</div><b>${fm(n.valor)}</b></td><td><div class="k">Valor líquido</div><b>${fm(tg('vLiq')||n.valor)}</b></td></tr></table>
-  <p style="font-size:11px;margin-top:14px">Confira a autenticidade em www.nfse.gov.br, Consulta pública, com a chave de acesso acima.</p><script>print()<\/script>`);w.document.close();
+  const w=window.open('','_blank');if(!w)return toast('Libere as janelas (pop-up) para imprimir.');
+  w.document.write('<p style="font:14px Arial;padding:20px">Montando o documento da nota…</p>');
+  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();
+  if(!data?.xml_nfse){w.close();return toast('XML da nota não encontrado.')}
+  const chave=(data.xml_nfse.match(/Id="NFS(\d{50})"/)||[])[1]||n.chave||'';
+  const qr=chave?await nsQrDataUri(`https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=${chave}`):'';
+  w.document.open();w.document.write(nsDanfseHtml(data.xml_nfse,n,qr));w.document.close();
 }
 async function nsXml(n){
   const {data,error}=await sb.from('nfse_notas').select('xml_nfse,cancel_xml').eq('id',n.id).single();if(error||!data?.xml_nfse)return toast('XML não encontrado.');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data.xml_nfse],{type:'application/xml'}));a.download=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}.xml`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+// ---- enviar a nota por e-mail ao cliente (PDF do DANFSe + XML), pela função "nfse-email" (Resend) ----
+let NS_H2P=null;
+// gera o PDF do DANFSe dentro de uma janela escondida (iframe), para o estilo da nota não mexer no portal
+async function nsPdfB64(n){
+  const {data}=await sb.from('nfse_notas').select('xml_nfse').eq('id',n.id).single();
+  if(!data?.xml_nfse)throw new Error('XML da nota não encontrado.');
+  const chave=(data.xml_nfse.match(/Id="NFS(\d{50})"/)||[])[1]||n.chave||'';
+  const qr=chave?await nsQrDataUri(`https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=${chave}`):'';
+  const f=document.createElement('iframe');f.style.cssText='position:fixed;left:-10000px;top:0;width:800px;height:1200px;border:0';document.body.appendChild(f);
+  try{
+    const d=f.contentDocument;d.open();d.write(nsDanfseHtml(data.xml_nfse,n,qr).replace('<div class="bar">','<div class="bar" style="display:none">'));d.close();
+    await new Promise((ok,erro)=>{const sc=d.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';sc.onload=ok;sc.onerror=()=>erro(new Error('Não foi possível carregar o gerador de PDF. Confira a internet.'));d.head.appendChild(sc)});
+    const m=d.querySelector('.marca');if(m)m.style.position='absolute';
+    const uri=await f.contentWindow.html2pdf().set({margin:8,image:{type:'jpeg',quality:.95},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy']}}).from(d.body).outputPdf('datauristring');
+    return uri.replace(/^data:[^,]*,/,'');
+  }finally{f.remove()}
+}
+function nsEmailDe(n){
+  const doc=nsSo(n.tomador_doc),c=(CTL.cli||[]).find(x=>doc&&nsSo(x.cnpj_cpf)===doc);
+  return n.tomador?.email||c?.email||'';
+}
+function nsAbreEmail(n){
+  const e=nsEmitDe(n.emitente_id)||{},envios=n.extra?.emails||[];
+  const msg=`Olá,\n\nSegue a nota fiscal de serviço nº ${n.numero_nfse||''}, no valor de ${fm(n.valor)}, referente a ${n.descricao||'nossos serviços'}.\nO PDF (DANFSe) e o arquivo XML estão anexos.\n\nQualquer dúvida, estamos à disposição.\n\n${e.razao_social||e.nome||'Controlacs'}`;
+  ctMostra('nsemail',n,`Enviar a NFS-e nº ${n.numero_nfse||''} por e-mail`,nsChip(n)+' '+nsAmbChip(n.ambiente),
+    `${n.situacao==='cancelada'?'<div class="alerta bad" style="margin:0 0 10px"><b>Esta nota está cancelada.</b><span>Se enviar, o cliente recebe também o XML do cancelamento.</span></div>':''}
+    ${Number(n.ambiente)===2?'<div class="alerta" style="margin:0 0 10px"><b>Nota de teste.</b><span>Não vale como nota fiscal; o PDF sai com o aviso “sem validade jurídica”.</span></div>':''}
+    <div class="fields">
+    <label class="f wide">Para (e-mail do cliente) *<input id="ne_para" value="${esc(nsEmailDe(n))}" placeholder="cliente@empresa.com.br; outro@empresa.com.br"></label>
+    <label class="f wide">Com cópia<input id="ne_cc" value="${esc(e.email||'')}" placeholder="Opcional"></label>
+    <label class="f wide">Assunto<input id="ne_ass" value="${esc(`Nota fiscal de serviço nº ${n.numero_nfse||''} - ${e.razao_social||e.nome||''}`)}"></label>
+    <label class="f wide">Mensagem<textarea id="ne_msg" rows="8">${esc(msg)}</textarea></label>
+    <label class="f wide" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="ne_pdf" checked style="width:auto"> Anexar o PDF (DANFSe) além do XML</label></div>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">Sai de <b>notas@controlacs.com.br</b> com o nome da empresa que emitiu. Quando o cliente clicar em “Responder”, a resposta vai para ${esc(e.email||'o e-mail da empresa (cadastre em Dados fiscais)')}.</p>
+    ${envios.length?`<div class="f wide" style="margin-top:12px"><span>Já enviada</span><ul style="margin:4px 0 0;padding-left:18px">${envios.slice().reverse().map(x=>`<li>${dtBR(x.em)} para ${esc((x.para||[]).join(', '))}${x.cc?.length?' (cópia: '+esc(x.cc.join(', '))+')':''}</li>`).join('')}</ul></div>`:''}`,
+    ctBtn('nsvoltanota','Voltar','ghost')+'<span class="spacer"></span>'+ctBtn('nsenvia','Enviar e-mail','primary'));
+}
+async function nsEnviaEmail(bt){
+  const n=CTL.dlg?.obj;const para=ctV('ne_para');
+  if(!para)return ctErr('Informe o e-mail do cliente.');
+  if(!confirm(`Enviar a NFS-e nº ${n.numero_nfse||''} para ${para}? Depois de enviado, o e-mail não tem como ser desfeito.`))return;
+  bt.disabled=true;const txt=bt.textContent;
+  try{
+    let pdf='';if($('ne_pdf').checked){bt.textContent='Gerando o PDF…';pdf=await nsPdfB64(n)}
+    bt.textContent='Enviando…';
+    const {data,error}=await sb.functions.invoke('nfse-email',{body:{nota_id:n.id,para,cc:ctV('ne_cc'),assunto:ctV('ne_ass'),mensagem:$('ne_msg').value,pdf_b64:pdf}});
+    if(error){let j=null;try{j=await error.context.json()}catch(_){}throw new Error(j?.erro||error.message)}
+    n.extra={...(n.extra||{}),emails:[...(n.extra?.emails||[]),data.envio]};
+    toast('E-mail enviado');await ctCarrega().catch(()=>{});return nsAbreNota(CTL.ns.find(x=>x.id===n.id)||n);
+  }catch(e){ctErr('Não foi possível enviar: '+(e.message||e))}
+  bt.disabled=false;bt.textContent=txt;
 }
 // ---- relatório: baixar os XMLs das notas de um período (zip com os XMLs + planilha com a lista) ----
 function nsAbreLote(){
   const ini=TODAY.slice(0,8)+'01';
   ctMostra('nslote',{},'Baixar XMLs das notas','',
     `<div class="fields"><label class="f">De<input type="date" id="nl_ini" value="${ini}"></label><label class="f">Até<input type="date" id="nl_fim" value="${TODAY}"></label>
-    <label class="f">Empresa que emitiu<select id="nl_emp"><option value="">Todas</option>${CTL.nsEmit.map(e=>`<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></label>
+    <label class="f">Empresa que emitiu<select id="nl_emp"><option value="">Todas as empresas</option>${CTL.nsEmit.map(e=>`<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></label>
     <label class="f">Situação<select id="nl_sit"><option value="">Emitidas e canceladas</option><option value="emitida">Só emitidas</option><option value="cancelada">Só canceladas</option></select></label>
     <label class="f">Período pela data de<select id="nl_por"><option value="emissao">Emissão</option><option value="competencia">Competência</option></select></label>
     <label class="f">Ambiente<select id="nl_amb"><option value="1">Produção (valem como nota)</option><option value="2">Teste</option><option value="">Todos</option></select></label></div>
-    <p class="muted" style="font-size:13px;margin:8px 0 0">Baixa um arquivo .zip com o XML de cada nota (e o XML do cancelamento, quando houver) e uma planilha com a lista das notas. Pronto para mandar à contabilidade.</p>`,
+    <p class="muted" style="font-size:13px;margin:8px 0 0">Baixa um arquivo .zip com uma pasta por empresa, o XML de cada nota (e o XML do cancelamento, quando houver) e uma planilha com a lista das notas. Pronto para mandar à contabilidade.</p>`,
     ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nslote','Baixar','primary'));
 }
 let NS_ZIP=null;
@@ -12790,8 +13124,10 @@ async function nsBaixaLote(bt){
     q=por==='competencia'?q.gte('competencia',ini).lte('competencia',fim):q.gte('emitida_em',ini+'T00:00:00-03:00').lte('emitida_em',fim+'T23:59:59-03:00');
     const {data,error}=await q.order('emitida_em');if(error)throw error;
     if(!data.length){bt.disabled=false;bt.textContent=txt;return ctErr('Nenhuma nota nesse período com esses filtros.')}
-    const JSZip=await nsZipLib(),zip=new JSZip(),pasta=zip.folder('xml');
-    for(const n of data){const nome=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}`;if(n.xml_nfse)pasta.file(nome+'.xml',n.xml_nfse);if(n.cancel_xml)pasta.file(nome+'_cancelamento.xml',n.cancel_xml)}
+    const JSZip=await nsZipLib(),zip=new JSZip();
+    // uma pasta por empresa que emitiu (facilita mandar para a contabilidade)
+    const pastaDe=n=>{const e=nsEmitDe(n.emitente_id)||{};return zip.folder(`${String(e.nome||'Empresa').replace(/[\\/:*?"<>|]+/g,' ').trim()} ${nsSo(e.cnpj)}`.trim())};
+    for(const n of data){const nome=`NFSe_${n.numero_nfse||n.ndps}_${n.chave}`,pasta=pastaDe(n);if(n.xml_nfse)pasta.file(nome+'.xml',n.xml_nfse);if(n.cancel_xml)pasta.file(nome+'_cancelamento.xml',n.cancel_xml)}
     const linhas=data.map(n=>({'Empresa':nsEmitDe(n.emitente_id)?.nome||'','Nº NFS-e':n.numero_nfse||'','Emissão':n.emitida_em?dtBR(n.emitida_em):'','Competência':dBR(n.competencia),'Tomador':n.tomador_nome||'','CNPJ/CPF':nsDoc(n.tomador_doc),'Descrição':n.descricao||'','Código do serviço':nsTrib(n.ctribnac),'Valor':Number(n.valor)||0,'Situação':NSSIT[n.situacao]?.[1]||n.situacao,'Cancelada em':n.cancelada_em?dtBR(n.cancelada_em):'','Motivo do cancelamento':n.cancel_motivo||'','Ambiente':Number(n.ambiente)===2?'Teste':'Produção','Chave de acesso':n.chave}));
     const ws=XLSX.utils.json_to_sheet(linhas),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Notas');
     zip.file('lista-de-notas.xlsx',XLSX.write(wb,{type:'array',bookType:'xlsx'}));
@@ -12868,6 +13204,8 @@ async function nsAcao(act,bt){
   if(act==='nsvoltanota')return nsAbreNota(n);
   if(act==='nsimprime')return nsImprime(n);
   if(act==='nsxml')return nsXml(n);
+  if(act==='nsemail')return nsAbreEmail(n);
+  if(act==='nsenvia')return nsEnviaEmail(bt);
   if(act==='nslote')return nsBaixaLote(bt);
   if(act==='nsdenovo')return nsAbreEmit(CTL.lanc.find(x=>x.id===n.ctl_lancamento_id),n);
   if(act==='nsdescarta'||act==='nsvolta'){
@@ -13040,7 +13378,7 @@ $('ctdFoot').addEventListener('click',e=>{const b=e.target.closest('[data-ctact]
 $('ctdBody').addEventListener('click',e=>{const b=e.target.closest('[data-ctact]');if(b){e.stopPropagation();ctAcao(b.dataset.ctact,b)}});
 const MANUAL=[
   {g:'Primeiros passos',itens:[
-    {k:'_inicio',t:'Como navegar no portal',img:'menu.png',
+    {k:'_inicio',t:'Como navegar no portal',img:'menu.png',vid:'portal-no-celular.mp4',vidt:'Portal no celular: como instalar (2 min)',
       txt:`<p>Entre com o seu e-mail e a sua senha. Deixe marcado <b>Lembrar meu login e senha neste aparelho</b> e, quando o navegador ou o celular perguntar, toque em <b>Salvar senha</b>: nas próximas vezes o e-mail e a senha já aparecem preenchidos (a senha fica guardada no próprio navegador/celular, não no portal). Em computador de uso compartilhado, desmarque a opção e não salve a senha. No alto da tela ficam a <b>Empresa</b>, os <b>módulos</b> e o caminho da tela aberta.</p>
 <ol>
 <li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas. Se houver <b>grupos de empresas</b> (Configurações › Cadastro de empresas), aparecem também as opções <b>Grupo: …</b>, que somam só as empresas do grupo; a matriz com filiais vira um grupo sozinha.</li>
@@ -13067,7 +13405,7 @@ const MANUAL=[
 <p>Para o operador da empresa, o Dashboard mostra também o caixa de hoje, o saldo da tesouraria, os boletos a pagar e as suas tarefas.</p>
 <p>Use <b>Atualizar</b> para buscar os números de novo sem sair da tela.</p>`}]},
   {g:'Rotina diária',itens:[
-    {k:'caixa',t:'Caixa (fechamento do dia)',img:'caixa.png',
+    {k:'caixa',t:'Caixa (fechamento do dia)',img:'caixa.png',vid:'rotina-caixa-tesouraria.mp4',
       txt:`<p>Aqui a recepção fecha o caixa de cada dia e envia para a Controlacs conferir.</p>
 <ol>
 <li>Confira o <b>Dia do fechamento</b> no alto à direita. Nas empresas com mais de um caixa por dia, escolha também o caixa.</li>
@@ -13078,7 +13416,7 @@ const MANUAL=[
 <li>Clique em <b>Enviar fechamento</b>.</li>
 </ol>
 <p>O quadro <b>Últimos dias</b> mostra a situação dos dias anteriores. Dias sem lançamento ou com diferença sem explicação aparecem marcados para você resolver.</p>`},
-    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar.png',
+    {k:'pagar',t:'Boletos e notas fiscais a pagar',img:'pagar.png',vid:'boletos-notas-cartao.mp4',vidt:'Boletos, notas e cartão de crédito (3 min)',
       txt:`<p>O cliente envia o boleto e a nota fiscal de cada conta, e a Controlacs faz o pagamento. O envio é simples: só o anexo e a descrição.</p>
 <ol>
 <li>Clique em <b>+ Nova conta</b>.</li>
@@ -13093,7 +13431,7 @@ const MANUAL=[
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
 <p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
 <p>Os quadros mostram o total a pagar, o que vence em 7 dias, o que está vencido e o que já foi pago. Em <b>Mostrar</b> escolha <i>Em aberto</i> ou um período. Contas sem anexo aparecem com <span style="color:var(--bad)">sem documento</span>. Clique numa linha para ver os documentos; o escritório marca a conta como paga.</p>`},
-    {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',
+    {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',vid:'rotina-caixa-tesouraria.mp4',
       txt:`<p>O controle do dinheiro guardado na empresa: o que entra do caixa, as despesas pagas em dinheiro e os depósitos no banco.</p>
 <ol>
 <li>Clique em <b>+ Novo lançamento</b> e escolha o tipo: <b>Suprimento</b> (dinheiro que entrou na tesouraria), <b>Despesa</b> (anexe a nota, o cupom ou o recibo) ou <b>Depósito bancário</b> (escolha o banco de destino).</li>
@@ -13102,13 +13440,14 @@ const MANUAL=[
 <p>Os quadros mostram o saldo anterior, as entradas, as despesas, os depósitos, o saldo atual e quantos lançamentos o escritório ainda vai conferir. Troque o mês em <b>Período</b>.</p>
 <h4>Conferência física</h4>
 <p>Pelo menos uma vez por semana, conte o dinheiro e use <b>Conferir o dinheiro agora</b>. O portal compara com o saldo e mostra a falta ou a sobra. Empresas sem conferência há mais de 7 dias aparecem em vermelho e com aviso no menu.</p>`},
-    {k:'cartao',t:'Cartão de crédito',img:'cartao.png',
+    {k:'cartao',t:'Cartão de crédito',img:'cartao.png',vid:'boletos-notas-cartao.mp4',vidt:'Boletos, notas e cartão de crédito (3 min)',
       txt:`<p>As notas fiscais das compras pagas com o cartão de crédito da empresa.</p>
 <ol>
 <li>Clique em <b>+ Nova nota</b>.</li>
-<li>Informe a data da compra, o fornecedor, do que se trata, o nº da NF ou do cupom, o valor total e as parcelas.</li>
-<li>Anexe a nota fiscal da compra e salve.</li>
+<li>Em <b>Do que se trata esta despesa</b>, escreva o que foi comprado e de quem.</li>
+<li>Anexe a nota fiscal ou o cupom da compra e salve. Não precisa preencher mais nada.</li>
 </ol>
+<p>Se quiser, abra <b>Outros dados da compra (opcional)</b> para informar a data, o fornecedor, o nº da nota, o valor e as parcelas. Enquanto a Controlacs não completa, a nota aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>. O escritório continua vendo e editando todos os campos e, em Fatura do cartão, só traz as notas que já têm valor.</p>
 <p>Os quadros mostram as compras do período, o que falta conferir com a fatura e as compras sem nota anexada (essas precisam ser cobradas). O escritório marca cada compra como conferida com a fatura.</p>`}]},
   {g:'Gestão financeira',itens:[
     {k:'gfpagar',t:'Contas a pagar e a receber',
@@ -13313,7 +13652,7 @@ const MANUAL=[
 <li>Para emitir: <b>+ Emitir NFS-e</b>, ou o botão <b>Emitir NF</b> na receita do Financeiro (a nota fica ligada à receita). Escolha o cliente, confira o tomador, a competência, o valor e a descrição e clique em Emitir.</li>
 <li>Se o emissor recusar, a tentativa aparece como <b>Recusada</b> com o motivo. Use <b>Corrigir e tentar de novo</b> ou <b>Descartar</b> (o descarte também tem <b>Desfazer</b>).</li>
 <li>Para desfazer uma nota emitida: abra a nota e clique em <b>Cancelar NFS-e</b>, com o motivo. O cancelamento vai para o emissor nacional e não tem volta; para corrigir, cancele e emita outra.</li>
-<li>Na nota: <b>Imprimir</b> e <b>Baixar XML</b>. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
+<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. <b>Enviar por e-mail</b> manda o PDF e o XML ao cliente (confira o e-mail, a cópia e a mensagem antes; e-mail enviado não tem como desfazer, por isso o sistema pede confirmação). A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
 </ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
@@ -13344,7 +13683,7 @@ function renderManual(){
   $('mnIdx').innerHTML=grupos.map(x=>`<h3>${esc(x.g)}</h3>${x.itens.map(i=>`<a href="#${ids(i)}" data-mn="${ids(i)}">${esc(i.t)}</a>`).join('')}`).join('')||'<p class="muted" style="margin:6px">Nada encontrado.</p>';
   const feitas=new Set(MANUAL.flatMap(x=>x.itens.map(i=>i.k)));
   const faltam=NAV.filter(n=>!n.aba&&!feitas.has(n.k)&&n.ok()&&eqPode(n.k)).map(n=>n.t);
-  $('mnConteudo').innerHTML=grupos.map(x=>x.itens.map(i=>`<article class="card mnsec" id="${ids(i)}"><p class="mng">${esc(x.g)}</p><h2>${esc(i.t)}</h2>${i.img?`<a class="mnimg" href="manual/${i.img}" target="_blank" rel="noopener" title="Abrir a imagem em tamanho maior"><img src="manual/${i.img}" loading="lazy" alt="Exemplo da tela ${esc(i.t)}"></a>`:''}${i.txt}</article>`).join('')).join('')
+  $('mnConteudo').innerHTML=grupos.map(x=>x.itens.map(i=>`<article class="card mnsec" id="${ids(i)}"><p class="mng">${esc(x.g)}</p><h2>${esc(i.t)}</h2>${i.vid?`<div class="mnvid"><p class="mnvidt">▶ Vídeo explicativo: ${esc(i.vidt||'Caixa e Tesouraria (4 min)')}</p><video controls preload="none" poster="manual/${i.vid.replace(/\.mp4$/,'.jpg')}" src="manual/${i.vid}"></video></div>`:''}${i.img?`<a class="mnimg" href="manual/${i.img}" target="_blank" rel="noopener" title="Abrir a imagem em tamanho maior"><img src="manual/${i.img}" loading="lazy" alt="Exemplo da tela ${esc(i.t)}"></a>`:''}${i.txt}</article>`).join('')).join('')
     +(!b&&faltam.length?`<article class="card mnsec"><p class="mng">Em construção</p><h2>Próximas partes do manual</h2><p>O manual está sendo escrito por partes. Estas telas que você usa ainda vão ganhar explicação: ${esc(faltam.join(', '))}.</p></article>`:'');
 }
 $('mnBusca').addEventListener('input',()=>renderManual());
@@ -13854,6 +14193,19 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-16video2',data:'2026-11-16',t:'Novos vídeos na Ajuda: boletos, cartão e celular',itens:[
+    {x:'Em Ajuda › Manual do sistema, nas partes Boletos e notas fiscais a pagar e Cartão de crédito, tem um vídeo de 3 minutos mostrando como enviar o boleto, a nota ou o cupom (anexe o documento antes de preencher: o portal lê e completa sozinho).',mods:['pagar','cartao','manual']},
+    {x:'Na parte Como navegar no portal, um vídeo de 2 minutos ensina a colocar o portal na tela inicial do celular (iPhone e Android), como se fosse um aplicativo.',mods:['manual']}]},
+  {k:'2026-11-16adto',data:'2026-11-16',t:'Recibo de adiantamento salarial',itens:[
+    {x:'Nova tela RH › Adiantamento salarial: escolha o colaborador, o valor e a data do pagamento e clique em Gerar recibo. Sai o recibo para assinar, entra a conta a pagar (categoria Adto. de Salário) e o desconto na coluna Adiantamento da folha do mês.',mods:['adto']},
+    {x:'Quem já tem adiantamento no cadastro (ex.: Oliveira) não fica com desconto em dobro: o recibo substitui o valor que estava na folha do mês.',mods:['adto','folha']},
+    {x:'Relatório de líquidos (PDF e Excel): separado por empresa, com o nome e o valor do adiantamento de cada colaborador, o total de cada empresa e o total geral. Filtra pela folha ou pelo período do pagamento.',mods:['adto']},
+    {x:'Desfazer: tira a conta a pagar e o desconto da folha e devolve o adiantamento que estava antes. O recibo fica no histórico como desfeito, com filtros por colaborador, folha, data, conta paga ou em aberto e busca.',mods:['adto']}]},
+  {k:'2026-11-16cart',data:'2026-11-16',t:'Cartão de crédito: envio simples pelo cliente',itens:[
+    {x:'Rotina diária › Cartão de crédito: agora basta anexar a nota fiscal ou o cupom e escrever do que se trata. Data, fornecedor, nº da nota, valor e parcelas ficam opcionais em “Outros dados da compra”: a Controlacs completa.',mods:['cartao']},
+    {x:'Fatura do cartão: “Trazer notas enviadas” só traz as que já têm valor. As que o cliente mandou sem valor ficam esperando: complete em Rotina diária › Cartão de crédito.',para:'esc'}]},
+  {k:'2026-11-16video',data:'2026-11-16',t:'Vídeo explicativo da rotina de Caixa e Tesouraria',itens:[
+    {x:'Em Ajuda › Manual do sistema, nas partes Caixa e Tesouraria, tem um vídeo de 4 minutos mostrando passo a passo como lançar o fechamento do caixa e a tesouraria (com dados de exemplo).',mods:['caixa','tesouraria','manual']}]},
   {k:'2026-11-15movbc',data:'2026-11-15',t:'Movimentação financeira, Contas a pagar e a receber no modelo do Bom Controle',itens:[
     {x:'As três telas ficaram no mesmo modelo: colunas Parcela, Empresa (em Todas as empresas), Tipo, data, Cliente/Fornecedor com a descrição embaixo, Categoria, Conta e Valor. A Movimentação mostra entradas e saídas juntas; Contas a pagar só as despesas; Contas a receber só as receitas.',mods:['gfmov','gfpagar','gfrec']},
     {x:'Novos filtros: “Data por” (vencimento, pagamento ou competência), Empresas, Conta, Categoria, Anexos, Forma de pagamento e Conciliação. Os filtros que já existiam continuam.',mods:['gfmov','gfpagar','gfrec']},
@@ -13872,7 +14224,9 @@ const NOVIDADES=[
     {x:'Ao ganhar, a empresa pode virar cliente da Controlacs na hora e o botão “Criar contrato” abre o contrato já preenchido. Visões Funil, Lista, Follow-ups e Propostas, com filtro por coluna e busca por qualquer campo, valor ou data.',para:'master'}]},
   {k:'2026-11-15nfse-envio',data:'2026-11-15',t:'Notas fiscais (NFS-e): envio ligado',itens:[
     {x:'Controlacs › Notas fiscais e o botão “Emitir NF” já enviam a nota direto ao emissor nacional e trazem o número da NFS-e na hora. O aviso “envio ainda em preparação” saiu. O cancelamento também é feito pelo portal.',para:'master'},
-    {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista. Pronto para mandar à contabilidade.',para:'master'}]},
+    {x:'Novo botão “Baixar XMLs”: escolha o período (pela data de emissão ou de competência), a empresa e a situação, e baixe um .zip com o XML de todas as notas (e dos cancelamentos) e uma planilha com a lista, com uma pasta por empresa quando escolher “Todas as empresas”. Pronto para mandar à contabilidade.',para:'master'},
+    {x:'O botão “Imprimir” da nota agora abre o DANFSe no modelo oficial novo (NT 008/2026), com QR Code de autenticidade, dados do prestador e do tomador, ISSQN, IBS/CBS e valor líquido. Use “Imprimir / Salvar em PDF” para gerar o PDF e mandar ao cliente.',para:'master'},
+    {x:'Novo botão “Enviar por e-mail” na nota: manda ao cliente o PDF (DANFSe) e o XML, de notas@controlacs.com.br, com o nome da empresa que emitiu. O e-mail do cliente vem do cadastro, dá para pôr cópia e mudar a mensagem, e a nota mostra quando e para quem já foi enviada.',para:'master'}]},
   {k:'2026-11-15topo',data:'2026-11-15',t:'Novos ícones no canto direito do topo',itens:[
     {x:'Contabilidade, Comunicação, Controlacs, Configurações (engrenagem) e Ajuda (?) saíram da faixa de módulos e agora ficam no canto direito do topo, ao lado do seu nome. É só clicar no ícone para abrir as mesmas telas de antes; nada mudou dentro delas.'},
     {x:'O Manual do sistema agora fica em Ajuda › Manual do sistema (antes ficava em Configurações).'}]},
@@ -14732,7 +15086,9 @@ const altOkEmp=(a,emp)=>!!a&&!!emp&&(a.conferida_empresas||[]).includes(emp);
 function rnAlt(it){const a=rnAltBruto(it);if(!a)return null;if(a.status==='Aplicada'&&altOkEmp(a,it.empresa_id))return null;return a}
 const rnConta=p=>!p?'':[p.titular&&p.titular!==p.nome&&p.titular!==p.nome_global?'Titular: '+esc(p.titular)+((p.titular_doc||p.cpf_cnpj)?' · '+esc(p.titular_doc||p.cpf_cnpj):''):'',
   p.conta?[p.banco&&esc(p.banco),p.agencia&&'ag. '+esc(p.agencia),'c/c '+esc(p.conta)].filter(Boolean).join(' · '):'',p.pix_chave?'Pix '+(p.pix_tipo?esc(p.pix_tipo)+' ':'')+esc(p.pix_chave):''].filter(Boolean).join('<br>');
-const rnDescPend=p=>p?RN.desc.filter(d=>d.parceiro_id===p.id||RN.parc.some(x=>x.id===d.parceiro_id&&rnChave(x.nome)===rnChave(p.nome))):[];
+// o desconto só sai no repasse do grupo da empresa escolhida ao lançar (Carol, 16/11)
+const rnDescNoGrupo=d=>!d.cliente_id||!RN.grupo||(RN.grupo.empresas||[]).includes(d.cliente_id);
+const rnDescPend=p=>p?RN.desc.filter(d=>rnDescNoGrupo(d)&&(d.parceiro_id===p.id||RN.parc.some(x=>x.id===d.parceiro_id&&rnChave(x.nome)===rnChave(p.nome)))):[];
 function rnVazio(t,cls){$('rnBar').hidden=true;$('rnTiles').innerHTML='';$('rnTilesTg').hidden=true;$('rnBulk').hidden=true;$('rnGerar').hidden=true;$('rnHead').innerHTML='';$('rnBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('rnNote').innerHTML=''}
 async function renderRN(recarrega=true){
   const cli=cliAtual();['rnImp','rnCfg','rnCtrl','rnXls'].forEach(id=>$(id).hidden=true);
