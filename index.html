@@ -328,6 +328,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .uscols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 .uscol table{width:100%;border-collapse:collapse;font-size:13.5px}.uscol th{text-align:left;font-size:15px;padding:6px 6px 8px;border-bottom:1px solid var(--line)}.uscol th.r{width:42px;text-align:center;color:var(--muted)}.uscol th.r svg{width:16px;height:16px}
 .uscol td{padding:6px;border-bottom:1px solid var(--line)}.uscol td.r{text-align:center}.uscol td.r input{width:auto;margin:0;cursor:pointer}
+.uscol tr.usenv td{padding:0 6px 8px 16px;font-size:12.5px}.uscol tr.usenv label{display:flex;gap:6px;align-items:center;cursor:pointer}.uscol tr.usenv input{width:auto;margin:0}
 .uslinha{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line);font-size:13.5px;font-weight:600}
 .usgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .chk{display:flex;flex-wrap:wrap;gap:6px 18px;font-weight:400;color:var(--ink)}.chk label{display:flex;gap:6px;align-items:center}.chk input{width:auto;margin:0}
@@ -1751,10 +1752,14 @@ const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.include
 // permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
 const PERM=()=>ME&&!ehAdm()&&ME.permissoes&&typeof ME.permissoes==='object'&&!Array.isArray(ME.permissoes)?ME.permissoes:null;
-const permTela=k=>{if(!ME||ehAdm())return 'exec';const p=PERM();if(!p||SEMPRE.includes(k)||k==='avisos')return 'exec';return p[k]==='exec'?'exec':p[k]==='ver'?'ver':''};
+const permTela=k=>{if(!ME||ehAdm())return 'exec';const p=PERM();if(!p||SEMPRE.includes(k)||k==='avisos')return 'exec';return p[k]==='exec'||p[k]==='env'?'exec':p[k]==='ver'?'ver':''};
 const eqPode=k=>{if(!ME)return false;if(ehAdm())return true;const p=PERM();if(!p)return eqPodeAnt(k);if(ehEsc()&&SO_MASTER.includes(k))return false;return !!permTela(k)};
 // Executar: lança, altera, exclui e anexa na tela; só Visualizar: vê e baixa, sem gravar nada
 const podeExec=k=>permTela(k)==='exec';
+// "Só enviar" (Carol, 16/11): em Boletos e notas fiscais a pagar, o operador (ex.: do caixa) envia o boleto ou a nota que chegou,
+// mas não vê o que a empresa paga no mês: some Contas do mês e ele vê só o que ele mesmo enviou. Fica em perfis.permissoes.pagar='env'
+const soEnvio=k=>{if(!ME||ehAdm()||ehEsc())return false;const p=PERM();return !!p&&p[k]==='env'};
+const soMeus=k=>soEnvio(k)?{enviado_por:ME.user_id}:{};
 const MODNOME={caixa:'Caixa',pagar:'Boletos e notas fiscais a pagar',cartao:'Cartão de crédito',tesouraria:'Tesouraria',ferias:'Férias (RH)',folha:'Folha de pagamento (RH)',repasse:'Parceiros: cadastro e alterações',tarefas:'Tarefas e recados',premio:'Premiação (RH)',ponto:'Espelho de ponto (RH)',beneficios:'Pedido de benefícios (RH)',colab:'Colaboradores e prazos (RH)',contabil:'Portal da contabilidade (contador)'};
 // seções agrupadas no quadro Acessos
 const MODGRUPOS=[['Rotina diária',['caixa','pagar','tesouraria','cartao']],['Recursos humanos',['ferias','folha','ponto','premio','beneficios','colab']],['Comunicação',['tarefas','repasse']],['Contabilidade',['contabil']]];
@@ -3210,13 +3215,13 @@ const temPermNova=u=>!!u.permissoes&&typeof u.permissoes==='object'&&!Array.isAr
 // permissões atuais do usuário; quem ainda não foi salvo na tela nova tem as permissões montadas pela regra antiga (nada muda para ele)
 function permsDe(u,tipo){
   tipo=tipo||tipoUsr(u);const r={};
-  if(temPermNova(u)){ferramentas(tipo).forEach(n=>{const v=u.permissoes[n.k];if(v==='ver'||v==='exec')r[n.k]=v});return r}
+  if(temPermNova(u)){ferramentas(tipo).forEach(n=>{const v=u.permissoes[n.k];if(v==='ver'||v==='exec'||v==='env')r[n.k]=v});return r}
   if(ehTipoEquipe(tipo)){ferramentas(tipo).forEach(n=>{const k=n.k==='docs'?'colab':n.k;if(!u.modulos_equipe||u.modulos_equipe.includes(k))r[n.k]='exec'});return r}
   ferramentas(tipo).forEach(n=>{const l=ACS_TODOS.filter(a=>a.user_id===u.user_id&&a.modulo===TOOLMOD[n.k]);if(l.length)r[n.k]=l.some(a=>a.nivel==='lancamento')?'exec':'ver'});
   return r;
 }
 function permResumo(u){
-  const t=tipoUsr(u),p=permsDe(u,t),fs=ferramentas(t),ex=fs.filter(n=>p[n.k]==='exec').map(n=>n.t),ve=fs.filter(n=>p[n.k]==='ver').map(n=>n.t);
+  const t=tipoUsr(u),p=permsDe(u,t),fs=ferramentas(t),ex=fs.filter(n=>p[n.k]==='exec'||p[n.k]==='env').map(n=>n.t+(p[n.k]==='env'?' (só enviar)':'')),ve=fs.filter(n=>p[n.k]==='ver').map(n=>n.t);
   if(!ex.length&&!ve.length)return '<span class="muted">Nenhuma ferramenta marcada</span>';
   return (ex.length?`<b>Executar:</b> ${esc(ex.join(', '))}`:'')+(ex.length&&ve.length?'<br>':'')+(ve.length?`<b>Só visualizar:</b> ${esc(ve.join(', '))}`:'');
 }
@@ -3230,7 +3235,7 @@ function modSit(u,g){
   const t=tipoUsr(u);if(t==='admin')return 'exec';if(t==='pendente')return '';
   if(ehTipoEquipe(t)&&NAV.some(n=>navGrp(n)===g&&SEMPRE.includes(n.k)&&n.k!=='manual'))return 'exec';
   const p=permsDe(u,t),vs=ferramentas(t).filter(n=>navGrp(n)===g).map(n=>p[n.k]).filter(Boolean);
-  return vs.includes('exec')?'exec':vs.length?'ver':'';
+  return vs.includes('exec')||vs.includes('env')?'exec':vs.length?'ver':'';
 }
 // lista no estilo do Bom Controle: nome, login e um cadeado por módulo
 function usLista(){
@@ -3300,13 +3305,15 @@ function usPrivDesenha(){
   if(!mods.some(m=>m.g===US.mod))US.mod=mods[0].g;
   const doMod=g=>fs.filter(n=>navGrp(n)===g),sit=g=>{const vs=doMod(g).map(n=>US.p[n.k]);return vs.every(v=>v==='exec')?'total':vs.every(v=>!v)?'bloq':'pers'};
   const itens=doMod(US.mod),modo=sit(US.mod),secs=SECOES.map(sc=>[sc==='Relatórios'?'Visões e relatórios':sc,itens.filter(n=>(n.s||'Dia a dia')===sc)]).filter(([,l])=>l.length);
-  const radio=(n,v,tit)=>`<td class="r"><input type="radio" name="usr_${n.k}" value="${v}" title="${tit}" aria-label="${esc(n.t)}: ${tit}"${(US.p[n.k]||'')===v?' checked':''}></td>`;
+  const radio=(n,v,tit)=>`<td class="r"><input type="radio" name="usr_${n.k}" value="${v}" title="${tit}" aria-label="${esc(n.t)}: ${tit}"${(US.p[n.k]==='env'?'exec':US.p[n.k]||'')===v?' checked':''}></td>`;
+  // Boletos e notas a pagar: "Só enviar" logo abaixo (Carol, 16/11), para liberar o envio sem mostrar o que a empresa paga
+  const envLin=n=>n.k==='pagar'&&!ehTipoEquipe(t)?`<tr class="usenv"><td colspan="4"><label title="Envia o boleto e a nota fiscal, mas não vê Contas do mês nem o que outras pessoas enviaram"><input type="checkbox" data-usenv="pagar"${US.p.pagar==='env'?' checked':''}${US.p.pagar==='exec'||US.p.pagar==='env'?'':' disabled'}> Só enviar boletos e notas <span class="muted">(não vê o que a empresa tem a pagar)</span></label></td></tr>`:'';
   box.innerHTML=`<div class="row" style="align-items:center"><h3 style="margin:0">Privilégios de acesso</h3><span class="spacer"></span><span class="note">${ehTipoEquipe(t)?'Tarefas, Avisos, Projetos e o Dashboard ficam sempre liberados para a equipe.':'Avisos e o Dashboard ficam sempre liberados.'}</span></div>
     <div class="usmods">${mods.map(m=>{const x=sit(m.g);return `<button type="button" class="usmod" data-usm="${esc(m.g)}" aria-pressed="${m.g===US.mod}">${svgI(m.i)}<span>${m.c||m.g}</span><span class="ck${x==='bloq'?' no':''}" title="${x==='total'?'Acesso total':x==='bloq'?'Bloqueado':'Personalizado'}">${x==='bloq'?'✕':'✔'}</span></button>`}).join('')}</div>
     <div class="usmodo"><label><input type="radio" name="usmodo" value="pers"${modo==='pers'?' checked':''}> Acesso personalizado</label><label><input type="radio" name="usmodo" value="total"${modo==='total'?' checked':''}> Acesso <b style="color:var(--ok)">Total</b> ao módulo ${esc(US.mod)}</label><label><input type="radio" name="usmodo" value="bloq"${modo==='bloq'?' checked':''}> Acesso <b style="color:var(--bad)">BLOQUEADO</b> ao módulo ${esc(US.mod)}</label></div>
     <div class="uscols">${secs.map(([sc,l])=>`<div class="uscol"><table><thead><tr><th>${sc}</th>${[['ver','Ver (visualiza e baixa)',icoSvg('olho')],['exec','Executar (lança, altera, exclui e anexa)',icoSvg('lapis')],['','Bloqueado',LKSVG(false)]].map(([v,tit,ic])=>`<th class="r"><button type="button" class="uscolbt" data-uscol="${v}" data-ussec="${esc(sc)}" title="${tit}: clique para marcar ou desmarcar todas de ${esc(sc)}" aria-label="${tit}: marcar ou desmarcar todas de ${esc(sc)}">${ic}</button></th>`).join('')}</tr></thead>
-      <tbody>${l.map(n=>`<tr><td>${esc(n.t)}</td>${radio(n,'ver','Ver')}${radio(n,'exec','Executar')}${radio(n,'','Bloqueado')}</tr>`).join('')}</tbody></table></div>`).join('')}</div>
-    <p class="note" style="margin:10px 0 0">${icoSvg('olho').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} <b>Ver</b>: vê a tela e baixa relatórios e documentos. ${icoSvg('lapis').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} <b>Executar</b>: também lança, altera, exclui e anexa. 🔒 <b>Bloqueado</b>: a tela não aparece.</p>`;
+      <tbody>${l.map(n=>`<tr><td>${esc(n.t)}</td>${radio(n,'ver','Ver')}${radio(n,'exec','Executar')}${radio(n,'','Bloqueado')}</tr>${envLin(n)}`).join('')}</tbody></table></div>`).join('')}</div>
+    <p class="note" style="margin:10px 0 0">${icoSvg('olho').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} <b>Ver</b>: vê a tela e baixa relatórios e documentos. ${icoSvg('lapis').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} <b>Executar</b>: também lança, altera, exclui e anexa. 🔒 <b>Bloqueado</b>: a tela não aparece.${US.mod==='Rotina diária'&&!ehTipoEquipe(t)?' Em Boletos e notas fiscais a pagar, <b>Só enviar</b> deixa a pessoa enviar o boleto e a nota sem ver o que a empresa tem a pagar.':''}</p>`;
 }
 $('usBody').addEventListener('click',e=>{const b=e.target.closest('[data-usm]');if(b){US.mod=b.dataset.usm;usPrivDesenha();return}
   // o olho, o lápis e o cadeado do alto de cada coluna marcam todas as telas daquela coluna; clicar de novo desmarca (Carol, 04/11)
@@ -3315,6 +3322,7 @@ $('usBody').addEventListener('click',e=>{const b=e.target.closest('[data-usm]');
   const todas=v&&l.every(n=>US.p[n.k]===v);l.forEach(n=>{if(v&&!todas)US.p[n.k]=v;else delete US.p[n.k]});usPrivDesenha()});
 $('usBody').addEventListener('change',e=>{const x=e.target;
   if(x.name==='usmodo'){if(x.value==='pers')return;ferramentas(US.tipo).filter(n=>navGrp(n)===US.mod).forEach(n=>{if(x.value==='total')US.p[n.k]='exec';else delete US.p[n.k]});usPrivDesenha();return}
+  if(x.dataset.usenv){const k=x.dataset.usenv;if(US.p[k]==='exec'||US.p[k]==='env')US.p[k]=x.checked?'env':'exec';usPrivDesenha();return}
   if(x.name?.startsWith('usr_')){const k=x.name.slice(4);if(x.value)US.p[k]=x.value;else delete US.p[k];usPrivDesenha()}});
 // lido na hora de salvar
 function usLePerm(){return {p:{...US.p},emps:US.emps===null?null:[...(US.emps||[])]}}
@@ -3345,7 +3353,7 @@ $('usFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-a
   if(e1){console.error(e1);return er(msgV85(e1))}
   // operador cliente: os acessos do banco (empresa × módulo × nível) saem das ferramentas marcadas
   if(cli&&window.V2){
-    const niv={};Object.entries(p).forEach(([k,v])=>{const m=TOOLMOD[k];if(m)niv[m]=v==='exec'||niv[m]==='lancamento'?'lancamento':'consulta'});
+    const niv={};Object.entries(p).forEach(([k,v])=>{const m=TOOLMOD[k];if(m)niv[m]=v==='exec'||v==='env'||niv[m]==='lancamento'?'lancamento':'consulta'});
     const rows=(emps||[]).flatMap(c=>Object.entries(niv).map(([modulo,nivel])=>({user_id:uid,cliente_id:c,modulo,nivel})));
     if(rows.length){const {error}=await sb.from('acessos').upsert(rows,{onConflict:'user_id,cliente_id,modulo'});if(error){console.error(error);return er('Cadastro salvo, mas os acessos não: '+(error.message||'tente de novo.'))}}
     const {data:atu}=await sb.from('acessos').select('cliente_id,modulo').eq('user_id',uid);
@@ -3456,12 +3464,12 @@ function initMod(m){
   const cfg=MODCFG[m],cli=cliOuTodas();
   if(MOD!==m){
     MOD=m;const fut=isoLocal(new Date(dObj(TODAY).getFullYear(),dObj(TODAY).getMonth()+3,1)).slice(0,7);
-    mFiltro.innerHTML=m==='pagar'?'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option><option value="todos">Tudo o que foi enviado</option><option value="falta">Falta enviar o boleto</option>':'';
+    mFiltro.innerHTML=m==='pagar'?(soEnvio('pagar')?'<option value="aberto">Aguardando a Controlacs</option><option value="todos">Tudo o que você enviou</option>':'<option value="aberto">Em aberto</option><option value="per">Vencimento no período</option><option value="todos">Tudo o que foi enviado</option><option value="falta">Falta enviar o boleto</option>'):'';
     $('mFiltroBox').hidden=m!=='pagar';$('mTipo').value='';$('mTipoBox').hidden=m!=='tesouraria';
     mFiltro.value=m==='pagar'?'aberto':'';[$('mIni').value,$('mFim').value]=monthRange(TODAY.slice(0,7));
   }
   $('mTitle').textContent=cfg.titulo;
-  $('mSub').textContent=(cli?cli.nome+(m==='cartao'&&cli.cartao_final?' · cartão final '+cli.cartao_final:'')+' · ':'')+cfg.sub;
+  $('mSub').textContent=(cli?cli.nome+(m==='cartao'&&cli.cartao_final?' · cartão final '+cli.cartao_final:'')+' · ':'')+(m==='pagar'&&soEnvio('pagar')?'Envie o boleto e a nota fiscal que chegarem. A Controlacs faz o pagamento. Aqui aparece só o que você enviou.':cfg.sub);
   $('mNovo').textContent='+ '+cfg.novo;
   $('mNovo').hidden=!(cli&&cli.id!=='*'&&podeLancar(cli.id,m));
   renderMod();
@@ -3473,6 +3481,7 @@ async function renderMod(){
   if(!cli){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l muted">Nenhuma empresa liberada para este módulo.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   if(!window.V2){$('mHead').innerHTML='';$('mBody').innerHTML='<tr><td class="l neg">Este módulo precisa da atualização v2 do banco. Rode o SQL no Supabase.</td></tr>';$('mTiles').innerHTML='';$('mFoot').innerHTML='';return}
   let q=tod?sb.from(cfg.tabela).select('*').in('cliente_id',empresasDe(MOD).map(c=>c.id)):sb.from(cfg.tabela).select('*').eq('cliente_id',cli.id);
+  const env=MOD==='pagar'&&soEnvio('pagar');if(env)q=q.match(soMeus('pagar'));
   const f=MOD==='pagar'?mFiltro.value:'per',per=f==='per';$('mPerBox').hidden=$('mPerBox2').hidden=!per;
   const [pIni,pFim]=[$('mIni').value||'1900-01-01',$('mFim').value||'2999-12-31'];
   // "Falta enviar o boleto" (Carol, 13/11): a lista de enviados fica como Em aberto e Contas do mês mostra só o que falta
@@ -3493,7 +3502,7 @@ async function renderMod(){
     ANT=r2(ANT);
   }
   // boletos e notas: contas do mês da Controlacs e situação do que foi enviado (Carol, 05/11)
-  if(MOD==='pagar'&&!tod)await pagCarrega(cli);else PST={tits:[],por:{},cli:null};
+  if(MOD==='pagar'&&!tod&&!env)await pagCarrega(cli);else PST={tits:[],por:{},cli:null};
   if(REGS.length){const {data:dd}=await sb.from('documentos').select('*').in('registro_id',REGS.map(r=>r.id));(dd||[]).forEach(d=>(DOCS[d.registro_id]=DOCS[d.registro_id]||[]).push(d))}
   const nd=r=>(DOCS[r.id]||[]).length, clip=r=>nd(r)?`<span class="muted" title="Documentos">📎${nd(r)}</span>`:'<span class="neg">sem documento</span>';
   const sum=a=>r2(a.reduce((x,r)=>x+(+r.valor),0));
@@ -3508,7 +3517,7 @@ async function renderMod(){
     head='<tr><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th class="l">Anexos</th><th class="l">Situação</th></tr>';
     body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBRv(r.vencimento)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td class="l">${clip(r)}${r.liquidos?.length?` <span class="muted" title="Relatório de líquidos">👥${r.liquidos.length}</span>`:''}</td><td class="l">${st(r)}${lan(r)}${r.boleto_alerta&&!r.conferido?` <span class="chip c-bad" title="${esc(r.boleto_alerta)}">⚠ Conferir boleto</span>`:''}</td></tr>`).join('');
     const ab=REGS.filter(r=>!r.conferido),sem=ab.filter(r=>r.vencimento<=isoLocal(new Date(dObj(TODAY).getTime()+7*864e5))),venc=ab.filter(r=>r.vencimento<TODAY);
-    tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':f==='todos'?'de tudo o que foi enviado':'no mês']];
+    tiles=env?[['Enviados por você',String(REGS.length),f==='todos'?'desde o início':'aguardando a Controlacs'],['Aguardando a Controlacs',String(ab.length),ab.length===1?'envio':'envios'],['Já pagos',String(REGS.filter(r=>r.conferido).length),f==='aberto'?'escolha “Tudo o que você enviou”':'dos seus envios']]:[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':f==='todos'?'de tudo o que foi enviado':'no mês']];
   }else if(MOD==='cartao'){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
     body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':r.valor==null?'<span class="chip c-warn" title="A Controlacs confere com a fatura e completa o valor">Enviado · a Controlacs completa</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
@@ -9444,7 +9453,7 @@ async function dsModulos(cli){
     tem.tes?sb.from('tesouraria').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).limit(6).then(lista):null,
     tem.tes?tcSaldo(cli.id,TODAY).catch(()=>null):null,
     tem.tes?sb.from('tesouraria_conferencias').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).limit(1).then(r=>lista(r)[0]||null):null,
-    tem.pagar?sb.from('contas_pagar').select('*').eq('cliente_id',cli.id).eq('conferido',false).order('vencimento').limit(300).then(lista):null,
+    tem.pagar?sb.from('contas_pagar').select('*').eq('cliente_id',cli.id).eq('conferido',false).match(soMeus('pagar')).order('vencimento').limit(300).then(lista):null,
     tem.cartao?sb.from('cartao_notas').select('valor,data').eq('cliente_id',cli.id).gte('data',TODAY.slice(0,8)+'01').then(lista):null])}
   catch(e){console.error(e);g.innerHTML='<p class="neg">Erro ao carregar. Verifique a internet e tente de novo.</p>';return}
   if(VIEW!=='gfdash'||cliOuTodas()?.id!==cli.id)return;
@@ -9474,8 +9483,9 @@ function dsModDesenha(){
   // boletos e notas a pagar
   if(tem.pagar){
     const v=P.filter(r=>r.vencimento&&r.vencimento<TODAY),tot=r2(P.reduce((x,r)=>x+(+r.valor||0),0));
-    ks.push(kpi(v.length?'t-bad':'t-ok',ico(ICO.pagar),'pagar','Boletos a pagar',fm(tot),v.length?`<span class="chip c-bad">${qt(v.length,'vencido','vencidos')}</span>`:qt(P.length,'conta em aberto','contas em aberto')));
-    cards.push(`<div class="card"><div class="ch"><div><h2>Boletos e notas a pagar ${cnt(P.length)}</h2><p class="sub">Próximos vencimentos</p></div></div><div class="dl">${P.slice(0,6).map(r=>`<button type="button" class="dr dvenc" data-go="pagar"><span class="dd${r.vencimento<TODAY?' late':''}"><b>${(r.vencimento||'').slice(8,10)}</b><small>${r.vencimento?MESES[+r.vencimento.slice(5,7)-1].slice(0,3):''}</small></span><span class="nm"><b>${esc(r.fornecedor||r.sobre||'—')}</b><span>${esc(r.documento?'Doc. '+r.documento:r.fornecedor?r.sobre||'':'a Controlacs completa')}</span></span><span class="neg" style="font-weight:600">${fm(r.valor)}</span></button>`).join('')||vazio('Nenhuma conta em aberto.')}</div></div>`);
+    if(soEnvio('pagar'))ks.push(kpi('t-ok',ico(ICO.pagar),'pagar','Boletos que você enviou',String(P.length),P.length===1?'aguardando a Controlacs':'aguardando a Controlacs'));
+    else ks.push(kpi(v.length?'t-bad':'t-ok',ico(ICO.pagar),'pagar','Boletos a pagar',fm(tot),v.length?`<span class="chip c-bad">${qt(v.length,'vencido','vencidos')}</span>`:qt(P.length,'conta em aberto','contas em aberto')));
+    cards.push(`<div class="card"><div class="ch"><div><h2>${soEnvio('pagar')?'Boletos e notas que você enviou':'Boletos e notas a pagar'} ${cnt(P.length)}</h2><p class="sub">${soEnvio('pagar')?'Aguardando a Controlacs':'Próximos vencimentos'}</p></div></div><div class="dl">${P.slice(0,6).map(r=>`<button type="button" class="dr dvenc" data-go="pagar"><span class="dd${r.vencimento<TODAY?' late':''}"><b>${(r.vencimento||'').slice(8,10)}</b><small>${r.vencimento?MESES[+r.vencimento.slice(5,7)-1].slice(0,3):''}</small></span><span class="nm"><b>${esc(r.fornecedor||r.sobre||'—')}</b><span>${esc(r.documento?'Doc. '+r.documento:r.fornecedor?r.sobre||'':'a Controlacs completa')}</span></span><span class="neg" style="font-weight:600">${fm(r.valor)}</span></button>`).join('')||vazio('Nenhuma conta em aberto.')}</div></div>`);
   }
   if(tem.cartao){const tot=r2(C.reduce((x,r)=>x+(+r.valor||0),0));ks.push(kpi('t-cred',ico(ICO.cartao),'cartao','Cartão no mês',fm(tot),qt(C.length,'nota lançada','notas lançadas')))}
   if(tem.tar){
@@ -13427,6 +13437,7 @@ const MANUAL=[
 <p><b>Contas do mês:</b> logo acima da lista aparece tudo o que a Controlacs tem para pagar no mês (inclusive o que chegou por e-mail), com a situação de cada conta: <span class="chip c-bad">Falta enviar o boleto</span>, <span class="chip c-ok">Boleto recebido</span> ou <span class="chip c-done">✓ Paga</span>. Use ‹ e › para trocar o mês. Na conta que falta, o botão <b>📎 Enviar boleto</b> já abre o envio com a descrição preenchida. Essa lista é só para consultar: quem lança é a Controlacs.</p>
 <p><b>Boleto com valor diferente do previsto:</b> ao anexar o boleto em PDF, o sistema lê o valor. Se for diferente do previsto, aparece o aviso “O valor do boleto anexado é diferente do valor previsto” para confirmar o valor novo. No escritório, ao validar o boleto (ou ao anexar o boleto na própria conta em Contas a pagar), o sistema mostra o mesmo aviso e pergunta “Deseja alterar também as contas futuras?”. Sem marcar, muda só esta conta; marcando, mudam também as próximas contas previstas do mesmo fornecedor e categoria que ainda vão vencer. As vencidas e não quitadas nunca mudam sozinhas: corrija à mão.</p>
 <p><b>Só o que falta:</b> em <b>Mostrar</b>, escolha <i>Falta enviar o boleto</i> para ver em Contas do mês só as contas que ainda estão sem boleto.</p>
+<p><b>Só enviar (operador do caixa):</b> no Cadastro de usuários › Privilégios de acesso, em Boletos e notas fiscais a pagar, marque <b>Executar</b> e depois <b>Só enviar boletos e notas</b>. A pessoa envia o boleto ou a nota que chegou, mas não vê Contas do mês nem o que outras pessoas enviaram: aparece só o que ela mesma enviou.</p>
 <p><b>O que eu enviei:</b> em <b>Mostrar</b>, escolha <i>Tudo o que foi enviado</i> para ver todos os boletos e notas que já mandou. Cada um mostra <span class="chip c-none">Aguardando a Controlacs</span> ou <span class="chip c-ok">✓ Lançado pela Controlacs</span> e, depois do pagamento, <span class="chip c-done">✓ Paga</span>.</p>
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
 <p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
@@ -14193,6 +14204,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-16soenv',data:'2026-11-16',t:'Boletos e notas a pagar: permissão Só enviar',itens:[
+    {x:'Cadastro de usuários › Privilégios de acesso › Rotina diária: em Boletos e notas fiscais a pagar, marque Executar e depois Só enviar boletos e notas. A pessoa (por exemplo, quem fica no caixa) envia o boleto ou a nota que chegou, mas não vê Contas do mês nem o que outras pessoas enviaram. Quem já tem acesso continua igual.',para:'esc'},
+    {x:'Em Boletos e notas fiscais a pagar, quem tem a permissão Só enviar vê só os boletos e notas que ele mesmo enviou, com a situação de cada um (Aguardando a Controlacs ou Paga).',mods:['pagar']}]},
   {k:'2026-11-16video2',data:'2026-11-16',t:'Novos vídeos na Ajuda: boletos, cartão e celular',itens:[
     {x:'Em Ajuda › Manual do sistema, nas partes Boletos e notas fiscais a pagar e Cartão de crédito, tem um vídeo de 3 minutos mostrando como enviar o boleto, a nota ou o cupom (anexe o documento antes de preencher: o portal lê e completa sozinho).',mods:['pagar','cartao','manual']},
     {x:'Na parte Como navegar no portal, um vídeo de 2 minutos ensina a colocar o portal na tela inicial do celular (iPhone e Android), como se fosse um aplicativo.',mods:['manual']}]},
