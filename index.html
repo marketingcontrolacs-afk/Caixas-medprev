@@ -662,6 +662,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div style="min-width:0">
       <div class="alerta" id="tpBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
+      <div class="alerta" id="rotVisBanner" hidden style="margin:0 0 14px"></div>
       <div class="alerta" id="soVerBanner" hidden style="margin:0 0 14px"><b>Somente visualização</b><span>Você pode ver e baixar o que está nesta tela, mas não lançar, alterar ou excluir. Para isso, peça ao master para marcar “Executar” nesta ferramenta.</span></div>
   <!-- OPERADOR -->
   <section id="viewOp" hidden>
@@ -1702,6 +1703,11 @@ function anexoView(a,url,small){
 // ---------- sessão, acessos e menu ----------
 let ME=null, CLIENTES=[], ACESSOS=[], VIEW=null;
 const ehEsc=()=>ME&&ME.papel==='escritorio';
+// Rotina diária com a visão do cliente (Carol, 16/11): a equipe Controlacs vê as telas do módulo exatamente como o cliente vê.
+// O botão no alto troca para a visão do escritório (Marcar como paga, conferências etc. continuam lá e na Gestão financeira).
+const ROT_V=['caixa','pagar','tesouraria','cartao'];let ROT_ESC=false;try{ROT_ESC=localStorage.getItem('rotVisEsc')==='1'}catch(e){}
+const rotCli=()=>ehEsc()&&!ROT_ESC&&ROT_V.includes(VIEW);
+const escR=()=>ehEsc()&&!rotCli();
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
@@ -2062,7 +2068,7 @@ document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.
 function openView(){
   viewDaEmp();renderNav();
   ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
-  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
+  if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
   // a conferência fica em Escritório › Conferência de caixa. Quem só consulta vê os dias do mês.
@@ -2099,9 +2105,13 @@ function openView(){
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
   else if(VIEW.startsWith('ctl')){$('viewCtl').hidden=false;renderCtl()}
-  avBanner();tpBanner();soVerBanner();
+  avBanner();tpBanner();soVerBanner();rotBanner();
 }
 // aviso no alto da tela de quem só tem "Visualizar" nela
+function rotBanner(){const b=$('rotVisBanner');if(!b)return;const on=ehEsc()&&ROT_V.includes(VIEW);b.hidden=!on;if(!on)return;
+  b.innerHTML=rotCli()?'<b>👁 Visão do cliente</b><span>Você está vendo a Rotina diária exatamente como o cliente vê. <button type="button" class="btn small ghost" data-rotvis="esc">Ver como escritório</button></span>'
+    :'<b>Visão do escritório</b><span>Esta é a tela com as funções do escritório (marcar como paga, conferir, notas da conferência). <button type="button" class="btn small ghost" data-rotvis="cli">Ver como o cliente</button></span>'}
+$('rotVisBanner').addEventListener('click',e=>{const b=e.target.closest('[data-rotvis]');if(!b)return;ROT_ESC=b.dataset.rotvis==='esc';try{localStorage.setItem('rotVisEsc',ROT_ESC?'1':'0')}catch(x){}MOD=null;openView()});
 function soVerBanner(){$('soVerBanner').hidden=!VIEW||podeExec(VIEW)||telaSemEmp(VIEW)&&VIEW.startsWith('cfg')}
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);document.body.classList.toggle('lg',view==='loginForm'||view==='viewPend');$('modrow').hidden=view!=='app';if(view!=='app')megaFecha();
@@ -2185,7 +2195,7 @@ const nCx=c=>Math.max(1,Math.min(9,+(c&&c.caixas)||1));
 const cxNome=(c,f)=>nCx(c)>1||(f&&f.caixa>1)?'Caixa '+(f?f.caixa||1:1):'';
 const opCx=()=>+$('opCaixa').value||1;
 function initOp(cli){
-  OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!ehEsc();
+  OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!escR();
   const n=nCx(cli),atual=Math.min(opCx(),n);$('opCaixaBox').hidden=n<2;
   $('opCaixa').innerHTML=Array.from({length:n},(_,i)=>`<option value="${i+1}">Caixa ${i+1}</option>`).join('');$('opCaixa').value=atual;
   if(!$('opData').value)$('opData').value=TODAY;
@@ -3402,7 +3412,7 @@ const MODCFG={
 };
 let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
 // envio simples dos boletos e notas a pagar: vale para quem não é do escritório, em todas as empresas
-const pagSimples=()=>MOD==='pagar'&&!ehEsc();
+const pagSimples=()=>MOD==='pagar'&&!escR();
 const SIMP_DICA='Diga do que se trata a despesa: o que foi comprado ou qual serviço, de quem e de qual mês ou parcela, se souber. Isso ajuda a Controlacs a achar a conta certa.';
 const dBRv=s=>s?dBR(s):'—';
 const mFiltro=$('mFiltro');
@@ -3482,7 +3492,7 @@ async function renderMod(){
   $('mTiles').innerHTML=tiles.map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   if(MOD==='tesouraria'&&!tod)renderTC(cli);else $('mConf').innerHTML='';
   pagMesDesenha();
-  $('mNote').textContent='Clique numa linha para ver os documentos'+(ehEsc()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
+  $('mNote').textContent='Clique numa linha para ver os documentos'+(escR()?' e '+cfg.conf[0].toLowerCase()+'.':!tod&&podeLancar(cli.id,MOD)?' ou corrigir enquanto o escritório não conferir.':'.');
 }
 $('mNovo').onclick=()=>openReg(null);
 // ---------- Contas do mês (checklist do cliente) ----------
@@ -3500,7 +3510,7 @@ const pagSt=t=>+t.pago>=+t.valor-0.005?['c-done','✓ Paga','pago']:t.origem_id|
 function pagMesDesenha(){
   const box=$('mPagMes');if(!box)return;
   if(MOD!=='pagar'||!PST.cli){box.innerHTML='';return}
-  if(PST.erro){box.innerHTML=ehEsc()?'<p class="note">Para o cliente ver as contas do mês aqui, rode a atualização v100 do banco.</p>':'';return}
+  if(PST.erro){box.innerHTML=escR()?'<p class="note">Para o cliente ver as contas do mês aqui, rode a atualização v100 do banco.</p>':'';return}
   const ls=PST.vis=MOD==='pagar'&&mFiltro.value==='falta'?PST.tits.filter(t=>pagSt(t)[2]==='falta'):PST.tits,st=ls.map(pagSt),n=k=>st.filter(x=>x[2]===k).length,pode=podeLancar(PST.cli,'pagar'),mesAt=PMES===TODAY.slice(0,7);
   box.innerHTML=`<div class="card" style="margin:14px 0"><div class="row" style="justify-content:space-between;align-items:center;gap:8px">
     <div><h2 style="margin:0">Contas do mês</h2><p class="sub" style="margin:2px 0 0">Tudo o que a Controlacs tem para pagar em ${mesTxt(PMES)}, inclusive o que chegou por e-mail. Conforme os pagamentos são feitos, a conta aparece como paga.</p></div>
@@ -3517,7 +3527,7 @@ $('mBody').addEventListener('click',e=>{const tr=e.target.closest('tr.click');if
 $('mBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openReg(REGS.find(r=>r.id===tr.dataset.id))}});
 const dlgReg=$('dlgReg');
 // o suprimento que vem do fechamento do caixa só muda pelo caixa
-const regEditavel=()=>{const cli=cliAtual();return !!cli&&podeLancar(cli.id,MOD)&&!(REG&&REG.conferido)&&!(REG&&REG.fechamento_id&&!ehEsc())};
+const regEditavel=()=>{const cli=cliAtual();return !!cli&&podeLancar(cli.id,MOD)&&!(REG&&REG.conferido)&&!(REG&&REG.fechamento_id&&!escR())};
 // depósito bancário: só data, valor, banco de destino e comprovante; a descrição é automática
 function ajustaDeposito(){
   const t=$('rFields').querySelector('[data-k="tipo"]'),dep=t&&t.value==='Depósito bancário';
@@ -3575,12 +3585,12 @@ async function openReg(r,pre){
   const emps=empresasDe(MOD,true).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
-  $('rBaixa').innerHTML=(ehEsc()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
+  $('rBaixa').innerHTML=(escR()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
   if(MOD==='pagar'&&r?.origem==='beneficios')$('rFields').insertAdjacentHTML('afterbegin',`<div class="note wide" style="margin:0">Conta do pedido de benefícios de ${ymTxt(r.beneficio_comp.slice(0,7))}: pedido ${fm(r.valor_pedido)} + taxa do boleto ${fm(r.taxa_boleto)} = <b>${fm(+r.valor_pedido+(+r.taxa_boleto||0))}</b>.${r.boleto_alerta?` <span class="chip c-bad">${esc(r.boleto_alerta)}</span>`:''}</div>`);
   renderRateio(r,ed);ajustaDeposito();
   $('rErr').hidden=true;
-  $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||ehEsc()));
-  $('rConf').hidden=!(ehEsc()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
+  $('rSave').hidden=!ed;$('rDel').hidden=!(r&&(ed||escR()));
+  $('rConf').hidden=!(escR()&&r);if(r)$('rConf').textContent=r.conferido?cfg.conf[1]:cfg.conf[0];
   await renderRDocs();renderRLiq();
   dlgReg.showModal();
 }
@@ -3620,7 +3630,7 @@ $('rForm').addEventListener('submit',async e=>{
   if(!m&&$('rRat').innerHTML){const rt=lerRateio(row.valor);if(rt.erro)m=rt.erro;else row.rateio=rt.partes}
   if(!m&&MOD==='pagar'&&row.linha_digitavel){const rp=await boletoRepetido(boletoDe(row.linha_digitavel)||{linha:row.linha_digitavel},REG?.id);
     if(rp.length){const t='Este boleto já está lançado em outra conta: '+repetidoTxt(rp)+'.';
-      if(!ehEsc())m=t+' Confira se é o boleto certo desta empresa.';else if(!confirm(t+'\n\nSalvar mesmo assim?'))return}}
+      if(!escR())m=t+' Confira se é o boleto certo desta empresa.';else if(!confirm(t+'\n\nSalvar mesmo assim?'))return}}
   if(m){err.textContent=m;err.hidden=false;return}
   // tesouraria: nº da NF e comprovante não impedem salvar (Carol, 30/10): só avisa
   if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
@@ -3954,7 +3964,7 @@ async function renderTC(cli){
   const {data,error}=await sb.from('tesouraria_conferencias').select('*').eq('cliente_id',cli.id).order('data',{ascending:false}).order('conferido_em',{ascending:false}).limit(30);
   if(MOD!=='tesouraria'||cliAtual()?.id!==cli.id)return;
   const box=$('mConf');
-  if(error){box.innerHTML=ehEsc()?'<div class="alerta"><b>Conferência física da tesouraria</b><span>Rode a atualização v41 no Supabase para ligar a conferência.</span></div>':'';return}
+  if(error){box.innerHTML=escR()?'<div class="alerta"><b>Conferência física da tesouraria</b><span>Rode a atualização v41 no Supabase para ligar a conferência.</span></div>':'';return}
   TCL=data||[];
   const ult=TCL[0],dias=tcDias(ult),btn=podeLancar(cli.id,'tesouraria')?`<button type="button" class="btn small${tcAtrasada(ult)?' primary':''}" id="tcNova">Conferir o dinheiro agora</button>`:'';
   let h=tcAtrasada(ult)
@@ -4046,7 +4056,7 @@ function tcAbrir(c){
     $('tcFields').innerHTML=`<div class="cmp wide" style="grid-column:1/-1"><div><span class="note">Dinheiro contado</span><br><b>${fm(c.valor_fisico)}</b></div><div><span class="note">Saldo do sistema na data</span><br><b>${fm(c.saldo_sistema)}</b></div><div><span class="note">Registrada em</span><br><b>${new Date(c.conferido_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</b></div></div>`+(c.obs?`<p class="wide" style="margin:0;grid-column:1/-1"><b>Observação:</b> ${esc(c.obs)}</p>`:'');
     $('tcRes').innerHTML=tcResHtml(Number(c.diferenca),(c.analise||'').split('\n').filter(Boolean));
     const meu=c.conferido_por===ME.user_id&&Date.now()-new Date(c.conferido_em).getTime()<864e5&&podeLancar(cli.id,'tesouraria');
-    $('tcDel').hidden=!(ehEsc()||meu);
+    $('tcDel').hidden=!(escR()||meu);
   }else{
     $('tcTitle').textContent='Conferência física da tesouraria';$('tcChip').innerHTML='';$('tcSave').hidden=false;$('tcDel').hidden=true;
     $('tcFields').innerHTML=`<label class="f">Data da contagem<input type="date" id="tcData" value="${TODAY}" max="${TODAY}"></label><label class="f">Dinheiro contado na tesouraria<input class="money" id="tcValor" inputmode="decimal" placeholder="0,00"></label><label class="f wide">Observação (opcional)<textarea id="tcObs" placeholder="Ex.: contado às 18h, junto com o envelope do depósito de amanhã"></textarea></label>`;
