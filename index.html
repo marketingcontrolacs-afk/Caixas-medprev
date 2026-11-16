@@ -541,6 +541,7 @@ body.lg header.top .logo{visibility:hidden}
 .mnsec h4{margin:14px 0 4px;font-size:15px}
 .mnimg{display:block;margin:12px 0 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;max-width:960px;cursor:zoom-in;background:var(--sunk)}
 .mnimg img{display:block;width:100%;height:auto}
+.mnvid{margin:12px 0 14px;max-width:960px}.mnvid video{display:block;width:100%;border-radius:10px;border:1px solid var(--line);background:#000}.mnvidt{margin:0 0 6px;font-weight:600}
 .mndica{background:var(--brand-soft);border-radius:10px;padding:10px 14px;margin:10px 0;max-width:80ch}
 .mnquem{font-size:13px;color:var(--muted);margin:0 0 6px}
 @media (max-width:820px){.mnwrap{grid-template-columns:minmax(0,1fr)}.mnidx{position:static;max-height:none}.mnsec{padding:16px}}
@@ -13067,7 +13068,7 @@ const MANUAL=[
 <p>Para o operador da empresa, o Dashboard mostra também o caixa de hoje, o saldo da tesouraria, os boletos a pagar e as suas tarefas.</p>
 <p>Use <b>Atualizar</b> para buscar os números de novo sem sair da tela.</p>`}]},
   {g:'Rotina diária',itens:[
-    {k:'caixa',t:'Caixa (fechamento do dia)',img:'caixa.png',
+    {k:'caixa',t:'Caixa (fechamento do dia)',img:'caixa.png',vid:'rotina-caixa-tesouraria.mp4',
       txt:`<p>Aqui a recepção fecha o caixa de cada dia e envia para a Controlacs conferir.</p>
 <ol>
 <li>Confira o <b>Dia do fechamento</b> no alto à direita. Nas empresas com mais de um caixa por dia, escolha também o caixa.</li>
@@ -13093,7 +13094,7 @@ const MANUAL=[
 <p>Se quiser, abra <b>Outros dados do boleto (opcional)</b> para colar a linha digitável ou informar fornecedor, nº da nota, vencimento e valor. Enquanto a Controlacs não completa, a conta aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>.</p>
 <p><b>Para o escritório:</b> em Gestão financeira › Contas a pagar, o botão <b>Boletos e notas do cliente para validar</b> mostra o que chegou. O sistema procura a conta já lançada (prevista ou recorrente) pelo fornecedor, pelas palavras da descrição, pelo valor e pela data. Quando não acha, marca como <b>Novo</b> e você completa o vencimento, o fornecedor e o valor na própria linha, ou clica em <b>✚ Criar lançamento</b> para abrir a tela completa (conta a pagar ou a receber, categoria, parcelas, nº da nota), já com os anexos do cliente. O escritório continua vendo e editando todos os campos do lançamento.</p>
 <p>Os quadros mostram o total a pagar, o que vence em 7 dias, o que está vencido e o que já foi pago. Em <b>Mostrar</b> escolha <i>Em aberto</i> ou um período. Contas sem anexo aparecem com <span style="color:var(--bad)">sem documento</span>. Clique numa linha para ver os documentos; o escritório marca a conta como paga.</p>`},
-    {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',
+    {k:'tesouraria',t:'Tesouraria',img:'tesouraria.png',vid:'rotina-caixa-tesouraria.mp4',
       txt:`<p>O controle do dinheiro guardado na empresa: o que entra do caixa, as despesas pagas em dinheiro e os depósitos no banco.</p>
 <ol>
 <li>Clique em <b>+ Novo lançamento</b> e escolha o tipo: <b>Suprimento</b> (dinheiro que entrou na tesouraria), <b>Despesa</b> (anexe a nota, o cupom ou o recibo) ou <b>Depósito bancário</b> (escolha o banco de destino).</li>
@@ -13344,7 +13345,7 @@ function renderManual(){
   $('mnIdx').innerHTML=grupos.map(x=>`<h3>${esc(x.g)}</h3>${x.itens.map(i=>`<a href="#${ids(i)}" data-mn="${ids(i)}">${esc(i.t)}</a>`).join('')}`).join('')||'<p class="muted" style="margin:6px">Nada encontrado.</p>';
   const feitas=new Set(MANUAL.flatMap(x=>x.itens.map(i=>i.k)));
   const faltam=NAV.filter(n=>!n.aba&&!feitas.has(n.k)&&n.ok()&&eqPode(n.k)).map(n=>n.t);
-  $('mnConteudo').innerHTML=grupos.map(x=>x.itens.map(i=>`<article class="card mnsec" id="${ids(i)}"><p class="mng">${esc(x.g)}</p><h2>${esc(i.t)}</h2>${i.img?`<a class="mnimg" href="manual/${i.img}" target="_blank" rel="noopener" title="Abrir a imagem em tamanho maior"><img src="manual/${i.img}" loading="lazy" alt="Exemplo da tela ${esc(i.t)}"></a>`:''}${i.txt}</article>`).join('')).join('')
+  $('mnConteudo').innerHTML=grupos.map(x=>x.itens.map(i=>`<article class="card mnsec" id="${ids(i)}"><p class="mng">${esc(x.g)}</p><h2>${esc(i.t)}</h2>${i.vid?`<div class="mnvid"><p class="mnvidt">▶ Vídeo explicativo: Caixa e Tesouraria (4 min)</p><video controls preload="none" poster="manual/rotina-caixa-tesouraria.jpg" src="manual/${i.vid}"></video></div>`:''}${i.img?`<a class="mnimg" href="manual/${i.img}" target="_blank" rel="noopener" title="Abrir a imagem em tamanho maior"><img src="manual/${i.img}" loading="lazy" alt="Exemplo da tela ${esc(i.t)}"></a>`:''}${i.txt}</article>`).join('')).join('')
     +(!b&&faltam.length?`<article class="card mnsec"><p class="mng">Em construção</p><h2>Próximas partes do manual</h2><p>O manual está sendo escrito por partes. Estas telas que você usa ainda vão ganhar explicação: ${esc(faltam.join(', '))}.</p></article>`:'');
 }
 $('mnBusca').addEventListener('input',()=>renderManual());
@@ -13854,6 +13855,8 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-16video',data:'2026-11-16',t:'Vídeo explicativo da rotina de Caixa e Tesouraria',itens:[
+    {x:'Em Ajuda › Manual do sistema, nas partes Caixa e Tesouraria, tem um vídeo de 4 minutos mostrando passo a passo como lançar o fechamento do caixa e a tesouraria (com dados de exemplo).',mods:['caixa','tesouraria','manual']}]},
   {k:'2026-11-15movbc',data:'2026-11-15',t:'Movimentação financeira, Contas a pagar e a receber no modelo do Bom Controle',itens:[
     {x:'As três telas ficaram no mesmo modelo: colunas Parcela, Empresa (em Todas as empresas), Tipo, data, Cliente/Fornecedor com a descrição embaixo, Categoria, Conta e Valor. A Movimentação mostra entradas e saídas juntas; Contas a pagar só as despesas; Contas a receber só as receitas.',mods:['gfmov','gfpagar','gfrec']},
     {x:'Novos filtros: “Data por” (vencimento, pagamento ou competência), Empresas, Conta, Categoria, Anexos, Forma de pagamento e Conciliação. Os filtros que já existiam continuam.',mods:['gfmov','gfpagar','gfrec']},
