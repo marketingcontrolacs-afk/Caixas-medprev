@@ -3402,7 +3402,8 @@ const MODCFG={
 };
 let MOD=null, REGS=[], DOCS={}, REG=null, RDOCS=[];
 // envio simples dos boletos e notas a pagar: vale para quem não é do escritório, em todas as empresas
-const pagSimples=()=>MOD==='pagar'&&!ehEsc();
+// cartão de crédito também (Carol, 16/11): o cliente só anexa a nota ou o cupom e diz do que se trata
+const pagSimples=()=>(MOD==='pagar'||MOD==='cartao')&&!ehEsc();
 const SIMP_DICA='Diga do que se trata a despesa: o que foi comprado ou qual serviço, de quem e de qual mês ou parcela, se souber. Isso ajuda a Controlacs a achar a conta certa.';
 const dBRv=s=>s?dBR(s):'—';
 const mFiltro=$('mFiltro');
@@ -3465,7 +3466,7 @@ async function renderMod(){
     tiles=[['A pagar',fm(sum(ab)),ab.length+' conta'+(ab.length===1?'':'s')],['Vencem em 7 dias',fm(sum(sem)),sem.length+' conta'+(sem.length===1?'':'s')],['Vencidas',fm(sum(venc)),venc.length?'pague ou fale com o cliente':'nenhuma'],['Pagas',fm(sum(REGS.filter(r=>r.conferido))),f==='aberto'?'escolha um mês para ver':f==='todos'?'de tudo o que foi enviado':'no mês']];
   }else if(MOD==='cartao'){
     head='<tr><th>Compra</th><th class="l">Fornecedor</th><th class="l">Documento</th><th>Valor</th><th>Parcelas</th><th class="l">Nota</th><th class="l">Situação</th></tr>';
-    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${esc(r.fornecedor)}${empC(r)}</td><td class="l">${esc(r.documento)}</td><td>${fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
+    body=REGS.map(r=>`<tr class="click" data-id="${r.id}" tabindex="0"><td>${dBR(r.data)}</td><td class="l">${r.fornecedor?esc(r.fornecedor):`<span class="muted">${esc(r.sobre||'—')}</span>`}${empC(r)}</td><td class="l">${esc(r.documento||'')}</td><td>${r.valor==null?'<span class="muted">—</span>':fm(r.valor)}</td><td>${r.parcelas}x</td><td class="l">${clip(r)}</td><td class="l">${r.conferido?'<span class="chip c-done">✓ Conferido</span>':r.valor==null?'<span class="chip c-warn" title="A Controlacs confere com a fatura e completa o valor">Enviado · a Controlacs completa</span>':'<span class="chip c-none">A conferir</span>'}</td></tr>`).join('');
     foot=REGS.length?`<tr><td>Total</td><td></td><td></td><td>${fm(sum(REGS))}</td><td colspan="3"></td></tr>`:'';
     tiles=[['Compras do período',fm(sum(REGS)),REGS.length+' nota'+(REGS.length===1?'':'s')],['A conferir',String(REGS.filter(r=>!r.conferido).length),'com a fatura'],['Sem nota anexada',String(REGS.filter(r=>!nd(r)).length),'cobrar do cliente']];
   }else{
@@ -3560,14 +3561,15 @@ async function openReg(r,pre){
     if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
     // boleto: colar a linha digitável (ou anexar o PDF) preenche valor e vencimento; a chave da NF-e vai junto, escondida
     if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
-    if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
+    if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="${MOD==='cartao'?'Ex.: material de escritório na papelaria; almoço com a equipe; peça para a impressora':'Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção'}"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
       :`<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
     return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${dis}></label>`;
   };
   // cliente nos boletos e notas a pagar: só anexa e diz do que se trata; o resto é opcional e a Controlacs completa (Carol, 04/11)
-  $('rFields').innerHTML=simp?`<p class="note wide" style="margin:0">Anexe o <b>boleto</b> e/ou a <b>nota fiscal</b> logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere, procura se a conta já está lançada (ou se é recorrente) e completa o resto.</p>`
+  $('rFields').innerHTML=simp?(MOD==='cartao'?`<p class="note wide" style="margin:0">Anexe a <b>nota fiscal</b> ou o <b>cupom</b> da compra logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere com a fatura do cartão e completa o resto.</p>`
+      :`<p class="note wide" style="margin:0">Anexe o <b>boleto</b> e/ou a <b>nota fiscal</b> logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere, procura se a conta já está lançada (ou se é recorrente) e completa o resto.</p>`)
     +campo(cfg.campos.find(c=>c[0]==='sobre'))
-    +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
+    +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">${MOD==='cartao'?'Outros dados da compra (opcional): data, fornecedor, nº da nota, valor, parcelas':'Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor'}</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
     :cfg.campos.map(campo).join('');
   // fornecedor: sugere os nomes do cadastro único de clientes e fornecedores (vale para todas as empresas; v101)
   pesListaLiga($('rFields'));
@@ -3612,6 +3614,7 @@ $('rForm').addEventListener('submit',async e=>{
   if(MOD==='tesouraria'){if(row.tipo==='Depósito bancário'){row.descricao='Depósito bancário'+(row.conta_destino?' - '+row.conta_destino:'');if(!row.conta_destino)m='Informe o banco de destino do depósito.'}else delete row.conta_destino}
   const simp=pagSimples(),falta=!m&&cfg.campos.find(([k,,,req])=>(simp?k==='sobre':req)&&(row[k]==null||row[k]===''));
   if(falta)m=simp?'Escreva do que se trata esta despesa.':'Preencha: '+falta[1]+'.';
+  else if(simp&&MOD==='cartao'&&!row.data)row.data=TODAY;   // data da compra: se ficou em branco, vale a do envio
   else if(Number.isNaN(row.valor)||!(row.valor>0)&&!(simp&&row.valor==null))m='O valor precisa ser um número maior que zero, por exemplo 1.234,56.';
   else if(MOD!=='tesouraria'&&cfg.precisaDoc(row)&&!RDOCS.length)m=cfg.precisaDoc(row);
   if(MOD==='pagar'){liqLer();const l=(RLIQ||[]).filter(x=>x.nome||x.valor);
@@ -3639,6 +3642,7 @@ $('rForm').addEventListener('submit',async e=>{
     if(e1&&/titulo_id|valor_previsto/.test(e1.message||'')){delete row.titulo_id;delete row.valor_previsto;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single())}
     if(e1&&/liquidos/.test(e1.message||'')){delete row.liquidos;({data:sv,error:e1}=await sb.from(cfg.tabela).upsert(row).select().single());if(!e1)toast('Conta salva sem o relatório de líquidos: rode a atualização v54 do banco.')}
     // banco ainda sem o v99: o envio simples precisa que fornecedor, nº, vencimento e valor possam ficar em branco
+    if(e1&&/not-null|null value/i.test(e1.message||'')&&MOD==='cartao'){err.textContent=ehEsc()?'Rode a atualização v137 do banco para salvar a nota do cartão sem fornecedor, nº ou valor.':'Preencha também o fornecedor, o nº da nota e o valor (em “Outros dados”). O envio só com o anexo será liberado em breve.';err.hidden=false;return}
     if(e1&&/not-null|null value/i.test(e1.message||'')&&MOD==='pagar'){err.textContent=ehEsc()?'Rode a atualização v99 do banco para salvar sem fornecedor, nº, vencimento ou valor.':'Preencha também o fornecedor, o nº da nota, o vencimento e o valor (em “Outros dados”). O envio só com o anexo será liberado em breve.';err.hidden=false;return}
     if(e1&&/BOLETO_REPETIDO/.test(e1.message||'')){err.textContent='Este boleto já está lançado em outra conta a pagar. Confira se é o boleto certo desta empresa.';err.hidden=false;return}
     if(e1)throw e1;
@@ -9924,14 +9928,16 @@ async function ftAcao(a){
 }
 // notas do cartão enviadas pelo cliente (Financeiro › Cartão de crédito) que ainda não estão em nenhuma fatura
 $('ftImp').onclick=async()=>{
-  const c=FT.conta,cli=cliAtual(),ls=FT.notas;if(!c||!ls.length)return;
+  const c=FT.conta,cli=cliAtual(),semV=FT.notas.filter(r=>!(+r.valor>0)),ls=FT.notas.filter(r=>+r.valor>0);if(!c)return;
+  // envio simples do cliente: a nota sem valor fica esperando o escritório completar (Rotina diária › Cartão de crédito)
+  if(!ls.length)return toast(semV.length?`${semV.length===1?'A nota enviada está':'As notas enviadas estão'} sem valor. Abra em Rotina diária › Cartão de crédito, complete e traga de novo.`:'Nada para trazer.');
   const rows=[],fora=[];
   ls.forEach(r=>{const n=Math.max(1,r.parcelas||1),cada=Math.floor(r.valor/n*100)/100,f1=faturaDe(c,r.data),g=n>1?crypto.randomUUID():null;
     const ps=[...Array(n).keys()].map(i=>({cliente_id:cli.id,conta_id:c.id,tipo:'saida',data:somaMes(r.data,i),valor:i===n-1?r2(r.valor-cada*(n-1)):cada,fatura:somaMes(f1,i),parcela:i+1,parcelas:n,grupo_id:g,
-      pessoa_nome:r.fornecedor,documento:r.documento||null,categoria:r.categoria||null,descricao:r.obs||null,cartao_nota_id:r.id}));
+      pessoa_nome:r.fornecedor,documento:r.documento||null,categoria:r.categoria||null,descricao:r.obs||r.sobre||null,cartao_nota_id:r.id}));
     if(ps.some(x=>ftFechada(x.fatura)))fora.push(r);else rows.push(...ps)});
   if(!rows.length)return toast('As notas enviadas caem em faturas já fechadas. Lance à mão na fatura aberta.');
-  if(!confirm(`Trazer ${ls.length-fora.length} ${ls.length-fora.length===1?'nota enviada':'notas enviadas'} pelo cliente para o cartão ${c.nome}? Cada uma cai na fatura certa pela data da compra, com as parcelas.${fora.length?` ${fora.length} ficam de fora porque caem em fatura já fechada.`:''}`))return;
+  if(!confirm(`Trazer ${ls.length-fora.length} ${ls.length-fora.length===1?'nota enviada':'notas enviadas'} pelo cliente para o cartão ${c.nome}? Cada uma cai na fatura certa pela data da compra, com as parcelas.${fora.length?` ${fora.length} ficam de fora porque caem em fatura já fechada.`:''}${semV.length?` ${semV.length} ${semV.length===1?'fica':'ficam'} de fora porque o cliente mandou sem valor: complete em Rotina diária › Cartão de crédito.`:''}`))return;
   $('ftImp').disabled=true;
   const {error}=await sb.from('fin_movimentos').insert(rows);$('ftImp').disabled=false;
   if(error){console.error(error);return toast(v52(error)?v52Msg:'Não foi possível trazer as notas.')}
@@ -13106,9 +13112,10 @@ const MANUAL=[
       txt:`<p>As notas fiscais das compras pagas com o cartão de crédito da empresa.</p>
 <ol>
 <li>Clique em <b>+ Nova nota</b>.</li>
-<li>Informe a data da compra, o fornecedor, do que se trata, o nº da NF ou do cupom, o valor total e as parcelas.</li>
-<li>Anexe a nota fiscal da compra e salve.</li>
+<li>Em <b>Do que se trata esta despesa</b>, escreva o que foi comprado e de quem.</li>
+<li>Anexe a nota fiscal ou o cupom da compra e salve. Não precisa preencher mais nada.</li>
 </ol>
+<p>Se quiser, abra <b>Outros dados da compra (opcional)</b> para informar a data, o fornecedor, o nº da nota, o valor e as parcelas. Enquanto a Controlacs não completa, a nota aparece como <span class="chip c-warn">Enviado · a Controlacs completa</span>. O escritório continua vendo e editando todos os campos e, em Fatura do cartão, só traz as notas que já têm valor.</p>
 <p>Os quadros mostram as compras do período, o que falta conferir com a fatura e as compras sem nota anexada (essas precisam ser cobradas). O escritório marca cada compra como conferida com a fatura.</p>`}]},
   {g:'Gestão financeira',itens:[
     {k:'gfpagar',t:'Contas a pagar e a receber',
@@ -13854,6 +13861,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-16cart',data:'2026-11-16',t:'Cartão de crédito: envio simples pelo cliente',itens:[
+    {x:'Rotina diária › Cartão de crédito: agora basta anexar a nota fiscal ou o cupom e escrever do que se trata. Data, fornecedor, nº da nota, valor e parcelas ficam opcionais em “Outros dados da compra”: a Controlacs completa.',mods:['cartao']},
+    {x:'Fatura do cartão: “Trazer notas enviadas” só traz as que já têm valor. As que o cliente mandou sem valor ficam esperando: complete em Rotina diária › Cartão de crédito.',para:'esc'}]},
   {k:'2026-11-15movbc',data:'2026-11-15',t:'Movimentação financeira, Contas a pagar e a receber no modelo do Bom Controle',itens:[
     {x:'As três telas ficaram no mesmo modelo: colunas Parcela, Empresa (em Todas as empresas), Tipo, data, Cliente/Fornecedor com a descrição embaixo, Categoria, Conta e Valor. A Movimentação mostra entradas e saídas juntas; Contas a pagar só as despesas; Contas a receber só as receitas.',mods:['gfmov','gfpagar','gfrec']},
     {x:'Novos filtros: “Data por” (vencimento, pagamento ou competência), Empresas, Conta, Categoria, Anexos, Forma de pagamento e Conciliação. Os filtros que já existiam continuam.',mods:['gfmov','gfpagar','gfrec']},
