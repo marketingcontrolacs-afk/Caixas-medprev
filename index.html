@@ -1289,6 +1289,35 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
     <div class="row"><span class="spacer"></span><button class="btn primary" id="prSalvar">Salvar premiação</button></div>
     <p class="note">Deixe em branco quem não tem premiação no mês. Afastados não aparecem aqui. Depois que o escritório confere a folha, os valores ficam travados.</p>
   </section>
+  <!-- RH · RECIBO DE ADIANTAMENTO SALARIAL (Carol, 16/11): gera o recibo, a conta a pagar e o desconto na folha -->
+  <section id="viewAdto" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Adiantamento salarial</h1><p class="sub">Gere o recibo de adiantamento. Ao gerar, o sistema cria a conta a pagar (Gestão financeira › Contas a pagar) e o desconto na coluna Adiantamento da folha do mês.</p></div>
+    </div>
+    <div class="card block" style="margin-top:16px">
+      <div class="fields">
+        <label class="f wide">Colaborador<select id="adFunc"></select></label>
+        <label class="f">Valor (R$)<input id="adValor" class="money" placeholder="0,00"></label>
+        <label class="f">Data do pagamento<input id="adData" type="date"></label>
+        <label class="f">Desconto na folha de<select id="adComp"></select></label>
+        <label class="f wide">Observação (opcional)<input id="adObs" placeholder="Sai no recibo e na conta a pagar"></label>
+      </div>
+      <p class="note" id="adInfo" style="margin:8px 0 0"></p>
+      <p class="neg" id="adErr" hidden></p>
+      <div class="row"><span class="spacer"></span><button class="btn primary" id="adGerar">Gerar recibo</button></div>
+    </div>
+    <h3 style="margin-top:18px">Recibos gerados</h3>
+    <div class="card block"><div class="row" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+      <label class="f">Buscar<input id="adBusca" placeholder="Nome, valor, data…"></label>
+      <label class="f">Colaborador<select id="adFCol"><option value="">Todos</option></select></label>
+      <label class="f">Folha<select id="adFComp"><option value="">Todas</option></select></label>
+      <label class="f">Pagamento de<input id="adFIni" type="date"></label><label class="f">até<input id="adFFim" type="date"></label>
+      <label class="f">Conta a pagar<select id="adFPg"><option value="">Todas</option><option value="aberta">Em aberto</option><option value="paga">Paga</option></select></label>
+      <label class="f">Situação<select id="adFSit"><option value="ativo">Valendo</option><option value="desfeito">Desfeitos</option><option value="">Todos</option></select></label>
+      <button type="button" class="btn small ghost" id="adLimpa">Limpar filtros</button></div></div>
+    <div class="card tablebox"><table id="adTab"></table></div>
+    <p class="note">Desfazer apaga a conta a pagar e o desconto da folha e devolve o adiantamento que estava na folha antes do recibo (o recibo continua no histórico como desfeito). Conta já paga: estorne o pagamento em Contas a pagar antes. Folha já enviada à contabilidade não pode ser alterada.</p>
+  </section>
   <!-- RH · ESPELHO DE PONTO (alimenta a folha e o pedido de benefícios) -->
   <section id="viewPonto" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -1736,6 +1765,7 @@ const ICO={
   folha:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14h7M9 17h4"/>',
   ponto:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
   ben:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  adto:'<path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M12 7v8M14.5 8.5h-3.2a1.5 1.5 0 0 0 0 3h1.4a1.5 1.5 0 0 1 0 3H9.5"/>',
   premio:'<circle cx="12" cy="9" r="6"/><path d="M8.5 13.5 7 22l5-3 5 3-1.5-8.5"/>',
   colab:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 14h2M8 17h5"/>',
   docs:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/><path d="M4 7v14h11"/>',
@@ -1831,6 +1861,7 @@ const NAV=[
   {k:'folha',t:'Folha de pagamento',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('folha')},
   {k:'ponto',t:'Espelho de ponto',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('ponto')},
   {k:'premio',t:'Premiação',g:'Recursos humanos',s:'Dia a dia',ok:()=>empresasDe('premio').length>0},
+  {k:'adto',t:'Adiantamento salarial',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('folha')},
   {k:'ben',t:'Pedido de benefícios',g:'Recursos humanos',s:'Dia a dia',ok:()=>temAcesso('beneficios')},
   {k:'colab',t:'Colaboradores e prazos',g:'Recursos humanos',s:'Cadastros',ok:()=>temAcesso('colab')},
   {k:'docs',t:'Documentos',g:'Recursos humanos',s:'Cadastros',ok:()=>temAcesso('colab')},
@@ -1955,7 +1986,7 @@ function empresasMod(m){
   // operador cliente com a Gestão financeira liberada: as empresas em que ele tem o acesso 'gestao' (Carol, 04/11)
   if(!ehEsc()&&TOOLMOD[m]==='gestao')return CLIENTES.filter(c=>c.ativo!==false&&temEm(c.id,'gestao'));
   if(m.startsWith('ctb'))return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_financeiro!==false:temEm(c.id,'contabil')));
-  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'?'folha':m;
+  const mod=m==='rh'?'ferias':m==='premio'||m==='ben'||m==='ponto'||m==='adto'?'folha':m;
   // empresa só de RH (sem BPO financeiro) não aparece nos módulos do financeiro
   // o cliente vê só as empresas em que tem a seção liberada (Benefícios é seção própria)
   return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?(mod!=='cartao'||c.tem_cartao)&&(mod==='ferias'||mod==='folha'?c.bpo_rh:c.bpo_financeiro!==false):temEm(c.id,m==='ben'?'beneficios':m==='ponto'?'ponto':mod)));
@@ -2061,7 +2092,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfdash','gfresumo','gffluxo','
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2076,6 +2107,7 @@ function openView(){
   else if(VIEW==='colab'){$('viewColab').hidden=false;renderColab()}
   else if(VIEW==='docs'){$('viewDocs').hidden=false;initDocs()}
   else if(VIEW==='premio'){$('viewPremio').hidden=false;initPremio()}
+  else if(VIEW==='adto'){$('viewAdto').hidden=false;initAdto()}
   else if(VIEW==='ponto'){$('viewPonto').hidden=false;initPonto()}
   else if(VIEW==='ben'){$('viewBen').hidden=false;initBen()}
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
@@ -3154,7 +3186,7 @@ const msgBanco=(e,v)=>/criar_usuario|trocar_senha|function/i.test(e.message||'')
 const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origin+location.pathname}\nE-mail: ${email}\nSenha: ${senha}`;
 // ---------- cadastro do usuário com permissões por ferramenta (Carol, 03/11) ----------
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
-const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
+const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
   gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
@@ -5436,6 +5468,122 @@ $('folGrid').addEventListener('click',async ev=>{
   toast(v?`Adiantamento de ${fm(v)} confirmado`:'Adiantamento excluído deste mês');renderFolha();
 });
 $('folGrid').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest('.fin input'))ev.target.blur()});
+
+// RH › Adiantamento salarial (Carol, 16/11): escolhe o colaborador, o valor e a data do pagamento e gera o recibo.
+// Ao gerar: conta a pagar (fin_titulos, origem 'adiantamento'), desconto na coluna Adiantamento da folha (descrição ADTO,
+// então o adiantamento do cadastro deixa de entrar sozinho) e o recibo em rh_documentos (modelo 'recibo_adto').
+// O adiantamento que já estava confirmado na folha do mês (✓/✎/✗ da Oliveira) é SUBSTITUÍDO pelo recibo, sem duplicar,
+// e volta se o recibo for desfeito. Tudo fica em dados do rh_documentos (titulo_id, lanc_id, substituidos).
+let ADT={cli:null,func:[],docs:[],pagos:new Set(),st:{}};
+const ADTREC='recibo_adto';
+const adtoRecMod={t:'Recibo de adiantamento salarial',corpo:D=>{const E=D.emp,un=`${E.razao}${E.unidade?' - '+E.unidade.toUpperCase():''}`,v=+D.valor;return `
+  <div class="emp c"><b>${esc(un)}</b>${E.cnpj?`<br>CNPJ: ${esc(E.cnpj)}`:''}</div>
+  <h1>RECIBO DE ADIANTAMENTO SALARIAL</h1>
+  <p style="text-align:right"><b>Valor: ${fm(v)}</b></p>
+  <p>Recebi de <b>${esc(un)}</b>${E.cnpj?`, CNPJ ${esc(E.cnpj)}`:''}, a importância de <b>${fm(v)}</b> (${esc(extenso(v))}), referente a adiantamento salarial, paga em ${dBR(D.data_pgto)}, que será descontada na folha de pagamento de ${esc(mesTxt(D.competencia))}.</p>
+  ${D.obs?`<p>Observação: ${esc(D.obs)}</p>`:''}
+  <p class="id">Colaborador(a): <b>${esc(D.f.nome)}</b>${D.f.cpf?`<br>CPF: ${esc(D.f.cpf)}`:''}${D.f.cargo?`<br>Cargo: ${esc(D.f.cargo)}`:''}</p>
+  <p class="loc">${esc(E.cidade||'_______________')}${E.uf?'/'+esc(E.uf):''}, ${dExt(D.data_pgto)}.</p>
+  <div class="ass"><div><div class="lin"></div>${esc(D.f.nome)}</div></div>`}};
+const dExt=d=>{const [y,m,dd]=String(d).split('-');return `${+dd} de ${MESES[+m-1].toLowerCase()} de ${y}`};
+function initAdto(){
+  const ate=addDias(TODAY,62).slice(0,7);
+  if(!$('adComp').options.length)$('adComp').innerHTML=mesesOpts(ate);
+  if(!$('adData').value){$('adData').value=TODAY;$('adComp').value=TODAY.slice(0,7)}
+  renderAdto();
+}
+$('adData').onchange=()=>{const d=$('adData').value;if(d&&[...$('adComp').options].some(o=>o.value===d.slice(0,7)))$('adComp').value=d.slice(0,7);adtoInfo()};
+$('adComp').onchange=adtoInfo;$('adFunc').onchange=adtoInfo;
+async function renderAdto(){
+  const cli=cliAtual();ADT.cli=cli;
+  if(!cli){$('adFunc').innerHTML='';$('adTab').innerHTML='<tbody><tr><td class="l muted">Escolha uma empresa no alto.</td></tr></tbody>';return}
+  const [rf,rd]=await Promise.all([sb.from('funcionarios').select('id,nome,cpf,cargo,situacao,desligado_em,folha_fixos').eq('cliente_id',cli.id).order('nome'),
+    sb.from('rh_documentos').select('*').eq('cliente_id',cli.id).eq('modelo',ADTREC).order('criado_em',{ascending:false})]);
+  if(rf.error||rd.error){console.error(rf.error||rd.error);$('adTab').innerHTML='<tbody><tr><td class="l neg">Erro ao carregar. Verifique a internet e tente de novo.</td></tr></tbody>';return}
+  ADT.func=rf.data||[];ADT.docs=rd.data||[];
+  const tids=ADT.docs.map(d=>d.dados?.titulo_id).filter(Boolean);ADT.pagos=new Set();
+  if(tids.length){const {data}=await sb.from('fin_movimentos').select('titulo_id').in('titulo_id',tids);(data||[]).forEach(m=>ADT.pagos.add(m.titulo_id))}
+  const {data:ms}=await sb.from('folha_meses').select('competencia,status').eq('cliente_id',cli.id);ADT.st=Object.fromEntries((ms||[]).map(m=>[m.competencia.slice(0,7),m.status]));
+  const ativos=ADT.func.filter(f=>f.situacao!=='Desligado');
+  $('adFunc').innerHTML='<option value="">— escolha —</option>'+ativos.map(f=>`<option value="${f.id}">${esc(f.nome)}${f.cargo?' · '+esc(f.cargo):''}</option>`).join('');
+  const op=(id,l)=>{const el=$(id),v=el.value,pri=el.options[0].outerHTML;el.innerHTML=pri+l.map(([k,t])=>`<option value="${k}"${k===v?' selected':''}>${esc(t)}</option>`).join('')};
+  op('adFCol',[...new Map(ADT.docs.map(d=>[d.funcionario_id,d.nome])).entries()].sort((a,b)=>a[1].localeCompare(b[1])));
+  op('adFComp',[...new Set(ADT.docs.map(d=>d.dados?.competencia?.slice(0,7)).filter(Boolean))].sort().reverse().map(c=>[c,mesTxt(c)]));
+  adtoInfo();adtoLista();
+}
+function adtoInfo(){
+  const f=ADT.func.find(x=>x.id===$('adFunc').value),c=$('adComp').value,st=ADT.st[c]||'Aberta',fx=f&&ffNum(f,'adto_salarial'),t=[];
+  if(f&&fx)t.push(`${f.nome} tem adiantamento de ${fm(Math.min(fx,ADTO_MAX))} no cadastro: o recibo substitui esse valor na folha de ${mesTxt(c)} (não soma os dois).`);
+  if(c)t.push(st==='Enviada'?`A folha de ${mesTxt(c)} já foi enviada à contabilidade: escolha outro mês para o desconto.`:`Folha de ${mesTxt(c)}: ${st.toLowerCase()}.`);
+  $('adInfo').textContent=t.join(' ');
+  if(f&&!$('adValor').value&&fx)$('adValor').value=showMoney(Math.min(fx,ADTO_MAX));
+}
+async function adtoCategoria(cli){let plano=[];try{plano=await planoDe(cli)}catch(e){console.error(e)}
+  const c=plano.find(x=>/^(adto\.?|adiantamento) (de )?sal/.test(chave(x.categoria)))||plano.find(x=>chave(x.categoria)==='salario');return c?.categoria||null}
+$('adGerar').onclick=async()=>{
+  const cli=ADT.cli,err=$('adErr'),b=$('adGerar');err.hidden=true;if(!cli)return;
+  const f=ADT.func.find(x=>x.id===$('adFunc').value),v=r2(parseMoney($('adValor').value)),dt=$('adData').value,ym=$('adComp').value,obs=$('adObs').value.trim();
+  const erro=m=>{err.textContent=m;err.hidden=false};
+  if(!f)return erro('Escolha o colaborador.');if(!(v>0))return erro('Informe o valor.');if(!dt)return erro('Informe a data do pagamento.');if(!ym)return erro('Escolha a folha do desconto.');
+  if((ADT.st[ym]||'Aberta')==='Enviada')return erro(`A folha de ${mesTxt(ym)} já foi enviada à contabilidade. Escolha o mês seguinte para o desconto.`);
+  if(v>ADTO_MAX&&!confirm(`O valor (${fm(v)}) passa do máximo de adiantamento (${fm(ADTO_MAX)}). Gerar mesmo assim?`))return;
+  const comp=ym+'-01';b.disabled=true;let tit=null,lanc=null;
+  try{
+    // adiantamento que já estava na folha do mês (confirmado/alterado/excluído pela tela da folha): sai, e volta no Desfazer
+    const {data:ex,error:e0}=await sb.from('folha_lancamentos').select('*').eq('cliente_id',cli.id).eq('competencia',comp).eq('funcionario_id',f.id).eq('coluna','adiantamento');if(e0)throw e0;
+    const subs=(ex||[]).filter(l=>(l.descricao||'').startsWith(ADTO)&&!/\(recibo/.test(l.descricao||''));
+    const cat=await adtoCategoria(cli);
+    ({data:tit}=await sb.from('fin_titulos').insert({cliente_id:cli.id,tipo:'pagar',pessoa_nome:f.nome,descricao:`Adiantamento salarial · folha ${mesTxt(ym)}`,categoria:cat,cat_revisar:!cat,
+      competencia:comp,vencimento:dt,valor:v,parcela:1,parcelas:1,origem:'adiantamento',obs:['Recibo de adiantamento salarial',obs].filter(Boolean).join(' · ')}).select('id').single().then(r=>{if(r.error)throw r.error;return r}));
+    ({data:lanc}=await sb.from('folha_lancamentos').insert({cliente_id:cli.id,competencia:comp,funcionario_id:f.id,coluna:'adiantamento',data:dt,quantidade:v,descricao:`${ADTO} (recibo de ${dBR(dt)})`}).select('id').single().then(r=>{if(r.error)throw r.error;return r}));
+    const E=docEmp(cli);if(!E.cidade){E.cidade=cli.municipio||'';E.uf=E.uf||cli.uf||''}const D={emp:E,f:{nome:f.nome,cpf:f.cpf||'',cargo:f.cargo||''},valor:v,data_pgto:dt,competencia:ym,obs,titulo_id:tit.id,lanc_id:lanc.id,substituidos:subs.map(({id,...r})=>r)};
+    const {error:e3}=await sb.from('rh_documentos').insert({cliente_id:cli.id,funcionario_id:f.id,modelo:ADTREC,nome:f.nome,dados:D});if(e3)throw e3;
+    if(subs.length){const {error:e4}=await sb.from('folha_lancamentos').delete().in('id',subs.map(l=>l.id));if(e4)console.error(e4)}
+    docImprime(adtoRecMod,D);
+    toast(`Recibo gerado: conta a pagar de ${fm(v)} e desconto na folha de ${mesTxt(ym)}${subs.length?' (substituiu o adiantamento que estava na folha)':''}`);
+    $('adValor').value='';$('adObs').value='';$('adFunc').value='';
+  }catch(e){
+    // não deixa pela metade: o que entrou sai
+    if(lanc)await sb.from('folha_lancamentos').delete().eq('id',lanc.id);if(tit)await sb.from('fin_titulos').delete().eq('id',tit.id);
+    fail(e,'Não foi possível gerar o recibo')}
+  b.disabled=false;renderAdto();
+};
+function adtoFiltra(){
+  const q=$('adBusca').value,col=$('adFCol').value,cp=$('adFComp').value,ini=$('adFIni').value,fim=$('adFFim').value,pg=$('adFPg').value,sit=$('adFSit').value;
+  return ADT.docs.filter(d=>{const x=d.dados||{},des=!!x.desfeito_em,pago=ADT.pagos.has(x.titulo_id);
+    if(sit==='ativo'&&des||sit==='desfeito'&&!des)return false;if(col&&d.funcionario_id!==col)return false;if(cp&&!String(x.competencia||'').startsWith(cp))return false;
+    if(ini&&(x.data_pgto||'')<ini||fim&&(x.data_pgto||'')>fim)return false;if(pg&&(des||(pg==='paga')!==pago))return false;
+    return buscaCasa(q,[d.nome,x.obs,x.competencia&&mesTxt(x.competencia),des?'desfeito':pago?'paga':'em aberto'],[x.valor],[x.data_pgto,String(d.criado_em).slice(0,10)])});
+}
+function adtoLista(){
+  const l=adtoFiltra(),tot=r2(l.filter(d=>!d.dados?.desfeito_em).reduce((s,d)=>s+(+d.dados?.valor||0),0));
+  $('adTab').innerHTML=`<thead><tr><th>Gerado em</th><th class="l">Colaborador</th><th>Valor</th><th>Pagamento</th><th>Folha</th><th>Conta a pagar</th><th>Situação</th><th></th></tr></thead><tbody>${
+    l.map(d=>{const x=d.dados||{},des=!!x.desfeito_em,pago=ADT.pagos.has(x.titulo_id);return `<tr${des?' class="muted"':''}><td>${dBR(String(d.criado_em).slice(0,10))}</td><td class="l"><b>${esc(d.nome)}</b>${x.obs?`<br><span class="note">${esc(x.obs)}</span>`:''}</td>
+      <td>${fm(+x.valor||0)}</td><td>${dBR(x.data_pgto)}</td><td>${x.competencia?mesTxt(x.competencia):''}</td><td>${des?'—':pago?'<span class="chip c-ok">Paga</span>':'<span class="chip c-warn">Em aberto</span>'}</td>
+      <td>${des?`<span class="chip">Desfeito em ${dBR(String(x.desfeito_em).slice(0,10))}</span>`:'<span class="chip c-done">Valendo</span>'}</td>
+      <td style="white-space:nowrap"><button type="button" class="btn small ghost" data-adp="${d.id}">Imprimir</button>${des?'':` <button type="button" class="btn small ghost" data-adx="${d.id}">Desfazer</button>`}</td></tr>`}).join('')
+    ||'<tr><td class="l muted" colspan="8">Nenhum recibo com estes filtros.</td></tr>'}</tbody>${l.length?`<tfoot><tr><td></td><td class="l"><b>Total valendo</b></td><td><b>${fm(tot)}</b></td><td colspan="5"></td></tr></tfoot>`:''}`;
+}
+['adBusca','adFCol','adFComp','adFIni','adFFim','adFPg','adFSit'].forEach(id=>$(id).addEventListener(id==='adBusca'?'input':'change',adtoLista));
+$('adLimpa').onclick=()=>{['adBusca','adFCol','adFComp','adFIni','adFFim','adFPg'].forEach(id=>$(id).value='');$('adFSit').value='ativo';adtoLista()};
+$('adTab').addEventListener('click',async ev=>{
+  const p=ev.target.closest('[data-adp]'),x=ev.target.closest('[data-adx]');
+  if(p){const d=ADT.docs.find(r=>r.id===p.dataset.adp);if(d)docImprime(adtoRecMod,d.dados);return}
+  if(!x)return;const d=ADT.docs.find(r=>r.id===x.dataset.adx);if(!d)return;const D=d.dados||{};
+  if(ADT.pagos.has(D.titulo_id)){alert('Esta conta a pagar já foi paga. Estorne o pagamento em Gestão financeira › Contas a pagar e depois desfaça o recibo.');return}
+  const ym=String(D.competencia||'').slice(0,7);
+  if(ADT.st[ym]==='Enviada'){alert(`A folha de ${mesTxt(ym)} já foi enviada à contabilidade, então o desconto não pode mais sair dela.`);return}
+  if(!confirm(`Desfazer o recibo de ${fm(+D.valor)} de ${d.nome}?\n\nSai a conta a pagar e o desconto da folha de ${mesTxt(ym)}${D.substituidos?.length?', e volta o adiantamento que estava na folha antes':''}.`))return;
+  x.disabled=true;
+  try{
+    if(D.titulo_id){const {error}=await sb.from('fin_titulos').delete().eq('id',D.titulo_id);if(error)throw error}
+    if(D.lanc_id){const {error}=await sb.from('folha_lancamentos').delete().eq('id',D.lanc_id);if(error)throw error}
+    if(D.substituidos?.length){const {error}=await sb.from('folha_lancamentos').insert(D.substituidos);if(error)throw error}
+    const {error}=await sb.from('rh_documentos').update({dados:{...D,desfeito_em:new Date().toISOString(),desfeito_por:ME?.user_id||ME?.id||null}}).eq('id',d.id);if(error)throw error;
+    toast('Recibo desfeito: a conta a pagar e o desconto da folha saíram');
+  }catch(e){fail(e,'Não foi possível desfazer')}
+  renderAdto();
+});
 
 // RH › Premiação: o cliente preenche o valor do mês por colaborador; vira um lançamento da folha
 // (um por colaborador e coluna, trocado a cada salvamento). As colunas ficam em folha_modelo.premiacao,
@@ -13854,6 +14002,10 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-16adto',data:'2026-11-16',t:'Recibo de adiantamento salarial',itens:[
+    {x:'Nova tela RH › Adiantamento salarial: escolha o colaborador, o valor e a data do pagamento e clique em Gerar recibo. Sai o recibo para assinar, entra a conta a pagar (categoria Adto. de Salário) e o desconto na coluna Adiantamento da folha do mês.',mods:['adto']},
+    {x:'Quem já tem adiantamento no cadastro (ex.: Oliveira) não fica com desconto em dobro: o recibo substitui o valor que estava na folha do mês.',mods:['adto','folha']},
+    {x:'Desfazer: tira a conta a pagar e o desconto da folha e devolve o adiantamento que estava antes. O recibo fica no histórico como desfeito, com filtros por colaborador, folha, data, conta paga ou em aberto e busca.',mods:['adto']}]},
   {k:'2026-11-15movbc',data:'2026-11-15',t:'Movimentação financeira, Contas a pagar e a receber no modelo do Bom Controle',itens:[
     {x:'As três telas ficaram no mesmo modelo: colunas Parcela, Empresa (em Todas as empresas), Tipo, data, Cliente/Fornecedor com a descrição embaixo, Categoria, Conta e Valor. A Movimentação mostra entradas e saídas juntas; Contas a pagar só as despesas; Contas a receber só as receitas.',mods:['gfmov','gfpagar','gfrec']},
     {x:'Novos filtros: “Data por” (vencimento, pagamento ou competência), Empresas, Conta, Categoria, Anexos, Forma de pagamento e Conciliação. Os filtros que já existiam continuam.',mods:['gfmov','gfpagar','gfrec']},
