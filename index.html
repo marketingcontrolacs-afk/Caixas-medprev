@@ -7229,6 +7229,19 @@ const pPode=p=>p.cliente_id?podeLancar(p.cliente_id,'repasse'):ehEsc()||pLancaEm
 // empresa em que a alteração de conta ou o desconto foi pedido: a do topo, se tiver Parceiros nela
 const pEmp=()=>{const v=escCli.value;return v&&v!=='*'&&v!=='int'&&empresasDe('repasse').some(c=>c.id===v)?v:(pLancaEm()[0]||empresasDe('repasse')[0])?.id||null};
 const pOrNulo=ids=>`cliente_id.in.(${ids.join(',')}),cliente_id.is.null`;
+// EMPRESA DO DESCONTO E DA ALTERAÇÃO DE CONTA (Carol, 16/11): quem lança escolhe a empresa (nada vem do seletor do alto).
+// O desconto vale para o grupo do Repasse da empresa escolhida (ex.: Oliveira SJ vale para SJ, Biguaçu e Palhoça).
+let PGRUPOS=[];
+const pGrupoDe=id=>PGRUPOS.find(g=>(g.empresas||[]).includes(id))||null;
+const pEmpNome=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+const pEmpGrupoTxt=id=>{const g=pGrupoDe(id),o=(g?.empresas||[]).filter(x=>x!==id).map(pEmpNome).filter(Boolean);return o.length?`vale para o grupo ${g.nome}: ${[pEmpNome(id),...o].join(', ')}`:''};
+function pEmpSelect(id,titulo){
+  const ls=pLancaEm(),usados=new Set(),grp=[];
+  PGRUPOS.forEach(g=>{const es=ls.filter(c=>(g.empresas||[]).includes(c.id)&&!usados.has(c.id));if(es.length){es.forEach(c=>usados.add(c.id));grp.push([g.nome,es])}});
+  const resto=ls.filter(c=>!usados.has(c.id));if(resto.length)grp.push([grp.length?'Outras empresas':'',resto]);
+  const ops=es=>es.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  return `<label class="f wide">${titulo} *<select id="${id}"><option value="">Escolha a empresa</option>${grp.map(([n,es])=>n?`<optgroup label="${esc('Grupo '+n)}">${ops(es)}</optgroup>`:ops(es)).join('')}</select><span class="muted" id="${id}_g" style="font-weight:400;font-size:12px"></span></label>`}
+function pEmpLiga(id){const s=$(id);if(s)s.onchange=()=>{$(id+'_g').textContent=s.value?pEmpGrupoTxt(s.value)||'só nesta empresa':''}}
 // ---------- Gestão financeira › Cadastros (contas bancárias, clientes e fornecedores; v44) ----------
 // contas bancárias por empresa; clientes e fornecedores por empresa ou para todas (cliente_id vazio).
 // Os fornecedores começam com a lista do Bom Controle (fornecedor_bc = chave em fornecedores_bc).
@@ -11567,11 +11580,12 @@ async function renderRep(){
     :'Cadastre os parceiros, avise quando um parceiro trocar de conta e informe os descontos a fazer no repasse.';
   $('pNovo').hidden=!pLancaEm().length;
   if(!ids.length){vazio('Nenhuma empresa liberada para repasses.');return}
-  const [r1,r2_,r3,r4]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
+  const [r1,r2_,r3,r4,r5]=await Promise.all([sb.from('parceiros').select('*').or(pOrNulo(ids)).order('nome'),
     sb.from('parceiro_alteracoes').select('*').eq('status','Pendente'),
     sb.from('repasse_descontos').select('*').in('cliente_id',ids).eq('status','Pendente').order('criado_em'),
-    sb.from('parceiro_alteracoes').select('*').eq('status','Aplicada').gte('resolvido_em',altDesde()).order('resolvido_em')]);
-  const err=r1.error||r2_.error||r3.error;
+    sb.from('parceiro_alteracoes').select('*').eq('status','Aplicada').gte('resolvido_em',altDesde()).order('resolvido_em'),
+    sb.from('repasse_grupos').select('id,nome,empresas').order('nome')]);
+  const err=r1.error||r2_.error||r3.error;PGRUPOS=r5?.data||[];
   if(err){console.error(err);vazio(err.code==='42P01'||/parceir|repasse/.test(err.message||'')?'Este módulo precisa da atualização v7 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
   PARC=r1.data||[];PALT={};(r2_.data||[]).forEach(a=>PALT[a.parceiro_id]=a);PALTA={};(r4.data||[]).filter(altRecente).forEach(a=>PALTA[a.parceiro_id]=a);PDESC={};(r3.data||[]).forEach(d=>(PDESC[d.parceiro_id]||=[]).push(d));
   const nomeCli=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'':'Todas as empresas';
@@ -11635,10 +11649,12 @@ async function abrirParceiro(p,modo){
   }else if(modo==='alt'){
     h+=`<p class="note" style="margin:0">Informe a conta nova. O escritório confere e troca antes do próximo repasse; até lá, o pagamento continua na conta atual.</p>
       <div class="cmp">${cmpBox('Conta atual',p)}</div>${pCampos('pa',p,false,true)}
+      <div class="fields">${pEmpSelect('pa_emp','Empresa em que a troca foi pedida')}</div>
+      <p class="note" style="margin:0">O cadastro do parceiro é um só: a conta nova vale para ele em todas as empresas. A empresa escolhida aparece no aviso e no histórico.</p>
       <label class="f">Motivo ou quem pediu a troca *<textarea id="pa_motivo" rows="2" placeholder="Ex.: parceiro pediu por WhatsApp em 24/10 para receber na conta da empresa dele"></textarea></label>`;
   }else if(modo==='desc'){
     h+=`<p class="note" style="margin:0">O desconto fica em alerta para o escritório e sai do próximo repasse ${p?'de '+esc(p.nome):'do parceiro'}.</p>
-      <div class="fields">${p?'':`<label class="f wide">Parceiro *<select id="pd_parc">${pOpt(pDescaveis())}</select></label>`}<label class="f">Valor do desconto *<input class="money" id="pd_valor" inputmode="decimal" placeholder="0,00"></label>
+      <div class="fields">${p?'':`<label class="f wide">Parceiro *<select id="pd_parc">${pOpt(pDescaveis())}</select></label>`}${pEmpSelect('pd_emp','Empresa em que sai o desconto')}<label class="f">Valor do desconto *<input class="money" id="pd_valor" inputmode="decimal" placeholder="0,00"></label>
       <label class="f">Nº da guia *<input id="pd_guia" placeholder="guia que corresponde ao desconto"></label>
       <label class="f wide">Observação<textarea id="pd_motivo" rows="2" placeholder="Ex.: procedimento refeito sem cobrança"></textarea></label></div>`;
   }else{
@@ -11650,7 +11666,7 @@ async function abrirParceiro(p,modo){
       <div class="cmp" style="margin-top:6px">${cmpBox('Conta anterior',altA.anterior||{})}${cmpBox('Conta nova (em uso)',p)}</div>
       ${ehAdm()?`<div class="row" style="gap:8px"><button class="btn small primary" data-act="altConf" title="Marca como conferida em todas as empresas. Para dar OK empresa por empresa, use o Repasse de parceiros.">Conferido em todas as empresas</button>${altA.anterior?'<button class="btn small ghost" data-act="altDesfaz">Desfazer (voltar para a conta anterior)</button>':''}</div>`:''}
       <p class="note" style="margin:0">${e?'O aviso continua no Repasse de parceiros até a Master dar OK em cada empresa do grupo (ou marcar “Conferido em todas”).':'O escritório confere a conta nova antes do próximo repasse.'}</p></div>`;
-    if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
+    if(p&&descs.length)h+=`<div><h3 style="margin-bottom:6px">Descontos para o próximo repasse</h3><div class="tablebox" style="margin:0"><table><tbody>${descs.map(d=>`<tr data-d="${d.id}"><td class="l">${dBR(d.criado_em.slice(0,10))}</td><td class="l" style="white-space:normal">${esc(d.motivo)}${d.referencia?`<br><span class="muted">${esc(d.referencia)}</span>`:''}${d.cliente_id?`<br><span class="muted">Empresa: ${esc(pEmpNome(d.cliente_id))}${pGrupoDe(d.cliente_id)?.empresas?.length>1?' (grupo '+esc(pGrupoDe(d.cliente_id).nome)+')':''}</span>`:''}</td><td>${fm(d.valor)}</td><td><div class="row" style="gap:6px;justify-content:flex-end"><button class="btn small ghost" data-act="copDesc">Copiar</button>${e?'<button class="btn small primary" data-act="descontado">Descontado</button>':''}${e||pode?'<button class="btn small ghost" data-act="cancDesc">Cancelar</button>':''}</div></td></tr>`).join('')}</tbody></table></div>
       ${e?'<p class="note" style="margin:6px 0 0">“Copiar” leva o texto do desconto para colar no comprovante.</p>':''}</div>`;
     h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
       ${p&&!editaCad?'<p class="note" style="margin:6px 0 0">Os dados já foram conferidos pelo escritório. Para trocar a conta, use “Informar alteração de conta”.</p>':''}
@@ -11673,7 +11689,7 @@ async function abrirParceiro(p,modo){
   }
   $('rpFoot').innerHTML=f;
   if(modo==='alt'&&!p)$('pa_parc').onchange=ev=>{const x=PARC.find(y=>y.id===ev.target.value);if(x){PVOLTA=true;abrirParceiro(x,'alt')}};
-  ['pa_parc','pd_parc'].forEach(pBuscaParc);
+  ['pa_parc','pd_parc'].forEach(pBuscaParc);['pa_emp','pd_emp'].forEach(pEmpLiga);
   if(!dlgRep.open)dlgRep.showModal();
   $('pa_parc_b')?.focus();$('pd_parc_b')?.focus();
 }
@@ -11723,16 +11739,18 @@ async function rpAcao(act,el){
       const o=lerCampos('pa',CONTAP);o.cpf_cnpj=o.titular_doc;delete o.titular_doc;o.motivo=$('pa_motivo').value.trim();
       if(!temConta(o))return rpErr('Informe a chave Pix ou banco, agência e conta novos.');
       if(!o.motivo)return rpErr('Informe o motivo ou quem pediu a troca.');
+      const empA=$('pa_emp')?.value;if(!empA)return rpErr('Escolha a empresa em que a troca foi pedida.');
       if(CONTAK.every(k=>(o[k]||null)===(p[altK(k)]||null)))return rpErr('A conta nova está igual à atual.');
-      o.parceiro_id=p.id;o.cliente_id=p.cliente_id||pEmp();const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
+      o.parceiro_id=p.id;o.cliente_id=empA;const {error}=await sb.from('parceiro_alteracoes').insert(o);if(error)throw error;
       PMODO=null;PVOLTA=false;return recarregar(e?'Alteração registrada. Aplique para trocar a conta.':'Alteração enviada ao escritório');
     }
     if(act==='salvarDesc'){
       const parc=p?p.id:$('pd_parc').value,valor=parseMoney($('pd_valor').value),obs=$('pd_motivo').value.trim(),guia=$('pd_guia').value.trim().replace(/^(guia\s*)?(n[º°o.]*\s*)?/i,'');
       if(!parc)return rpErr('Escolha o parceiro.');
+      const empD=$('pd_emp').value;if(!empD)return rpErr('Escolha a empresa em que sai o desconto.');
       if(!(valor>0))return rpErr('Informe o valor do desconto.');if(!guia)return rpErr('Informe o número da guia que corresponde ao desconto.');
       // a guia vai na referência; sem observação, o motivo é a própria guia
-      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:PARC.find(x=>x.id===parc)?.cliente_id||pEmp(),valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
+      const {error}=await sb.from('repasse_descontos').insert({parceiro_id:parc,cliente_id:empD,valor,motivo:obs||'Guia nº '+guia,referencia:obs?'Guia nº '+guia:null});if(error)throw error;
       PMODO=null;PVOLTA=false;if(!p)PARCDLG=null;return recarregar('Desconto lançado');
     }
     if(['aplicar','recusar','altConf','altDesfaz'].includes(act)&&!ehAdm())return rpErr('Só a Master aplica, confere ou desfaz a alteração de conta.');
@@ -11743,7 +11761,7 @@ async function rpAcao(act,el){
     if(act==='recusar'){const {error}=await sb.from('parceiro_alteracoes').update({status:'Recusada',resolvido_em:new Date().toISOString(),resolvido_por:await me(),nota_escritorio:$('pa_nota')?.value.trim()||null}).eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Alteração recusada')}
     if(act==='cancAlt'){if(!confirm('Cancelar o pedido de alteração de conta?'))return;const {error}=await sb.from('parceiro_alteracoes').delete().eq('id',PALT[p.id].id);if(error)throw error;return recarregar('Pedido cancelado')}
     // o desconto sai do valor da conta a pagar do repasse em aberto (Carol, 10/11); antes só marcava como feito
-    if(act==='descontado'){const ab=await descContasAbertas(d.parceiro_id);
+    if(act==='descontado'){const gE=d.cliente_id?(pGrupoDe(d.cliente_id)?.empresas||[d.cliente_id]):null,ab=(await descContasAbertas(d.parceiro_id)).filter(t=>!gE||gE.includes(t.cliente_id));
       if(ab.length){const t=ab[0];
         if(!confirm(`Tirar o desconto de ${fm(d.valor)} da conta a pagar do repasse em aberto?\n\n${t.pessoa_nome} · ${CLIENTES.find(c=>c.id===t.cliente_id)?.nome||''} · venc. ${dBR(t.vencimento)}\n${fm(t.valor)} − ${fm(d.valor)} = ${fm(r2(+t.valor-(+d.valor)))} a pagar.`))return;
         await descNaConta(d,t,+t.valor);return recarregar('Desconto feito: a conta a pagar ficou com o valor líquido')}
@@ -14732,7 +14750,9 @@ const altOkEmp=(a,emp)=>!!a&&!!emp&&(a.conferida_empresas||[]).includes(emp);
 function rnAlt(it){const a=rnAltBruto(it);if(!a)return null;if(a.status==='Aplicada'&&altOkEmp(a,it.empresa_id))return null;return a}
 const rnConta=p=>!p?'':[p.titular&&p.titular!==p.nome&&p.titular!==p.nome_global?'Titular: '+esc(p.titular)+((p.titular_doc||p.cpf_cnpj)?' · '+esc(p.titular_doc||p.cpf_cnpj):''):'',
   p.conta?[p.banco&&esc(p.banco),p.agencia&&'ag. '+esc(p.agencia),'c/c '+esc(p.conta)].filter(Boolean).join(' · '):'',p.pix_chave?'Pix '+(p.pix_tipo?esc(p.pix_tipo)+' ':'')+esc(p.pix_chave):''].filter(Boolean).join('<br>');
-const rnDescPend=p=>p?RN.desc.filter(d=>d.parceiro_id===p.id||RN.parc.some(x=>x.id===d.parceiro_id&&rnChave(x.nome)===rnChave(p.nome))):[];
+// o desconto só sai no repasse do grupo da empresa escolhida ao lançar (Carol, 16/11)
+const rnDescNoGrupo=d=>!d.cliente_id||!RN.grupo||(RN.grupo.empresas||[]).includes(d.cliente_id);
+const rnDescPend=p=>p?RN.desc.filter(d=>rnDescNoGrupo(d)&&(d.parceiro_id===p.id||RN.parc.some(x=>x.id===d.parceiro_id&&rnChave(x.nome)===rnChave(p.nome)))):[];
 function rnVazio(t,cls){$('rnBar').hidden=true;$('rnTiles').innerHTML='';$('rnTilesTg').hidden=true;$('rnBulk').hidden=true;$('rnGerar').hidden=true;$('rnHead').innerHTML='';$('rnBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('rnNote').innerHTML=''}
 async function renderRN(recarrega=true){
   const cli=cliAtual();['rnImp','rnCfg','rnCtrl','rnXls'].forEach(id=>$(id).hidden=true);
