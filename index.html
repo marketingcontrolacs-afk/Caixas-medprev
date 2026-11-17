@@ -9823,7 +9823,7 @@ const CVSYN={
   data_pago:['data de pagamento','data do pagamento','data pagamento','data de liquidacao','data liquidacao','pago em','data efetiva'],
   data_venda:['data da venda','data venda','data de venda','data da transacao','data transacao','data de captura','data captura','data da compra','data e hora da venda','data hora da venda','data hora','data'],
   valor_liquido:['valor liquido da parcela','valor liquido','liquido','valor a receber','valor recebido','valor creditado'],
-  taxa:['valor da taxa','valor descontado','taxa administrativa','taxas','taxa','tarifa','desconto','mdr','valor mdr'],
+  taxa:['valor da taxa','valor taxa','valor descontado','taxa administrativa','taxas','taxa','tarifa','desconto','mdr','valor mdr'],
   valor_bruto:['valor bruto da parcela','valor bruto','valor da venda','valor original','valor total da venda','valor total','valor da transacao','valor da parcela','valor'],
   bandeira:['bandeira do cartao','bandeira','brand'],
   modalidade:['forma de pagamento','modalidade','produto','tipo de transacao','tipo de pagamento','meio de pagamento','tipo de venda','tipo do cartao','tipo de produto','plano','tipo'],
@@ -9832,12 +9832,13 @@ const CVSYN={
   nsu:['nsu doc','nsu','codigo da transacao','id da transacao','numero do comprovante','comprovante de venda','cv','stone id','codigo da venda','tid'],
   autorizacao:['codigo de autorizacao','cod autorizacao','cod de autorizacao','autorizacao'],
   estabelecimento:['numero do estabelecimento','codigo do estabelecimento','estabelecimento','ec','stonecode','stone code','codigo do cliente','ponto de venda','loja'],
-  terminal:['numero logico','terminal','maquina','numero de serie','serial','pos'],
+  terminal:['numero logico','identificacao da maquininha','maquininha','terminal','maquina','numero de serie','serial','pos'],
   canal:['canal de venda','canal','meio de captura','tipo de captura','captura','origem da venda','origem'],
   status:['status da venda','status','situacao','tipo de lancamento','lancamento','descricao','historico'],
-  antecipado:['antecipado','antecipada','antecipacao']};
+  antecipado:['antecipado','antecipada','antecipacao'],
+  data_cancel:['data do cancelamento','data de cancelamento','data cancelamento']};
 const CVCAMPOS={data_venda:'Data da venda',data_prevista:'Data prevista de recebimento',data_pago:'Data em que foi pago',bandeira:'Bandeira',modalidade:'Modalidade (débito, crédito...)',parcela:'Parcela',parcelas:'Total de parcelas',
-  valor_bruto:'Valor bruto',taxa:'Taxa',valor_liquido:'Valor líquido',nsu:'NSU / código da transação',autorizacao:'Autorização',estabelecimento:'Estabelecimento (EC)',terminal:'Terminal / máquina',canal:'Canal (loja, e-commerce)',status:'Status / tipo de lançamento',antecipado:'Antecipado'};
+  valor_bruto:'Valor bruto',taxa:'Taxa',valor_liquido:'Valor líquido',nsu:'NSU / código da transação',autorizacao:'Autorização',estabelecimento:'Estabelecimento (EC)',terminal:'Terminal / máquina',canal:'Canal (loja, e-commerce)',data_cancel:'Data do cancelamento',status:'Status / tipo de lançamento',antecipado:'Antecipado'};
 // acha as colunas: primeiro o nome igual, depois o que contém o nome (só nomes longos, para "valor" não pegar "valor líquido")
 function cvMapa(cab){
   const hs=cab.map(cvN),usado=new Set(),m={};
@@ -9890,29 +9891,46 @@ async function cvLeArquivo(f){
 // transforma as linhas do arquivo em vendas, com o mapa das colunas escolhido
 function cvMonta(L,mapa,ops){
   const g=(r,k)=>mapa[k]!=null&&mapa[k]!==''?r[mapa[k]]:'',cont={},out=[];let negadas=0,vazias=0;
+  const temTerm=mapa.terminal!=null&&mapa.terminal!==''&&L.linhas.some(r=>String(r[mapa.terminal]??'').trim());
   for(const r of L.linhas){
     const bruto0=cvNum(g(r,'valor_bruto')),liq0=cvNum(g(r,'valor_liquido')),taxa0=cvNum(g(r,'taxa'));
     const dv=cvData(g(r,'data_venda')),dp=cvData(g(r,'data_prevista'));
     if(bruto0==null&&liq0==null||!dv&&!dp){vazias++;continue}
     const st=String(g(r,'status')||'');if(cvNegada(st)){negadas++;continue}
     let pa=String(g(r,'parcela')||''),parc=null,parcs=cvNum(g(r,'parcelas'))||null;
-    const pm=pa.match(/(\d+)\s*(?:\/|de)\s*(\d+)/);if(pm){parc=+pm[1];parcs=parcs||+pm[2]}else parc=cvNum(pa)||null;
+    const pm=pa.match(/(\d+)\s*(?:\/|de)\s*(\d+)/),px=cvN(pa).match(/parcelad\w*\s*(?:em\s*)?(\d+)\s*x/);
+    if(pm){parc=+pm[1];parcs=parcs||+pm[2]}else if(px)parcs=parcs||+px[1];else if(/a vista/.test(cvN(pa)))parcs=parcs||1;else parc=cvNum(pa)||null;
     const bandT=g(r,'bandeira'),modT=g(r,'modalidade');
     let tipo=cvTipo(st,g(r,'antecipado'),!!(cvN(bandT)||cvN(modT)));
+    // PagBank "O que vendi": a venda cancelada vem com o valor positivo, o status "Cancelada" e a data do cancelamento
+    const canc=mapa.data_cancel!=null&&mapa.data_cancel!==''&&/^cancelad[ao]( parcialmente)?$/.test(cvN(st))&&(bruto0??liq0)>0;if(canc)tipo='venda';
     const neg=(bruto0??liq0)<0;if(tipo==='venda'&&neg)tipo='estorno';
     let b=Math.abs(bruto0??((liq0||0)+Math.abs(taxa0||0))),l=liq0!=null?Math.abs(liq0):r2(b-Math.abs(taxa0||0)),t=taxa0!=null?Math.abs(taxa0):r2(b-l);
     if(taxa0!=null&&liq0==null)l=r2(b-t);
     const sg=tipo==='venda'?1:-1;
     const canalT=g(r,'canal'),ec=String(g(r,'estabelecimento')||'').trim();
-    const canal=cvEcom(canalT)||(ec&&ops.ecs.includes(cvN(ec)))?'ecommerce':/pos|maquin|tef|loja|presencial|fisic|cartao presente/.test(cvN(canalT))?'caixa':ops.canal;
+    const term=String(g(r,'terminal')||'').trim();
+    // PagBank "O que vendi": venda com "Identificação da Maquininha" é do caixa; no mesmo arquivo, a que não tem maquininha é venda por link (sistema)
+    const canal=cvEcom(canalT)||(ec&&ops.ecs.includes(cvN(ec)))?'ecommerce':/pos|maquin|tef|loja|presencial|fisic|cartao presente/.test(cvN(canalT))||term&&temTerm?'caixa':temTerm&&!cvN(canalT)?'ecommerce':ops.canal;
     const v={cliente_id:ops.cliente_id,adquirente:ops.adq,canal,tipo,antecipada:tipo==='venda'&&(/antecip/.test(cvN(st))||!!cvN(g(r,'antecipado'))&&!/^(n|nao|no|false|0)$/.test(cvN(g(r,'antecipado')))),
       data_venda:dv||dp,data_prevista:dp||null,data_pago:cvData(g(r,'data_pago')),bandeira:tipo==='antecipacao'||tipo==='ajuste'?(cvN(bandT)?cvBand(bandT):'—'):cvBand(bandT||modT),
       modalidade:tipo==='antecipacao'||tipo==='ajuste'?(String(modT||st).trim()||CVTIPO[tipo][0]):cvModal(modT||bandT,parcs),parcela:parc,parcelas:parcs,
       valor_bruto:r2(sg*b),taxa:r2(sg*t),valor_liquido:r2(sg*l),nsu:String(g(r,'nsu')||'').trim()||null,autorizacao:String(g(r,'autorizacao')||'').trim()||null,
-      estabelecimento:ec||null,terminal:String(g(r,'terminal')||'').trim()||null,descricao:st.trim()||null};
+      estabelecimento:ec||null,terminal:term||null,descricao:st.trim()||null};
     let k=[v.adquirente,v.nsu,v.autorizacao,v.data_venda,v.parcela,v.tipo,v.valor_bruto.toFixed(2),v.estabelecimento,v.data_prevista].join('|');
     if(!v.nsu&&!v.autorizacao){cont[k]=(cont[k]||0)+1;k+='#'+cont[k]}
-    v.chave=k;out.push(v)}
+    v.chave=k;
+    // venda parcelada numa linha só, com a data da última parcela (PagBank "O que vendi"): uma linha por parcela, mês a mês
+    if(tipo==='venda'&&parc==null&&parcs>1&&parcs<=24&&dp){
+      const mes=(d,n)=>{const [y,m,dd]=d.split('-').map(Number),x=new Date(y,m-1+n,1),u=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();return isoLocal(new Date(x.getFullYear(),x.getMonth(),Math.min(dd,u),12))};
+      let rb=v.valor_bruto,rt=v.taxa,rl=v.valor_liquido;
+      for(let i=1;i<=parcs;i++){const ult=i===parcs,pb=ult?r2(rb):r2(v.valor_bruto/parcs),pt=ult?r2(rt):r2(v.taxa/parcs),pl=ult?r2(rl):r2(v.valor_liquido/parcs);rb-=pb;rt-=pt;rl-=pl;
+        out.push({...v,parcela:i,data_prevista:mes(dp,i-parcs),valor_bruto:pb,taxa:pt,valor_liquido:pl,chave:k+'|p'+i})}
+    }else out.push(v);
+    // relatório de vendas com a venda "Cancelada" numa linha só (PagBank): grava a venda e o estorno, para o líquido ficar zero
+    const dc=cvData(g(r,'data_cancel'));
+    if(canc&&/^cancelad[ao]$/.test(cvN(st))){const e={...v,tipo:'estorno',antecipada:false,data_prevista:dc||v.data_prevista,valor_bruto:-v.valor_bruto,taxa:-v.taxa,valor_liquido:-v.valor_liquido,descricao:'Cancelamento'+(dc?' em '+dBR(dc):'')};
+      e.chave=k+'|cancel';out.push(e)}}
   return {vendas:out,negadas,vazias}}
 // ---------- tela ----------
 const cvEmps=()=>escCli.value==='*'?empresasDe('gfcartoes'):[cliAtual()].filter(Boolean);
@@ -9927,7 +9945,18 @@ async function renderCV(){
       todas(()=>sb.from('cartao_vendas').select('*').in('cliente_id',ids).or(`and(data_venda.gte.${de},data_venda.lte.${ate}),and(data_prevista.gte.${de},data_prevista.lte.${ate})`).order('data_venda').order('id')),
       todas(()=>sb.from('fechamentos').select('id,cliente_id,data,caixa,deb_sis,deb_maq,cred_sis,cred_maq').in('cliente_id',ids).gte('data',de).lte('data',ate).order('data')),
       todas(()=>sb.from('cartao_config').select('*').in('cliente_id',ids))]);
-    CV.vendas=vs;CV.fech=fs;CV.cfg=cf;CV.de=de;CV.ate=ate;
+    // caixa lançado em outra empresa (v147): ex. a maquininha é da MP Gestão PB, mas o caixa é lançado na MPA PB.
+    // O fechamento vem da empresa do caixa e é conferido na empresa da maquininha; na empresa do caixa ele sai do confronto.
+    let fsx=fs;CV.caixaDe={};CV.caixaPara={};
+    try{
+      const liga=cf.filter(c=>c.caixa_cliente_id&&c.caixa_cliente_id!==c.cliente_id);liga.forEach(c=>CV.caixaDe[c.cliente_id]=c.caixa_cliente_id);
+      const {data:para}=await sb.from('cartao_config').select('cliente_id,caixa_cliente_id').in('caixa_cliente_id',ids);(para||[]).filter(c=>c.cliente_id!==c.caixa_cliente_id).forEach(c=>CV.caixaPara[c.caixa_cliente_id]=c.cliente_id);
+      const origens=[...new Set(Object.values(CV.caixaDe))];
+      const fo=origens.length?await todas(()=>sb.from('fechamentos').select('id,cliente_id,data,caixa,deb_sis,deb_maq,cred_sis,cred_maq').in('cliente_id',origens).gte('data',de).lte('data',ate).order('data')):[];
+      fsx=fs.filter(f=>!CV.caixaPara[f.cliente_id]);
+      for(const [alvo,orig] of Object.entries(CV.caixaDe))fo.filter(f=>f.cliente_id===orig).forEach(f=>fsx.push({...f,cliente_id:alvo,caixa_origem:orig}));
+    }catch(e){console.error(e)}
+    CV.vendas=vs;CV.fech=fsx;CV.cfg=cf;CV.de=de;CV.ate=ate;
     const tids=[...new Set(vs.map(v=>v.titulo_id).filter(Boolean))];CV.tits={};
     for(let i=0;i<tids.length;i+=200){const {data}=await sb.from('fin_titulos').select('id,valor,vencimento,conta_id').in('id',tids.slice(i,i+200));(data||[]).forEach(t=>CV.tits[t.id]={...t,pago:0})}
     for(let i=0;i<tids.length;i+=200){const {data}=await sb.from('fin_movimentos').select('titulo_id,valor,juros,desconto').in('titulo_id',tids.slice(i,i+200));(data||[]).forEach(m=>{const t=CV.tits[m.titulo_id];if(t)t.pago=r2(t.pago+abat(m))})}
@@ -9971,6 +10000,9 @@ function cvDesenha(){
     const ls=Object.values(dias).sort((a,b)=>a.data.localeCompare(b.data)||cvEmpNome(a.cliente_id).localeCompare(cvEmpNome(b.cliente_id)));
     const dif=(a,b)=>{const d=r2(a-b);return Math.abs(d)<0.05?'<span class="pos">OK</span>':`<b class="neg">${d>0?'+':''}${fm(d)}</b>`};
     const soEc=$('cvCanal').value==='ecommerce';
+    const lig=[...Object.entries(CV.caixaDe||{}).filter(([a])=>CV.ids.includes(a)).map(([a,o])=>`O caixa da maquininha de <b>${esc(cvEmpNome(a))}</b> é lançado na <b>${esc(cvEmpNome(o))}</b>: o débito e o crédito do caixa vêm de lá.`),
+      ...Object.entries(CV.caixaPara||{}).filter(([o,a])=>CV.ids.includes(o)&&!CV.ids.includes(a)).map(([o,a])=>`O cartão do caixa de <b>${esc(cvEmpNome(o))}</b> é conferido na <b>${esc(cvEmpNome(a))}</b>, dona da maquininha. Escolha essa empresa para ver o confronto.`)];
+    $('cvAcoes').insertAdjacentHTML('beforeend',lig.length?`<span class="note" style="margin:0;align-self:center">${lig.join(' ')}</span>`:'');
     $('cvHead').innerHTML=`<tr><th>Dia</th>${empH}${soEc?'':'<th>Débito no caixa</th><th>Débito na adquirente</th><th>Diferença</th><th>Crédito no caixa</th><th>Crédito na adquirente</th><th>Diferença</th>'}<th>E-commerce</th><th class="l">Situação</th></tr>`;
     $('cvBody').innerHTML=ls.map(d=>{const ok=Math.abs(d.cxDeb-d.aDeb)<0.05&&Math.abs(d.cxCred-d.aCred)<0.05,semImp=!d.aDeb&&!d.aCred&&(d.cxDeb||d.cxCred),semCx=!d.nf&&(d.aDeb||d.aCred);
       return `<tr data-dia="${d.data}" data-emp="${d.cliente_id}" class="click" tabindex="0"><td>${dBR(d.data)}</td>${emp(d)}${soEc?'':`<td>${fm(d.cxDeb)}</td><td>${fm(d.aDeb)}</td><td>${dif(d.aDeb,d.cxDeb)}</td><td>${fm(d.cxCred)}</td><td>${fm(d.aCred)}</td><td>${dif(d.aCred,d.cxCred)}</td>`}<td>${d.ec?fm(d.ec):mu('—')}</td>
@@ -10069,6 +10101,7 @@ $('cvCfg').onclick=async()=>{
     <label class="f wide">Códigos de estabelecimento (EC) do e-commerce<input data-k="ec_ecommerce" value="${esc(c?.ec_ecommerce||'')}" placeholder="separe por vírgula; as vendas desses EC ficam como e-commerce"></label>
     <label class="f">Conta onde a adquirente deposita<select data-k="conta_id"><option value=""></option>${contas.filter(x=>x.ativo!==false).map(x=>`<option value="${x.id}"${x.id===c?.conta_id?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
     <label class="f">Categoria das contas a receber<select data-k="categoria"><option value=""></option>${[...new Set([...(c?.categoria?[c.categoria]:[]),...rec])].map(x=>`<option${x===c?.categoria?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+    <label class="f">Caixa (maquininha) lançado na empresa<select data-k="caixa_cliente_id"><option value="">Nesta mesma empresa</option>${CLIENTES.filter(x=>x.id!==cli.id&&x.ativo!==false&&x.bpo_financeiro!==false).map(x=>`<option value="${x.id}"${x.id===c?.caixa_cliente_id?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
     <label class="f">Ligação direta (API)<select data-k="api_status"><option value="">Ainda não (importação do arquivo)</option><option value="solicitada"${c?.api_status==='solicitada'?' selected':''}>Acesso pedido à adquirente</option><option value="liberada"${c?.api_status==='liberada'?' selected':''}>Acesso liberado (falta ligar)</option></select></label></div></div>`;
   $('cvDTit').textContent='Adquirentes · '+cli.nome;CV.cfgCli=cli;
   $('cvDBody').innerHTML=`<p class="note" style="margin:0">Cadastre cada adquirente que a empresa usa. As chaves e senhas da API não ficam aqui: quando a adquirente liberar o acesso, a Controlacs faz a ligação com segurança.</p>
