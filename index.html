@@ -3727,7 +3727,9 @@ function ajustaDeposito(){
 let PESLISTA=null;
 async function pesLista(){
   if(PESLISTA)return PESLISTA;
-  let {data,error}=await sb.rpc('pessoas_lista');
+  // o Supabase devolve no máximo 1000 linhas por chamada: busca em páginas para vir o cadastro inteiro (Carol, 17/11)
+  let data=null,error=null;
+  try{data=await todas(()=>sb.rpc('pessoas_lista').order('nome').order('codigo'))}catch(e){error=e}
   if(error){console.error(error);data=okGestao()?await todas(()=>sb.from('fin_pessoas').select('nome,fantasia,documento,papel').is('cliente_id',null).eq('ativo',true).order('nome')).catch(()=>[]):[]}
   return PESLISTA=data||[];
 }
