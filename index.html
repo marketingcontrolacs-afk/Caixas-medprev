@@ -307,7 +307,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .msg .q{font-size:12px;color:var(--muted)}.msg .x{white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.mine{background:var(--brand-soft);border-color:transparent}.msg.int{background:var(--warn-soft);border-color:var(--warn)}
 .msg.sys{border:0;padding:0 4px;font-size:12px;color:var(--muted);font-style:italic}
-#dlgTar,#dlgProj,#dlgPend{width:min(860px,calc(100vw - 32px))} #dlgTar .db>*,#dlgProj .db>*,#dlgPend .db>*{min-width:0}
+#dlgTar,#dlgProj,#dlgPend{width:min(860px,calc(100vw - 32px))} .tl-tab tr.tl-click{cursor:pointer}.tl-tab tr.tl-click:hover td,.tl-tab tr.tl-click:focus td{background:var(--soft,rgba(0,0,0,.04))}.tl-tab{min-width:980px;table-layout:auto}.tl-tab td,.tl-tab th{vertical-align:top;white-space:normal;text-align:left;overflow:visible;max-width:none}.tl-tab td.num,.tl-tab th:nth-child(3){text-align:right}.tl-tab td:last-child{white-space:nowrap}.tl-tab thead input{padding:4px 6px;font-size:12px;height:auto;min-height:0}#dlgTar.cheia #td_desc{min-height:28vh}#dlgTar.cheia #td_lancBox .tablebox{max-height:none!important} #dlgTar .db>*,#dlgProj .db>*,#dlgPend .db>*{min-width:0}
 #pjBody tr{cursor:pointer}#pjBody tr.novo td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
 .pjdec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;background:var(--sunk)}
 .pick{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:10px;max-height:300px;overflow:auto}
@@ -1740,6 +1740,23 @@ const DEV='Devolução em dinheiro';
 const TIPOS_SAIDA=[DEV,'Repasse','Água / voucher','Material de limpeza / higiene',OUTRAS];
 const REF=t=>t===DEV?['guia','Nº da guia','Ex.: 48213']:t==='Repasse'?['parceiro','Nome do parceiro','Ex.: Lab. Parceiro']:['guia','Nº do documento ou NF','Ex.: NF 1520'];
 const AVISO_NF='É importante informar o número da nota fiscal e anexar o comprovante.';
+// Tesouraria não pode ficar negativa (Carol, 16/11/2026), em todas as empresas: antes de salvar, confere o saldo de cada dia
+// fonte: {tab:'tesouraria',cli} (o que o cliente lança) ou {tab:'fin_movimentos',conta,ini} (conta de tesouraria da Gestão financeira)
+// novo/antigo: {data,v} com v = +entrada / -saída; devolve o primeiro dia que fica negativo (ou mais negativo) ou null
+async function tesNegativa(fonte,id,novo,antigo){
+  const linhas=[];
+  for(let i=0;;i+=1000){
+    const q=fonte.tab==='tesouraria'?sb.from('tesouraria').select('id,data,tipo,valor').eq('cliente_id',fonte.cli):sb.from('fin_movimentos').select('id,data,tipo,valor').eq('conta_id',fonte.conta);
+    const {data,error}=await q.order('id').range(i,i+999);if(error){console.error(error);return null}
+    linhas.push(...(data||[]));if(!data||data.length<1000)break}
+  const sin=r=>fonte.tab==='tesouraria'?(r.tipo==='Suprimento'?1:-1):(r.tipo==='entrada'?1:-1);
+  const base={};linhas.forEach(r=>{if(id&&r.id===id)return;base[r.data]=(base[r.data]||0)+sin(r)*(+r.valor)});
+  const cen=x=>{const d={...base};if(x)d[x.data]=(d[x.data]||0)+x.v;return d};
+  const dn=cen(novo),da=cen(antigo),dias=[...new Set([...Object.keys(dn),...Object.keys(da)])].sort();
+  const desde=[novo?.data,antigo?.data].filter(Boolean).sort()[0];let sn=+fonte.ini||0,sa=+fonte.ini||0;
+  for(const d of dias){sn=r2(sn+(dn[d]||0));sa=r2(sa+(da[d]||0));if(d>=desde&&sn<-0.004&&sn<sa-0.004)return {data:d,saldo:sn}}
+  return null}
+const tesNegMsg=p=>`Atenção: com este lançamento a tesouraria fica negativa em ${dBR(p.data)} (saldo ${fm(p.saldo)}).\n\nA tesouraria não pode ficar negativa. Confira se falta lançar uma entrada (suprimento, saque) ou se a data está certa.\n\nSe salvar mesmo assim, o lançamento fica marcado para a Controlacs conferir.\n\nSalvar mesmo assim?`;
 const refTxt=x=>x.tipo==='Repasse'?(x.parceiro?' · parceiro '+esc(x.parceiro):''):x.guia?(x.tipo===DEV?' · guia ':' · doc ')+esc(x.guia):'';
 const anexoHint=t=>t===DEV?'Ex.: foto da guia ou do recibo de devolução.':t==='Repasse'?'Ex.: recibo assinado pelo parceiro.':'Ex.: nota ou cupom fiscal.';
 const CATS=['Relatório do caixa (sistema)','Relatório da máquina de cartão','Outro comprovante'];
@@ -3740,6 +3757,8 @@ $('rForm').addEventListener('submit',async e=>{
   if(m){err.textContent=m;err.hidden=false;return}
   // tesouraria: nº da NF e comprovante não impedem salvar (Carol, 30/10): só avisa
   if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
+  if(MOD==='tesouraria'&&row.valor>0&&row.data){const sg=t=>t==='Suprimento'?1:-1,p=await tesNegativa({tab:'tesouraria',cli:cli.id},REG?.id,{data:row.data,v:sg(row.tipo)*row.valor},REG?{data:REG.data,v:sg(REG.tipo)*(+REG.valor)}:null);
+    if(p&&!confirm(tesNegMsg(p)))return}
   // leu valor diferente do previsto e ainda não confirmou: pergunta antes de enviar (Carol, 13/11)
   if(!REG&&REGPRE?.lido&&!REGPRE.ok&&Math.abs((row.valor||0)-REGPRE.lido)>0.004&&confirm(`O valor do boleto anexado (${fm(REGPRE.lido)}) é diferente do valor previsto (${fm(REGPRE.valor)}).\n\nConfirma a atualização do valor para ${fm(REGPRE.lido)}?`)){regPrevOk();row.valor=REGPRE.lido}
   err.hidden=true;$('rSave').disabled=true;
@@ -11011,6 +11030,9 @@ async function gxAcao(a){
   }
   const val=k=>($('ga_'+k)?.value||'').trim()||null,valor=parseMoney($('ga_valor').value),tipo=$('ga_tipo').value;
   if(!val('data'))return gtErr('Informe a data.');if(!(valor>0))return gtErr('Informe o valor.');if(!val('descricao'))return gtErr('Informe a descrição.');
+  {const ct=[...(GT.contas||[]),...(CGRUPO||[])].find(x=>x.id===c.id)||c;
+    if(ct.tipo==='Caixa / tesouraria'&&(tipo!=='entrada'||m)){const tv=m?.tipo||(tipo==='entrada'?'entrada':'saida'),p=await tesNegativa({tab:'fin_movimentos',conta:c.id,ini:ct.saldo_inicial},m?.id,{data:val('data'),v:(tv==='entrada'?1:-1)*r2(valor)},m?{data:m.data,v:(m.tipo==='entrada'?1:-1)*(+m.valor)}:null);
+      if(p&&!confirm(tesNegMsg(p)))return}}
   // transferência não tem categoria (Carol, 05/11)
   const base={data:val('data'),valor:r2(valor),descricao:val('descricao'),categoria:tipo==='transf'||m?.transf_id?null:val('categoria'),pessoa_nome:val('pessoa'),documento:val('documento')};
   let error;
@@ -12234,7 +12256,7 @@ async function abrirTarefa(t){
   if(!t){const ls=e?empresasDe('tarefas'):tLancaEm(),cv=TL_NOVO?.cli||escCli.value;
     h+=`<label class="f">Empresa<select id="td_cli">${e?'<option value="">Interna da Controlacs (sem empresa)</option>':''}${ls.map(c=>`<option value="${c.id}"${c.id===cv?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`}
   h+=`<div class="fields"><label class="f wide">Título *<input id="td_titulo" value="${esc(t?.titulo||'')}" maxlength="160" placeholder="Ex.: enviar extrato de setembro"${d}></label>
-    <label class="f wide">Descrição<textarea id="td_desc" rows="3"${d}>${esc(t?.descricao||'')}</textarea></label>
+    <label class="f wide">Descrição<textarea id="td_desc" rows="${Math.min(14,Math.max(3,(t?.descricao||'').split('\n').reduce((n,x)=>n+1+Math.floor(x.length/95),0)))}"${d}>${esc(t?.descricao||'')}</textarea></label>
     <label class="f">Status${sel('td_status',TCOLS,t?.status||'afazer')}</label>
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
@@ -12242,6 +12264,7 @@ async function abrirTarefa(t){
       :t&&(t.responsavel||t.executor)?`<p class="note wide" style="margin:0">${t.executor?'Executor: <b>'+esc(t.executor_nome||'')+'</b>':''}${t.responsavel&&t.executor?' · ':''}${t.responsavel?'Responsável: <b>'+esc(t.responsavel_nome||'')+'</b>':''}</p>`:''}
     ${!e&&t?.tarefa_participantes?.length?`<p class="note wide" style="margin:0">${['executor','validador'].map(pp=>{const l=t.tarefa_participantes.filter(x=>x.papel===pp);return l.length?(pp==='executor'?'Mais executores: ':'Validadores: ')+'<b>'+l.map(x=>esc(x.nome||'')).join(', ')+'</b>':''}).filter(Boolean).join(' · ')}</p>`:''}
     <p class="note wide" style="margin:0">Cadastrada por <b>${esc(t?nomeDe(t.criado_por,t.criado_por_nome):nomeDe(ME.user_id,ME.nome||ME.email))}</b>${t?' em '+dtBR(t.criado_em):''}${t?.concluida_em?' · concluída em '+dtBR(t.concluida_em):''}</p></div>
+    ${tlBox(t)}
     ${e&&window.V31?'<div id="td_visBox"></div>':''}
     ${e?`<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px" id="td_intBox"><input type="checkbox" id="td_int" style="width:auto"${t?.interna?' checked':''}> Tarefa interna (o cliente não vê)</label>`:''}
 `;
@@ -12249,7 +12272,6 @@ async function abrirTarefa(t){
     h+=`<div class="alerta" style="margin:0"><b>Ciente da conclusão: ${n} de ${ev.length}</b><span class="note">Todos os envolvidos confirmam que viram a tarefa concluída.</span>
       <div class="chk">${ev.map(x=>{const c=tCienteDe(t,x.id);return `<span>${c?'✅':'⏳'} ${esc(x.nome)} <span class="muted">(${x.papeis.join(', ')})${c?' · '+dtBR(c.ciente_em):''}</span></span>`}).join('')}</div>
       ${me&&!eu?'<div><button type="button" class="btn small primary" data-act="ciente">Dar ciente</button></div>':''}</div>`}
-  h+=tlBox(t);
   if(t)h+=`<div><h3 style="margin-bottom:6px">Conversa</h3><div class="conv" id="td_conv"><p class="note">Carregando…</p></div>
     ${pode?`<div style="display:grid;gap:8px;margin-top:10px"><textarea id="td_msg" rows="2" placeholder="Escreva uma mensagem"></textarea>
       <div class="row" style="gap:10px;align-items:center"><input type="file" id="td_file" accept="image/*,application/pdf" style="max-width:260px" aria-label="Anexar foto ou PDF">
@@ -12445,19 +12467,58 @@ async function tlCarrega(t){
   const {data,error}=await sb.from('tarefa_lancamentos').select('*').eq('tarefa_id',t.id).order('criado_em');
   if(TARDLG?.id!==t.id||!$('td_lancBox'))return;
   if(error||!data?.length){box.hidden=true;return}
-  const mids=data.filter(l=>l.mov_id).map(l=>l.mov_id),tids=data.filter(l=>l.titulo_id).map(l=>l.titulo_id);
-  const [{data:ms},{data:ts}]=await Promise.all([mids.length?sb.from('fin_movimentos').select('id,validar').in('id',mids):{data:[]},tids.length?sb.from('fin_titulos').select('id').in('id',tids):{data:[]}]);
-  const mm=new Map((ms||[]).map(m=>[m.id,m])),tt=new Set((ts||[]).map(x=>x.id)),e=ehEsc();
+  // busca os lançamentos em partes (tarefas com centenas de lançamentos)
+  const partes=(ids,n=150)=>{const r=[];for(let i=0;i<ids.length;i+=n)r.push(ids.slice(i,i+n));return r};
+  const busca=async(tab,cols,ids)=>(await Promise.all(partes(ids).map(p=>sb.from(tab).select(cols).in('id',p)))).flatMap(r=>r.data||[]);
+  const mids=[...new Set(data.filter(l=>l.mov_id).map(l=>l.mov_id))],tids=[...new Set(data.filter(l=>l.titulo_id).map(l=>l.titulo_id))];
+  const [ms,ts]=await Promise.all([busca('fin_movimentos','id,data,tipo,valor,descricao,pessoa_nome,categoria,validar,conta_id',mids),busca('fin_titulos','id',tids)]);
+  const cids=[...new Set(ms.map(m=>m.conta_id).filter(Boolean))],cs=cids.length?await busca('fin_contas','id,nome',cids):[];
+  if(TARDLG?.id!==t.id||!$('td_lancBox'))return;
+  box._mm=new Map(ms.map(m=>[m.id,m]));box._tt=new Set(ts.map(x=>x.id));box._ct=new Map(cs.map(c=>[c.id,c.nome]));
+  box._ls=data;box._f=box._f||{sit:'abertos',col:{}};
+  tlDesenha(box);box.hidden=false;
+}
+// uma linha por lançamento ligado: data, tipo, valor, descrição, conta, categoria e situação
+function tlLinhas(box){
+  const mm=box._mm,ct=box._ct;
+  return box._ls.map(l=>{const m=l.mov_id?mm.get(l.mov_id):null,some=l.mov_id?!m:l.titulo_id?!box._tt.has(l.titulo_id):true;
+    const pz=(l.resumo||'').split(' · ');
+    const sit=l.removido_em?'Desvinculado':l.validado_em?'Validado':some?'Apagado':m?.validar?'A validar':'Aguardando conferência';
+    return {l,m,some,sit,data:m?dtBR(m.data):pz[0]||'',tipo:m?(m.tipo==='entrada'?'Entrada':'Saída'):pz[1]?.split(' ')[0]||'',
+      valor:m?showMoney(m.valor):(pz[1]||'').replace(/^\S+\s*(R\$\s*)?/,''),desc:m?[m.descricao,m.pessoa_nome].filter(Boolean).join(' · '):pz.slice(2).join(' · '),
+      conta:m?ct.get(m.conta_id)||'':'',cat:m?.categoria||'',aviso:m?.validar||''}});
+}
+function tlDesenha(box){
+  const f=box._f,e=ehEsc(),todas=tlLinhas(box),ativos=todas.filter(r=>!r.l.removido_em),abertos=ativos.filter(r=>!r.l.validado_em&&!r.some).length;
+  const cols=[['data','Data'],['tipo','Tipo'],['valor','Valor (R$)'],['desc','Descrição'],['conta','Conta'],['cat','Categoria'],['sit','Situação']];
+  const sel=(v,n)=>`<option value="${v}"${f.sit===v?' selected':''}>${n}</option>`;
+  box.innerHTML=`<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">📎 Lançamentos ligados (${ativos.length})</h3>
+      <span class="chip ${abertos?'c-warn':'c-done'}">${abertos?'Faltam '+abertos+' de '+ativos.length:'Todos conferidos'}</span><span class="spacer"></span>
+      <label class="note" style="display:flex;gap:6px;align-items:center;margin:0">Mostrar<select id="tl_sit" style="width:auto">${sel('abertos','A conferir')}${sel('validados','Validados')}${sel('todos','Todos')}${sel('desv','Desvinculados')}</select></label>
+      <button type="button" class="btn small ghost" id="tl_limpa">Limpar filtros</button></div>
+    <p class="note" style="margin:0 0 6px">Clique na linha para abrir o lançamento.</p>
+    <div class="tablebox" style="max-height:min(60vh,520px);overflow:auto"><table class="tl-tab"><thead><tr>${cols.map(c=>`<th>${c[1]}</th>`).join('')}<th></th></tr>
+      <tr>${cols.map(c=>`<th><input data-tlf="${c[0]}" value="${esc(f.col[c[0]]||'')}" placeholder="Filtrar" aria-label="Filtrar ${c[1]}" style="min-width:60px"></th>`).join('')}<th></th></tr></thead><tbody id="tl_body"></tbody></table></div>
+    <div class="row" id="tl_rodape" style="gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"></div>`;
+  tlCorpo(box);
+}
+function tlCorpo(box){
+  const f=box._f,e=ehEsc(),norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
   const b=(act,id,txt,cl)=>`<button type="button" class="btn small ${cl||''}" data-tl="${act}" data-id="${id}">${txt}</button>`;
-  const at=data.filter(l=>!l.removido_em),rm=data.filter(l=>l.removido_em);
-  box.innerHTML=`<h3 style="margin-bottom:6px">📎 Lançamentos ligados a esta tarefa (${at.length})</h3><div style="display:grid;gap:8px">${at.map(l=>{
-      const m=l.mov_id?mm.get(l.mov_id):null,some=l.mov_id?!m:l.titulo_id?!tt.has(l.titulo_id):true;
-      const st=l.validado_em?`<span class="chip c-done">✓ Validado em ${dtBR(l.validado_em)}${l.validado_por?' por '+esc(nomeDe(l.validado_por)):''}</span>`
-        :some?'<span class="chip c-none">O lançamento foi apagado</span>':m?.validar?`<span class="chip c-warn" style="white-space:normal">⚠ A validar: ${esc(m.validar)}</span>`:'<span class="chip c-warn">Aguardando conferência</span>';
-      return `<div class="card" style="padding:10px 12px;display:grid;gap:8px;margin:0"><div>${esc(l.resumo||'')}</div><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">${st}<span class="spacer"></span>${some?'':b('abrir',l.id,'Abrir o lançamento')}${e?(l.validado_em?b('desvalida',l.id,'Desfazer validação','ghost'):some?'':b('valida',l.id,'✓ Validar','primary'))+b('remove',l.id,'Desvincular','ghost'):''}</div></div>`}).join('')||'<p class="note" style="margin:0">Nenhum lançamento ligado.</p>'}
-    ${rm.length?`<p class="note" style="margin:0">${rm.map(l=>`Desvinculado em ${dtBR(l.removido_em)}: ${esc(l.resumo||'')} ${e?b('volta',l.id,'Desfazer','ghost'):''}`).join('<br>')}</p>`:''}</div>
-    ${e&&at.length?'<p class="note" style="margin:0">✓ Validar tira o aviso “A validar” do lançamento. Desfazer validação devolve o aviso como estava.</p>':''}`;
-  box._ls=data;box.hidden=false;
+  const rs=tlLinhas(box).filter(r=>f.sit==='desv'?r.l.removido_em:!r.l.removido_em&&(f.sit==='todos'||(f.sit==='validados'?r.l.validado_em:!r.l.validado_em)))
+    .filter(r=>Object.entries(f.col).every(([k,v])=>!v||norm(k==='desc'?r.desc+' '+r.aviso:r[k]).includes(norm(v))));
+  const chip=r=>r.l.validado_em?`<span class="chip c-done" title="${r.l.validado_por?'Por '+esc(nomeDe(r.l.validado_por)):''}">✓ ${dtBR(r.l.validado_em)}</span>`
+    :r.some?'<span class="chip c-none">Apagado</span>':r.l.removido_em?'<span class="chip c-none">Desvinculado</span>':`<span class="chip c-warn">${esc(r.sit)}</span>`;
+  $('tl_body').innerHTML=rs.map(r=>`<tr data-tlrow="${r.l.id}"${r.some?'':' class="tl-click" tabindex="0" title="Abrir o lançamento"'}>
+      <td style="white-space:nowrap">${esc(r.data)}</td><td>${esc(r.tipo)}</td><td class="num" style="white-space:nowrap">${esc(r.valor)}</td>
+      <td style="min-width:220px">${esc(r.desc)}${r.aviso&&!r.l.validado_em?`<div class="note" style="margin:2px 0 0;color:var(--warn,#a15c00)">⚠ ${esc(r.aviso)}</div>`:''}</td>
+      <td>${esc(r.conta)}</td><td>${esc(r.cat)||'<span class="muted">sem categoria</span>'}</td><td>${chip(r)}</td>
+      <td style="white-space:nowrap">${e?(r.l.removido_em?b('volta',r.l.id,'Desfazer','ghost'):r.l.validado_em?b('desvalida',r.l.id,'Desfazer validação','ghost'):r.some?'':b('valida',r.l.id,'✓ Validar','primary'))+(r.l.removido_em?'':b('remove',r.l.id,'Desvincular','ghost')):''}</td></tr>`).join('')
+    ||`<tr><td colspan="8" class="note">Nenhum lançamento com esses filtros.</td></tr>`;
+  const ab=rs.filter(r=>!r.l.validado_em&&!r.l.removido_em&&!r.some);
+  $('tl_rodape').innerHTML=`<span class="note" style="margin:0">${rs.length} mostrado${rs.length===1?'':'s'}.${e?' ✓ Validar tira o aviso “A validar” do lançamento; Desfazer validação devolve o aviso.':''}</span>`
+    +(e&&ab.length>1?`<span class="spacer"></span><button type="button" class="btn small" data-tlall="1">✓ Validar os ${ab.length} mostrados</button>`:'');
+  box._vis=ab;
 }
 async function tlAbreLanc(l){
   const cli=l.cliente_id,id=l.mov_id||l.titulo_id,k=l.mov_id?'m':'t';
@@ -12474,8 +12535,26 @@ async function tlVincula(tar,N){
   const {error}=await sb.from('tarefa_lancamentos').insert(N.itens.map(i=>({...i,tarefa_id:tar.id})));if(error)throw error;
   MV.tlK=null;MV.sel.clear();if(VIEW==='gfmov')mvDesenha();
 }
+async function tlValidaVarios(t,box,btn){
+  const ls=(box._vis||[]).map(r=>r.l);if(!ls.length||!confirm(`Validar os ${ls.length} lançamentos mostrados? Cada um pode ser desfeito depois em “Desfazer validação”.`))return;
+  btn.disabled=true;const agora=new Date().toISOString();let n=0;
+  try{for(const l of ls){let antes=null;
+      if(l.mov_id){antes=box._mm.get(l.mov_id)?.validar||null;if(antes){const {error}=await sb.from('fin_movimentos').update({validar:null}).eq('id',l.mov_id);if(error)throw error}}
+      const {error}=await sb.from('tarefa_lancamentos').update({validado_em:agora,validado_por:ME.user_id,validar_antes:antes}).eq('id',l.id);if(error)throw error;n++}
+    toast(n+' lançamentos validados')}
+  catch(err){console.error(err);tdErr('Validei '+n+' de '+ls.length+'. '+(err.message||'Verifique a internet e tente de novo.'))}
+  finally{MV.tlK=null;if(VIEW==='gfmov'){GT.key='';renderGT()}await tlCarrega(t)}
+}
+$('tdBody').addEventListener('input',e=>{const i=e.target.closest('[data-tlf]'),bx=$('td_lancBox');if(!i||!bx?._f)return;bx._f.col[i.dataset.tlf]=i.value;tlCorpo(bx)});
+$('tdBody').addEventListener('change',e=>{const bx=$('td_lancBox');if(e.target.id!=='tl_sit'||!bx?._f)return;bx._f.sit=e.target.value;tlCorpo(bx)});
+$('tdBody').addEventListener('keydown',e=>{if(e.key!=='Enter')return;const tr=e.target.closest?.('tr.tl-click'),bx=$('td_lancBox');if(!tr||!bx)return;const l=(bx._ls||[]).find(x=>x.id===tr.dataset.tlrow);if(l)tlAbreLanc(l)});
 $('tdBody').addEventListener('click',async e=>{
-  const b=e.target.closest('[data-tl]');if(!b)return;const t=TARDLG,l=($('td_lancBox')?._ls||[]).find(x=>x.id===b.dataset.id);if(!t||!l)return;
+  const bx=$('td_lancBox');
+  if(bx&&e.target.id==='tl_limpa'){bx._f={sit:'abertos',col:{}};tlDesenha(bx);return}
+  const ba=e.target.closest('[data-tlall]');if(ba&&bx&&TARDLG)return tlValidaVarios(TARDLG,bx,ba);
+  const b=e.target.closest('[data-tl]');
+  if(!b){const tr=e.target.closest('tr.tl-click');if(tr&&bx){const l=(bx._ls||[]).find(x=>x.id===tr.dataset.tlrow);if(l)tlAbreLanc(l)}return}
+  const t=TARDLG,l=(bx?._ls||[]).find(x=>x.id===b.dataset.id);if(!t||!l)return;
   const a=b.dataset.tl;if(a==='abrir')return tlAbreLanc(l);
   const agora=new Date().toISOString(),up=async r=>{const {error}=await sb.from('tarefa_lancamentos').update(r).eq('id',l.id);if(error)throw error};
   b.disabled=true;
@@ -14276,6 +14355,13 @@ $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoar
 const NOVIDADES=[
   {k:'2026-11-17perm',data:'2026-11-17',t:'Permissões: Apresentação no cadastro do usuário',itens:[
     {x:'Configurações › Cadastro de usuários › Privilégios de acesso: a Apresentação (DRE financeira) entrou na lista de Gestão financeira › Visões e relatórios do operador cliente, com Ver, Executar ou Bloqueado. Liberada, ele vê só as unidades das empresas dele (Pato Branco só aparece para quem tem MPA PB e MP Gestão PB). A aba Unidades continua só do escritório.',para:'esc'}]},
+  {k:'2026-11-17tesneg',data:'2026-11-17',t:'Tesouraria: aviso de saldo negativo',itens:[
+    {x:'Ao lançar na Tesouraria, se o lançamento deixar o saldo negativo em algum dia, aparece um aviso antes de salvar. A tesouraria não pode ficar negativa: confira se falta lançar uma entrada ou se a data está certa.',mods:['tesouraria']},
+    {x:'Se salvar mesmo assim, o lançamento fica marcado "Tesouraria negativa" e entra na tarefa "Tesouraria negativa: conferir" da empresa, para a Controlacs conferir. Vale para todas as empresas.',para:'esc'}]},
+  {k:'2026-11-16tlista',data:'2026-11-16',t:'Tarefas: lançamentos ligados em lista',itens:[
+    {x:'Na tarefa, os lançamentos ligados aparecem logo abaixo da descrição, numa lista com data, tipo, valor, descrição, conta, categoria e situação. Clique na linha para abrir o lançamento.',mods:['tarefas']},
+    {x:'A lista tem filtro em todas as colunas e o seletor Mostrar (A conferir, Validados, Todos, Desvinculados). Com vários lançamentos na tela, o botão Validar os N mostrados valida todos de uma vez, e cada um pode ser desfeito em Desfazer validação.',mods:['tarefas']},
+    {x:'A descrição da tarefa abre com o tamanho do texto, e o botão Tela cheia no topo da janela aumenta a tarefa inteira.',mods:['tarefas']}]},
   {k:'2026-11-16apres',data:'2026-11-16',t:'Apresentação (DRE financeira)',itens:[
     {x:'Gestão financeira › Relatórios › Apresentação (DRE financeira): a DRE para apresentar ao cliente. Receita = liquidez do sistema da empresa + juros do cartão; despesas vêm dos lançamentos, sem Restituições. Tem Resumo de recebíveis (taxas entram como despesa), rateios entre empresas, análise por unidade e geral, modo apresentação e PDF. Já estão lançadas a liquidez de 2024 a out/2026, os recebíveis das planilhas e o rateio de marketing (para conferir).',para:'esc'}]},
   {k:'2026-11-16soenv',data:'2026-11-16',t:'Boletos e notas a pagar: permissão Só enviar',itens:[
