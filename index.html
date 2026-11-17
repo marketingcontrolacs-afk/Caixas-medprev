@@ -1916,7 +1916,8 @@ const NAV=[
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gforc',t:'Previsão orçamentária',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gfdre',t:'DRE gerencial',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
-  {k:'gfapres',t:'Apresentação (DRE financeira)',g:'Gestão financeira',s:'Relatórios',ok:ehEsc},
+  // o operador cliente também, se liberado no cadastro do usuário (Carol, 17/11; v146): vê só as unidades de empresas dele
+  {k:'gfapres',t:'Apresentação (DRE financeira)',g:'Gestão financeira',s:'Relatórios',ok:()=>ehEsc()||okGestao()&&!!PERM()},
   {k:'gfdcat',t:'Despesas por categoria',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gfdforn',t:'Despesas por fornecedor',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gfdforma',t:'Despesas por forma de pagamento',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
@@ -3264,7 +3265,7 @@ const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origi
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
 const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
-  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -13595,7 +13596,7 @@ const MANUAL=[
 <li><b>Liberar um pagamento só:</b> se o banco não pagou um dos pagamentos da remessa (por exemplo, limite diário) e você não quer esperar o retorno, clique em <b>Liberar</b> ao lado dele na lista de contas do Envio de remessa. Só ele volta a ficar livre para outra remessa; os outros continuam aguardando o retorno. Confira antes no banco que ele não foi pago.</li>
 </ul>`},
     {k:'gfapres',t:'Apresentação (DRE financeira)',
-      txt:`<p>É o que o cliente vê na reunião: a DRE financeira das empresas que são intermediárias (a maior parte do que entra é das clínicas parceiras). Só o escritório acessa.</p>
+      txt:`<p>É o que o cliente vê na reunião: a DRE financeira das empresas que são intermediárias (a maior parte do que entra é das clínicas parceiras). O escritório vê todas as unidades. O operador do cliente só acessa se a tela estiver liberada no cadastro dele (Configurações › Cadastro de usuários › Privilégios de acesso › Gestão financeira › Visões e relatórios) e vê só as unidades cujas empresas ele tem; a aba Unidades é só do escritório.</p>
 <ol>
 <li><b>Receita</b> = a <b>liquidez</b> do mês (do sistema da empresa) + os <b>juros de parcelamento</b> do cartão (fechamento do caixa: crédito da máquina menos crédito do sistema). Lance a liquidez em <b>Lançar liquidez</b>, digitando ou importando o "Relatório de liquidez" (.xls).</li>
 <li><b>Despesas</b> vêm sozinhas dos lançamentos da Movimentação. Corrigiu uma categoria lá, a apresentação muda. <b>Restituições</b> (repasses e devoluções) e transferências <b>nunca</b> entram. Saídas sem categoria com "restituição" ou "repasse" na descrição também ficam fora, com aviso para categorizar.</li>
@@ -14273,6 +14274,8 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-17perm',data:'2026-11-17',t:'Permissões: Apresentação no cadastro do usuário',itens:[
+    {x:'Configurações › Cadastro de usuários › Privilégios de acesso: a Apresentação (DRE financeira) entrou na lista de Gestão financeira › Visões e relatórios do operador cliente, com Ver, Executar ou Bloqueado. Liberada, ele vê só as unidades das empresas dele (Pato Branco só aparece para quem tem MPA PB e MP Gestão PB). A aba Unidades continua só do escritório.',para:'esc'}]},
   {k:'2026-11-16apres',data:'2026-11-16',t:'Apresentação (DRE financeira)',itens:[
     {x:'Gestão financeira › Relatórios › Apresentação (DRE financeira): a DRE para apresentar ao cliente. Receita = liquidez do sistema da empresa + juros do cartão; despesas vêm dos lançamentos, sem Restituições. Tem Resumo de recebíveis (taxas entram como despesa), rateios entre empresas, análise por unidade e geral, modo apresentação e PDF. Já estão lançadas a liquidez de 2024 a out/2026, os recebíveis das planilhas e o rateio de marketing (para conferir).',para:'esc'}]},
   {k:'2026-11-16soenv',data:'2026-11-16',t:'Boletos e notas a pagar: permissão Só enviar',itens:[
@@ -16252,7 +16255,9 @@ async function renderApr(){
   const box=$('aprBody');
   if(!APR.de){const y=TODAY.slice(0,4);APR.de=y+'-01';APR.ate=aprMes(somaMes(TODAY.slice(0,8)+'01',-1))<APR.de?APR.de:aprMes(somaMes(TODAY.slice(0,8)+'01',-1))}
   $('aprDe').value=APR.de;$('aprAte').value=APR.ate;
-  $('aprTabs').innerHTML=APR_TABS.map(t=>`<button type="button" aria-selected="${t[0]===APR.tab}" data-aprtab="${t[0]}">${t[1]}</button>`).join('');
+  // a aba Unidades (montar as unidades e os grupos) é só do escritório
+  if(!ehEsc()&&APR.tab==='cfg')APR.tab='grupo';
+  $('aprTabs').innerHTML=APR_TABS.filter(t=>ehEsc()||t[0]!=='cfg').map(t=>`<button type="button" aria-selected="${t[0]===APR.tab}" data-aprtab="${t[0]}">${t[1]}</button>`).join('');
   box.innerHTML='<p class="muted">Carregando…</p>';
   let base;try{base=await aprCarregaBase()}catch(e){console.error(e);box.innerHTML=`<p class="neg">${aprV43(e)?aprMsg:'Erro ao carregar. Verifique a internet e tente de novo.'}</p>`;return}
   const grupos=[...new Set(base.unid.filter(u=>u.ativo!==false).map(u=>u.grupo))].sort();
