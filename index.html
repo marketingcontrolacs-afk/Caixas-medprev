@@ -1759,6 +1759,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&calcCampo(e.target))
 const showMoney=v=>v==null||v===''?'':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,3200)}
+// aviso com botão Desfazer (12 segundos)
+function toastDesfazer(t,fn){const el=$('toast');el.innerHTML=`<span>${esc(t)}</span> <button type="button" class="btn small" style="margin-left:10px">↶ Desfazer</button>`;el.hidden=false;
+  clearTimeout(toast.t);el.querySelector('button').onclick=async()=>{el.hidden=true;try{await fn()}catch(e){fail(e,'Não foi possível desfazer')}};toast.t=setTimeout(()=>el.hidden=true,12000)}
 function fail(e,msg){console.error(e);toast((msg||'Não foi possível salvar')+'. Verifique a internet e tente de novo.')}
 const one=x=>Array.isArray(x)?x[0]:x;
 
@@ -4109,13 +4112,20 @@ $('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitav
   const b=boletoDe(d);if(b)aplicarLeitura({bol:b},'linha');else if(box)box.innerHTML='<span class="neg">Esta linha digitável não confere. Verifique os números.</span>'});
 // o cliente apaga enquanto está aberto; o escritório apaga sempre (lançamento errado ou que não devia existir)
 async function excluirLanc(mod,r,docs){
-  if(!confirm((r.conferido?'Este lançamento já foi '+MODCFG[mod].okTxt.toLowerCase()+'. ':'')+'Excluir este lançamento e os documentos dele? Não dá para desfazer.'))return false;
-  const {error:e1}=await sb.from('documentos').delete().eq('registro_id',r.id);
+  // tesouraria (v149): apaga também na Gestão financeira e guarda cópia para o Desfazer (Carol, 17/11)
+  const tes=mod==='tesouraria'&&await v149();
+  if(!confirm((r.conferido?'Este lançamento já foi '+MODCFG[mod].okTxt.toLowerCase()+'. ':'')+(tes?'Excluir este lançamento e os documentos dele? Ele sai também da Movimentação financeira e do extrato. Logo depois aparece o botão Desfazer.':'Excluir este lançamento e os documentos dele? Não dá para desfazer.')))return false;
+  const {error:e1}=tes?{error:null}:await sb.from('documentos').delete().eq('registro_id',r.id);
   const {error}=e1?{error:e1}:await sb.from(MODCFG[mod].tabela).delete().eq('id',r.id);
   if(error){fail(error,'Não foi possível excluir');return false}
+  if(tes){toastDesfazer('Lançamento excluído da tesouraria e da Movimentação financeira.',async()=>{
+      const {error}=await sb.rpc('tes_desfazer_exclusao',{p_tes:r.id});if(error)throw error;toast('Lançamento de volta');renderMod()});return true}
   if(ehEsc()&&docs.length)await sb.storage.from('anexos').remove(docs.map(d=>d.caminho).filter(Boolean));
   toast('Lançamento excluído');return true;
 }
+// a exclusão com desfazer da tesouraria depende da atualização v149 no banco
+async function v149(){if(window.V149===undefined){const {error}=await sb.rpc('tes_desfazer_exclusao',{p_tes:'00000000-0000-0000-0000-000000000000'});
+  window.V149=!(error&&/function|schema cache|does not exist|Could not find/i.test(error.message||''))}return window.V149}
 $('rDel').onclick=async()=>{if(REG&&await excluirLanc(MOD,REG,DOCS[REG.id]||[])){dlgReg.close();renderMod()}};
 $('rConf').onclick=async()=>{
   const r=REG,novo=!r.conferido,upd={conferido:novo};
@@ -4162,19 +4172,26 @@ async function renderTC(cli){
   if(error){box.innerHTML=escR()?'<div class="alerta"><b>Conferência física da tesouraria</b><span>Rode a atualização v41 no Supabase para ligar a conferência.</span></div>':'';return}
   TCL=data||[];
   const ult=TCL[0],dias=tcDias(ult),btn=podeLancar(cli.id,'tesouraria')?`<button type="button" class="btn small${tcAtrasada(ult)?' primary':''}" id="tcNova">Conferir o dinheiro agora</button>`:'';
+  const oc=tcOculto(cli.id);
   let h=tcAtrasada(ult)
-    ?`<div class="alerta bad"><b>⚠ ${ult?dias+' dias sem conferência física da tesouraria':'Nenhuma conferência física da tesouraria registrada'}</b><span>${ult?'A última foi em '+dBR(ult.data)+'. ':''}O dinheiro precisa ser contado e conferido com o sistema pelo menos uma vez por semana.</span>${btn?`<div class="row">${btn}</div>`:''}</div>`
+    ?oc?`<div class="row note" style="margin-top:12px;gap:8px;align-items:center">⚠ Aviso de conferência física oculto até ${dBR(isoLocal(new Date(oc)))}.<span class="spacer"></span>${btn}<button type="button" class="btn small ghost" id="tcMostra">Mostrar aviso</button></div>`
+    :`<div class="alerta bad" style="position:relative"><button type="button" class="btn small ghost" id="tcOculta" title="Ocultar este aviso por 7 dias neste computador" style="position:absolute;top:8px;right:8px">✕ Ocultar</button><b>⚠ ${ult?dias+' dias sem conferência física da tesouraria':'Nenhuma conferência física da tesouraria registrada'}</b><span>${ult?'A última foi em '+dBR(ult.data)+'. ':''}O dinheiro precisa ser contado e conferido com o sistema pelo menos uma vez por semana.</span>${btn?`<div class="row">${btn}</div>`:''}</div>`
     :`<div class="card row" style="margin-top:16px;padding:12px 18px"><span><b>Conferência física</b> · última em ${dBR(ult.data)} (${dias===0?'hoje':dias===1?'ontem':'há '+dias+' dias'})</span>${tcChip(ult)}<span class="spacer"></span>${btn}</div>`;
   if(TCL.length)h+=`<details style="margin-top:8px"><summary class="note">Histórico das conferências físicas (${TCL.length})</summary><div class="card tablebox" style="margin-top:8px"><table><thead><tr><th>Data</th><th>Dinheiro contado</th><th>Saldo do sistema</th><th>Diferença</th><th class="l">Situação</th></tr></thead><tbody>${
     TCL.map(c=>`<tr class="click" data-tc="${c.id}" tabindex="0"><td>${dBR(c.data)}</td><td>${fm(c.valor_fisico)}</td><td>${fm(c.saldo_sistema)}</td><td class="${Math.abs(c.diferenca)>=0.01?'neg':''}">${fm(c.diferenca)}</td><td class="l">${tcChip(c)}</td></tr>`).join('')}</tbody></table></div></details>`;
+  // avisos de conferência física podem ser ocultados por 7 dias, por empresa, em cada computador (Carol, 17/11)
   box.innerHTML=h;
   // outras empresas atrasadas, para quem cuida de mais de uma
   const u=await tcAtrasos();
   if(!u||MOD!=='tesouraria'||cliAtual()?.id!==cli.id)return;
   const outras=empresasDe('tesouraria').filter(c=>c.id!==cli.id&&tcAtrasada(u[c.id]));
-  if(outras.length)box.insertAdjacentHTML('beforeend',`<div class="alerta bad" style="margin-top:10px"><b>Outras empresas sem conferência física há mais de ${TC_PRAZO} dias</b><div class="row" style="gap:8px">${outras.map(c=>`<button type="button" class="btn small" data-tcc="${c.id}">${esc(c.nome)} · ${u[c.id]?tcDias(u[c.id])+' dias':'nunca conferida'}</button>`).join('')}</div></div>`);
+  if(outras.length&&!oc)box.insertAdjacentHTML('beforeend',`<div class="alerta bad" style="margin-top:10px"><b>Outras empresas sem conferência física há mais de ${TC_PRAZO} dias</b><div class="row" style="gap:8px">${outras.map(c=>`<button type="button" class="btn small" data-tcc="${c.id}">${esc(c.nome)} · ${u[c.id]?tcDias(u[c.id])+' dias':'nunca conferida'}</button>`).join('')}</div></div>`);
 }
+function tcOculto(cid){try{const o=JSON.parse(localStorage.getItem('ctl_tc_oculto')||'{}');return o[cid]&&o[cid]>Date.now()?o[cid]:0}catch(e){return 0}}
+function tcOcultar(cid,ate){try{const o=JSON.parse(localStorage.getItem('ctl_tc_oculto')||'{}');if(ate)o[cid]=ate;else delete o[cid];localStorage.setItem('ctl_tc_oculto',JSON.stringify(o))}catch(e){}}
 $('mConf').addEventListener('click',e=>{
+  if(e.target.closest('#tcOculta')){const c=cliAtual();if(c){tcOcultar(c.id,Date.now()+7*864e5);renderTC(c)}return}
+  if(e.target.closest('#tcMostra')){const c=cliAtual();if(c){tcOcultar(c.id,0);renderTC(c)}return}
   if(e.target.closest('#tcNova'))return tcAbrir(null);
   const t=e.target.closest('[data-tc]');if(t)return tcAbrir(TCL.find(c=>c.id===t.dataset.tc));
   const b=e.target.closest('[data-tcc]');if(b&&escCli.querySelector(`option[value="${b.dataset.tcc}"]`)){escCli.value=b.dataset.tcc;guardaEmp();openView()}
@@ -12932,6 +12949,7 @@ function tlCorpo(box){
 async function tlAbreLanc(l){
   const cli=l.cliente_id,id=l.mov_id||l.titulo_id,k=l.mov_id?'m':'t';
   if(!cli||!escCli.querySelector(`option[value="${cli}"]`))return alert('Você não tem acesso à empresa deste lançamento.');
+  const volta={t:TARDLG,view:VIEW};
   dlgTar.close();
   // depósito de cartão que não entrou (v148): abre os Recebíveis de cartão no dia, em Alertas
   if(l.cartao_chave){const d=l.cartao_chave.split('|')[1];if(escCli.value!==cli){escCli.value=cli;guardaEmp()}
@@ -12940,8 +12958,22 @@ async function tlAbreLanc(l){
   GT.key='';go('gfmov');
   const ok=()=>GT.modo==='gfmov'&&(k==='m'?GT.todos:GT.lista)?.some(x=>x.id===id&&x.cliente_id===cli);
   for(let i=0;i<50&&!ok();i++)await new Promise(r=>setTimeout(r,300));
-  if(!ok())return toast('Não achei o lançamento. Ele pode ter sido apagado ou baixado.');
+  if(!ok()){tlVoltaTarefa(volta,true);return toast('Não achei o lançamento. Ele pode ter sido apagado ou baixado.')}
   mvAbre({dataset:{mv:k+':'+id}});
+  tlVoltaTarefa(volta);
+}
+// aberto pela tarefa: ao fechar a janela do lançamento, volta para a tela de antes com a tarefa aberta (Carol, 17/11)
+function tlVoltaTarefa(v,ja){
+  if(!v?.t)return;
+  const reabre=async()=>{if(document.querySelector('dialog[open]'))return;
+    if(v.view&&v.view!==VIEW)go(v.view);
+    await abrirTarefa(TAR.find(x=>x.id===v.t.id)||v.t)};
+  if(ja)return reabre();
+  // a janela do lançamento abre depois de carregar os dados: espera ela aparecer (até 8 s)
+  let n=0;const espera=()=>{const d=[...document.querySelectorAll('dialog[open]')].pop();
+    if(d)return d.addEventListener('close',()=>setTimeout(reabre,60),{once:true});
+    if(++n<40)setTimeout(espera,200)};
+  espera();
 }
 async function tlVincula(tar,N){
   const {error}=await sb.from('tarefa_lancamentos').insert(N.itens.map(i=>({...i,tarefa_id:tar.id})));if(error)throw error;
@@ -14786,6 +14818,10 @@ const NOVIDADES=[
     {x:'O menu da Gestão financeira ficou dividido em Caixa e tesouraria, Bancos, Recebíveis, Cadastros e Relatórios. Nenhuma tela saiu; as permissões dos usuários seguem iguais, na mesma divisão.',para:'esc'}]},
   {k:'2026-11-17perm',data:'2026-11-17',t:'Permissões: Apresentação no cadastro do usuário',itens:[
     {x:'Configurações › Cadastro de usuários › Privilégios de acesso: a Apresentação (DRE financeira) entrou na lista de Gestão financeira › Visões e relatórios do operador cliente, com Ver, Executar ou Bloqueado. Liberada, ele vê só as unidades das empresas dele (Pato Branco só aparece para quem tem MPA PB e MP Gestão PB). A aba Unidades continua só do escritório.',para:'esc'}]},
+  {k:'2026-11-17tesexc',data:'2026-11-17',t:'Tesouraria: excluir apaga em tudo, avisos que dá para ocultar e tarefas',itens:[
+    {x:'Excluir um lançamento na Tesouraria agora tira ele também da Movimentação financeira e do extrato, mesmo que a Controlacs já tenha revisado. Logo depois aparece o botão Desfazer, que volta o lançamento como estava, com os documentos.',mods:['tesouraria']},
+    {x:'O aviso de conferência física da tesouraria tem o botão ✕ Ocultar: ele some por 7 dias nesta empresa, neste computador. Mostrar aviso traz de volta.',mods:['tesouraria']},
+    {x:'Na tarefa, ao abrir um lançamento ligado e fechar a janela dele, a tarefa abre de novo, na mesma tela de antes.',mods:['tarefas']}]},
   {k:'2026-11-17tesneg',data:'2026-11-17',t:'Tesouraria: aviso de saldo negativo',itens:[
     {x:'Ao lançar na Tesouraria, se o lançamento deixar o saldo negativo em algum dia, aparece um aviso antes de salvar. A tesouraria não pode ficar negativa: confira se falta lançar uma entrada ou se a data está certa.',mods:['tesouraria']},
     {x:'Se salvar mesmo assim, o lançamento fica marcado "Tesouraria negativa" e entra na tarefa "Tesouraria negativa: conferir" da empresa, para a Controlacs conferir. Vale para todas as empresas.',para:'esc'}]},
