@@ -1029,6 +1029,25 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     <p class="note" id="cvNote"></p>
   </section>
 
+  <!-- GESTÃO FINANCEIRA › RECEBÍVEIS DE CARTÃO: o que a adquirente vai pagar, somado do jeito que cai no banco, com taxas, antecipações e alertas (Carol, 17/11; v148) -->
+  <section id="viewRC" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div><h1>Recebíveis de cartão</h1><p class="sub">O valor a receber de cada dia, já com as taxas e as antecipações, somado do mesmo jeito que a adquirente deposita no banco, e conferido com o extrato. O que devia ter entrado e não entrou vira alerta e tarefa.</p></div>
+      <div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:8px"><button class="btn" id="rcCfg">Adquirentes e taxas</button><button class="btn" id="rcXls">Baixar Excel</button><span class="btn fotobtn" id="rcVendas">Importar vendas<input type="file" id="rcArq" accept=".csv,.txt,.xls,.xlsx" aria-label="Importar o relatório de vendas ou de recebíveis da adquirente"></span></div>
+    </div>
+    <div class="toolbar">
+      <label class="f">Recebimento de<input type="date" id="rcDe"></label><label class="f">até<input type="date" id="rcAte"></label>
+      <label class="f">Mostrar<select id="rcVisao"><option value="dia">A receber por dia (como cai no banco)</option><option value="alertas">Alertas</option><option value="taxas">Taxas cobradas × contratadas</option><option value="antecip">Antecipações</option></select></label>
+      <label class="f">Adquirente<select id="rcAdq"><option value="">Todas</option></select></label>
+      <label class="f">Situação<select id="rcSit"><option value="">Todas</option><option value="ok">Entrou no banco</option><option value="dif">Entrou com diferença</option><option value="nao">Não entrou</option><option value="prev">A receber</option><option value="aguarda">Aguardando o extrato</option></select></label>
+      <input id="rcBusca" type="search" placeholder="Buscar em todas as colunas" style="max-width:240px">
+    </div>
+    <div class="tiles" id="rcTiles"></div>
+    <div class="row" id="rcAcoes" style="gap:8px;margin:14px 0 12px;flex-wrap:wrap"></div>
+    <div class="card tablebox"><table id="rcTab"><thead id="rcHead"></thead><tbody id="rcBody"></tbody><tfoot id="rcFoot"></tfoot></table></div>
+    <p class="note" id="rcNote"></p>
+  </section>
+
   <!-- GESTÃO FINANCEIRA › FATURA DO CARTÃO DE CRÉDITO (escritório) -->
   <section id="viewFat" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
@@ -1828,11 +1847,13 @@ const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual'];
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcrm','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
-const eqPodeAnt=k=>(k=k==='docs'?'colab':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
+const eqPodeAnt=k=>(k=k==='docs'?'colab':k==='gfreceb'?'gfcartoes':k,!ehEsc()||ehAdm()||!SO_MASTER.includes(k)&&(!ME.modulos_equipe||SEMPRE.includes(k)||ME.modulos_equipe.includes(k)));
 // permissões por ferramenta (Carol, 03/11): cada tela do menu tem Visualizar e/ou Executar.
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
 const PERM=()=>ME&&!ehAdm()&&ME.permissoes&&typeof ME.permissoes==='object'&&!Array.isArray(ME.permissoes)?ME.permissoes:null;
-const permTela=k=>{if(!ME||ehAdm())return 'exec';const p=PERM();if(!p||SEMPRE.includes(k)||k==='avisos')return 'exec';return p[k]==='exec'||p[k]==='env'?'exec':p[k]==='ver'?'ver':''};
+// tela nova herda a permissão da tela parecida até a pessoa ser salva de novo no cadastro (Recebíveis de cartão = Conciliação de cartões, Carol 17/11)
+const PERMHERDA={gfreceb:'gfcartoes'};
+const permTela=k=>{if(!ME||ehAdm())return 'exec';const p=PERM();if(!p||SEMPRE.includes(k)||k==='avisos')return 'exec';if(p[k]===undefined&&PERMHERDA[k])k=PERMHERDA[k];return p[k]==='exec'||p[k]==='env'?'exec':p[k]==='ver'?'ver':''};
 const eqPode=k=>{if(!ME)return false;if(ehAdm())return true;const p=PERM();if(!p)return eqPodeAnt(k);if(ehEsc()&&SO_MASTER.includes(k))return false;return !!permTela(k)};
 // Executar: lança, altera, exclui e anexa na tela; só Visualizar: vê e baixa, sem gravar nada
 const podeExec=k=>permTela(k)==='exec';
@@ -1877,6 +1898,7 @@ const ICO={
   gfext:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   gfconc:'<path d="M4 7h11l-3-3M20 17H9l3 3"/><path d="M17 7l3 0M4 17h1"/>',
   gfcartoes:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  gfreceb:'<rect x="2" y="5" width="14" height="10" rx="2"/><path d="M2 9h14"/><circle cx="18" cy="16" r="4"/><path d="M18 14v2l1.3 1"/>',
   gfnf:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/><path d="M4 7v14h11" opacity=".55"/>',
   gfrepasse:'<circle cx="8" cy="8" r="3"/><path d="M3 19a5 5 0 0 1 10 0M14 9h7M18 6l3 3-3 3M14 16h7"/>',
   gfpes:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
@@ -1917,25 +1939,27 @@ const NAV=[
   // Gestão financeira; por enquanto só o escritório
   // organizado como no Bom Controle: dia a dia, relatórios e cadastros (pedido da Carol, 27/10)
   {k:'gfdash',t:'Dashboard da empresa',g:'Gestão financeira',s:'Dia a dia',ok:()=>true},   // todos; cada um vê só o que tem acesso (Carol, 30/10)
-  {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gfinad',t:'Inadimplência',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gfagenda',t:'Agenda financeira',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfmov',t:'Movimentação financeira',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao},
+  {k:'gfpagar',t:'Contas a pagar',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao},
+  {k:'gfrec',t:'Contas a receber',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao},
+  {k:'gfinad',t:'Inadimplência',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao},
+  {k:'gfagenda',t:'Agenda financeira',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao},
   // a Tesouraria da Gestão financeira saiu do menu: a revisão fica no Extrato da conta, na conta Tesouraria (Carol, 03/11)
-  {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  {k:'gfconc',t:'Conciliação bancária',g:'Gestão financeira',s:'Bancos',ok:okGestao},
   // vendas da adquirente por bandeira × fechamento do caixa; e-commerce separado (Carol, 10/11; v110)
-  {k:'gfcartoes',t:'Conciliação de cartões',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
-  {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Dia a dia',ok:okGestao},
+  // o valor a receber por dia, com taxas e antecipações, somado como a adquirente deposita e conferido com o extrato (Carol, 17/11; v148)
+  {k:'gfreceb',t:'Recebíveis de cartão',g:'Gestão financeira',s:'Recebíveis',ok:okGestao},
+  {k:'gfcartoes',t:'Conciliação de cartões',g:'Gestão financeira',s:'Recebíveis',ok:okGestao},
+  {k:'gfremessa',t:'Envio de remessa',g:'Gestão financeira',s:'Bancos',ok:okGestao},
+  {k:'gfretorno',t:'Retorno de remessa',g:'Gestão financeira',s:'Bancos',ok:okGestao},
+  {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Bancos',ok:okGestao},
   // repasses da semana (relatório de restituições): separa quem emite NF e gera as contas a pagar em cada empresa do grupo (Carol, 30/10)
   // Parceiros saiu da Comunicação: é a tela única de parceiros na Gestão financeira, com as abas Cadastro, Repasse e Notas fiscais (Carol, 04/11)
-  {k:'repasse',t:'Parceiros',g:'Gestão financeira',s:'Dia a dia',ok:()=>temAcesso('repasse')},
+  {k:'repasse',t:'Parceiros',g:'Gestão financeira',s:'Caixa e tesouraria',ok:()=>temAcesso('repasse')},
   // Repasse e Notas fiscais viraram abas da tela Parceiros (aba:'repasse'): saem do menu, a tela continua igual (Carol, 04/11)
-  {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Dia a dia',ok:okGestao,aba:'repasse'},
+  {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
   // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
-  {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Dia a dia',ok:okGestao,aba:'repasse'},
+  {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
@@ -1970,8 +1994,8 @@ const NAV=[
   // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
   {k:'projetos',t:'Projetos e melhorias',g:'Comunicação',s:'Mensagens',ok:ehEsc},
   // o que era do Escritório fica na Gestão financeira; o Escritório virou Configurações (pedido da Carol, 28/10)
-  {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
-  {k:'bc',t:'Exportação Bom Controle',g:'Gestão financeira',s:'Dia a dia',ok:ehEsc},
+  {k:'confcaixa',t:'Conferência de caixa',g:'Gestão financeira',s:'Caixa e tesouraria',ok:ehEsc},
+  {k:'bc',t:'Exportação Bom Controle',g:'Gestão financeira',s:'Caixa e tesouraria',ok:ehEsc},
   // cadastro de empresas e de usuários em telas separadas (Carol, 04/11)
   {k:'cfg',t:'Cadastro de empresas',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgusr',t:'Cadastro de usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
@@ -1998,7 +2022,8 @@ const NAVBADGE={};
 const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'cfg'}];
 // Contabilidade, Comunicação, Controlacs, Configurações e Ajuda saem da faixa de módulos e ficam no canto direito do topo, ao lado do nome (Carol, 15/11)
 const TOPMODS=[{g:'Contabilidade',i:'m_ctb'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'engr'},{g:'Ajuda',i:'ajuda'}];
-const SECOES=['Dia a dia','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado','Ajuda'];
+// a Gestão financeira é dividida em Caixa e tesouraria, Bancos, Recebíveis, Cadastros e Relatórios (Carol, 17/11)
+const SECOES=['Dia a dia','Caixa e tesouraria','Bancos','Recebíveis','Mensagens','Cadastros','Bom Controle','Relatórios','Avançado','Ajuda'];
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
@@ -2148,12 +2173,13 @@ function msFiltro(el){if(typeof el==='string')el=$(el);if(!el||el._msdd)return;
   d.querySelector('.msmenu').addEventListener('click',e=>{const b=e.target.closest('[data-ms]');if(!b)return;if(b.dataset.ms==='limpa'){msSet(el,[],true);monta()}else d.open=false});
   msPinta(el)}
 document.addEventListener('click',e=>{document.querySelectorAll('details.msdd[open]').forEach(dd=>{if(!dd.contains(e.target))dd.open=false})});
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
   MOD=null;MV.lim=300;   // Contas a pagar e Tesouraria do cliente reabrem como na primeira vez
   NFP.cli=null;   // Notas fiscais › repasses pagos: volta para a empresa escolhida no alto
+  if(typeof RC!=='undefined'){RC.col={};RC.aberto.clear()}
 }
 // ajusta: filtro que o link já quer aplicar (ex.: "a validar" do Dashboard), depois da limpeza
 function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ctl'))PORTAL_VOLTA=VIEW;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
@@ -2184,12 +2210,12 @@ const GTTODAS=['gfpagar','gfrec','gfagenda','gfinad','gfmov'];
 const TODAS={id:'*',get nome(){const g=grupoSel();return g?'Grupo: '+g.nome:'Todas as empresas'},bpo_financeiro:true};
 const cliOuTodas=()=>escCli.value==='*'?TODAS:cliAtual();
 // telas que somam todas as empresas; nas outras, "Todas as empresas" mostra a lista das empresas para abrir a tela de cada uma
-const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
+const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
 // a conta ou o lançamento aberto com "Todas as empresas" usa a empresa dele; ao fechar a janela, volta
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewApr','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2222,6 +2248,7 @@ function openView(){
   else if(VIEW==='gfext'){$('viewGX').hidden=false;renderGX()}
   else if(VIEW==='gfconc'){$('viewGC').hidden=false;renderGC()}
   else if(VIEW==='gfcartoes'){$('viewCV').hidden=false;renderCV()}
+  else if(VIEW==='gfreceb'){$('viewRC').hidden=false;renderRC()}
   else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;parcAbas();renderRN()}
   else if(VIEW==='gfnf'){$('viewNF').hidden=false;parcAbas();renderNF()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
@@ -3322,7 +3349,7 @@ const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origi
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
 const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
-  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -3331,7 +3358,7 @@ const temPermNova=u=>!!u.permissoes&&typeof u.permissoes==='object'&&!Array.isAr
 // permissões atuais do usuário; quem ainda não foi salvo na tela nova tem as permissões montadas pela regra antiga (nada muda para ele)
 function permsDe(u,tipo){
   tipo=tipo||tipoUsr(u);const r={};
-  if(temPermNova(u)){ferramentas(tipo).forEach(n=>{const v=u.permissoes[n.k];if(v==='ver'||v==='exec'||v==='env')r[n.k]=v});return r}
+  if(temPermNova(u)){ferramentas(tipo).forEach(n=>{const v=u.permissoes[n.k]===undefined&&PERMHERDA[n.k]?u.permissoes[PERMHERDA[n.k]]:u.permissoes[n.k];if(v==='ver'||v==='exec'||v==='env')r[n.k]=v});return r}
   if(ehTipoEquipe(tipo)){ferramentas(tipo).forEach(n=>{const k=n.k==='docs'?'colab':n.k;if(!u.modulos_equipe||u.modulos_equipe.includes(k))r[n.k]='exec'});return r}
   ferramentas(tipo).forEach(n=>{const l=ACS_TODOS.filter(a=>a.user_id===u.user_id&&a.modulo===TOOLMOD[n.k]);if(l.length)r[n.k]=l.some(a=>a.nivel==='lancamento')?'exec':'ver'});
   return r;
@@ -9822,6 +9849,8 @@ const CVSYN={
   data_prevista:['data prevista de pagamento','data prevista pagamento','previsao de pagamento','data prevista','data de vencimento','data vencimento','data prevista de recebimento','data de recebimento','data do credito','data de credito','data credito'],
   data_pago:['data de pagamento','data do pagamento','data pagamento','data de liquidacao','data liquidacao','pago em','data efetiva'],
   data_venda:['data da venda','data venda','data de venda','data da transacao','data transacao','data de captura','data captura','data da compra','data e hora da venda','data hora da venda','data hora','data'],
+  taxa_antecipacao:['taxa de antecipacao','valor da antecipacao','custo da antecipacao','desconto de antecipacao','tarifa de antecipacao','valor taxa antecipacao','taxa antecipacao'],
+  data_prevista_original:['data prevista original','data original de pagamento','data original','vencimento original','data de vencimento original','data original do recebivel'],
   valor_liquido:['valor liquido da parcela','valor liquido','liquido','valor a receber','valor recebido','valor creditado'],
   taxa:['valor da taxa','valor taxa','valor descontado','taxa administrativa','taxas','taxa','tarifa','desconto','mdr','valor mdr'],
   valor_bruto:['valor bruto da parcela','valor bruto','valor da venda','valor original','valor total da venda','valor total','valor da transacao','valor da parcela','valor'],
@@ -9838,7 +9867,7 @@ const CVSYN={
   antecipado:['antecipado','antecipada','antecipacao'],
   data_cancel:['data do cancelamento','data de cancelamento','data cancelamento']};
 const CVCAMPOS={data_venda:'Data da venda',data_prevista:'Data prevista de recebimento',data_pago:'Data em que foi pago',bandeira:'Bandeira',modalidade:'Modalidade (débito, crédito...)',parcela:'Parcela',parcelas:'Total de parcelas',
-  valor_bruto:'Valor bruto',taxa:'Taxa',valor_liquido:'Valor líquido',nsu:'NSU / código da transação',autorizacao:'Autorização',estabelecimento:'Estabelecimento (EC)',terminal:'Terminal / máquina',canal:'Canal (loja, e-commerce)',data_cancel:'Data do cancelamento',status:'Status / tipo de lançamento',antecipado:'Antecipado'};
+  valor_bruto:'Valor bruto',taxa:'Taxa',valor_liquido:'Valor líquido',nsu:'NSU / código da transação',autorizacao:'Autorização',estabelecimento:'Estabelecimento (EC)',terminal:'Terminal / máquina',canal:'Canal (loja, e-commerce)',data_cancel:'Data do cancelamento',status:'Status / tipo de lançamento',antecipado:'Antecipado',taxa_antecipacao:'Taxa da antecipação',data_prevista_original:'Data prevista antes de antecipar'};
 // acha as colunas: primeiro o nome igual, depois o que contém o nome (só nomes longos, para "valor" não pegar "valor líquido")
 function cvMapa(cab){
   const hs=cab.map(cvN),usado=new Set(),m={};
@@ -9917,11 +9946,16 @@ function cvMonta(L,mapa,ops){
       modalidade:tipo==='antecipacao'||tipo==='ajuste'?(String(modT||st).trim()||CVTIPO[tipo][0]):cvModal(modT||bandT,parcs),parcela:parc,parcelas:parcs,
       valor_bruto:r2(sg*b),taxa:r2(sg*t),valor_liquido:r2(sg*l),nsu:String(g(r,'nsu')||'').trim()||null,autorizacao:String(g(r,'autorizacao')||'').trim()||null,
       estabelecimento:ec||null,terminal:term||null,descricao:st.trim()||null};
+    // v148: taxa da antecipação e a data que era prevista; só vão quando o arquivo tem essas colunas
+    {const ta=cvNum(g(r,'taxa_antecipacao')),dor=cvData(g(r,'data_prevista_original'));if(ta!=null&&tipo==='venda'){v.taxa_antecipacao=Math.abs(ta);if(ta)v.antecipada=true}if(dor&&tipo==='venda'){v.data_prevista_original=dor;if(dp&&dor!==dp)v.antecipada=true}}
     let k=[v.adquirente,v.nsu,v.autorizacao,v.data_venda,v.parcela,v.tipo,v.valor_bruto.toFixed(2),v.estabelecimento,v.data_prevista].join('|');
     if(!v.nsu&&!v.autorizacao){cont[k]=(cont[k]||0)+1;k+='#'+cont[k]}
     v.chave=k;
     // venda parcelada numa linha só, com a data da última parcela (PagBank "O que vendi"): uma linha por parcela, mês a mês
-    if(tipo==='venda'&&parc==null&&parcs>1&&parcs<=24&&dp){
+    // só quando a data prevista fica N meses depois da venda (a data é da última parcela); quando fica antes (ex.: 4x com previsão em 30 dias),
+    // a adquirente paga tudo na data prevista e a venda fica numa linha só (visto no "O que vendi" da MP Gestão PB, 17/11)
+    const mesesAte=(a,b)=>{const [y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number);return (y2-y1)*12+(m2-m1)-(d2+3<d1?1:0)};
+    if(tipo==='venda'&&parc==null&&parcs>1&&parcs<=24&&dp&&dv&&mesesAte(dv,dp)>=parcs){
       const mes=(d,n)=>{const [y,m,dd]=d.split('-').map(Number),x=new Date(y,m-1+n,1),u=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();return isoLocal(new Date(x.getFullYear(),x.getMonth(),Math.min(dd,u),12))};
       let rb=v.valor_bruto,rt=v.taxa,rl=v.valor_liquido;
       for(let i=1;i<=parcs;i++){const ult=i===parcs,pb=ult?r2(rb):r2(v.valor_bruto/parcs),pt=ult?r2(rt):r2(v.taxa/parcs),pl=ult?r2(rl):r2(v.valor_liquido/parcs);rb-=pb;rt-=pt;rl-=pl;
@@ -9973,11 +10007,14 @@ const cvRecebe=v=>v.data_pago||v.data_prevista||v.data_venda;
 // agenda: uma linha por empresa + dia de recebimento + adquirente + canal + bandeira + modalidade
 function cvAgenda(l){const g={};
   for(const v of l){const d=cvRecebe(v);if(d<CV.de||d>CV.ate)continue;
-    const k=[v.cliente_id,d,v.adquirente,v.canal,v.bandeira,v.modalidade,v.antecipada?'a':''].join('|');
-    const x=g[k]||={k,cliente_id:v.cliente_id,data:d,adquirente:v.adquirente,canal:v.canal,bandeira:v.bandeira,modalidade:v.modalidade,antecipada:v.antecipada,bruto:0,taxa:0,liq:0,n:0,ids:[],sem:[],tits:new Set(),dmin:v.data_venda,dmax:v.data_venda};
+    // somado do jeito que a adquirente deposita (Adquirentes › Como deposita no banco), para cada conta a receber bater com uma linha do extrato (Carol, 17/11)
+    const cf=CV.cfg.find(c=>c.cliente_id===v.cliente_id&&c.adquirente===v.adquirente)||{},ag=cf.agrupa||'bandeira',md=rcMod(v.modalidade),bd=rcBand(v.bandeira);
+    const grupo=rcGrupo(ag,md,bd)+(ag==='venda'?' · '+(v.nsu||v.autorizacao||v.id.slice(0,6)):'');
+    const k=[v.cliente_id,d,v.adquirente,v.canal,grupo,v.antecipada?'a':''].join('|');
+    const x=g[k]||={k,cliente_id:v.cliente_id,data:d,adquirente:v.adquirente,canal:v.canal,grupo,bandeira:md==='Pix'?'Pix':ag==='bandeira'?(bd||'Sem bandeira'):'Todas',modalidade:ag==='dia'?'Todas':md,antecipada:v.antecipada,bruto:0,taxa:0,liq:0,n:0,ids:[],sem:[],tits:new Set(),dmin:v.data_venda,dmax:v.data_venda};
     x.bruto=r2(x.bruto+(+v.valor_bruto));x.taxa=r2(x.taxa+(+v.taxa));x.liq=r2(x.liq+(+v.valor_liquido));x.n++;x.ids.push(v.id);if(v.titulo_id)x.tits.add(v.titulo_id);else x.sem.push(v);
     if(v.data_venda<x.dmin)x.dmin=v.data_venda;if(v.data_venda>x.dmax)x.dmax=v.data_venda}
-  return Object.values(g).sort((a,b)=>a.data.localeCompare(b.data)||a.bandeira.localeCompare(b.bandeira))}
+  return Object.values(g).sort((a,b)=>a.data.localeCompare(b.data)||a.grupo.localeCompare(b.grupo))}
 function cvDesenha(){
   const vis=$('cvVisao').value,todasE=CV.ids.length>1,mu=t=>`<span class="muted">${t}</span>`,emp=v=>todasE?`<td class="l">${esc(cvEmpNome(v.cliente_id))}</td>`:'',empH=todasE?'<th class="l">Empresa</th>':'';
   const noPer=CV.vendas.filter(v=>v.data_venda>=CV.de&&v.data_venda<=CV.ate),l=cvFiltra(noPer),vend=l.filter(v=>v.tipo==='venda');
@@ -9988,7 +10025,7 @@ function cvDesenha(){
     ['A receber',fm(r2(aReceber.reduce((x,a)=>x+a.liq,0))),`de hoje até ${dBR(CV.ate)}`]]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   const semTit=ag.filter(a=>a.sem.length&&a.liq>0.004);
-  $('cvAcoes').innerHTML=semTit.length?`<button type="button" class="btn primary" id="cvGerar">Gerar ${semTit.length} ${semTit.length===1?'conta':'contas'} a receber (${fm(r2(semTit.reduce((x,a)=>x+a.liq,0)))})</button><span class="note" style="margin:0;align-self:center">uma por dia de recebimento, bandeira e modalidade, com o valor líquido</span>`:'';
+  $('cvAcoes').innerHTML=semTit.length?`<button type="button" class="btn primary" id="cvGerar">Gerar ${semTit.length} ${semTit.length===1?'conta':'contas'} a receber (${fm(r2(semTit.reduce((x,a)=>x+a.liq,0)))})</button><span class="note" style="margin:0;align-self:center">uma por depósito (somadas do jeito que a adquirente deposita no banco), com o valor líquido</span>`:'';
   if($('cvGerar'))$('cvGerar').onclick=()=>cvGerar(semTit);
   if(!CV.vendas.length&&!CV.fech.length){$('cvHead').innerHTML='';$('cvFoot').innerHTML='';$('cvBody').innerHTML=`<tr><td class="l muted">Nenhuma venda de cartão importada neste período. Clique em “Importar vendas da adquirente” e escolha o relatório de vendas (ou de recebimentos) que a adquirente fornece no site dela, em Excel ou CSV.</td></tr>`;cvNota();return}
   if(vis==='conf'){
@@ -10038,7 +10075,7 @@ $('cvBusca').oninput=()=>{clearTimeout(cvDesenha.t);cvDesenha.t=setTimeout(cvDes
 $('cvBody').addEventListener('click',e=>{const tr=e.target.closest('tr[data-dia]');if(!tr)return;$('cvVisao').value='vendas';$('cvDe').value=$('cvAte').value=tr.dataset.dia;renderCV()});
 const dlgCV=$('dlgCV');
 dlgCV.addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.dataset.act==='fechar')return dlgCV.close();
-  if(b.dataset.act==='salvar'){b.disabled=true;try{CV.modo==='cfg'?await cvSalvaCfg():await cvSalvaImp()}catch(err){console.error(err);cvErr(v110cv(err)||v110(err)?v110Msg:err.message||'Não foi possível salvar.')}b.disabled=false}});
+  if(b.dataset.act==='salvar'){b.disabled=true;try{CV.modo==='cfg'?await cvSalvaCfg():CV.modo==='rcliga'?await rcSalvaLiga():await cvSalvaImp()}catch(err){console.error(err);cvErr(rcV148(err)?rcV148Msg:v110cv(err)||v110(err)?v110Msg:err.message||'Não foi possível salvar.')}b.disabled=false}});
 const cvErr=t=>{const x=$('cvDErr');if(x){x.textContent=t;x.hidden=false}else alert(t)};
 // importação: mostra as colunas que o portal achou (dá para trocar) e um resumo antes de gravar
 $('cvArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -10091,6 +10128,9 @@ async function cvSalvaImp(){
   renderCV();
 }
 // adquirentes de cada empresa: EC do e-commerce, conta onde cai o dinheiro e categoria das contas a receber
+// taxas contratadas: modalidade, bandeira (ou todas), faixa de parcelas, % e prazo (Carol, 17/11; v148)
+const CVTXMOD=['Débito','Crédito à vista','Crédito parcelado','Pix','Voucher','Pré-pago'],CVTXBAND=['Visa','Mastercard','Elo','Amex','Hipercard'];
+const cvTxLinha=t=>`<tr data-tx><td class="l"><select data-t="modalidade">${CVTXMOD.map(m=>`<option${m===t.modalidade?' selected':''}>${m}</option>`).join('')}</select></td><td class="l"><select data-t="bandeira"><option value="">Todas</option>${CVTXBAND.map(m=>`<option${m===t.bandeira?' selected':''}>${m}</option>`).join('')}</select></td><td><input data-t="de" inputmode="numeric" style="width:60px" value="${t.de||''}"></td><td><input data-t="ate" inputmode="numeric" style="width:60px" value="${t.ate||''}"></td><td><input data-t="taxa" inputmode="decimal" style="width:70px" value="${t.taxa!=null?String(t.taxa).replace('.',','):''}"></td><td><input data-t="prazo" inputmode="numeric" style="width:60px" value="${t.prazo??''}"></td><td><button type="button" class="btn small ghost" data-cvtxdel="1" title="Tirar esta taxa">✕</button></td></tr>`;
 $('cvCfg').onclick=async()=>{
   const emps=cvEmps();if(!emps.length)return alert('Escolha uma empresa.');const cli=emps.length===1?emps[0]:cliAtual()||emps[0];
   CV.modo='cfg';let contas=[],plano=[];try{[contas,plano]=await Promise.all([gfContasDe(cli.id),planoDe(cli)])}catch(e){console.error(e)}
@@ -10102,18 +10142,33 @@ $('cvCfg').onclick=async()=>{
     <label class="f">Conta onde a adquirente deposita<select data-k="conta_id"><option value=""></option>${contas.filter(x=>x.ativo!==false).map(x=>`<option value="${x.id}"${x.id===c?.conta_id?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
     <label class="f">Categoria das contas a receber<select data-k="categoria"><option value=""></option>${[...new Set([...(c?.categoria?[c.categoria]:[]),...rec])].map(x=>`<option${x===c?.categoria?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
     <label class="f">Caixa (maquininha) lançado na empresa<select data-k="caixa_cliente_id"><option value="">Nesta mesma empresa</option>${CLIENTES.filter(x=>x.id!==cli.id&&x.ativo!==false&&x.bpo_financeiro!==false).map(x=>`<option value="${x.id}"${x.id===c?.caixa_cliente_id?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
-    <label class="f">Ligação direta (API)<select data-k="api_status"><option value="">Ainda não (importação do arquivo)</option><option value="solicitada"${c?.api_status==='solicitada'?' selected':''}>Acesso pedido à adquirente</option><option value="liberada"${c?.api_status==='liberada'?' selected':''}>Acesso liberado (falta ligar)</option></select></label></div></div>`;
+    <label class="f">Ligação direta (API)<select data-k="api_status"><option value="">Ainda não (importação do arquivo)</option><option value="solicitada"${c?.api_status==='solicitada'?' selected':''}>Acesso pedido à adquirente</option><option value="liberada"${c?.api_status==='liberada'?' selected':''}>Acesso liberado (falta ligar)</option></select></label>
+    <label class="f wide">Como deposita no banco (Recebíveis)<select data-k="agrupa">${Object.entries(RCAGRUPA).map(([k,t])=>`<option value="${k}"${(c?.agrupa||'bandeira')===k?' selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f">Texto do depósito no extrato<input data-k="padrao_extrato" value="${esc(c?.padrao_extrato||'')}" placeholder="ex.: CIELO, GETNET, Vendas - Disponivel"></label>
+    <label class="f">Taxa de antecipação contratada (% ao mês)<input data-k="taxa_antecipacao" inputmode="decimal" value="${c?.taxa_antecipacao!=null?String(c.taxa_antecipacao).replace('.',','):''}" placeholder="ex.: 1,99"></label></div>
+    <details${(c?.taxas||[]).length?'':' open'}><summary style="cursor:pointer"><b>Taxas contratadas</b> <span class="muted">(para conferir a taxa cobrada em cada venda)</span></summary>
+      <div class="tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Modalidade</th><th class="l">Bandeira</th><th>Parcelas de</th><th>até</th><th>Taxa %</th><th>Prazo (dias)</th><th></th></tr></thead><tbody data-cvtx>${((c?.taxas||[]).length?c.taxas:[{modalidade:'Débito'},{modalidade:'Crédito à vista'},{modalidade:'Crédito parcelado',de:2,ate:6},{modalidade:'Crédito parcelado',de:7,ate:12},{modalidade:'Pix'}]).map(cvTxLinha).join('')}</tbody></table></div>
+      <button type="button" class="btn small ghost" data-cvtxmais="1" style="margin-top:6px">+ Outra taxa</button></details></div>`;
   $('cvDTit').textContent='Adquirentes · '+cli.nome;CV.cfgCli=cli;
   $('cvDBody').innerHTML=`<p class="note" style="margin:0">Cadastre cada adquirente que a empresa usa. As chaves e senhas da API não ficam aqui: quando a adquirente liberar o acesso, a Controlacs faz a ligação com segurança.</p>
     <div id="cvCfgLs" style="display:grid;gap:10px">${ls.map(linha).join('')||linha(null)}</div><div><button type="button" class="btn small" id="cvCfgMais">+ Outra adquirente</button></div><p class="err" id="cvDErr" hidden></p>`;
   $('cvCfgMais').onclick=()=>$('cvCfgLs').insertAdjacentHTML('beforeend',linha(null));
+  $('cvCfgLs').onclick=e=>{if(e.target.closest('[data-cvtxmais]'))e.target.closest('[data-cvcfg]').querySelector('[data-cvtx]').insertAdjacentHTML('beforeend',cvTxLinha({modalidade:'Crédito à vista'}));else if(e.target.closest('[data-cvtxdel]'))e.target.closest('tr').remove()};
   $('cvDFoot').querySelector('[data-act="salvar"]').textContent='Salvar';dlgCV.showModal();
 };
 async function cvSalvaCfg(){
-  const cli=CV.cfgCli,rows=[...$('cvCfgLs').querySelectorAll('[data-cvcfg]')].map(d=>{const o={cliente_id:cli.id};d.querySelectorAll('[data-k]').forEach(x=>o[x.dataset.k]=x.value.trim()||null);return o}).filter(o=>o.adquirente);
+  const num=v=>{const n=parseFloat(String(v||'').replace(/\./g,'').replace(',','.'));return isNaN(n)?null:n};
+  const cli=CV.cfgCli,rows=[...$('cvCfgLs').querySelectorAll('[data-cvcfg]')].map(d=>{const o={cliente_id:cli.id};d.querySelectorAll('[data-k]').forEach(x=>o[x.dataset.k]=x.value.trim()||null);
+    // v148: como deposita, texto do extrato e taxas; só vão para o banco quando a v148 já rodou
+    o.taxa_antecipacao=num(o.taxa_antecipacao);
+    o.taxas=[...d.querySelectorAll('[data-cvtx] tr[data-tx]')].map(tr=>{const t={};tr.querySelectorAll('[data-t]').forEach(x=>t[x.dataset.t]=x.value.trim());return {modalidade:t.modalidade,bandeira:t.bandeira||null,de:num(t.de),ate:num(t.ate),taxa:num(t.taxa),prazo:num(t.prazo)}}).filter(t=>t.taxa!=null);
+    return o}).filter(o=>o.adquirente);
   if(new Set(rows.map(r=>r.adquirente)).size!==rows.length)return cvErr('A mesma adquirente está duas vezes.');
-  for(const r of rows){r.canal_padrao=r.canal_padrao||'caixa';const {error}=await sb.from('cartao_config').upsert(r,{onConflict:'cliente_id,adquirente'});if(error)throw error}
-  dlgCV.close();toast('Adquirentes salvas');renderCV();
+  let semV148=false;
+  for(const r of rows){r.canal_padrao=r.canal_padrao||'caixa';let {error}=await sb.from('cartao_config').upsert(r,{onConflict:'cliente_id,adquirente'});
+    if(error&&rcV148(error)){semV148=true;const {agrupa,padrao_extrato,taxas,taxa_antecipacao,...velho}=r;({error}=await sb.from('cartao_config').upsert(velho,{onConflict:'cliente_id,adquirente'}))}
+    if(error)throw error}
+  dlgCV.close();toast(semV148?'Adquirentes salvas, menos as taxas e o jeito de depositar: '+rcV148Msg:'Adquirentes salvas');VIEW==='gfreceb'?renderRC():renderCV();
 }
 // uma conta a receber por empresa + dia de recebimento + bandeira + modalidade, com o líquido
 async function cvGerar(gs){
@@ -10127,7 +10182,7 @@ async function cvGerar(gs){
       const cat=cfg.categoria||planos[a.cliente_id].find(c=>(c.tipo||'')==='Receita'&&/cart/i.test(c.categoria))?.categoria||null;
       const sem=a.sem,liq=r2(sem.reduce((x,v)=>x+(+v.valor_liquido),0)),bru=r2(sem.reduce((x,v)=>x+(+v.valor_bruto),0)),tx=r2(sem.reduce((x,v)=>x+(+v.taxa),0));if(liq<=0.004)continue;
       const est=sem.filter(v=>v.tipo!=='venda'),dmin=sem.map(v=>v.data_venda).sort()[0],dmax=sem.map(v=>v.data_venda).sort().pop();
-      const row={cliente_id:a.cliente_id,tipo:'receber',pessoa_nome:a.adquirente||'Adquirente',descricao:`Cartão ${a.bandeira} ${a.modalidade} · ${a.canal==='ecommerce'?'e-commerce':'caixa'} · vendas de ${dmin===dmax?dBR(dmin):dBR(dmin)+' a '+dBR(dmax)}${a.antecipada?' · antecipado':''}`,
+      const row={cliente_id:a.cliente_id,tipo:'receber',pessoa_nome:a.adquirente||'Adquirente',descricao:`Cartão ${a.grupo} · ${a.canal==='ecommerce'?'e-commerce':'caixa'} · vendas de ${dmin===dmax?dBR(dmin):dBR(dmin)+' a '+dBR(dmax)}${a.antecipada?' · antecipado':''}`,
         documento:'Cartão',categoria:cat,competencia:dmin.slice(0,8)+'01',vencimento:a.data,valor:liq,parcela:1,parcelas:1,conta_id:cfg.conta_id||null,forma:'Cartão',origem:'cartao',
         obs:`${sem.length} ${sem.length===1?'transação':'transações'} · bruto ${fm(bru)} · taxa ${fm(tx)}${est.length?` · ${est.length} estornos/ajustes`:''} · Conciliação de cartões`};
       const {data,error}=await sb.from('fin_titulos').insert(row).select('id').single();if(error)throw error;
@@ -10145,6 +10200,285 @@ $('cvXls').onclick=()=>{
   const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([H,...rows]);ws['!cols']=H.map(()=>({wch:15}));xTabela(ws,{money:[9,10,11],texto:[14,15,16,17]});XLSX.utils.book_append_sheet(wb,ws,'Vendas');
   const H2=['Empresa','Recebimento','Adquirente','Canal','Bandeira','Modalidade','Vendas','Bruto','Taxa','Líquido','Conta a receber'],ws2=XLSX.utils.aoa_to_sheet([H2,...ag]);ws2['!cols']=H2.map(()=>({wch:15}));xTabela(ws2,{money:[7,8,9]});XLSX.utils.book_append_sheet(wb,ws2,'Agenda de recebimentos');
   XLSX.writeFile(wb,`Conciliacao de cartoes ${dBR(CV.de).replace(/\//g,'-')} a ${dBR(CV.ate).replace(/\//g,'-')}.xlsx`)};
+
+// ================= RECEBÍVEIS DE CARTÃO (Carol, 17/11; v148) =================
+// O que a adquirente vai pagar em cada dia, já com taxa e antecipação, somado do jeito que ela deposita
+// (visto nos extratos em 17/11: PagBank, Cielo e Getnet depositam um valor por dia para cada débito/crédito + bandeira;
+// o Pix do PagBank cai venda a venda e a conciliação soma no dia; a Cielo no Inter cai sem bandeira, um total).
+// Cada depósito esperado é conferido com a linha do extrato (OFX) da conta configurada em Adquirentes.
+const RC={vendas:[],cfg:[],ofx:[],ult:{},conf:[],tl:[],deps:[],sobras:[],ids:[],aberto:new Set(),col:{},tarefaFeita:new Set()};
+const RCAGRUPA={bandeira:'Um depósito por bandeira, separando débito e crédito',modalidade:'Um total de crédito e um total de débito',dia:'Um total por dia (sem separar)',venda:'Uma por venda'};
+// como cada adquirente costuma aparecer no extrato, quando o texto não foi informado em Adquirentes
+const RCPADRAO={Cielo:/cielo/i,Getnet:/getnet/i,PagBank:/vendas ?- ?disponivel|pagseguro|pagbank/i,Stone:/stone/i,Rede:/redecard|\brede\b/i,'Mercado Pago':/mercado ?pago/i,Sipag:/sipag/i,SafraPay:/safra ?pay/i,Vero:/\bvero\b/i,InfinitePay:/infinite ?pay|cloudwalk/i,Ton:/\bton\b|stone/i,SumUp:/sumup/i,Outra:/pagar\.?me/i};
+const rcV148=e=>/agrupa|padrao_extrato|taxas|taxa_antecipacao|data_prevista_original|cartao_receb_conf|cartao_chave/i.test(e?.message||'')&&/column|relation|schema cache|does not exist|find/i.test(e?.message||'');
+const rcV148Msg='Para os recebíveis, rode a atualização v148 do banco no Supabase.';
+// bandeira do depósito: Maestro é Mastercard débito, Electron é Visa débito
+const rcBand=b=>{const n=cvN(b);if(/maestro|master/.test(n))return 'Mastercard';if(/visa|electron/.test(n))return 'Visa';if(/\belo\b/.test(n))return 'Elo';if(/amex|american/.test(n))return 'Amex';if(/hiper/.test(n))return 'Hipercard';if(/pix/.test(n))return 'Pix';return b&&b!=='Sem bandeira'&&b!=='—'?b:''};
+const rcMod=m=>m==='Pix'?'Pix':m==='Voucher'?'Voucher':cvEhDeb(m)?'Débito':'Crédito';
+const rcCfgDe=(cid,adq)=>RC.cfg.find(c=>c.cliente_id===cid&&c.adquirente===adq)||{};
+// grupo do depósito: o mesmo para a venda (relatório da adquirente) e para a linha do extrato
+function rcGrupo(agrupa,mod,band){
+  if(agrupa==='dia')return 'Total do dia';
+  if(mod==='Pix')return 'Pix';
+  if(agrupa==='modalidade')return mod;
+  return band?mod+' '+band:mod;
+}
+const rcRecebe=v=>v.data_pago||v.data_prevista||v.data_venda;
+const rcEmps=()=>escCli.value==='*'?empresasDe('gfreceb'):[cliAtual()].filter(Boolean);
+function rcVazio(t,cls){['rcTiles','rcAcoes','rcHead','rcFoot','rcNote'].forEach(id=>$(id).innerHTML='');$('rcBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`}
+async function renderRC(){
+  const emps=rcEmps();if(!emps.length)return rcVazio('Escolha uma empresa.');
+  if(!$('rcDe').value){const d=new Date();d.setDate(d.getDate()-15);$('rcDe').value=isoLocal(d);const a=new Date();a.setDate(a.getDate()+45);$('rcAte').value=isoLocal(a)}
+  const de=$('rcDe').value,ate=$('rcAte').value||TODAY,ids=emps.map(c=>c.id);RC.ids=ids;RC.de=de;RC.ate=ate;
+  rcVazio('Carregando…');
+  const mais=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return isoLocal(x)};
+  try{
+    const [vs,cf]=await Promise.all([
+      todas(()=>sb.from('cartao_vendas').select('*').in('cliente_id',ids).or(`and(data_prevista.gte.${mais(de,-7)},data_prevista.lte.${ate}),and(data_pago.gte.${mais(de,-7)},data_pago.lte.${ate}),and(data_prevista.is.null,data_venda.gte.${mais(de,-7)},data_venda.lte.${ate})`).order('data_venda').order('id')),
+      todas(()=>sb.from('cartao_config').select('*').in('cliente_id',ids))]);
+    RC.vendas=vs.filter(v=>{const d=rcRecebe(v);return d>=mais(de,-7)&&d<=ate});RC.cfg=cf;
+    const contas=[...new Set(cf.map(c=>c.conta_id).filter(Boolean))];
+    RC.ofx=contas.length?await todas(()=>sb.from('fin_ofx').select('id,cliente_id,conta_id,data,valor,memo,nome,qtd,itens,ignorado').in('conta_id',contas).gte('data',mais(de,-7)).lte('data',mais(ate,7)).gt('valor',0).order('data')):[];
+    RC.ult={};await Promise.all(contas.map(async k=>{const {data}=await sb.from('fin_ofx').select('data').eq('conta_id',k).order('data',{ascending:false}).limit(1);RC.ult[k]=data?.[0]?.data||null}));
+    RC.contas={};if(contas.length){const {data}=await sb.from('fin_contas').select('id,nome').in('id',contas);(data||[]).forEach(c=>RC.contas[c.id]=c.nome)}
+    // aceites e ligações feitas à mão, e as tarefas abertas para os depósitos (v148); sem a v148 a tela funciona sem eles
+    RC.conf=[];RC.tl=[];RC.v148=true;
+    try{RC.conf=await todas(()=>sb.from('cartao_receb_conf').select('*').in('cliente_id',ids).is('desfeito_em',null).gte('data_prevista',mais(de,-7)).lte('data_prevista',ate));
+      const {data,error}=await sb.from('tarefa_lancamentos').select('id,tarefa_id,cliente_id,cartao_chave,validado_em,tarefas(titulo,status,arquivada)').in('cliente_id',ids).not('cartao_chave','is',null).is('removido_em',null);if(error)throw error;RC.tl=data||[]}
+    catch(e){if(!rcV148(e))console.error(e);RC.v148=false}
+  }catch(e){console.error(e);return rcVazio(v110cv(e)||v110(e)?v110Msg:'Erro ao carregar. Verifique a internet e tente de novo.','neg')}
+  if(VIEW!=='gfreceb')return;
+  const as=[...new Set(RC.cfg.map(c=>c.adquirente).concat(RC.vendas.map(v=>v.adquirente)))].filter(Boolean).sort(),cur=$('rcAdq').value;
+  $('rcAdq').innerHTML='<option value="">Todas</option>'+as.map(a=>`<option${a===cur?' selected':''}>${esc(a)}</option>`).join('');
+  rcMonta();rcDesenha();rcTarefaAuto();
+}
+// lê a linha do extrato: de qual adquirente é, débito/crédito/Pix e a bandeira
+function rcLeOfx(o){
+  const t=[o.memo,o.nome].filter(Boolean).join(' '),n=cvN(t);
+  const cs=RC.cfg.filter(c=>c.cliente_id===o.cliente_id&&c.conta_id===o.conta_id);
+  const c=cs.find(c=>c.padrao_extrato&&n.includes(cvN(c.padrao_extrato)))||cs.find(c=>!c.padrao_extrato&&RCPADRAO[c.adquirente]?.test(t));
+  if(!c)return null;
+  if(/^pix recebido|recebimento pix/.test(n)&&!/cielo|getnet|stone|vendas disponivel/.test(n))return null;
+  const mod=/\bpix\b/.test(n)?'Pix':/debit|electron|maestro|\bdeb\b/.test(n)?'Débito':/voucher|refeic|aliment/.test(n)?'Voucher':'Crédito';
+  const b=CVBAND.find(([r])=>r.test(n.replace(/\bpix\b/g,'')));
+  return {cfg:c,adq:c.adquirente,mod,band:b?rcBand(b[1]):'',antecip:/antecip/.test(n)}}
+// monta os depósitos esperados e confere com o extrato
+function rcMonta(){
+  const g={};
+  for(const v of RC.vendas){
+    const c=rcCfgDe(v.cliente_id,v.adquirente),ag=c.agrupa||'bandeira',d=rcRecebe(v);
+    const aj=v.tipo==='ajuste'||v.tipo==='antecipacao'&&!rcBand(v.bandeira);
+    let grupo=aj&&ag!=='dia'?'Ajustes e tarifas':rcGrupo(ag,rcMod(v.modalidade),rcBand(v.bandeira));
+    if(ag==='venda')grupo+=' · '+(v.nsu||v.autorizacao||v.id.slice(0,6));
+    if(v.antecipada&&ag!=='dia')grupo='Antecipação · '+grupo;
+    const k=[v.cliente_id,v.adquirente,d,grupo].join('|');
+    const x=g[k]||={k,cliente_id:v.cliente_id,adquirente:v.adquirente,data:d,grupo,conta_id:c.conta_id||null,agrupa:ag,vendas:[],bruto:0,taxa:0,tant:0,est:0,liq:0,n:0,aj};
+    x.vendas.push(v);x.liq=r2(x.liq+(+v.valor_liquido||0));x.tant=r2(x.tant+(+v.taxa_antecipacao||0));
+    if(v.tipo==='venda'){x.bruto=r2(x.bruto+(+v.valor_bruto||0));x.taxa=r2(x.taxa+(+v.taxa||0));x.n++}else x.est=r2(x.est+(+v.valor_liquido||0));
+  }
+  const deps=Object.values(g);deps.forEach(x=>{x.m=null;x.banco=null;x.ofx=[]});
+  // linhas do extrato das adquirentes
+  const linhas=RC.ofx.filter(o=>!o.ignorado).map(o=>{const r=rcLeOfx(o);if(!r)return null;const ag=r.cfg.agrupa||'bandeira';
+    return {o,adq:r.adq,cliente_id:o.cliente_id,conta_id:o.conta_id,data:o.data,valor:+o.valor,grupo:r.antecip&&ag!=='dia'?'Antecipação · '+rcGrupo(ag,r.mod,r.band):rcGrupo(ag,r.mod,r.band),usada:false}}).filter(Boolean);
+  const dias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
+  const mesmo=(x,l)=>x.cliente_id===l.cliente_id&&x.adquirente===l.adq&&x.conta_id===l.conta_id&&(x.grupo===l.grupo||!/ /.test(l.grupo)&&x.grupo.startsWith(l.grupo)&&x.agrupa==='bandeira');
+  const liga=(x,l,sit)=>{x.m=sit;x.ofx.push(l.o);x.banco=r2((x.banco||0)+l.valor);l.usada=true};
+  // ligações feitas à mão (v148)
+  for(const c of RC.conf.filter(c=>c.situacao==='ligado'&&c.ofx_id)){const x=deps.find(d=>d.cliente_id===c.cliente_id&&d.adquirente===c.adquirente&&d.data===c.data_prevista&&d.grupo===c.grupo),l=linhas.find(l=>l.o.id===c.ofx_id);if(x&&l){liga(x,l,Math.abs(x.liq-l.valor)<0.05?'ok':'dif');x.conf=c}}
+  // 1º: valor igual, na data prevista ou até 6 dias depois (fim de semana, feriado)
+  // 2º: dois ou três dias somados numa linha só (o que vencia no domingo cai junto com a segunda)
+  // 3º: mesma bandeira e mesma data, valor diferente = entrou com diferença
+  const cand=l=>deps.filter(x=>!x.m&&mesmo(x,l)&&dias(x.data,l.data)>=-1&&dias(x.data,l.data)<=6).sort((a,b)=>Math.abs(dias(a.data,l.data))-Math.abs(dias(b.data,l.data)));
+  for(const l of linhas){if(l.usada)continue;const x=cand(l).find(x=>Math.abs(x.liq-l.valor)<0.05);if(x)liga(x,l,'ok')}
+  for(const l of linhas){if(l.usada)continue;const cs=cand(l).slice(0,8);let ach=null;
+    for(let i=0;i<cs.length&&!ach;i++)for(let j=i+1;j<cs.length&&!ach;j++){if(Math.abs(cs[i].liq+cs[j].liq-l.valor)<0.05)ach=[cs[i],cs[j]];
+      for(let k=j+1;k<cs.length&&!ach;k++)if(Math.abs(cs[i].liq+cs[j].liq+cs[k].liq-l.valor)<0.05)ach=[cs[i],cs[j],cs[k]]}
+    if(ach){ach.forEach(x=>{x.m='ok';x.ofx.push(l.o);x.junto=ach.length});const tot=r2(ach.reduce((s,x)=>s+x.liq,0));ach.forEach(x=>x.banco=x.liq);l.usada=true;ach[0].juntoTot=tot}}
+  for(const l of linhas){if(l.usada)continue;const x=cand(l).find(x=>x.data===l.data||dias(x.data,l.data)<=3);if(x)liga(x,l,'dif')}
+  // o que sobrou: não entrou (o extrato já passou da data), aguardando o extrato, ou ainda a receber
+  for(const x of deps){x.dif=x.banco==null?null:r2(x.banco-x.liq);
+    const c=RC.conf.find(c=>c.situacao==='aceito'&&c.cliente_id===x.cliente_id&&c.adquirente===x.adquirente&&c.data_prevista===x.data&&c.grupo===x.grupo);if(c){x.conf=c;x.aceito=true}
+    if(x.m)x.sit=x.m==='ok'||x.aceito?'ok':'dif';
+    else if(x.aj)x.sit='aj';
+    else if(x.liq<=0.004)x.sit='zero';
+    else if(!x.conta_id)x.sit='semconta';
+    else{const u=RC.ult[x.conta_id];x.sit=x.data>TODAY?'prev':u&&dias(x.data,u)>=3?(x.aceito?'ok':'nao'):'aguarda'}
+    x.chave=[x.adquirente,x.data,x.grupo].join('|');
+    x.tar=RC.tl.find(t=>t.cliente_id===x.cliente_id&&t.cartao_chave===x.chave&&!t.validado_em);
+  }
+  // os dias antes do período só servem para conferir as linhas do extrato que juntam dias; não aparecem
+  RC.deps=deps.filter(x=>x.data>=RC.de).sort((a,b)=>a.data.localeCompare(b.data)||cvEmpNome(a.cliente_id).localeCompare(cvEmpNome(b.cliente_id))||a.adquirente.localeCompare(b.adquirente)||a.grupo.localeCompare(b.grupo));
+  RC.sobras=linhas.filter(l=>!l.usada&&l.data>=RC.de&&l.data<=RC.ate);
+}
+const RCSIT={ok:['✓ Entrou no banco','c-done'],dif:['Entrou com diferença','c-bad'],nao:['⚠ Não entrou','c-bad'],prev:['A receber','c-none'],aguarda:['Aguardando o extrato','c-warn'],semconta:['Sem conta em Adquirentes','c-warn'],aj:['Descontado pela adquirente','c-warn'],zero:['Sem valor a receber','c-none']};
+function rcFiltra(l){const a=$('rcAdq').value,s=$('rcSit').value,q=$('rcBusca').value.trim(),C=RC.col;
+  const nm=t=>cvN(t);
+  return l.filter(x=>(!a||x.adquirente===a)&&(!s||(s==='dif'?x.sit==='dif':s==='prev'?x.sit==='prev':x.sit===s))
+    &&buscaCasa(q,[cvEmpNome(x.cliente_id),x.adquirente,x.grupo,RCSIT[x.sit]?.[0]||'',RC.contas?.[x.conta_id]||'',...x.vendas.map(v=>[v.nsu,v.autorizacao,v.terminal].filter(Boolean).join(' '))],[x.bruto,x.taxa,x.liq,x.banco||0],[x.data])
+    &&Object.entries(C).every(([k,v])=>{if(!v)return true;const t={data:dBR(x.data),emp:cvEmpNome(x.cliente_id),adq:x.adquirente,conta:RC.contas?.[x.conta_id]||'',grupo:x.grupo,n:String(x.n),bruto:fm(x.bruto),taxa:fm(x.taxa),tant:fm(x.tant),est:fm(x.est),liq:fm(x.liq),banco:x.banco==null?'':fm(x.banco),dif:x.dif==null?'':fm(x.dif),sit:RCSIT[x.sit]?.[0]||''}[k]||'';return nm(t).includes(nm(v))||/\d/.test(v)&&t.replace(/\D/g,'').includes(v.replace(/\D/g,''))}))}
+function rcDesenha(){
+  const vis=$('rcVisao').value,todasE=RC.ids.length>1,mu=t=>`<span class="muted">${t}</span>`;
+  const deps=RC.deps,s=(l,k)=>r2(l.reduce((t,x)=>t+(+x[k]||0),0));
+  const fut=deps.filter(x=>x.sit==='prev'),nao=deps.filter(x=>x.sit==='nao'),dif=deps.filter(x=>x.sit==='dif'),ok=deps.filter(x=>x.sit==='ok');
+  const per=deps.filter(x=>x.data>=RC.de&&x.data<=RC.ate),brP=s(per,'bruto'),txP=s(per,'taxa');
+  $('rcTiles').innerHTML=[['A receber',fm(s(fut,'liq')),`${fut.length} depósitos de hoje até ${dBR(RC.ate)}`],['Entrou no banco',fm(s(ok,'banco')),`${ok.length} depósitos conferidos`],
+    ['Taxas',fm(txP),brP?`${(txP/brP*100).toLocaleString('pt-BR',{maximumFractionDigits:2})}% das vendas · bruto ${fm(brP)}`:'cobradas pela adquirente'],['Antecipação',fm(s(per,'tant')),`${per.filter(x=>x.grupo.startsWith('Antecipação')).length} depósitos antecipados`],
+    ['Não entrou',fm(s(nao,'liq')),nao.length?`<b class="neg">${nao.length} ${nao.length===1?'depósito':'depósitos'} em alerta</b>`:'nenhum alerta'],['Diferenças',fm(r2(dif.reduce((t,x)=>t+(x.dif||0),0))),`${dif.length} ${dif.length===1?'depósito':'depósitos'} com valor diferente`]]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  const semCfg=RC.ids.filter(id=>!RC.cfg.some(c=>c.cliente_id===id&&c.conta_id));
+  $('rcAcoes').innerHTML=(nao.length||dif.length?`<span class="chip c-bad" style="align-self:center">${nao.length+dif.length} ${nao.length+dif.length===1?'alerta':'alertas'}</span>`:'')
+    +(RC.sobras.length?`<button type="button" class="btn small ghost" data-rcv="alertas">${RC.sobras.length} ${RC.sobras.length===1?'depósito':'depósitos'} no banco sem venda importada</button>`:'')
+    +(semCfg.length?`<span class="note" style="margin:0;align-self:center">Sem a conta da adquirente em <b>Adquirentes e taxas</b>: ${semCfg.map(id=>esc(cvEmpNome(id))).join(', ')}. Sem ela, não dá para conferir com o banco.</span>`:'')
+    +(RC.v148?'':`<span class="note neg" style="margin:0;align-self:center">${rcV148Msg}</span>`);
+  if(!RC.vendas.length&&!RC.sobras.length){$('rcHead').innerHTML='';$('rcFoot').innerHTML='';$('rcBody').innerHTML=`<tr><td class="l muted">Nenhum recebível neste período. Importe o relatório de vendas (ou de recebíveis) da adquirente em <b>Importar vendas</b>; o extrato do banco entra pela Conciliação bancária.</td></tr>`;rcNota();return}
+  if(vis==='dia'||vis==='alertas'){
+    const vC=new Set(deps.map(x=>x.conta_id)).size>1,cols=[['data','Recebimento'],...(todasE?[['emp','Empresa']]:[]),['adq','Adquirente'],...(vC?[['conta','Conta']]:[]),['grupo','Depósito'],['n','Vendas'],['bruto','Bruto'],['taxa','Taxa'],['tant','Antecipação'],['est','Estornos'],['liq','Líquido previsto'],['banco','No banco'],['dif','Diferença'],['sit','Situação']];
+    $('rcHead').innerHTML=`<tr>${cols.map(([k,t])=>`<th${['adq','conta','grupo','emp','sit'].includes(k)?' class="l"':''}>${t}</th>`).join('')}<th></th></tr><tr class="f">${cols.map(([k,t])=>`<th><input data-rcf="${k}" value="${esc(RC.col[k]||'')}" placeholder="Filtrar" aria-label="Filtrar ${t}" style="min-width:50px;width:100%"></th>`).join('')}<th><button type="button" class="btn small ghost" data-rclimpa="1" title="Limpar os filtros das colunas">✕</button></th></tr>`;
+    let ls=rcFiltra(deps);if(vis==='alertas')ls=ls.filter(x=>x.sit==='nao'||x.sit==='dif'||x.sit==='semconta');
+    let ant='',h='';
+    for(const x of ls){
+      if(vis==='dia'&&x.data!==ant){const dd=ls.filter(y=>y.data===x.data);h+=`<tr class="rcdia"><td class="l" colspan="${cols.length+1}"><b>${dBR(x.data)}</b> ${mu(['dom','seg','ter','qua','qui','sex','sáb'][new Date(x.data+'T12:00:00').getDay()])} · previsto ${fm(s(dd,'liq'))}${dd.some(y=>y.banco!=null)?' · no banco '+fm(s(dd,'banco')):''}</td></tr>`;ant=x.data}
+      const ab=RC.aberto.has(x.k),sit=RCSIT[x.sit]||['',''];
+      h+=`<tr class="click" data-rck="${esc(x.k)}" tabindex="0" title="Clique para ver as vendas deste depósito"><td>${dBR(x.data)}</td>${todasE?`<td class="l">${esc(cvEmpNome(x.cliente_id))}</td>`:''}<td class="l">${esc(x.adquirente)}</td>${vC?`<td class="l">${esc(RC.contas?.[x.conta_id]||'')||mu('—')}</td>`:''}<td class="l"><b>${esc(x.grupo)}</b></td><td>${x.n||mu('—')}</td>
+        <td>${fm(x.bruto)}</td><td>${x.taxa?fm(x.taxa):mu('—')}${x.bruto&&x.taxa?'<br>'+mu((x.taxa/x.bruto*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%'):''}</td><td>${x.tant?fm(x.tant):mu('—')}</td><td>${x.est?`<span class="neg">${fm(x.est)}</span>`:mu('—')}</td><td><b>${fm(x.liq)}</b></td>
+        <td>${x.banco==null?mu('—'):fm(x.banco)+(x.ofx[0]&&x.ofx[0].data!==x.data?'<br>'+mu('em '+dBR(x.ofx[0].data)):'')}${x.junto?'<br>'+mu(`junto com ${x.junto-1} ${x.junto===2?'outro dia':'outros dias'}`):''}</td><td>${x.dif==null||Math.abs(x.dif)<0.05?mu('—'):`<b class="neg">${x.dif>0?'+':''}${fm(x.dif)}</b>`}</td>
+        <td class="l"><span class="chip ${sit[1]}">${x.aceito?(x.m?'Diferença aceita':'Aceito sem entrar'):x.conf?.situacao==='ligado'?'Ligado à mão':sit[0]}</span>${x.tar?`<br><button type="button" class="btn small ghost" data-rctar="${x.tar.tarefa_id}">📋 ${esc(x.tar.tarefas?.titulo||'Tarefa')}</button>`:''}</td>
+        <td style="white-space:nowrap">${rcBotoes(x)}</td></tr>`;
+      if(ab)h+=`<tr class="rcdet"><td colspan="${cols.length+1}" class="l" style="background:var(--sunk)">${rcDetalhe(x)}</td></tr>`}
+    if(vis==='alertas'&&RC.sobras.length){const ss=RC.sobras.filter(l=>!$('rcAdq').value||l.adq===$('rcAdq').value);
+      h+=`<tr class="rcdia"><td class="l" colspan="${cols.length+1}"><b>Entrou no banco e não tem venda importada</b> ${mu('— importe o relatório de vendas desses dias, ou confira se é de outra adquirente')}</td></tr>`
+        +ss.map(l=>`<tr><td>${dBR(l.data)}</td>${todasE?`<td class="l">${esc(cvEmpNome(l.cliente_id))}</td>`:''}<td class="l">${esc(l.adq)}</td>${vC?`<td class="l">${esc(RC.contas?.[l.conta_id]||'')}</td>`:''}<td class="l"><b>${esc(l.grupo)}</b><br>${mu(esc(l.o.memo||l.o.nome||''))}</td><td colspan="6"></td><td>${fm(l.valor)}</td><td></td><td class="l"><span class="chip c-warn">Sem venda importada</span></td><td></td></tr>`).join('')}
+    $('rcBody').innerHTML=h||`<tr><td class="l muted" colspan="${cols.length+1}">${vis==='alertas'?'Nenhum alerta neste período. ✓':'Nada com esses filtros.'}</td></tr>`;
+    $('rcFoot').innerHTML=ls.length?`<tr><td><b>Total</b></td>${todasE?'<td></td>':''}<td colspan="${vC?3:2}"></td><td>${ls.reduce((t,x)=>t+x.n,0)}</td><td>${fm(s(ls,'bruto'))}</td><td>${fm(s(ls,'taxa'))}</td><td>${fm(s(ls,'tant'))}</td><td>${fm(s(ls,'est'))}</td><td><b>${fm(s(ls,'liq'))}</b></td><td>${fm(s(ls,'banco'))}</td><td></td><td></td><td></td></tr>`:'';
+  }else if(vis==='taxas')rcTaxas(todasE);
+  else rcAntecip(todasE);
+  rcNota();
+}
+function rcBotoes(x){if(!podeExec('gfreceb')||!RC.v148)return '';
+  const b=(a,t,cl,tt)=>`<button type="button" class="btn small ${cl||'ghost'}" data-rca="${a}" data-rck="${esc(x.k)}"${tt?` title="${tt}"`:''}>${t}</button>`;
+  if(x.conf)return b('desfaz','Desfazer','ghost',x.conf.situacao==='aceito'?'Desfaz o aceite da diferença'+(x.conf.motivo?': '+esc(x.conf.motivo):''):'Desfaz a ligação feita à mão');
+  return (x.sit==='dif'||x.sit==='nao'?b('aceita','Aceitar','ghost','Aceitar a diferença, com o motivo (ex.: taxa diferente, cancelamento)'):'')+(x.sit==='nao'||x.sit==='dif'||x.sit==='aguarda'?b('liga','Ligar ao extrato','ghost','Escolher a linha do extrato em que este valor entrou'):'')+((x.sit==='nao'||x.sit==='dif')&&!x.tar?b('tarefa','📋 Tarefa','ghost','Gerar a tarefa para conferir'):'')}
+function rcDetalhe(x){
+  const mu=t=>`<span class="muted">${t}</span>`;
+  return `<div style="display:grid;gap:6px"><div class="row" style="gap:12px;flex-wrap:wrap">${x.ofx.length?`<span>🏦 Extrato: ${x.ofx.map(o=>`${dBR(o.data)} · ${esc(o.memo||o.nome||'')} · <b>${fm(o.valor)}</b>${o.qtd>1?' '+mu('('+o.qtd+' linhas somadas)'):''}`).join('<br>')}</span>`:mu('Nenhuma linha do extrato ligada.')}${x.juntoTot?`<span>${mu('Linha do banco = soma de '+x.junto+' dias: '+fm(x.juntoTot))}</span>`:''}${x.conf?.motivo?`<span>Motivo do aceite: <b>${esc(x.conf.motivo)}</b></span>`:''}</div>
+    <table style="font-size:13px"><thead><tr><th>Venda</th><th class="l">Tipo</th><th class="l">Canal</th><th class="l">Bandeira</th><th class="l">Modalidade</th><th>Parcela</th><th>Bruto</th><th>Taxa</th><th>%</th><th>Antecipação</th><th>Líquido</th><th>Previsto</th><th class="l">NSU · autorização</th></tr></thead><tbody>
+    ${x.vendas.slice(0,400).map(v=>`<tr><td>${dBR(v.data_venda)}</td><td class="l"><span class="chip ${CVTIPO[v.tipo]?.[1]||''}">${CVTIPO[v.tipo]?.[0]||esc(v.tipo)}</span>${v.antecipada?' <span class="chip c-warn">antecipada</span>':''}</td><td class="l">${v.canal==='ecommerce'?'E-commerce':'Caixa'}</td><td class="l">${esc(v.bandeira)}</td><td class="l">${esc(v.modalidade)}</td><td>${v.parcela?v.parcela+(v.parcelas?'/'+v.parcelas:''):mu('—')}</td><td>${fm(v.valor_bruto)}</td><td>${fm(v.taxa)}</td><td>${+v.valor_bruto?mu((Math.abs(v.taxa/v.valor_bruto)*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%'):''}</td><td>${+v.taxa_antecipacao?fm(v.taxa_antecipacao):mu('—')}</td><td><b>${fm(v.valor_liquido)}</b></td><td>${v.data_prevista_original&&v.data_prevista_original!==rcRecebe(v)?mu('era '+dBR(v.data_prevista_original)):v.data_prevista?dBR(v.data_prevista):''}</td><td class="l muted">${esc([v.nsu,v.autorizacao].filter(Boolean).join(' · '))}</td></tr>`).join('')}
+    ${x.vendas.length>400?`<tr><td colspan="13" class="l muted">Mostrando 400 de ${x.vendas.length}. Baixe o Excel para ver todas.</td></tr>`:''}</tbody></table></div>`}
+// taxa contratada da venda: a regra mais específica (bandeira e parcelas) que servir
+function rcContratada(v){const c=rcCfgDe(v.cliente_id,v.adquirente),ts=Array.isArray(c.taxas)?c.taxas:[];const p=+v.parcelas||1;
+  const ok=ts.filter(t=>t.modalidade===v.modalidade&&(!t.bandeira||t.bandeira===rcBand(v.bandeira))&&(!(+t.de)||p>=+t.de)&&(!(+t.ate)||p<=+t.ate));
+  return ok.sort((a,b)=>!!b.bandeira-!!a.bandeira||(+b.de||0)-(+a.de||0))[0]||null}
+function rcTaxas(todasE){
+  const g={},mu=t=>`<span class="muted">${t}</span>`,pc=n=>n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+  const a=$('rcAdq').value,q=$('rcBusca').value.trim();
+  for(const v of RC.vendas.filter(v=>v.tipo==='venda'&&(!a||v.adquirente===a)&&rcRecebe(v)>=RC.de&&rcRecebe(v)<=RC.ate)){
+    const faixa=v.modalidade==='Crédito parcelado'?(+v.parcelas||0):0,ct=rcContratada(v);
+    const k=[v.cliente_id,v.adquirente,v.modalidade,rcBand(v.bandeira)||v.bandeira,faixa].join('|');
+    const x=g[k]||={cliente_id:v.cliente_id,adquirente:v.adquirente,mod:v.modalidade,band:rcBand(v.bandeira)||v.bandeira,parc:faixa,n:0,bruto:0,taxa:0,esperado:0,semCt:0,ct:ct?+ct.taxa:null};
+    x.n++;x.bruto=r2(x.bruto+(+v.valor_bruto));x.taxa=r2(x.taxa+(+v.taxa));if(ct)x.esperado=r2(x.esperado+(+v.valor_bruto)*(+ct.taxa)/100);else x.semCt++}
+  let ls=Object.values(g).filter(x=>buscaCasa(q,[cvEmpNome(x.cliente_id),x.adquirente,x.mod,x.band],[x.bruto,x.taxa],[])).sort((a,b)=>a.adquirente.localeCompare(b.adquirente)||a.mod.localeCompare(b.mod)||a.band.localeCompare(b.band)||a.parc-b.parc);
+  $('rcHead').innerHTML=`<tr>${todasE?'<th class="l">Empresa</th>':''}<th class="l">Adquirente</th><th class="l">Modalidade</th><th class="l">Bandeira</th><th>Parcelas</th><th>Vendas</th><th>Bruto</th><th>Taxa cobrada</th><th>% cobrada</th><th>% contratada</th><th>Cobrado a mais</th><th class="l">Situação</th></tr>`;
+  $('rcBody').innerHTML=ls.map(x=>{const ef=x.bruto?x.taxa/x.bruto*100:0,mais=x.semCt?null:r2(x.taxa-x.esperado);
+    return `<tr>${todasE?`<td class="l">${esc(cvEmpNome(x.cliente_id))}</td>`:''}<td class="l">${esc(x.adquirente)}</td><td class="l">${esc(x.mod)}</td><td class="l"><b>${esc(x.band)}</b></td><td>${x.parc?x.parc+'x':mu('—')}</td><td>${x.n}</td><td>${fm(x.bruto)}</td><td>${fm(x.taxa)}</td><td><b>${pc(ef)}</b></td><td>${x.ct==null?mu('não informada'):pc(x.ct)}</td><td>${mais==null?mu('—'):Math.abs(mais)<0.05?mu('—'):`<b class="${mais>0?'neg':'pos'}">${fm(mais)}</b>`}</td>
+      <td class="l">${x.ct==null?'<span class="chip c-none">Informe a taxa em Adquirentes</span>':mais>0.05?'<span class="chip c-bad">Acima do contratado</span>':'<span class="chip c-done">✓ Confere</span>'}</td></tr>`}).join('')||`<tr><td class="l muted" colspan="12">Nenhuma venda neste período.</td></tr>`;
+  const T=k=>r2(ls.reduce((t,x)=>t+x[k],0)),br=T('bruto');
+  $('rcFoot').innerHTML=ls.length?`<tr>${todasE?'<td></td>':''}<td><b>Total</b></td><td colspan="3"></td><td>${ls.reduce((t,x)=>t+x.n,0)}</td><td>${fm(br)}</td><td>${fm(T('taxa'))}</td><td><b>${br?pc(T('taxa')/br*100):''}</b></td><td colspan="3"></td></tr>`:'';
+}
+function rcAntecip(todasE){
+  const mu=t=>`<span class="muted">${t}</span>`,a=$('rcAdq').value,q=$('rcBusca').value.trim();
+  const dias=(x,y)=>Math.round((new Date(y+'T12:00:00')-new Date(x+'T12:00:00'))/864e5);
+  const ls=RC.vendas.filter(v=>rcRecebe(v)>=RC.de&&(v.antecipada||+v.taxa_antecipacao)&&(!a||v.adquirente===a)&&buscaCasa(q,[cvEmpNome(v.cliente_id),v.adquirente,v.bandeira,v.modalidade,v.nsu||''],[v.valor_bruto,v.valor_liquido],[v.data_venda]));
+  $('rcHead').innerHTML=`<tr><th>Venda</th>${todasE?'<th class="l">Empresa</th>':''}<th class="l">Adquirente</th><th class="l">Bandeira</th><th class="l">Modalidade</th><th>Parcela</th><th>Bruto</th><th>Taxa</th><th>Taxa da antecipação</th><th>Líquido</th><th>Ia receber em</th><th>Recebeu em</th><th>Dias antecipados</th><th>Custo ao mês</th></tr>`;
+  $('rcBody').innerHTML=ls.map(v=>{const orig=v.data_prevista_original||v.data_prevista,rec=rcRecebe(v),d=orig&&rec?dias(rec,orig):0,ta=+v.taxa_antecipacao||0,am=ta&&d>0?ta/((+v.valor_liquido)+ta)/d*30*100:null;
+    return `<tr><td>${dBR(v.data_venda)}</td>${todasE?`<td class="l">${esc(cvEmpNome(v.cliente_id))}</td>`:''}<td class="l">${esc(v.adquirente)}</td><td class="l">${esc(v.bandeira)}</td><td class="l">${esc(v.modalidade)}</td><td>${v.parcela?v.parcela+(v.parcelas?'/'+v.parcelas:''):mu('—')}</td><td>${fm(v.valor_bruto)}</td><td>${fm(v.taxa)}</td><td>${ta?fm(ta):mu('—')}</td><td><b>${fm(v.valor_liquido)}</b></td><td>${orig?dBR(orig):mu('—')}</td><td>${dBR(rec)}</td><td>${d>0?d:mu('—')}</td><td>${am==null?mu('—'):am.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%'}</td></tr>`}).join('')
+    ||`<tr><td class="l muted" colspan="14">Nenhuma venda antecipada neste período. Quando a adquirente antecipar, importe o relatório de recebíveis (ou de antecipação): o portal acha a coluna da taxa de antecipação e a data original.</td></tr>`;
+  const T=k=>r2(ls.reduce((t,v)=>t+(+v[k]||0),0));
+  $('rcFoot').innerHTML=ls.length?`<tr><td><b>Total</b></td>${todasE?'<td></td>':''}<td colspan="4"></td><td>${fm(T('valor_bruto'))}</td><td>${fm(T('taxa'))}</td><td>${fm(T('taxa_antecipacao'))}</td><td><b>${fm(T('valor_liquido'))}</b></td><td colspan="4"></td></tr>`:'';
+}
+function rcNota(){
+  $('rcNote').innerHTML='Como funciona: as vendas vêm do relatório da adquirente (<b>Importar vendas</b>, na Conciliação de cartões) e o extrato do banco vem da <b>Conciliação bancária</b> (OFX). '
+    +'Cada adquirente deposita de um jeito; o portal soma as vendas do mesmo jeito que ela deposita (em <b>Adquirentes e taxas</b>): PagBank, Cielo e Getnet depositam um valor por dia para cada bandeira, separando débito e crédito; o Pix do PagBank é somado no dia. '
+    +'Quando a data prevista cai no fim de semana ou feriado, o valor pode entrar somado com o dia seguinte: o portal reconhece. <b>Não entrou</b> = o extrato já foi importado até depois da data e o valor não apareceu; vira tarefa para conferir. '
+    +'<b>Gerar contas a receber</b> (na Conciliação de cartões) cria uma conta por depósito, com o valor líquido, para a Conciliação bancária baixar uma a uma.';
+}
+// tarefa para os depósitos que não entraram (regra da Carol, 16/11: pendência vira tarefa ligada)
+async function rcTarefa(xs,auto){
+  if(!xs.length||!ehEsc()||!RC.v148)return;
+  const porEmp={};xs.forEach(x=>(porEmp[x.cliente_id]||=[]).push(x));let n=0;
+  let adm=ehAdm()?{user_id:ME.user_id,nome:ME.nome}:null;
+  if(!adm){const {data}=await sb.from('perfis').select('user_id,nome').eq('admin',true).limit(1);adm=data?.[0]||{user_id:ME.user_id,nome:ME.nome}}
+  for(const [cid,l] of Object.entries(porEmp)){
+    const tit='Cartão: recebíveis que não entraram no banco';
+    let {data:ts}=await sb.from('tarefas').select('id,titulo,status').eq('cliente_id',cid).eq('titulo',tit).neq('status','concluida').eq('arquivada',false).limit(1);
+    let tar=ts?.[0];
+    if(!tar){const r={cliente_id:cid,titulo:tit,descricao:'Depósitos de cartão que deviam ter entrado no banco e não entraram (ou entraram com valor diferente). Abra Gestão financeira › Recebíveis › Recebíveis de cartão › Alertas para ver as vendas de cada um. Confira com a adquirente; quando resolver, aceite a diferença ou ligue ao extrato, e valide aqui.',
+        status:'afazer',prioridade:'alta',interna:true,executor:adm.user_id,executor_nome:adm.nome,criado_por:ME.user_id,criado_por_nome:ME.nome};
+      const {data,error}=await sb.from('tarefas').insert(r).select('id,titulo').single();if(error)throw error;tar=data}
+    const novos=l.filter(x=>!RC.tl.some(t=>t.tarefa_id===tar.id&&t.cartao_chave===x.chave));
+    if(novos.length){const {data,error}=await sb.from('tarefa_lancamentos').insert(novos.map(x=>({tarefa_id:tar.id,cliente_id:cid,cartao_chave:x.chave,titulo_id:x.vendas.find(v=>v.titulo_id)?.titulo_id||null,
+        resumo:`${dBR(x.data)} · Entrada ${fm(x.liq)} · ${x.adquirente} ${x.grupo} · ${RC.contas?.[x.conta_id]||'conta não informada'} · ${x.sit==='dif'?'Entrou '+fm(x.banco)+' (diferença '+fm(x.dif)+')':'Não entrou no banco'}`,criado_por:ME.user_id}))).select('id,tarefa_id,cliente_id,cartao_chave,validado_em');
+      if(error)throw error;(data||[]).forEach(t=>RC.tl.push({...t,tarefas:{titulo:tar.titulo}}));n+=novos.length}
+  }
+  if(n&&!auto)toast(`${n} ${n===1?'depósito ligado':'depósitos ligados'} à tarefa`);
+  if(n){rcMonta();rcDesenha()}
+}
+// sozinho, uma vez por empresa ao abrir a tela: os alertas novos entram na tarefa aberta da empresa
+async function rcTarefaAuto(){
+  const xs=RC.deps.filter(x=>x.sit==='nao'&&!x.tar&&!RC.tarefaFeita.has(x.cliente_id+'|'+x.chave));if(!xs.length||!ehEsc()||!RC.v148)return;
+  xs.forEach(x=>RC.tarefaFeita.add(x.cliente_id+'|'+x.chave));
+  try{await rcTarefa(xs,true)}catch(e){console.error(e)}
+}
+async function rcAcao(a,x){
+  try{
+    if(a==='aceita'){const m=prompt(`Aceitar a diferença de ${x.grupo} em ${dBR(x.data)}?\nPrevisto ${fm(x.liq)} · no banco ${x.banco==null?'nada':fm(x.banco)}\n\nEscreva o motivo (ex.: taxa diferente, venda cancelada, chargeback):`);if(m==null)return;
+      const {error}=await sb.from('cartao_receb_conf').insert({cliente_id:x.cliente_id,adquirente:x.adquirente,data_prevista:x.data,grupo:x.grupo,valor_previsto:x.liq,valor_banco:x.banco,ofx_id:x.ofx[0]?.id||null,situacao:'aceito',motivo:m.trim()||null});if(error)throw error;toast('Diferença aceita. Dá para desfazer na mesma linha.')}
+    else if(a==='desfaz'){if(!x.conf||!confirm('Desfazer? A linha volta a aparecer como antes.'))return;
+      const {error}=await sb.from('cartao_receb_conf').update({desfeito_em:new Date().toISOString(),desfeito_por:ME.user_id}).eq('id',x.conf.id);if(error)throw error;toast('Desfeito')}
+    else if(a==='tarefa'){await rcTarefa([x]);return}
+    else if(a==='liga')return rcLigaDlg(x);
+    renderRC();
+  }catch(e){console.error(e);alert(rcV148(e)?rcV148Msg:'Não foi possível salvar: '+(e.message||e))}
+}
+// ligar à mão: escolhe uma linha do extrato da conta, perto da data
+function rcLigaDlg(x){
+  const dias=(a,b)=>Math.abs(Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5));
+  const ls=RC.ofx.filter(o=>o.conta_id===x.conta_id&&dias(o.data,x.data)<=10).sort((a,b)=>Math.abs(a.valor-x.liq)-Math.abs(b.valor-x.liq)).slice(0,40);
+  CV.modo='rcliga';RC.ligaX=x;
+  $('cvDTit').textContent=`Ligar ao extrato · ${x.adquirente} ${x.grupo} · ${dBR(x.data)} · ${fm(x.liq)}`;
+  $('cvDBody').innerHTML=ls.length?`<p class="note" style="margin:0">Escolha a linha do extrato (${esc(RC.contas?.[x.conta_id]||'')}) em que este depósito entrou. As mais parecidas aparecem primeiro. Dá para desfazer depois.</p>
+    <div class="tablebox"><table><thead><tr><th></th><th>Data</th><th class="l">Histórico</th><th>Valor</th><th>Diferença</th></tr></thead><tbody>${ls.map((o,i)=>`<tr><td><input type="radio" name="rcliga" value="${o.id}"${i?'':' checked'}></td><td>${dBR(o.data)}</td><td class="l">${esc([o.memo,o.nome].filter(Boolean).join(' · '))}</td><td>${fm(o.valor)}</td><td>${Math.abs(o.valor-x.liq)<0.05?'<span class="pos">igual</span>':fm(r2(o.valor-x.liq))}</td></tr>`).join('')}</tbody></table></div><p class="err" id="cvDErr" hidden></p>`
+    :'<p class="note">Nenhuma linha de extrato desta conta perto desta data. Importe o extrato (OFX) na Conciliação bancária.</p><p class="err" id="cvDErr" hidden></p>';
+  $('cvDFoot').querySelector('[data-act="salvar"]').textContent='Ligar';dlgCV.showModal();
+}
+async function rcSalvaLiga(){
+  const x=RC.ligaX,id=$('cvDBody').querySelector('input[name="rcliga"]:checked')?.value;if(!id)return cvErr('Escolha a linha do extrato.');
+  const o=RC.ofx.find(o=>o.id===id);
+  const {error}=await sb.from('cartao_receb_conf').insert({cliente_id:x.cliente_id,adquirente:x.adquirente,data_prevista:x.data,grupo:x.grupo,valor_previsto:x.liq,valor_banco:o?.valor??null,ofx_id:id,situacao:'ligado'});if(error)throw error;
+  dlgCV.close();toast('Ligado ao extrato');renderRC();
+}
+['rcDe','rcAte'].forEach(id=>$(id).onchange=renderRC);
+['rcVisao','rcAdq','rcSit'].forEach(id=>$(id).onchange=rcDesenha);
+$('rcBusca').oninput=()=>{clearTimeout(rcDesenha.t);rcDesenha.t=setTimeout(rcDesenha,200)};
+$('rcHead').addEventListener('input',e=>{const i=e.target.closest('[data-rcf]');if(!i)return;RC.col[i.dataset.rcf]=i.value;clearTimeout(rcDesenha.t);rcDesenha.t=setTimeout(()=>{const k=i.dataset.rcf,p=i.selectionStart;rcDesenha();const n=$('rcHead').querySelector(`[data-rcf="${k}"]`);if(n){n.focus();try{n.setSelectionRange(p,p)}catch(x){}}},250)});
+$('rcHead').addEventListener('click',e=>{if(e.target.closest('[data-rclimpa]')){RC.col={};rcDesenha()}});
+$('rcAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-rcv]');if(b){$('rcVisao').value=b.dataset.rcv;rcDesenha()}});
+$('rcBody').addEventListener('click',e=>{
+  const t=e.target.closest('[data-rctar]');if(t){(async()=>{const {data}=await sb.from('tarefas').select('*').eq('id',t.dataset.rctar).maybeSingle();if(data)abrirTarefa(data);else toast('Tarefa não encontrada.')})();return}
+  const b=e.target.closest('[data-rca]');if(b){const x=RC.deps.find(d=>d.k===b.dataset.rck);if(x){b.disabled=true;rcAcao(b.dataset.rca,x).finally(()=>b.disabled=false)}return}
+  const tr=e.target.closest('tr[data-rck]');if(!tr)return;const k=tr.dataset.rck;RC.aberto.has(k)?RC.aberto.delete(k):RC.aberto.add(k);rcDesenha()});
+$('rcBody').addEventListener('keydown',e=>{if(e.key!=='Enter')return;const tr=e.target.closest('tr[data-rck]');if(tr){const k=tr.dataset.rck;RC.aberto.has(k)?RC.aberto.delete(k):RC.aberto.add(k);rcDesenha()}});
+$('rcCfg').onclick=()=>{CV.cfg=RC.cfg;$('cvCfg').onclick()};
+// importa pelo mesmo caminho da Conciliação de cartões (abre a tela dela para conferir as colunas)
+$('rcArq').onchange=e=>{if(!e.target.files[0])return;go('gfcartoes');$('cvArq').onchange(e)};
+$('rcXls').onclick=()=>{
+  if(!RC.deps.length)return alert('Nada para baixar neste período.');
+  const H=['Empresa','Recebimento','Adquirente','Conta','Depósito','Vendas','Bruto','Taxa','Antecipação','Estornos','Líquido previsto','No banco','Diferença','Situação'];
+  const rows=rcFiltra(RC.deps).map(x=>[cvEmpNome(x.cliente_id),dBR(x.data),x.adquirente,RC.contas?.[x.conta_id]||'',x.grupo,x.n,x.bruto,x.taxa,x.tant,x.est,x.liq,x.banco??'',x.dif??'',RCSIT[x.sit]?.[0]||'']);
+  const V=['Empresa','Recebimento','Depósito','Data da venda','Tipo','Canal','Bandeira','Modalidade','Parcela','Parcelas','Bruto','Taxa','Taxa antecipação','Líquido','NSU','Autorização'];
+  const vr=rcFiltra(RC.deps).flatMap(x=>x.vendas.map(v=>[cvEmpNome(v.cliente_id),dBR(x.data),x.adquirente+' '+x.grupo,dBR(v.data_venda),CVTIPO[v.tipo]?.[0]||v.tipo,v.canal==='ecommerce'?'E-commerce':'Caixa',v.bandeira,v.modalidade,v.parcela,v.parcelas,+v.valor_bruto,+v.taxa,+v.taxa_antecipacao||0,+v.valor_liquido,v.nsu||'',v.autorizacao||'']));
+  const wb=XLSX.utils.book_new(),w1=XLSX.utils.aoa_to_sheet([H,...rows]);w1['!cols']=H.map(()=>({wch:15}));xTabela(w1,{money:[6,7,8,9,10,11,12]});XLSX.utils.book_append_sheet(wb,w1,'A receber por dia');
+  const w2=XLSX.utils.aoa_to_sheet([V,...vr]);w2['!cols']=V.map(()=>({wch:14}));xTabela(w2,{money:[10,11,12,13],texto:[14,15]});XLSX.utils.book_append_sheet(wb,w2,'Vendas de cada depósito');
+  XLSX.writeFile(wb,`Recebiveis de cartao ${dBR(RC.de).replace(/\//g,'-')} a ${dBR(RC.ate).replace(/\//g,'-')}.xlsx`)};
 
 async function renderFat(){
   const cli=cliAtual();['ftNovo','ftImp','ftXls'].forEach(id=>$(id).hidden=true);
@@ -12554,7 +12888,7 @@ async function tlCarrega(t){
 // uma linha por lançamento ligado: data, tipo, valor, descrição, conta, categoria e situação
 function tlLinhas(box){
   const mm=box._mm,ct=box._ct;
-  return box._ls.map(l=>{const m=l.mov_id?mm.get(l.mov_id):null,some=l.mov_id?!m:l.titulo_id?!box._tt.has(l.titulo_id):true;
+  return box._ls.map(l=>{const m=l.mov_id?mm.get(l.mov_id):null,some=l.cartao_chave?false:l.mov_id?!m:l.titulo_id?!box._tt.has(l.titulo_id):true;
     const pz=(l.resumo||'').split(' · ');
     const sit=l.removido_em?'Desvinculado':l.validado_em?'Validado':some?'Apagado':m?.validar?'A validar':'Aguardando conferência';
     return {l,m,some,sit,data:m?dtBR(m.data):pz[0]||'',tipo:m?(m.tipo==='entrada'?'Entrada':'Saída'):pz[1]?.split(' ')[0]||'',
@@ -12597,6 +12931,9 @@ async function tlAbreLanc(l){
   const cli=l.cliente_id,id=l.mov_id||l.titulo_id,k=l.mov_id?'m':'t';
   if(!cli||!escCli.querySelector(`option[value="${cli}"]`))return alert('Você não tem acesso à empresa deste lançamento.');
   dlgTar.close();
+  // depósito de cartão que não entrou (v148): abre os Recebíveis de cartão no dia, em Alertas
+  if(l.cartao_chave){const d=l.cartao_chave.split('|')[1];if(escCli.value!==cli){escCli.value=cli;guardaEmp()}
+    go('gfreceb',()=>{$('rcDe').value=d;$('rcAte').value=d;$('rcVisao').value='dia'});return}
   if(escCli.value!==cli){escCli.value=cli;guardaEmp()}
   GT.key='';go('gfmov');
   const ok=()=>GT.modo==='gfmov'&&(k==='m'?GT.todos:GT.lista)?.some(x=>x.id===id&&x.cliente_id===cli);
@@ -13764,12 +14101,26 @@ const MANUAL=[
 <li>No site da adquirente, baixe o relatório de <b>vendas</b> (ou de <b>recebimentos</b>) do período, em Excel ou CSV.</li>
 <li>Clique em <b>Importar vendas da adquirente</b> e escolha o arquivo. O portal acha as colunas sozinho (data da venda, bandeira, modalidade, valor bruto, taxa, líquido, data prevista, NSU, estabelecimento). Confira a empresa, a adquirente e as colunas, e clique em <b>Importar</b>. Importar o mesmo arquivo de novo não duplica nada.</li>
 <li>Em <b>Mostrar</b>, escolha: <b>Confronto com o caixa</b> (dia a dia, débito e crédito do fechamento de caixa contra a adquirente; clique no dia para ver as vendas), <b>Agenda de recebimentos</b> (por dia, bandeira e modalidade, com bruto, taxa e líquido), <b>Vendas uma a uma</b> ou <b>Estornos e antecipações</b>.</li>
-<li>Clique em <b>Gerar contas a receber</b>: uma conta a receber por dia de recebimento, bandeira e modalidade, com o valor líquido. Quando o dinheiro cair, a conciliação do extrato (OFX) dá a baixa.</li>
+<li>Clique em <b>Gerar contas a receber</b>: uma conta a receber por depósito (somada do jeito que a adquirente deposita: por padrão, uma por dia para cada bandeira, separando débito e crédito), com o valor líquido. Quando o dinheiro cair, a conciliação do extrato (OFX) dá a baixa.</li>
 </ol>
 <ul>
 <li><b>Caixa e e-commerce separados:</b> o que passou na maquininha é conferido com o caixa; o e-commerce aparece numa coluna à parte. Em <b>Adquirentes</b>, informe os códigos de estabelecimento (EC) do e-commerce, a conta onde a adquirente deposita e a categoria das contas a receber.</li>
 <li><b>Estornos e chargebacks</b> entram negativos e diminuem o valor a receber; <b>antecipações</b> aparecem marcadas, com a data em que foram pagas.</li>
 <li><b>Ligação direta com a adquirente (API):</b> depende de a adquirente liberar o acesso para a empresa. Enquanto isso, a importação do arquivo faz o mesmo trabalho.</li>
+<li>Com <b>Todas as empresas</b> escolhida, a tela soma todas as empresas.</li>
+</ul>`},
+    {k:'gfreceb',t:'Recebíveis de cartão',
+      txt:`<p>Mostra quanto a adquirente vai pagar em cada dia, já com as taxas e as antecipações, somado do mesmo jeito que ela deposita no banco, e confere com o extrato.</p>
+<ol>
+<li>As vendas vêm do relatório da adquirente (<b>Importar vendas</b>, o mesmo da Conciliação de cartões). O extrato vem da <b>Conciliação bancária</b> (OFX) da conta informada em <b>Adquirentes e taxas</b>.</li>
+<li>Em <b>Adquirentes e taxas</b>, para cada adquirente: a conta onde ela deposita, <b>como deposita no banco</b> (por bandeira separando débito e crédito; total de crédito e total de débito; um total por dia; ou venda a venda), o texto que aparece no extrato e as <b>taxas contratadas</b> (por modalidade, bandeira e parcelas).</li>
+<li><b>A receber por dia</b>: uma linha por depósito, com vendas, bruto, taxa, antecipação, estornos, líquido previsto, o valor que entrou no banco e a diferença. Clique na linha para ver as vendas daquele depósito.</li>
+<li><b>Alertas</b>: o que <b>não entrou</b> (o extrato já foi importado até depois da data e o valor não apareceu) e o que <b>entrou com diferença</b>. O que não entrou vira, sozinho, a tarefa “Cartão: recebíveis que não entraram no banco” da empresa, com o depósito ligado.</li>
+<li>Em cada alerta: <b>Aceitar</b> (com o motivo), <b>Ligar ao extrato</b> (escolher a linha em que entrou) ou <b>📋 Tarefa</b>. Tudo tem <b>Desfazer</b> na mesma linha.</li>
+<li><b>Taxas cobradas × contratadas</b>: a taxa de cada modalidade e bandeira, a % cobrada, a % contratada e o que foi cobrado a mais. <b>Antecipações</b>: as vendas antecipadas, com a taxa da antecipação, a data original e o custo ao mês.</li>
+</ol>
+<ul>
+<li>Quando a data prevista cai no fim de semana ou feriado, o valor entra no dia útil seguinte, às vezes somado com o próprio dia: o portal reconhece.</li>
 <li>Com <b>Todas as empresas</b> escolhida, a tela soma todas as empresas.</li>
 </ul>`},
     {k:'gfconc',t:'Conciliação bancária (extrato OFX)',img:'gfconc.png',
@@ -14426,6 +14777,11 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-17receb',data:'2026-11-17',t:'Recebíveis de cartão e menu da Gestão financeira',itens:[
+    {x:'Nova tela Gestão financeira › Recebíveis › Recebíveis de cartão: o valor a receber de cada dia, com taxa, antecipação e estornos, somado do jeito que a adquirente deposita no banco (por bandeira, débito e crédito separados) e conferido com o extrato. O que não entrou vira alerta e tarefa; as diferenças podem ser aceitas com o motivo ou ligadas ao extrato, com Desfazer.',mods:['gfreceb'],para:'esc'},
+    {x:'Adquirentes e taxas: informe como cada adquirente deposita e as taxas contratadas; a tela mostra o que foi cobrado a mais.',mods:['gfreceb'],para:'esc'},
+    {x:'Gerar contas a receber (Conciliação de cartões) agora cria uma conta por depósito, somada do mesmo jeito que cai no banco, para a Conciliação bancária baixar uma a uma.',mods:['gfcartoes'],para:'esc'},
+    {x:'O menu da Gestão financeira ficou dividido em Caixa e tesouraria, Bancos, Recebíveis, Cadastros e Relatórios. Nenhuma tela saiu; as permissões dos usuários seguem iguais, na mesma divisão.',para:'esc'}]},
   {k:'2026-11-17perm',data:'2026-11-17',t:'Permissões: Apresentação no cadastro do usuário',itens:[
     {x:'Configurações › Cadastro de usuários › Privilégios de acesso: a Apresentação (DRE financeira) entrou na lista de Gestão financeira › Visões e relatórios do operador cliente, com Ver, Executar ou Bloqueado. Liberada, ele vê só as unidades das empresas dele (Pato Branco só aparece para quem tem MPA PB e MP Gestão PB). A aba Unidades continua só do escritório.',para:'esc'}]},
   {k:'2026-11-17tesneg',data:'2026-11-17',t:'Tesouraria: aviso de saldo negativo',itens:[
