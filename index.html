@@ -1740,6 +1740,23 @@ const DEV='Devolução em dinheiro';
 const TIPOS_SAIDA=[DEV,'Repasse','Água / voucher','Material de limpeza / higiene',OUTRAS];
 const REF=t=>t===DEV?['guia','Nº da guia','Ex.: 48213']:t==='Repasse'?['parceiro','Nome do parceiro','Ex.: Lab. Parceiro']:['guia','Nº do documento ou NF','Ex.: NF 1520'];
 const AVISO_NF='É importante informar o número da nota fiscal e anexar o comprovante.';
+// Tesouraria não pode ficar negativa (Carol, 16/11/2026), em todas as empresas: antes de salvar, confere o saldo de cada dia
+// fonte: {tab:'tesouraria',cli} (o que o cliente lança) ou {tab:'fin_movimentos',conta,ini} (conta de tesouraria da Gestão financeira)
+// novo/antigo: {data,v} com v = +entrada / -saída; devolve o primeiro dia que fica negativo (ou mais negativo) ou null
+async function tesNegativa(fonte,id,novo,antigo){
+  const linhas=[];
+  for(let i=0;;i+=1000){
+    const q=fonte.tab==='tesouraria'?sb.from('tesouraria').select('id,data,tipo,valor').eq('cliente_id',fonte.cli):sb.from('fin_movimentos').select('id,data,tipo,valor').eq('conta_id',fonte.conta);
+    const {data,error}=await q.order('id').range(i,i+999);if(error){console.error(error);return null}
+    linhas.push(...(data||[]));if(!data||data.length<1000)break}
+  const sin=r=>fonte.tab==='tesouraria'?(r.tipo==='Suprimento'?1:-1):(r.tipo==='entrada'?1:-1);
+  const base={};linhas.forEach(r=>{if(id&&r.id===id)return;base[r.data]=(base[r.data]||0)+sin(r)*(+r.valor)});
+  const cen=x=>{const d={...base};if(x)d[x.data]=(d[x.data]||0)+x.v;return d};
+  const dn=cen(novo),da=cen(antigo),dias=[...new Set([...Object.keys(dn),...Object.keys(da)])].sort();
+  const desde=[novo?.data,antigo?.data].filter(Boolean).sort()[0];let sn=+fonte.ini||0,sa=+fonte.ini||0;
+  for(const d of dias){sn=r2(sn+(dn[d]||0));sa=r2(sa+(da[d]||0));if(d>=desde&&sn<-0.004&&sn<sa-0.004)return {data:d,saldo:sn}}
+  return null}
+const tesNegMsg=p=>`Atenção: com este lançamento a tesouraria fica negativa em ${dBR(p.data)} (saldo ${fm(p.saldo)}).\n\nA tesouraria não pode ficar negativa. Confira se falta lançar uma entrada (suprimento, saque) ou se a data está certa.\n\nSe salvar mesmo assim, o lançamento fica marcado para a Controlacs conferir.\n\nSalvar mesmo assim?`;
 const refTxt=x=>x.tipo==='Repasse'?(x.parceiro?' · parceiro '+esc(x.parceiro):''):x.guia?(x.tipo===DEV?' · guia ':' · doc ')+esc(x.guia):'';
 const anexoHint=t=>t===DEV?'Ex.: foto da guia ou do recibo de devolução.':t==='Repasse'?'Ex.: recibo assinado pelo parceiro.':'Ex.: nota ou cupom fiscal.';
 const CATS=['Relatório do caixa (sistema)','Relatório da máquina de cartão','Outro comprovante'];
@@ -3739,6 +3756,8 @@ $('rForm').addEventListener('submit',async e=>{
   if(m){err.textContent=m;err.hidden=false;return}
   // tesouraria: nº da NF e comprovante não impedem salvar (Carol, 30/10): só avisa
   if(MOD==='tesouraria'&&row.tipo==='Despesa'&&(!row.documento||!RDOCS.length)&&!confirm(AVISO_NF+'\n\n'+(!row.documento&&!RDOCS.length?'Falta o nº da nota e o comprovante.':!row.documento?'Falta o nº da nota.':'Falta o comprovante.')+' Salvar mesmo assim?'))return;
+  if(MOD==='tesouraria'&&row.valor>0&&row.data){const sg=t=>t==='Suprimento'?1:-1,p=await tesNegativa({tab:'tesouraria',cli:cli.id},REG?.id,{data:row.data,v:sg(row.tipo)*row.valor},REG?{data:REG.data,v:sg(REG.tipo)*(+REG.valor)}:null);
+    if(p&&!confirm(tesNegMsg(p)))return}
   // leu valor diferente do previsto e ainda não confirmou: pergunta antes de enviar (Carol, 13/11)
   if(!REG&&REGPRE?.lido&&!REGPRE.ok&&Math.abs((row.valor||0)-REGPRE.lido)>0.004&&confirm(`O valor do boleto anexado (${fm(REGPRE.lido)}) é diferente do valor previsto (${fm(REGPRE.valor)}).\n\nConfirma a atualização do valor para ${fm(REGPRE.lido)}?`)){regPrevOk();row.valor=REGPRE.lido}
   err.hidden=true;$('rSave').disabled=true;
@@ -11010,6 +11029,9 @@ async function gxAcao(a){
   }
   const val=k=>($('ga_'+k)?.value||'').trim()||null,valor=parseMoney($('ga_valor').value),tipo=$('ga_tipo').value;
   if(!val('data'))return gtErr('Informe a data.');if(!(valor>0))return gtErr('Informe o valor.');if(!val('descricao'))return gtErr('Informe a descrição.');
+  {const ct=[...(GT.contas||[]),...(CGRUPO||[])].find(x=>x.id===c.id)||c;
+    if(ct.tipo==='Caixa / tesouraria'&&(tipo!=='entrada'||m)){const tv=m?.tipo||(tipo==='entrada'?'entrada':'saida'),p=await tesNegativa({tab:'fin_movimentos',conta:c.id,ini:ct.saldo_inicial},m?.id,{data:val('data'),v:(tv==='entrada'?1:-1)*r2(valor)},m?{data:m.data,v:(m.tipo==='entrada'?1:-1)*(+m.valor)}:null);
+      if(p&&!confirm(tesNegMsg(p)))return}}
   // transferência não tem categoria (Carol, 05/11)
   const base={data:val('data'),valor:r2(valor),descricao:val('descricao'),categoria:tipo==='transf'||m?.transf_id?null:val('categoria'),pessoa_nome:val('pessoa'),documento:val('documento')};
   let error;
@@ -14330,6 +14352,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-17tesneg',data:'2026-11-17',t:'Tesouraria: aviso de saldo negativo',itens:[
+    {x:'Ao lançar na Tesouraria, se o lançamento deixar o saldo negativo em algum dia, aparece um aviso antes de salvar. A tesouraria não pode ficar negativa: confira se falta lançar uma entrada ou se a data está certa.',mods:['tesouraria']},
+    {x:'Se salvar mesmo assim, o lançamento fica marcado "Tesouraria negativa" e entra na tarefa "Tesouraria negativa: conferir" da empresa, para a Controlacs conferir. Vale para todas as empresas.',para:'esc'}]},
   {k:'2026-11-16tlista',data:'2026-11-16',t:'Tarefas: lançamentos ligados em lista',itens:[
     {x:'Na tarefa, os lançamentos ligados aparecem logo abaixo da descrição, numa lista com data, tipo, valor, descrição, conta, categoria e situação. Clique na linha para abrir o lançamento.',mods:['tarefas']},
     {x:'A lista tem filtro em todas as colunas e o seletor Mostrar (A conferir, Validados, Todos, Desvinculados). Com vários lançamentos na tela, o botão Validar os N mostrados valida todos de uma vez, e cada um pode ser desfeito em Desfazer validação.',mods:['tarefas']},
