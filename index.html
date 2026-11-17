@@ -2957,6 +2957,22 @@ $('fbcFile').onchange=async e=>{
 const filiaisDe=c=>String(c?.filiais_rateio||'').split(',').map(x=>x.trim()).filter(Boolean);
 // empresa do lançamento aberto: a escolhida no próprio formulário (quem lança em mais de uma) ou a do topo
 const regCli=()=>CLIENTES.find(c=>c.id===($('rEmp')?.value||REG?.cliente_id||escCli.value));
+// Contas bancárias da empresa para os campos de banco (Carol 17/11/2026): lista do que a empresa tem cadastrado (v150 bancos_empresa)
+let BANCOSEMP=[];
+async function carregaBancosEmp(ids){ids=(ids||[]).filter(Boolean);if(!ids.length){BANCOSEMP=[];return}
+  try{const {data,error}=await sb.rpc('bancos_empresa',{clis:ids});if(error)throw error;BANCOSEMP=data||[]}
+  catch(e){const {data}=await sb.from('fin_contas').select('cliente_id,id,nome,conta_bc,banco,tipo,ativo,espelho_tes').in('cliente_id',ids).order('nome');
+    BANCOSEMP=(data||[]).filter(c=>c.ativo&&!c.espelho_tes&&c.tipo!=='Cartão de crédito')}}
+const bancosDe=cid=>BANCOSEMP.filter(c=>c.cliente_id===cid);
+function bancoOpts(lista,atual,valDe){const vals=lista.map(valDe);let h='<option value="">Escolha o banco</option>';
+  if(atual&&!vals.includes(atual))h+=`<option value="${esc(atual)}" selected>${esc(atual)}</option>`;
+  return h+lista.map(c=>{const v=valDe(c);return `<option value="${esc(v)}"${v===atual?' selected':''}>${esc(c.nome)}</option>`}).join('')}
+const bancoDestVal=c=>c.conta_bc||c.nome;
+function bancoDestHtml(k,lab,atual,dis){const cli=regCli(),lista=bancosDe(cli?.id);
+  if(!lista.length)return `<label class="f" data-dep>${lab}<input data-k="${k}" list="contasDest" value="${esc(atual||cli?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([cli?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+  let sel=atual;if(!sel){const pad=cli?.conta_deposito_bc;sel=pad&&lista.find(c=>c.conta_bc===pad||c.nome===pad)?bancoDestVal(lista.find(c=>c.conta_bc===pad||c.nome===pad)):lista.length===1?bancoDestVal(lista[0]):''}
+  return `<label class="f" data-dep>${lab}<select data-k="${k}" id="rBancoDest"${dis}>${bancoOpts(lista,sel,bancoDestVal)}</select></label>`}
+function bancoDestRefresh(){const s=$('rBancoDest');if(!s)return;const lista=bancosDe(regCli()?.id);s.innerHTML=bancoOpts(lista,lista.length===1?bancoDestVal(lista[0]):'',bancoDestVal)}
 // lançamento que trocou de empresa: os arquivos passam para a pasta da empresa nova
 // (o escritório move; o cliente copia, porque só pode enviar arquivos, não apagar)
 async function moverDocs(docs,cliId){
@@ -3014,7 +3030,7 @@ $('rRat').addEventListener('input',atualizaRateio);$('rRat').addEventListener('c
   if(e.target.name==='ratPor'){const total=totalReg(),pct=e.target.value==='pct';document.querySelectorAll('#rRat tbody input').forEach(i=>{const n=parseMoney(i.value)||0;if(n&&total)i.value=showMoney(r2(pct?n/total*100:total*n/100))})}
   atualizaRateio()});
 $('rFields').addEventListener('input',atualizaRateio);
-$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp')renderRateio(REG,true);else{ajustaDeposito();atualizaRateio()}});
+$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp'){renderRateio(REG,true);bancoDestRefresh()}else{ajustaDeposito();atualizaRateio()}});
 
 // ---------- categorias automáticas (contas a pagar, cartão e despesas da tesouraria) ----------
 const MODCAT=['pagar','cartao','tesouraria'];
@@ -3635,6 +3651,7 @@ async function renderMod(){
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
   REGS=data||[];DOCS={};
+  if(MOD==='tesouraria'||MOD==='pagar')await carregaBancosEmp(tod?empresasDe(MOD).map(c=>c.id):[cli.id]);
   // Tesouraria: saldo acumulado de tudo que foi lançado antes do mês
   let ANT=0;
   if(MOD==='tesouraria'&&f!=='aberto'){
@@ -3760,7 +3777,7 @@ async function openReg(r,pre){
     if(tp==='parc')return `<label class="f">${lab}<select data-k="${k}"${dis}>${Array.from({length:12},(_,i)=>`<option value="${i+1}"${+v(k)===i+1?' selected':''}>${i+1}x</option>`).join('')}</select></label>`;
     if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento','Depósito bancário'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
-    if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+    if(tp==='contaDest')return bancoDestHtml(k,lab.replace(' (opcional)','').replace(' (conta no Bom Controle)',''),r?v(k)||'':'',dis);
     // boleto: colar a linha digitável (ou anexar o PDF) preenche valor e vencimento; a chave da NF-e vai junto, escondida
     if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
     if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="${MOD==='cartao'?'Ex.: material de escritório na papelaria; almoço com a equipe; peça para a impressora':'Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção'}"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
@@ -3779,7 +3796,7 @@ async function openReg(r,pre){
   const emps=empresasDe(MOD,true).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
-  $('rBaixa').innerHTML=(escR()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
+  $('rBaixa').innerHTML=(escR()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento${(l=>l.length?`<select id="rBanco"${r.conferido?' disabled':''}>${bancoOpts(l,r.banco||(l.length===1?l[0].nome:''),c=>c.nome)}</select>`:`<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}>`)(bancosDe(r.cliente_id))}</label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
   if(MOD==='pagar'&&r?.origem==='beneficios')$('rFields').insertAdjacentHTML('afterbegin',`<div class="note wide" style="margin:0">Conta do pedido de benefícios de ${ymTxt(r.beneficio_comp.slice(0,7))}: pedido ${fm(r.valor_pedido)} + taxa do boleto ${fm(r.taxa_boleto)} = <b>${fm(+r.valor_pedido+(+r.taxa_boleto||0))}</b>.${r.boleto_alerta?` <span class="chip c-bad">${esc(r.boleto_alerta)}</span>`:''}</div>`);
   renderRateio(r,ed);ajustaDeposito();
   $('rErr').hidden=true;
@@ -14811,6 +14828,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-17bancos',data:'2026-11-17',t:'Lista de bancos da empresa',itens:[
+    {x:'Tesouraria: no Depósito bancário, o campo Banco de destino agora mostra a lista das contas bancárias cadastradas da empresa. É só escolher.',mods:['tesouraria']},
+    {x:'Contas a pagar: o Banco do pagamento também mostra a lista das contas da empresa.',mods:['pagar'],para:'esc'}]},
   {k:'2026-11-17receb',data:'2026-11-17',t:'Recebíveis de cartão e menu da Gestão financeira',itens:[
     {x:'Nova tela Gestão financeira › Recebíveis › Recebíveis de cartão: o valor a receber de cada dia, com taxa, antecipação e estornos, somado do jeito que a adquirente deposita no banco (por bandeira, débito e crédito separados) e conferido com o extrato. O que não entrou vira alerta e tarefa; as diferenças podem ser aceitas com o motivo ou ligadas ao extrato, com Desfazer.',mods:['gfreceb'],para:'esc'},
     {x:'Adquirentes e taxas: informe como cada adquirente deposita e as taxas contratadas; a tela mostra o que foi cobrado a mais.',mods:['gfreceb'],para:'esc'},
