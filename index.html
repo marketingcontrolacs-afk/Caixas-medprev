@@ -706,7 +706,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <section id="viewOp" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Fechamento do caixa</h1><p class="sub" id="opSub"></p><p class="note" id="opEscAviso" hidden style="margin:4px 0 0">Você está na mesma tela que o operador usa. O que salvar aqui vale como lançamento da empresa. Para conferir, use Escritório › Conferência de caixa.</p></div>
-      <div class="row" style="align-items:flex-end;gap:10px"><label class="f" id="opCaixaBox" hidden style="min-width:120px">Caixa<select id="opCaixa"></select></label><label class="f" style="min-width:170px">Dia do fechamento<input type="date" id="opData"></label></div>
+      <div class="row" style="align-items:flex-end;gap:10px"><label class="f" id="opCaixaBox" hidden style="min-width:120px">Caixa<select id="opCaixa"></select></label><label class="f" id="opOperBox" hidden style="min-width:190px">Quem está operando<select id="opOper"></select></label><label class="f" style="min-width:170px">Dia do fechamento<input type="date" id="opData"></label></div>
     </div>
     <div class="grid-op">
       <form class="card" id="opForm" novalidate>
@@ -1484,6 +1484,14 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     <div class="db"><div class="fields" id="rFields"></div><div id="rRat"></div><div id="rDocs" style="display:grid;gap:8px"></div><div id="rLiq" style="display:grid;gap:8px"></div><div id="rBaixa"></div><p class="err" id="rErr" hidden></p></div>
     <div class="df"><button type="button" class="btn ghost" id="rDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="rClose">Fechar</button><button type="button" class="btn" id="rConf"></button><button type="submit" class="btn primary" id="rSave">Salvar</button></div>
   </form>
+</dialog>
+<dialog id="dlgOpCx" style="max-width:520px;width:calc(100% - 32px)">
+  <div class="dh"><h2 id="ocTitle">Operadores do caixa</h2></div>
+  <div class="db"><p class="note" style="margin:0 0 10px">Cadastre o nome das pessoas que operam o caixa nesta empresa. Na tela Caixa, quem fecha escolhe o próprio nome; o nome aparece na Conferência de caixa e na planilha do mês.</p>
+    <div id="ocLista" style="display:grid;gap:6px;margin:0 0 10px"></div>
+    <div class="row" style="gap:8px;align-items:flex-end"><label class="f" style="flex:1">Nome do operador<input id="ocNome" placeholder="Ex.: Maria"></label><button type="button" class="btn" id="ocAdd">+ Adicionar</button></div>
+    <p class="note" id="ocAnt" hidden style="margin:10px 0 0"></p><p class="err" id="ocErr" hidden></p></div>
+  <div class="df"><button type="button" class="btn ghost" id="ocDesf" hidden title="Volta a lista de operadores para como estava antes da última alteração salva">Desfazer última alteração</button><span class="spacer"></span><button type="button" class="btn ghost" id="ocClose">Fechar</button><button type="button" class="btn primary" id="ocSave">Salvar</button></div>
 </dialog>
 <dialog id="dlgTC">
   <form id="tcForm" novalidate>
@@ -2310,6 +2318,13 @@ const V43=c=>!!c&&'caixas' in c;
 const nCx=c=>Math.max(1,Math.min(9,+(c&&c.caixas)||1));
 const cxNome=(c,f)=>nCx(c)>1||(f&&f.caixa>1)?'Caixa '+(f?f.caixa||1:1):'';
 const opCx=()=>+$('opCaixa').value||1;
+// operadores do caixa (Carol, 16/11): nomes cadastrados na empresa; quem fecha escolhe o próprio nome (v139)
+const V139=c=>!!c&&'operadores_caixa' in c;
+const opersCx=c=>(V139(c)&&Array.isArray(c.operadores_caixa)?c.operadores_caixa:[]).map(x=>String(x||'').trim()).filter(Boolean);
+const temOperCx=c=>V139(c)&&opersCx(c).length>0;
+function opOperMonta(sel){const ns=opersCx(OPCLI);if(sel&&!ns.includes(sel))ns.push(sel);
+  $('opOperBox').hidden=!temOperCx(OPCLI)&&!sel;
+  $('opOper').innerHTML='<option value="">— escolha —</option>'+ns.map(n=>`<option${n===sel?' selected':''}>${esc(n)}</option>`).join('')}
 function initOp(cli){
   OPCLI=cli;$('opData').max=TODAY;$('opEscAviso').hidden=!escR();
   const n=nCx(cli),atual=Math.min(opCx(),n);$('opCaixaBox').hidden=n<2;
@@ -2327,6 +2342,7 @@ async function loadDay(){
   cur=f;
   NUM.forEach(k=>$(k).value=f?showMoney(f[k]):'');
   $('obs').value=f?f.obs||'':'';
+  opOperMonta(f?f.operador||'':'');
   const anx=f?f.anexos||[]:[];
   draftSaidas=f?(f.saidas||[]).map(s=>({...s,anexo:anx.find(a=>a.saida_id===s.id)||null})):[];
   draftAnexos=anx.filter(a=>!a.saida_id);
@@ -2406,13 +2422,14 @@ $('opForm').addEventListener('submit',async e=>{
   else if(d.saidas.some(s=>s.tipo==='Repasse'&&!(s.parceiro||'').trim()))m='Informe o nome do parceiro em cada repasse.';
   else if(d.saidas.some(s=>s.tipo===OUTRAS&&!(s.descricao||'').trim()))m='Descreva cada saída do tipo “Outras despesas”.';
   else if(c.alerta&&!d.obs)m='Tem diferença no caixa. Explique nas observações antes de enviar.';
+  else if(!$('opOperBox').hidden&&!$('opOper').value)m='Escolha quem está operando o caixa.';
   if(m){err.textContent=m;err.hidden=false;return}
   // nº da NF e comprovante não impedem o envio (Carol, 30/10): só avisa
   if(d.saidas.some(s=>s.tipo!==DEV&&s.tipo!=='Repasse'&&(!(s.guia||'').trim()||!s.anexo))&&!confirm(AVISO_NF+'\n\nHá saída sem o nº da nota ou sem o comprovante. Enviar mesmo assim?'))return;
   err.hidden=true;$('btnEnviar').disabled=true;
   try{
     const row={cliente_id:OPCLI.id,data:$('opData').value,obs:d.obs||null,enviado_em:new Date().toISOString()};
-    NUM.forEach(k=>row[k]=r2(d[k]));if(V43(OPCLI))row.caixa=opCx();
+    NUM.forEach(k=>row[k]=r2(d[k]));if(V43(OPCLI))row.caixa=opCx();if(V139(OPCLI))row.operador=$('opOper').value||null;
     const {data:f,error:e1}=await sb.from('fechamentos').upsert(row,{onConflict:V43(OPCLI)?'cliente_id,data,caixa':'cliente_id,data'}).select().single();if(e1)throw e1;
     // saídas: apaga as removidas, atualiza as existentes e cria as novas
     const keep=d.saidas.filter(s=>s.id).map(s=>s.id);
@@ -2584,14 +2601,14 @@ async function renderPainel(){
     const fs=by[s]||[];for(let k=1;k<=Math.max(n,...fs.map(f=>f.caixa||1));k++){const f=fs.find(x=>(x.caixa||1)===k);if(f||k<=n)days.push([s,k,f])}}d.setDate(d.getDate()+1)}
   const T={din:0,sai:0,fs:0,deb:0,difDeb:0,cred:0,juros:0};let nAlert=0,nPend=0,nConf=0,nSem=0;
   const cls=v=>v<-0.004?'neg':v>0.004?'pos':'muted';
-  const lbl=(s,k)=>dLabel(s)+(n>1||k>1?` <span class="muted">· Cx ${k}</span>`:'');
+  const lbl=(s,k,f)=>dLabel(s)+(n>1||k>1?` <span class="muted">· Cx ${k}</span>`:'')+(f&&f.operador?` <span class="muted" title="Quem operou o caixa">· ${esc(f.operador)}</span>`:'');
   $('tbDias').innerHTML=days.map(([s,k,f])=>{
     if(!f){nSem++;return `<tr><td>${lbl(s,k)}</td><td colspan="7" class="l muted">Ainda não lançado</td><td class="l">${chip('none')}</td></tr>`}
     const c=calc(f);T.din+=+f.din_sis;T.sai+=c.sai;T.fs+=c.fs;T.deb+=+f.deb_maq;T.difDeb+=c.difDeb;T.cred+=+f.cred_maq;T.juros+=c.juros;
     if(f.conferido)nConf++;else{nPend++;if(c.alerta)nAlert++}
     const clip=(f.anexos||[]).length?` <span class="muted" title="Comprovantes">📎${f.anexos.length}</span>`:'';
     const aj=(f.ajustes||[]).length?` <span class="muted" title="Valores corrigidos pelo escritório">✎${f.ajustes.length}</span>`:'';
-    return `<tr class="click${aConferir(f)?' pend':''}" data-id="${f.id}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${lbl(s,k)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}${aj}</td></tr>`}).join('')
+    return `<tr class="click${aConferir(f)?' pend':''}" data-id="${f.id}" tabindex="0"${aConferir(f)?` title="${esc(f.obs)}"`:''}><td>${lbl(s,k,f)}</td><td>${fm(f.din_sis)}</td><td>${c.sai?fm(c.sai):'<span class="muted">—</span>'}</td><td class="${cls(c.fs)}">${fsign(c.fs)}</td><td>${fm(f.deb_maq)}</td><td class="${cls(c.difDeb)}">${fsign(c.difDeb)}</td><td>${fm(f.cred_maq)}</td><td>${fm(c.juros)}</td><td class="l">${chip(c.status)}${clip}${aj}</td></tr>`}).join('')
     ||'<tr><td class="l muted" colspan="9">Nenhum dia neste período até hoje.</td></tr>';
   $('tfDias').innerHTML=MES.length?`<tr><td>Total</td><td>${fm(T.din)}</td><td>${fm(T.sai)}</td><td>${fsign(T.fs)}</td><td>${fm(T.deb)}</td><td>${fsign(T.difDeb)}</td><td>${fm(T.cred)}</td><td>${fm(T.juros)}</td><td></td></tr>`:'';
   $('tiles').innerHTML=`
@@ -2617,7 +2634,7 @@ async function openDay(id,edit){
   const cls=v=>v<-0.004?'neg':v>0.004?'pos':'';
   const anxSaida=id=>(f.anexos||[]).find(a=>a.saida_id===id);
   const anxDia=(f.anexos||[]).filter(a=>!a.saida_id);
-  $('dTitle').textContent=`${DOW[dObj(s).getDay()]}, ${dBR(s)}`+(cx?' · '+cx:'')+(edit?' · corrigindo':'');$('dChip').innerHTML=chip(c.status);
+  $('dTitle').textContent=`${DOW[dObj(s).getDay()]}, ${dBR(s)}`+(cx?' · '+cx:'')+(f.operador?' · '+f.operador:'')+(edit?' · corrigindo':'');$('dChip').innerHTML=chip(c.status);
   const docs=`${f.saidas.some(x=>anxSaida(x.id))?`<div><h3 style="margin-bottom:6px">Comprovantes das saídas</h3><div class="fotos">${f.saidas.map(x=>anxSaida(x.id)).filter(Boolean).map(a=>anexoView(a,urls[a.caminho])).join('')}</div></div>`:''}
     <div><h3 style="margin-bottom:6px">Comprovantes do dia</h3>${anxDia.length?`<div class="fotos">${anxDia.map(a=>`<div style="display:grid;gap:4px;max-width:100%"><span class="note">${esc(a.categoria)}</span>${anexoView(a,urls[a.caminho])}</div>`).join('')}</div>`:'<p class="neg" style="margin:0">Nenhum relatório anexado.</p>'}</div>
     <div><h3 style="margin-bottom:6px">Observação do operador</h3><p style="margin:0">${f.obs?esc(f.obs):'<span class="muted">Sem observação</span>'}</p></div>`;
@@ -2731,8 +2748,8 @@ $('dConf').onclick=async()=>{
 };
 $('btnPlanMes').onclick=()=>{
   const cli=cliAtual();if(!cli||!MES.length){toast('Não há lançamentos neste período.');return}
-  const H=['Data','Dia','Dinheiro (sistema)','Saídas','Dinheiro esperado','Dinheiro contado','Falta(-)/Sobra(+)','Débito (sistema)','Débito (máquina)','Diferença débito','Crédito (sistema)','Crédito (máquina)','Juros de parcelamento','Observações','Situação','Nota da conferência','Ajustes do escritório'];
-  const rows=MES.map(f=>{const c=calc(f),cx=cxNome(cli,f);return [dObj(f.data),DOW[dObj(f.data).getDay()]+(cx?' · '+cx:''),+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'',(f.ajustes||[]).map(a=>a.campo+': '+(a.antes||'—')+' → '+(a.depois||'removida')).join(' | ')]});
+  const H=['Data','Dia','Dinheiro (sistema)','Saídas','Dinheiro esperado','Dinheiro contado','Falta(-)/Sobra(+)','Débito (sistema)','Débito (máquina)','Diferença débito','Crédito (sistema)','Crédito (máquina)','Juros de parcelamento','Observações','Situação','Nota da conferência','Ajustes do escritório'];if(MES.some(f=>f.operador))H.push('Operador do caixa');
+  const rows=MES.map(f=>{const c=calc(f),cx=cxNome(cli,f);return [dObj(f.data),DOW[dObj(f.data).getDay()]+(cx?' · '+cx:''),+f.din_sis,c.sai,c.esp,+f.din_cont,c.fs,+f.deb_sis,+f.deb_maq,c.difDeb,+f.cred_sis,+f.cred_maq,c.juros,f.obs||'',CHIP[c.status][1],f.conf?.nota||'',(f.ajustes||[]).map(a=>a.campo+': '+(a.antes||'—')+' → '+(a.depois||'removida')).join(' | ')].concat(H.length>17?[f.operador||'']:[])});
   const S=[['Tipo','Nº guia / documento','Parceiro','Descrição','Valor','Data','Caixa']];
   MES.forEach(f=>f.saidas.forEach(s=>S.push([s.tipo,s.guia||'',s.parceiro||'',s.descricao||'',+s.valor,dObj(f.data),cxNome(cli,f)])));
   const wb=XLSX.utils.book_new();
@@ -3217,7 +3234,7 @@ const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
   $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th>${'matriz_id' in (CLIENTES[0]||{})?'<th class="l" title="Deixe em branco se for matriz ou empresa sem filial">Filial de</th>':''}<th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td>${'matriz_id' in c?`<td><select data-k="matriz_id" aria-label="Filial de" style="min-width:170px"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></td>`:''}<td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px"></td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td>${'matriz_id' in c?`<td><select data-k="matriz_id" aria-label="Filial de" style="min-width:170px"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></td>`:''}<td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px">${V139(c)&&nCx(c)>1?`<button type="button" class="btn small ocAbrir" style="margin-left:6px;white-space:nowrap" title="Nomes de quem opera o caixa">👤 Operadores (${opersCx(c).length})</button>`:''}</td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   await grCarrega();grRender();
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   ACS_TODOS=acs||[];
@@ -3246,7 +3263,30 @@ async function renderAcessos(){if(!$('tbAc'))return;
 }
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;let v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
   if(k==='caixas')e.target.value=v=Math.max(1,Math.min(9,parseInt(v)||1));
-  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);c[k]=v;if(k==='matriz_id'||k==='nome'||k==='ativo')grRender()}});
+  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);const ant=c[k];c[k]=v;if(k==='matriz_id'||k==='nome'||k==='ativo')grRender();
+    if(k==='caixas'&&V139(c)){renderCadastro();if(v>1&&!(+ant>1)&&!opersCx(c).length)ocAbre(id)}}});
+// cadastro dos operadores do caixa (Carol, 16/11): abre ao colocar mais de 1 caixa; Desfazer volta a lista anterior
+let OC=null;
+function ocDesenha(){const c=CLIENTES.find(x=>x.id===OC.id);
+  $('ocTitle').textContent='Operadores do caixa · '+(c?.nome||'');
+  $('ocLista').innerHTML=OC.nomes.map((n,i)=>`<div class="row" style="gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:8px"><span style="flex:1">${esc(n)}</span><button type="button" class="btn small ghost" data-ocdel="${i}">Remover</button></div>`).join('')||'<p class="muted" style="margin:0">Nenhum operador cadastrado.</p>';
+  const ant=Array.isArray(c?.operadores_caixa_ant)?c.operadores_caixa_ant:null;
+  $('ocDesf').hidden=!ant;$('ocAnt').hidden=!ant;if(ant)$('ocAnt').textContent='Antes da última alteração: '+(ant.join(', ')||'nenhum operador')+'.'}
+function ocAbre(id){const c=CLIENTES.find(x=>x.id===id);if(!c)return;OC={id,nomes:opersCx(c)};$('ocNome').value='';$('ocErr').hidden=true;ocDesenha();$('dlgOpCx').showModal();setTimeout(()=>$('ocNome').focus(),50)}
+function ocAdd(){const n=$('ocNome').value.trim().replace(/\s+/g,' ');if(!n)return;
+  if(OC.nomes.some(x=>x.toLowerCase()===n.toLowerCase())){$('ocErr').textContent='Esse nome já está na lista.';$('ocErr').hidden=false;return}
+  $('ocErr').hidden=true;OC.nomes.push(n);$('ocNome').value='';ocDesenha();$('ocNome').focus()}
+async function ocGrava(nomes,ant,msg){const {error}=await sb.from('clientes').update({operadores_caixa:nomes,operadores_caixa_ant:ant}).eq('id',OC.id);
+  if(error){fail(error);return false}const c=CLIENTES.find(x=>x.id===OC.id);c.operadores_caixa=nomes;c.operadores_caixa_ant=ant;toast(msg);renderCadastro();return true}
+$('tbCli').addEventListener('click',e=>{const b=e.target.closest('.ocAbrir');if(b)ocAbre(b.closest('tr').dataset.id)});
+$('ocAdd').addEventListener('click',ocAdd);
+$('ocNome').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ocAdd()}});
+$('ocLista').addEventListener('click',e=>{const b=e.target.closest('[data-ocdel]');if(b){OC.nomes.splice(+b.dataset.ocdel,1);ocDesenha()}});
+$('ocClose').addEventListener('click',()=>$('dlgOpCx').close());
+$('ocSave').addEventListener('click',async()=>{if($('ocNome').value.trim())ocAdd();const c=CLIENTES.find(x=>x.id===OC.id);
+  if(await ocGrava(OC.nomes.slice(),opersCx(c),'Operadores do caixa salvos'))$('dlgOpCx').close()});
+$('ocDesf').addEventListener('click',async()=>{const c=CLIENTES.find(x=>x.id===OC.id),ant=c.operadores_caixa_ant||[];
+  if(await ocGrava(ant.slice(),opersCx(c),'Última alteração desfeita')){OC.nomes=ant.slice();ocDesenha()}});
 // ---------- grupos de empresas (Carol, 12/11) ----------
 async function grCarrega(){const {data,error}=await sb.from('empresa_grupos').select('*').order('nome');GRUPOS=error?[]:data||[];GRUPOS.ok=!error;return !error}
 function grRender(){
@@ -13556,7 +13596,7 @@ const MANUAL=[
     {k:'caixa',t:'Caixa (fechamento do dia)',img:'caixa.png',vid:'rotina-caixa-tesouraria.mp4',
       txt:`<p>Aqui a recepção fecha o caixa de cada dia e envia para a Controlacs conferir.</p>
 <ol>
-<li>Confira o <b>Dia do fechamento</b> no alto à direita. Nas empresas com mais de um caixa por dia, escolha também o caixa.</li>
+<li>Confira o <b>Dia do fechamento</b> no alto à direita. Nas empresas com mais de um caixa por dia, escolha também o caixa e, em <b>Quem está operando</b>, o seu nome. Os nomes são cadastrados pela Controlacs em Configurações › Cadastro de empresas › <b>👤 Operadores</b> (o botão aparece quando a empresa tem mais de 1 caixa por dia).</li>
 <li><b>Dinheiro:</b> informe o total em dinheiro que o sistema da clínica mostra e o dinheiro contado (sangria).</li>
 <li><b>Saídas do caixa:</b> clique em <b>+ Adicionar saída</b> para cada dinheiro que saiu do caixa: devolução (com o nº da guia), repasse (com o nome do parceiro), água ou voucher, material de limpeza ou outra despesa. Informe o nº do documento ou da NF, o valor, e anexe o comprovante (foto ou PDF).</li>
 <li><b>Cartão de débito</b> e <b>Cartão de crédito:</b> informe o valor do sistema e o valor do relatório da máquina. A diferença aparece logo abaixo.</li>
@@ -14364,6 +14404,10 @@ const NOVIDADES=[
     {x:'A descrição da tarefa abre com o tamanho do texto, e o botão Tela cheia no topo da janela aumenta a tarefa inteira.',mods:['tarefas']}]},
   {k:'2026-11-16apres',data:'2026-11-16',t:'Apresentação (DRE financeira)',itens:[
     {x:'Gestão financeira › Relatórios › Apresentação (DRE financeira): a DRE para apresentar ao cliente. Receita = liquidez do sistema da empresa + juros do cartão; despesas vêm dos lançamentos, sem Restituições. Tem Resumo de recebíveis (taxas entram como despesa), rateios entre empresas, análise por unidade e geral, modo apresentação e PDF. Já estão lançadas a liquidez de 2024 a out/2026, os recebíveis das planilhas e o rateio de marketing (para conferir).',para:'esc'}]},
+  {k:'2026-11-16opcx',data:'2026-11-16',t:'Operadores do caixa',itens:[
+    {x:'Configurações › Cadastro de empresas: quando a empresa tem mais de 1 caixa por dia, o botão 👤 Operadores abre o cadastro dos nomes de quem opera o caixa (abre sozinho ao trocar de 1 para mais caixas). Dá para tirar nomes e usar Desfazer última alteração.',para:'esc'},
+    {x:'Rotina diária › Caixa: nas empresas com operadores cadastrados, escolha em Quem está operando o seu nome antes de enviar o fechamento.',mods:['caixa']},
+    {x:'Conferência de caixa: o nome de quem operou aparece em cada dia, na janela do dia e na planilha do mês (coluna Operador do caixa).',para:'esc'}]},
   {k:'2026-11-16soenv',data:'2026-11-16',t:'Boletos e notas a pagar: permissão Só enviar',itens:[
     {x:'Cadastro de usuários › Privilégios de acesso › Rotina diária: em Boletos e notas fiscais a pagar, marque Executar e depois Só enviar boletos e notas. A pessoa (por exemplo, quem fica no caixa) envia o boleto ou a nota que chegou, mas não vê Contas do mês nem o que outras pessoas enviaram. Quem já tem acesso continua igual.',para:'esc'},
     {x:'Em Boletos e notas fiscais a pagar, quem tem a permissão Só enviar vê só os boletos e notas que ele mesmo enviou, com a situação de cada um (Aguardando a Controlacs ou Paga).',mods:['pagar']}]},
