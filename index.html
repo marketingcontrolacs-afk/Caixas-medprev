@@ -650,6 +650,8 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 .apr-ana textarea{width:100%;min-height:110px;font:inherit}.apr-ana h4{margin:12px 0 4px;font-size:13px}
 .apr-obs{white-space:normal!important;max-width:320px;font-size:12px}
 #viewApr .chip.ok{background:var(--ok-soft);color:var(--ok)}#viewApr .chip.warn{background:var(--warn-soft);color:var(--warn)}#viewApr .chip.bad{background:var(--bad-soft);color:var(--bad)}#viewApr .chip:not(.ok):not(.warn):not(.bad){background:var(--sunk);color:var(--muted)}
+#viewEnc .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}#viewEnc .chip.ok{background:var(--ok-soft);color:var(--ok)}#viewEnc .chip.warn{background:var(--warn-soft);color:var(--warn)}
+#viewEnc .enc-f input{padding:4px 6px;font-size:12px;min-width:70px}#viewEnc tr.enc-sep td{border-top:2px solid var(--line)}#viewEnc .enc-pend{color:var(--warn)}#viewEnc .neg{color:var(--bad)}.enc-t td,.enc-t th{white-space:nowrap}
 #viewApr .note.warn{color:var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:8px}
 #viewApr .tile .v.neg,#viewApr .neg{color:var(--bad)}#viewApr .pos{color:var(--ok)}
 body.apr-pres header.top,body.apr-pres nav.side,body.apr-pres #modrow,body.apr-pres #viewApr .tabs button[data-aprtab="receb"],body.apr-pres #viewApr .tabs button[data-aprtab="liq"],body.apr-pres #viewApr .tabs button[data-aprtab="rat"],body.apr-pres #viewApr .tabs button[data-aprtab="ana"],body.apr-pres #viewApr .tabs button[data-aprtab="cfg"],body.apr-pres #viewApr #aprPdf{display:none!important}
@@ -1120,6 +1122,24 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     </div>
     <div class="tabs" id="aprTabs" role="tablist"></div>
     <div id="aprBody" class="apr-body"></div>
+  </section>
+  <section id="viewEnc" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div><h1>Encerramento de mês</h1><p class="sub">Depois de conferir, encerre o mês de cada conta. Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta; só o Master desbloqueia. A Apresentação (DRE financeira) mostra quais meses já estão encerrados.</p></div>
+      <div class="row" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
+        <label class="f">Mês<input type="month" id="encMes"></label>
+        <label class="f">Empresa<select id="encCli"></select></label>
+        <label class="f">Mostrar<select id="encVer"><option value="">Todas as contas</option><option value="aberto">Só as abertas</option><option value="enc">Só as encerradas</option></select></label>
+        <label class="f">Buscar<input id="encBusca" placeholder="Empresa, conta, pessoa..." style="max-width:220px"></label>
+      </div>
+    </div>
+    <div class="tiles" id="encTiles"></div>
+    <div class="toolbar" id="encBar"></div>
+    <div class="card tablebox"><table class="enc-t"><thead id="encHead"></thead><tbody id="encBody"></tbody></table></div>
+    <p class="note" id="encNote"></p>
+    <h2 style="margin-top:18px">Histórico do mês</h2>
+    <p class="sub">Todo encerramento e todo desbloqueio fica guardado aqui, com quem fez, quando e o motivo.</p>
+    <div class="card tablebox"><table><thead><tr><th class="l">Empresa</th><th class="l">Conta</th><th class="l">Encerrado por</th><th class="l">Desbloqueado por</th><th class="l">Motivo</th></tr></thead><tbody id="encHist"></tbody></table></div>
   </section>
 
   <!-- GESTÃO FINANCEIRA › CADASTROS (escritório) -->
@@ -1592,6 +1612,11 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <div class="db" id="ctdBody"></div>
   <div class="df" id="ctdFoot"></div>
 </dialog>
+<dialog id="mesEncDlg" style="width:min(520px,calc(100vw - 32px))">
+  <div class="dh"><h2>🔒 Mês encerrado</h2></div>
+  <div class="db"><p id="mesEncTxt"></p><p class="muted">O lançamento não foi gravado. Depois do desbloqueio, faça de novo.</p></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn" id="mesEncIr" hidden>Abrir Encerramento de mês</button><button type="button" class="btn primary" onclick="this.closest('dialog').close()">Entendi</button></div>
+</dialog>
 <dialog id="aprDlg" style="width:min(760px,calc(100vw - 32px))">
   <div class="dh"><h2 id="aprDlgT"></h2></div>
   <div class="db" id="aprDlgB"></div>
@@ -1713,7 +1738,17 @@ const soVerResp=()=>{const r={data:null,error:{message:SOVER_MSG,code:'so_visual
   sb.from=t=>SEMPRE_GRAVA.has(t)?_from(t):guarda(_from(t),['insert','upsert','update','delete']);
   sb.rpc=(f,...a)=>RPC_GRAVA.has(f)&&soVerBloq()?soVerResp():_rpc(f,...a);
   // o storage do supabase-js é criado a cada acesso (getter): embrulha o from de cada um
-  if(_stGet)Object.defineProperty(sb,'storage',{get(){const st=_stGet.call(sb),f=st.from.bind(st);st.from=b=>guarda(f(b),['upload','remove','update','move']);return st}});}
+  if(_stGet)Object.defineProperty(sb,'storage',{get(){const st=_stGet.call(sb),f=st.from.bind(st);st.from=b=>guarda(f(b),['upload','remove','update','move']);return st}});
+  // Encerramento de mês (Carol, 18/11; v151): o banco recusa lançamento em mês/conta encerrado (hint MES_ENCERRADO).
+  // Qualquer tela que tente gravar mostra o mesmo aviso, com o pedido de desbloqueio ao Master.
+  try{let p=Object.getPrototypeOf(_from('clientes').select('id'));while(p&&!Object.prototype.hasOwnProperty.call(p,'then'))p=Object.getPrototypeOf(p);
+    if(p){const t0=p.then;p.then=function(ok,ko){return t0.call(this,r=>{try{if(r&&r.error&&(r.error.hint==='MES_ENCERRADO'||/já foi encerrado/.test(r.error.message||'')))mesEncAviso(r.error.message)}catch(e){}return ok?ok(r):r},ko)}}}catch(e){console.error(e)}}
+let MESENC_T=0;
+function mesEncAviso(msg){MESENC_T=Date.now();const d=document.getElementById('mesEncDlg');if(!d)return;
+  document.getElementById('mesEncTxt').textContent=msg||'Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período.';
+  let adm=false;try{adm=ehAdm()}catch(e){}document.getElementById('mesEncIr').hidden=!adm;if(!d.open)d.showModal()}
+// a tela que pegou o erro costuma dar alert(error.message) logo depois: o aviso já apareceu, não repete
+{const a0=window.alert.bind(window);window.alert=m=>{if(/já foi encerrado/.test(String(m??''))&&Date.now()-MESENC_T<5000)return;return a0(m)}}
 const $=id=>document.getElementById(id);
 
 // ---------- utilidades ----------
@@ -1846,7 +1881,7 @@ const escR=()=>ehEsc()&&!rotCli();
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual'];
+const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual','gfencerra'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcrm','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
@@ -1910,6 +1945,7 @@ const ICO={
   gffluxo:'<path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/>',
   gforc:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
   gfdre:'<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  gfencerra:'<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2"/>',
   gfapres:'<path d="M3 4h18v12H3z"/><path d="M12 16v4M8 20h8"/><path d="M7 12l3-3 2 2 4-4"/>',
   gfdcat:'<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
   gfdforn:'<path d="M3 21V9l9-5 9 5v12"/><path d="M9 21v-6h6v6"/>',
@@ -1963,6 +1999,8 @@ const NAV=[
   {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
   // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
   {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
+  // encerrar o mês de cada conta depois de conferir (Carol, 18/11; v151): toda a equipe Controlacs encerra, só o Master desbloqueia
+  {k:'gfencerra',t:'Encerramento de mês',g:'Gestão financeira',s:'Relatórios',ok:()=>ehEsc()},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
@@ -2030,7 +2068,7 @@ const SECOES=['Dia a dia','Caixa e tesouraria','Bancos','Recebíveis','Mensagens
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k==='gfapres'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
+const telaSemEmp=k=>k==='gfapres'||k==='gfencerra'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -2218,7 +2256,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewApr','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewEnc','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2257,6 +2295,7 @@ function openView(){
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW==='gfapres'){$('viewApr').hidden=false;renderApr()}
+  else if(VIEW==='gfencerra'){$('viewEnc').hidden=false;renderEnc()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
   else if(VIEW.startsWith('ctl')){$('viewCtl').hidden=false;renderCtl()}
   avBanner();tpBanner();soVerBanner();rotBanner();
@@ -2957,6 +2996,22 @@ $('fbcFile').onchange=async e=>{
 const filiaisDe=c=>String(c?.filiais_rateio||'').split(',').map(x=>x.trim()).filter(Boolean);
 // empresa do lançamento aberto: a escolhida no próprio formulário (quem lança em mais de uma) ou a do topo
 const regCli=()=>CLIENTES.find(c=>c.id===($('rEmp')?.value||REG?.cliente_id||escCli.value));
+// Contas bancárias da empresa para os campos de banco (Carol 17/11/2026): lista do que a empresa tem cadastrado (v150 bancos_empresa)
+let BANCOSEMP=[];
+async function carregaBancosEmp(ids){ids=(ids||[]).filter(Boolean);if(!ids.length){BANCOSEMP=[];return}
+  try{const {data,error}=await sb.rpc('bancos_empresa',{clis:ids});if(error)throw error;BANCOSEMP=data||[]}
+  catch(e){const {data}=await sb.from('fin_contas').select('cliente_id,id,nome,conta_bc,banco,tipo,ativo,espelho_tes').in('cliente_id',ids).order('nome');
+    BANCOSEMP=(data||[]).filter(c=>c.ativo&&!c.espelho_tes&&c.tipo!=='Cartão de crédito')}}
+const bancosDe=cid=>BANCOSEMP.filter(c=>c.cliente_id===cid);
+function bancoOpts(lista,atual,valDe){const vals=lista.map(valDe);let h='<option value="">Escolha o banco</option>';
+  if(atual&&!vals.includes(atual))h+=`<option value="${esc(atual)}" selected>${esc(atual)}</option>`;
+  return h+lista.map(c=>{const v=valDe(c);return `<option value="${esc(v)}"${v===atual?' selected':''}>${esc(c.nome)}</option>`}).join('')}
+const bancoDestVal=c=>c.conta_bc||c.nome;
+function bancoDestHtml(k,lab,atual,dis){const cli=regCli(),lista=bancosDe(cli?.id);
+  if(!lista.length)return `<label class="f" data-dep>${lab}<input data-k="${k}" list="contasDest" value="${esc(atual||cli?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([cli?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+  let sel=atual;if(!sel){const pad=cli?.conta_deposito_bc;sel=pad&&lista.find(c=>c.conta_bc===pad||c.nome===pad)?bancoDestVal(lista.find(c=>c.conta_bc===pad||c.nome===pad)):lista.length===1?bancoDestVal(lista[0]):''}
+  return `<label class="f" data-dep>${lab}<select data-k="${k}" id="rBancoDest"${dis}>${bancoOpts(lista,sel,bancoDestVal)}</select></label>`}
+function bancoDestRefresh(){const s=$('rBancoDest');if(!s)return;const lista=bancosDe(regCli()?.id);s.innerHTML=bancoOpts(lista,lista.length===1?bancoDestVal(lista[0]):'',bancoDestVal)}
 // lançamento que trocou de empresa: os arquivos passam para a pasta da empresa nova
 // (o escritório move; o cliente copia, porque só pode enviar arquivos, não apagar)
 async function moverDocs(docs,cliId){
@@ -3014,7 +3069,7 @@ $('rRat').addEventListener('input',atualizaRateio);$('rRat').addEventListener('c
   if(e.target.name==='ratPor'){const total=totalReg(),pct=e.target.value==='pct';document.querySelectorAll('#rRat tbody input').forEach(i=>{const n=parseMoney(i.value)||0;if(n&&total)i.value=showMoney(r2(pct?n/total*100:total*n/100))})}
   atualizaRateio()});
 $('rFields').addEventListener('input',atualizaRateio);
-$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp')renderRateio(REG,true);else{ajustaDeposito();atualizaRateio()}});
+$('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp'){renderRateio(REG,true);bancoDestRefresh()}else{ajustaDeposito();atualizaRateio()}});
 
 // ---------- categorias automáticas (contas a pagar, cartão e despesas da tesouraria) ----------
 const MODCAT=['pagar','cartao','tesouraria'];
@@ -3352,7 +3407,7 @@ const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origi
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
 const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
-  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -3635,6 +3690,7 @@ async function renderMod(){
   const {data,error}=await q.order(cfg.dataK).order('enviado_em');
   if(error){fail(error,'Erro ao carregar');return}
   REGS=data||[];DOCS={};
+  if(MOD==='tesouraria'||MOD==='pagar')await carregaBancosEmp(tod?empresasDe(MOD).map(c=>c.id):[cli.id]);
   // Tesouraria: saldo acumulado de tudo que foi lançado antes do mês
   let ANT=0;
   if(MOD==='tesouraria'&&f!=='aberto'){
@@ -3760,7 +3816,7 @@ async function openReg(r,pre){
     if(tp==='parc')return `<label class="f">${lab}<select data-k="${k}"${dis}>${Array.from({length:12},(_,i)=>`<option value="${i+1}"${+v(k)===i+1?' selected':''}>${i+1}x</option>`).join('')}</select></label>`;
     if(tp==='tipoTes')return `<label class="f">${lab}<select data-k="${k}"${dis}>${['Despesa','Suprimento','Depósito bancário'].map(o=>`<option${v(k)===o?' selected':''}>${o}</option>`).join('')}</select></label>`;
     if(tp==='money')return `<label class="f">${lab}<input class="money" data-k="${k}" inputmode="decimal" placeholder="0,00" value="${showMoney(v(k))}"${dis}></label>`;
-    if(tp==='contaDest')return `<label class="f" data-dep>${lab.replace(' (opcional)','')}<input data-k="${k}" list="contasDest" value="${esc(r?v(k)||'':regCli()?.conta_deposito_bc||'')}" placeholder="Ex.: Sicredi - MPA Palmas"${dis}></label><datalist id="contasDest">${[...new Set([regCli()?.conta_deposito_bc,...REGS.map(x=>x.conta_destino),...MAPA.map(m=>m.conta)].filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`;
+    if(tp==='contaDest')return bancoDestHtml(k,lab.replace(' (opcional)','').replace(' (conta no Bom Controle)',''),r?v(k)||'':'',dis);
     // boleto: colar a linha digitável (ou anexar o PDF) preenche valor e vencimento; a chave da NF-e vai junto, escondida
     if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
     if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="${MOD==='cartao'?'Ex.: material de escritório na papelaria; almoço com a equipe; peça para a impressora':'Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção'}"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
@@ -3779,7 +3835,7 @@ async function openReg(r,pre){
   const emps=empresasDe(MOD,true).filter(c=>podeLancar(c.id,MOD)),ce=r?r.cliente_id:escCli.value;
   if(ed&&emps.length>1)$('rFields').insertAdjacentHTML('afterbegin',`<label class="f wide">Empresa<select id="rEmp">${emps.map(c=>`<option value="${c.id}"${c.id===ce?' selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`);
   // categoria fica fora do lançamento (inclusive para o escritório): é sugerida e confirmada em Escritório › Exportação Bom Controle
-  $('rBaixa').innerHTML=(escR()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}></label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
+  $('rBaixa').innerHTML=(escR()&&MOD==='pagar'&&r?`<div class="fields"><label class="f">Pago em<input type="date" id="rPagoEm" value="${r.pago_em||TODAY}"${r.conferido?' disabled':''}></label><label class="f">Banco do pagamento${(l=>l.length?`<select id="rBanco"${r.conferido?' disabled':''}>${bancoOpts(l,r.banco||(l.length===1?l[0].nome:''),c=>c.nome)}</select>`:`<input id="rBanco" list="bancosList" value="${esc(r.banco||'')}" placeholder="Ex.: Sicredi"${r.conferido?' disabled':''}>`)(bancosDe(r.cliente_id))}</label></div><datalist id="bancosList">${[...new Set(REGS.map(x=>x.banco).filter(Boolean))].map(b=>`<option value="${esc(b)}">`).join('')}</datalist>`:'');
   if(MOD==='pagar'&&r?.origem==='beneficios')$('rFields').insertAdjacentHTML('afterbegin',`<div class="note wide" style="margin:0">Conta do pedido de benefícios de ${ymTxt(r.beneficio_comp.slice(0,7))}: pedido ${fm(r.valor_pedido)} + taxa do boleto ${fm(r.taxa_boleto)} = <b>${fm(+r.valor_pedido+(+r.taxa_boleto||0))}</b>.${r.boleto_alerta?` <span class="chip c-bad">${esc(r.boleto_alerta)}</span>`:''}</div>`);
   renderRateio(r,ed);ajustaDeposito();
   $('rErr').hidden=true;
@@ -14118,6 +14174,18 @@ const MANUAL=[
 <li><b>Ver os pagamentos de uma remessa:</b> em <b>Remessas geradas</b>, clique em <b>Pagamentos</b> na linha da remessa. Abre a lista com cada pagamento e a situação. Se o banco não pagou um deles, clique em <b>Liberar</b> ao lado dele.</li>
 <li><b>Liberar um pagamento só:</b> se o banco não pagou um dos pagamentos da remessa (por exemplo, limite diário) e você não quer esperar o retorno, clique em <b>Liberar</b> ao lado dele na lista de contas do Envio de remessa. Só ele volta a ficar livre para outra remessa; os outros continuam aguardando o retorno. Confira antes no banco que ele não foi pago.</li>
 </ul>`},
+    {k:'gfencerra',t:'Encerramento de mês',
+      txt:`<p>Depois de conferir o mês, a equipe Controlacs encerra cada conta. Mês encerrado fica travado: ninguém inclui, altera ou exclui lançamentos daquela conta com data naquele mês (Movimentação, Extrato, Conciliação, Tesouraria e Caixa diário). Quem tentar vê o aviso <b>"Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."</b></p>
+<ol>
+<li>Em <b>Gestão financeira › Relatórios › Encerramento de mês</b>, escolha o <b>Mês</b> e a <b>Empresa</b> (ou Todas as empresas).</li>
+<li>A lista mostra todas as contas (caixa diário, tesouraria, bancos, aplicações e cartão) com lançamentos, entradas, saídas, saldo no fim do mês e as <b>pendências</b> (a validar, sem categoria, sem conciliar, dias de caixa sem conferir).</li>
+<li>Clique em <b>🔒 Encerrar</b> na conta já conferida, ou marque várias e clique em <b>Encerrar as marcadas</b>. Se tiver pendência, o sistema avisa antes.</li>
+<li>Errou o clique? O botão <b>Desfazer</b> aparece logo depois (e fica na linha por 15 minutos para quem encerrou).</li>
+<li>Só o <b>Master</b> desbloqueia: botão <b>🔓 Desbloquear</b>, com o motivo. Depois de corrigir, encerre de novo.</li>
+</ol>
+<ul><li>Nada é apagado: o <b>Histórico do mês</b> mostra quem encerrou, quem desbloqueou, quando e o motivo.</li>
+<li>Encerrar não muda nenhum lançamento: as marcações internas (a validar, revisado) continuam funcionando.</li>
+<li>Na <b>Apresentação (DRE financeira)</b>, os meses com todas as contas encerradas aparecem com 🔒; os que ainda têm conta aberta aparecem num aviso.</li></ul>`},
     {k:'gfapres',t:'Apresentação (DRE financeira)',
       txt:`<p>É o que o cliente vê na reunião: a DRE financeira das empresas que são intermediárias (a maior parte do que entra é das clínicas parceiras). O escritório vê todas as unidades. O operador do cliente só acessa se a tela estiver liberada no cadastro dele (Configurações › Cadastro de usuários › Privilégios de acesso › Gestão financeira › Visões e relatórios) e vê só as unidades cujas empresas ele tem; a aba Unidades é só do escritório.</p>
 <ol>
@@ -14811,6 +14879,13 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
+    {x:'Nova tela Gestão financeira › Relatórios › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
+    {x:'Se tentar lançar, alterar ou excluir com data de um mês já encerrado, aparece o aviso: "Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."',mods:['caixa','tesouraria']},
+    {x:'Apresentação (DRE financeira): meses encerrados aparecem com 🔒 e há aviso dos que ainda têm conta aberta. A antecipação de recebíveis que entra no banco não abate mais as despesas (fica numa linha à parte, fora da DRE).',para:'esc'}]},
+  {k:'2026-11-17bancos',data:'2026-11-17',t:'Lista de bancos da empresa',itens:[
+    {x:'Tesouraria: no Depósito bancário, o campo Banco de destino agora mostra a lista das contas bancárias cadastradas da empresa. É só escolher.',mods:['tesouraria']},
+    {x:'Contas a pagar: o Banco do pagamento também mostra a lista das contas da empresa.',mods:['pagar'],para:'esc'}]},
   {k:'2026-11-17receb',data:'2026-11-17',t:'Recebíveis de cartão e menu da Gestão financeira',itens:[
     {x:'Nova tela Gestão financeira › Recebíveis › Recebíveis de cartão: o valor a receber de cada dia, com taxa, antecipação e estornos, somado do jeito que a adquirente deposita no banco (por bandeira, débito e crédito separados) e conferido com o extrato. O que não entrou vira alerta e tarefa; as diferenças podem ser aceitas com o motivo ou ligadas ao extrato, com Desfazer.',mods:['gfreceb'],para:'esc'},
     {x:'Adquirentes e taxas: informe como cada adquirente deposita e as taxas contratadas; a tela mostra o que foi cobrado a mais.',mods:['gfreceb'],para:'esc'},
@@ -16739,19 +16814,22 @@ async function aprCalcula(base){
   const uDe={};us.forEach(u=>(u.empresas||[]).forEach(id=>uDe[id]=u.id));
   const [movs,contas,fechs,vendas]=await Promise.all([
     ids.length?todas(()=>sb.from('fin_movimentos').select('cliente_id,conta_id,data,tipo,valor,categoria,descricao,transf_id,cat_revisar').in('cliente_id',ids).gte('data',ini).lte('data',fim).order('data')):[],
-    ids.length?todas(()=>sb.from('fin_contas').select('id,cliente_id,tipo').in('cliente_id',ids)):[],
+    ids.length?todas(()=>sb.from('fin_contas').select('id,cliente_id,tipo,ativo,nome').in('cliente_id',ids)):[],
     ids.length?todas(()=>sb.from('fechamentos').select('cliente_id,data,cred_sis,cred_maq').in('cliente_id',ids).gte('data',ini).lte('data',fim)):[],
     ids.length?todas(()=>sb.from('cartao_vendas').select('cliente_id,data_venda,adquirente,valor_bruto,taxa,valor_liquido').in('cliente_id',ids).gte('data_venda',ini).lte('data_venda',fim)).catch(()=>[]):[]]);
   const cart=new Set(contas.filter(ehCartao).map(c=>c.id)),nat={},grp={};
   for(const id of ids){const cli=CLIENTES.find(c=>c.id===id);let pl=[];try{pl=await planoDe(cli)}catch(e){}nat[id]={};grp[id]={};pl.forEach(c=>{nat[id][c.categoria]=c.tipo;grp[id][c.categoria]=c.grupo})}
   const R={};const z=()=>Object.fromEntries(meses.map(m=>[m,0]));
-  us.forEach(u=>R[u.id]={u,liq:z(),juros:z(),taxas:z(),desp:{},abaixo:{},outras:z(),atend:z(),bruto:z(),repasse:z(),rec:{},semCat:0,restit:z()});
+  us.forEach(u=>R[u.id]={u,liq:z(),juros:z(),taxas:z(),desp:{},abaixo:{},outras:z(),atend:z(),bruto:z(),repasse:z(),rec:{},semCat:0,restit:z(),antecip:z()});
   const addD=(o,g,c,m,v)=>{o[g]=o[g]||{};o[g][c]=o[g][c]||z();o[g][c][m]=r2(o[g][c][m]+v)};
   for(const mv of movs){const u=uDe[mv.cliente_id],m=aprMes(mv.data);if(!u||!(m in R[u].liq)||mv.transf_id)continue;
     const n=nat[mv.cliente_id][mv.categoria],cat=mv.categoria||'Sem categoria',ent=mv.tipo==='entrada',v=+mv.valor;
     // sem categoria, mas a descrição diz que é restituição/repasse (pendência de categorizar): fica fora da DRE, com aviso
     const restDesc=!mv.categoria&&!ent&&/restitui|repasse/i.test(mv.descricao||'');if(restDesc&&mostra.includes(m))R[u].restSemCat=r2((R[u].restSemCat||0)+v);
     if(aprRestit(cat)||restDesc){R[u].restit[m]=r2(R[u].restit[m]+(ent?-v:v));continue}
+    // antecipação de recebíveis que ENTRA no banco (Cielo etc.) é o dinheiro do cartão recebido antes: a receita já está na
+    // liquidez, então não pode abater despesa (revisão 18/11: MPA PB 2026 tinha R$ 1,2 mi abatendo despesas). A taxa (saída) continua despesa.
+    if(ent&&/antecipa[çc][ãa]o de receb/i.test(cat)){R[u].antecip[m]=r2(R[u].antecip[m]+v);continue}
     if(n==='Receita'){if(/aporte/i.test(cat)||grp[mv.cliente_id][cat]==='Venda de Serviço')continue;R[u].outras[m]=r2(R[u].outras[m]+(ent?v:-v));continue}
     if(!n&&ent&&!cart.has(mv.conta_id))continue;   // entrada sem categoria: não é despesa
     const val=ent?-v:v;
@@ -16791,7 +16869,11 @@ async function aprCalcula(base){
       [x.desp,x.abaixo].forEach(o=>Object.keys(o).forEach(g=>{Object.keys(o[g]).forEach(c=>{if(!nz(o[g][c]))delete o[g][c]});if(!Object.keys(o[g]).length)delete o[g]}));
       x.grupos=x.grupos.filter(([g,v])=>nz(v))})}
   Object.values(R).forEach(x=>x.semLiq=mostra.filter(m=>!x.liq[m]));
-  return {meses:mostra,us,R};
+  // meses encerrados (Encerramento de mês, v151): a unidade só está encerrada no mês se todas as contas ativas dela estiverem
+  let enc=null;try{const ls=await mesEncLista();enc=new Set(ls.filter(l=>l.conta_id).map(l=>l.conta_id+'|'+aprMes(l.competencia)))}catch(e){}
+  Object.values(R).forEach(x=>{x.abertas={};if(!enc)return;const cs=contas.filter(c=>(x.u.empresas||[]).includes(c.cliente_id)&&c.ativo!==false);
+    mostra.forEach(m=>{const ab=cs.filter(c=>!enc.has(c.id+'|'+m));if(ab.length)x.abertas[m]=ab.length})});
+  return {meses:mostra,us,R,encOk:!!enc};
 }
 const tot=o=>r2(Object.values(o||{}).reduce((a,v)=>a+(+v||0),0));
 function aprGrupoSoma(D){const z=()=>Object.fromEntries(D.meses.map(m=>[m,0]));const G={receita:z(),despT:z(),res:z(),liq:z(),juros:z(),taxas:z(),atend:z(),grupos:{}};
@@ -16830,7 +16912,9 @@ async function renderApr(){
 }
 function aprPeriodoTxt(D){return aprMLabel(D.meses[0])+(D.meses.length>1?' a '+aprMLabel(D.meses[D.meses.length-1]):'')}
 function aprAvisos(D){const sem=D.us.filter(u=>D.R[u.id].semLiq.length);const sc=D.us.filter(u=>D.R[u.id].semCat);
-  return (sem.length?`<p class="note warn">Falta a liquidez de: ${sem.map(u=>`<b>${esc(u.nome)}</b> (${D.R[u.id].semLiq.map(aprMLabel).join(', ')})`).join('; ')}. Lance na aba Lançar liquidez.</p>`:'')
+  const ab=D.encOk?D.us.filter(u=>Object.keys(D.R[u.id].abertas||{}).length):[];
+  return (ab.length?`<p class="note warn">Meses ainda não encerrados (os números podem mudar): ${ab.map(u=>`<b>${esc(u.nome)}</b> (${Object.entries(D.R[u.id].abertas).map(([m,n])=>`${aprMLabel(m)}: ${n} conta${n>1?'s':''} aberta${n>1?'s':''}`).join(', ')})`).join('; ')}. Encerre em Gestão financeira › Encerramento de mês depois de conferir.</p>`:'')
+    +(sem.length?`<p class="note warn">Falta a liquidez de: ${sem.map(u=>`<b>${esc(u.nome)}</b> (${D.R[u.id].semLiq.map(aprMLabel).join(', ')})`).join('; ')}. Lance na aba Lançar liquidez.</p>`:'')
     +(sc.length?`<p class="note">Há lançamentos sem categoria em ${sc.map(u=>esc(u.nome)).join(', ')}; eles aparecem como "Sem categoria" até serem corrigidos na Movimentação.</p>`:'')
     +(D.us.some(u=>D.R[u.id].restSemCat)?`<p class="note">Saídas sem categoria com "restituição" ou "repasse" na descrição ficaram fora das despesas, como Restituições: ${D.us.filter(u=>D.R[u.id].restSemCat).map(u=>`${esc(u.nome)} ${fm(D.R[u.id].restSemCat)}`).join('; ')}. Categorize na Movimentação para confirmar.</p>`:'')}
 function aprGrupo(){const D=APR.D,G=aprGrupoSoma(D),r=tot(G.receita),d=tot(G.despT),res=r2(r-d),n=D.meses.length;
@@ -16859,18 +16943,19 @@ function aprDre(){const D=APR.D,ms=D.meses,todas=APR.uni==='*',x=todas?null:D.R[
   if(!todas)Object.entries(x.desp).forEach(([g,cs])=>det[g]=cs);
   let abaixo={};const somaAb=xx=>Object.entries(xx.abaixo['Abaixo do resultado']||{}).forEach(([c,v])=>{abaixo[c]=abaixo[c]||{};ms.forEach(m=>abaixo[c][m]=r2((abaixo[c][m]||0)+v[m]))});
   (todas?Object.values(D.R):[x]).forEach(somaAb);
-  const outras={},restit={};ms.forEach(m=>{outras[m]=r2((todas?Object.values(D.R):[x]).reduce((a,y)=>a+y.outras[m],0));restit[m]=r2((todas?Object.values(D.R):[x]).reduce((a,y)=>a+y.restit[m],0))});
+  const outras={},restit={},antecip={};ms.forEach(m=>{const xs=todas?Object.values(D.R):[x];outras[m]=r2(xs.reduce((a,y)=>a+y.outras[m],0));restit[m]=r2(xs.reduce((a,y)=>a+y.restit[m],0));antecip[m]=r2(xs.reduce((a,y)=>a+(y.antecip?.[m]||0),0))});
+  const fech=m=>D.encOk&&(todas?Object.values(D.R):[x]).every(y=>!(y.abertas||{})[m]);
   let acuRow='';if(!todas)acuRow=`<tr><td class="l">Acumulado</td>${ms.map(m=>`<td class="${x.acu[m]<0?'neg':'pos'}">${fm(x.acu[m])}</td>`).join('')}<td></td><td></td></tr>`;
   $('aprBody').innerHTML=`<div class="toolbar"><label class="f">Unidade<select id="aprUniSel"><option value="*"${todas?' selected':''}>Todas as unidades (${esc(APR.grupo)})</option>${D.us.map(u=>`<option value="${u.id}"${u.id===APR.uni?' selected':''}>${esc(u.nome)}</option>`).join('')}</select></label><button class="btn" id="aprDreXls">Baixar Excel</button></div>
   <h2 class="apr-h">DRE financeira · ${todas?esc(APR.grupo):esc(x.u.nome)} · ${aprPeriodoTxt(D)}</h2><p class="sub">Clique num grupo para abrir as categorias. As despesas vêm dos lançamentos do sistema: corrigiu lá, muda aqui.</p>
-  <div class="card tablebox"><table class="apr-t apr-dre"><thead><tr><th class="l">Descrição</th>${ms.map(m=>`<th>${aprMLabel(m)}</th>`).join('')}<th>Total</th><th>Média</th></tr></thead><tbody>
+  <div class="card tablebox"><table class="apr-t apr-dre"><thead><tr><th class="l">Descrição</th>${ms.map(m=>`<th title="${fech(m)?'Mês encerrado':'Mês ainda não encerrado'}">${aprMLabel(m)}${D.encOk&&fech(m)?' 🔒':''}</th>`).join('')}<th>Total</th><th>Média</th></tr></thead><tbody>
   <tr class="apr-sec"><td class="l" colspan="${ms.length+3}">RECEITA</td></tr>${row('Liquidez (sistema da empresa)',src.liq)}${row('Juros de parcelamento do cartão',src.juros)}${row('Receita total',src.receita,'apr-tot')}
   <tr class="apr-sec"><td class="l" colspan="${ms.length+3}">DESPESAS</td></tr>
   ${grupos.map(([g,v],i)=>row((det[g]?'<span class="apr-tg">▸</span> ':'')+esc(g),v,det[g]?'apr-click':'',` data-aprg="${i}"`)+(det[g]?Object.entries(det[g]).sort((a,b)=>tot(b[1])-tot(a[1])).map(([c,cv])=>row('&nbsp;&nbsp;&nbsp;&nbsp;'+esc(c),cv,'apr-det',` data-aprp="${i}" hidden`)).join(''):'')).join('')}
   ${row('Despesas total',src.despT,'apr-tot')}${row('Situação (receita − despesas)',src.res,'apr-tot')}${acuRow}
   <tr class="apr-sec"><td class="l" colspan="${ms.length+3}">ABAIXO DO RESULTADO (não entram na Situação)</td></tr>
   ${Object.entries(abaixo).map(([c,v])=>row(esc(c),v)).join('')}${tot(outras)?row('Outras receitas (rendimentos e outros recebimentos)',outras):''}${!Object.keys(abaixo).length&&!tot(outras)?`<tr><td class="l muted" colspan="${ms.length+3}">—</td></tr>`:''}
-  <tr class="apr-sec"><td class="l" colspan="${ms.length+3}">FORA DA DRE</td></tr>${row('Restituições (repasses aos parceiros e devoluções)',restit,'muted')}
+  <tr class="apr-sec"><td class="l" colspan="${ms.length+3}">FORA DA DRE</td></tr>${row('Restituições (repasses aos parceiros e devoluções)',restit,'muted')}${tot(antecip)?row('Antecipação de recebíveis (dinheiro do cartão recebido antes; a receita já está na liquidez)',antecip,'muted'):''}
   </tbody></table></div>`;
   $('aprDreXls').onclick=()=>{const t=document.querySelector('.apr-dre');const ws=XLSX.utils.table_to_sheet(t,{raw:false});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'DRE financeira');XLSX.writeFile(wb,`DRE financeira ${todas?APR.grupo:x.u.nome} ${APR.de} a ${APR.ate}.xlsx`)}}
 // ---- Resumo de recebíveis ----
@@ -17071,6 +17156,119 @@ $('aprBody').addEventListener('input',e=>{const t=e.target;if(t.tagName!=='INPUT
   if(t.dataset.aprf==='c'){APR.fRec={...(APR.fRec||{}),c:t.value};clearTimeout(APR.tf);APR.tf=setTimeout(()=>{aprReceb();const i=document.querySelector('[data-aprf="c"]');i?.focus();i?.setSelectionRange(99,99)},350)}
   if(t.dataset.aprrf==='t'){APR.fRat={...(APR.fRat||{}),t:t.value};clearTimeout(APR.tf);APR.tf=setTimeout(()=>{aprRat();const i=document.querySelector('[data-aprrf="t"]');i?.focus();i?.setSelectionRange(99,99)},350)}});
 // ---------- fim da Apresentação ----------
+// ---------- Gestão financeira › Encerramento de mês ----------
+// Pedido da Carol (18/11/2026, v151): depois de conferir, a equipe Controlacs encerra o mês de cada conta (bancos,
+// aplicações, cartão, tesouraria e o caixa diário). Mês encerrado: o banco recusa incluir, alterar ou excluir lançamento
+// com data naquele mês naquela conta (trigger), e qualquer tela mostra o aviso para pedir o desbloqueio ao Master.
+// Só o Master desbloqueia (com motivo). Quem encerrou pode desfazer nos primeiros 15 minutos. Nada é apagado: o histórico fica.
+const ENC={mes:'',cli:'*',ver:'',busca:'',f:{},sel:new Set(),rows:[],locks:[]};
+const encV151=e=>e&&(e.code==='42P01'||e.code==='PGRST202'||e.code==='42883'||/fin_meses_encerrados|fin_resumo_encerramento/.test(e.message||''));
+const encMsg='O Encerramento de mês precisa da atualização v151 do banco (Supabase). Peça para rodar o SQL v151.';
+const encEmps=()=>empresasDe('gfmov',true).filter(c=>c.bpo_financeiro!==false).sort((a,b)=>a.nome.localeCompare(b.nome));
+const encQuando=s=>s?new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const encK=r=>r.cliente_id+'|'+(r.conta_id||'caixa');
+const encPend=r=>[r.a_validar?`${r.a_validar} ${r.conta_id?'a validar':'dia(s) sem conferir'}`:'',r.sem_categoria?`${r.sem_categoria} sem categoria`:'',r.nao_conciliados?`${r.nao_conciliados} não conciliado(s)`:''].filter(Boolean);
+const encMeu=l=>{if(!l||!ME||l.fechado_por!==ME.user_id)return false;const d=Date.now()-new Date(l.fechado_em).getTime();return d>=-60e3&&d<15*60e3};
+async function renderEnc(){
+  if(!ENC.mes)ENC.mes=somaMes(TODAY.slice(0,8)+'01',-1).slice(0,7);
+  $('encMes').value=ENC.mes;$('encVer').value=ENC.ver;
+  const emps=encEmps();if(ENC.cli!=='*'&&!emps.some(c=>c.id===ENC.cli))ENC.cli='*';
+  $('encCli').innerHTML='<option value="*">Todas as empresas</option>'+emps.map(c=>`<option value="${c.id}"${c.id===ENC.cli?' selected':''}>${esc(c.nome)}</option>`).join('');
+  $('encBody').innerHTML='<tr><td class="l muted" colspan="11">Carregando…</td></tr>';$('encHist').innerHTML='';$('encTiles').innerHTML='';$('encBar').innerHTML='';$('encNote').textContent='';
+  const clis=ENC.cli==='*'?emps.map(c=>c.id):[ENC.cli];if(!clis.length){$('encBody').innerHTML='<tr><td class="l muted" colspan="11">Nenhuma empresa com Gestão financeira.</td></tr>';return}
+  const comp=ENC.mes+'-01';
+  const [r1,r2_]=await Promise.all([sb.rpc('fin_resumo_encerramento',{mes:comp,clis}),
+    todas(()=>sb.from('fin_meses_encerrados').select('*').eq('competencia',comp).in('cliente_id',clis).order('fechado_em')).then(d=>({data:d}),e=>({error:e}))]);
+  const err=r1.error||r2_.error;if(err){console.error(err);$('encBody').innerHTML=`<tr><td class="l neg" colspan="11">${encV151(err)?encMsg:'Erro ao carregar: '+esc(err.message||err)}</td></tr>`;return}
+  if(VIEW!=='gfencerra')return;
+  ENC.locks=r2_.data||[];const ativos={};ENC.locks.filter(l=>l.ativo).forEach(l=>ativos[encK(l)]=l);
+  const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'?';
+  const ord={'Caixa diário':0,'Caixa / tesouraria':1,'Conta corrente':2,'Conta de pagamento':3,'Poupança':4,'Aplicação':5,'Cartão de crédito':6};
+  ENC.rows=(r1.data||[]).map(r=>({...r,emp:nomeCli(r.cliente_id),lock:ativos[encK(r)]||null}))
+    .sort((a,b)=>a.emp.localeCompare(b.emp)||(ord[a.tipo]??9)-(ord[b.tipo]??9)||a.conta.localeCompare(b.conta));
+  ENC.sel=new Set([...ENC.sel].filter(k=>ENC.rows.some(r=>encK(r)===k&&!r.lock)));
+  encDesenha();
+}
+function encCols(r){const p=encPend(r);return [r.emp,r.conta,r.tipo,String(r.lancamentos),fm(r.entradas),r.conta_id?fm(r.saidas):'—',r.saldo_final==null?'—':fm(r.saldo_final),p.join(' · ')||'Nenhuma',
+  r.lock?`Encerrado · ${r.lock.fechado_por_nome||''} · ${encQuando(r.lock.fechado_em)}`:'Aberto']}
+const ENC_COLS=['Empresa','Conta','Tipo','Lançamentos','Entradas','Saídas','Saldo no fim do mês','Pendências','Situação'];
+function encDesenha(){
+  const adm=ehAdm(),bq=chave(ENC.busca||'');
+  const vis=ENC.rows.filter(r=>{if(ENC.ver==='aberto'&&r.lock||ENC.ver==='enc'&&!r.lock)return false;const cs=encCols(r);
+    if(bq&&!chave(cs.join(' ')+' '+(r.lock?.fechado_por_nome||'')).includes(bq))return false;
+    return ENC_COLS.every((_,i)=>!ENC.f[i]||chave(cs[i]).includes(chave(ENC.f[i])))});
+  const abertas=vis.filter(r=>!r.lock),selVis=abertas.filter(r=>ENC.sel.has(encK(r)));
+  $('encHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="encTodas" style="width:auto" title="Marcar todas as abertas mostradas" aria-label="Marcar todas as abertas mostradas"${abertas.length&&selVis.length===abertas.length?' checked':''}></th>${ENC_COLS.map((c,i)=>`<th class="${i<3||i>6?'l':''}">${c}</th>`).join('')}<th></th></tr>
+    <tr class="enc-f"><th></th>${ENC_COLS.map((c,i)=>`<th><input data-encf="${i}" value="${esc(ENC.f[i]||'')}" placeholder="Filtrar" aria-label="Filtrar ${esc(c)}"></th>`).join('')}<th></th></tr>`;
+  let emp='';
+  $('encBody').innerHTML=vis.map(r=>{const k=encK(r),cs=encCols(r),p=encPend(r),l=r.lock;
+    const acao=l?(adm?`<button type="button" class="btn small" data-encdes="${l.id}">🔓 Desbloquear</button>`:encMeu(l)?`<button type="button" class="btn small ghost" data-encdes="${l.id}">↶ Desfazer</button>`:'<span class="muted">Só o Master desbloqueia</span>')
+      :`<button type="button" class="btn small primary" data-encone="${esc(k)}">🔒 Encerrar</button>`;
+    const sep=r.emp!==emp;emp=r.emp;
+    return `<tr${sep?' class="enc-sep"':''}><td>${l?'':`<input type="checkbox" data-encsel="${esc(k)}" style="width:auto"${ENC.sel.has(k)?' checked':''} aria-label="Marcar ${esc(r.conta)}">`}</td>
+      <td class="l">${sep?`<b>${esc(r.emp)}</b>`:`<span class="muted">${esc(r.emp)}</span>`}</td><td class="l">${esc(r.conta)}</td><td class="l">${esc(r.tipo)}</td>
+      <td>${r.lancamentos}</td><td>${cs[4]}</td><td>${cs[5]}</td><td>${r.saldo_final!=null&&r.saldo_final<-0.004?`<span class="neg">${cs[6]}</span>`:cs[6]}</td>
+      <td class="l">${p.length?`<span class="enc-pend">${esc(p.join(' · '))}</span>`:'<span class="muted">Nenhuma</span>'}</td>
+      <td class="l">${l?`<span class="chip ok">🔒 Encerrado</span><br><span class="muted">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</span>`:'<span class="chip warn">Aberto</span>'}</td><td>${acao}</td></tr>`}).join('')
+    ||`<tr><td class="l muted" colspan="11">${ENC.rows.length?'Nenhuma conta com esse filtro.':'Nenhuma conta nessas empresas.'}</td></tr>`;
+  const tot=ENC.rows.length,enc=ENC.rows.filter(r=>r.lock).length,porEmp={};ENC.rows.forEach(r=>{porEmp[r.emp]=porEmp[r.emp]||[0,0];porEmp[r.emp][0]++;if(r.lock)porEmp[r.emp][1]++});
+  const empOk=Object.values(porEmp).filter(([a,b])=>a===b).length,pend=ENC.rows.filter(r=>!r.lock&&encPend(r).length).length;
+  $('encTiles').innerHTML=`<div class="card tile"><div class="k">Contas encerradas</div><div class="v">${enc} de ${tot}</div><div class="n">${MESES[+ENC.mes.slice(5)-1]} de ${ENC.mes.slice(0,4)}</div></div>`
+    +`<div class="card tile"><div class="k">Empresas com o mês todo encerrado</div><div class="v">${empOk} de ${Object.keys(porEmp).length}</div><div class="n">Essas já podem ir para a Apresentação</div></div>`
+    +`<div class="card tile"><div class="k">Contas abertas com pendência</div><div class="v ${pend?'neg':''}">${pend}</div><div class="n">A validar, sem categoria ou sem conciliar</div></div>`;
+  $('encBar').innerHTML=`<button type="button" class="btn primary" id="encSel"${selVis.length?'':' disabled'}>🔒 Encerrar ${selVis.length?'as '+selVis.length+' marcadas':'as marcadas'}</button>`
+    +(abertas.length?`<button type="button" class="btn" id="encTodasBtn">Marcar as ${abertas.length} abertas mostradas</button>`:'')
+    +`<button type="button" class="btn" id="encXls">Baixar Excel</button>`;
+  $('encNote').innerHTML='Encerrar não muda nenhum lançamento: só trava a conta naquele mês. O caixa diário aparece quando a empresa teve fechamento de caixa no mês; a tesouraria vale também para o que o cliente lança na Tesouraria.'
+    +(adm?'':' Para desbloquear um mês, peça ao Master (a Carol).');
+  const nomeConta=l=>ENC.rows.find(r=>encK(r)===encK(l))?.conta||(l.conta_id?'Conta':'Caixa diário');
+  $('encHist').innerHTML=[...ENC.locks].sort((a,b)=>String(b.reaberto_em||b.fechado_em||'').localeCompare(String(a.reaberto_em||a.fechado_em||''))).map(l=>`<tr><td class="l">${esc(CLIENTES.find(c=>c.id===l.cliente_id)?.nome||'')}</td><td class="l">${esc(nomeConta(l))}</td>
+    <td class="l">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</td><td class="l">${l.ativo?'<span class="muted">Continua encerrado</span>':`${esc(l.reaberto_por_nome||'')} · ${encQuando(l.reaberto_em)}`}</td><td class="l">${esc(l.motivo||'')}</td></tr>`).join('')
+    ||'<tr><td class="l muted" colspan="5">Nenhum encerramento neste mês ainda.</td></tr>';
+}
+async function encEncerra(ks){const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&!r.lock);if(!rs.length)return;
+  const comPend=rs.filter(r=>encPend(r).length);const mesTxt=MESES[+ENC.mes.slice(5)-1].toLowerCase()+'/'+ENC.mes.slice(0,4);
+  let msg=`Encerrar ${mesTxt} em ${rs.length===1?'1 conta':rs.length+' contas'}? Depois disso ninguém inclui, altera ou exclui lançamentos ${rs.length===1?'dela':'delas'} nesse mês; só o Master desbloqueia.`;
+  if(comPend.length)msg+=`\n\nAtenção: ${comPend.length===1?'1 conta tem':comPend.length+' contas têm'} pendência:\n`+comPend.slice(0,12).map(r=>`• ${r.emp} · ${r.conta}: ${encPend(r).join(', ')}`).join('\n')+(comPend.length>12?'\n• ...':'')+'\n\nEncerrar mesmo assim?';
+  if(!confirm(msg))return;
+  const {data,error}=await sb.from('fin_meses_encerrados').insert(rs.map(r=>({cliente_id:r.cliente_id,conta_id:r.conta_id||null,competencia:ENC.mes+'-01',fechado_por_nome:ME?.nome||ME?.email||null}))).select();
+  if(error){console.error(error);return alert(encV151(error)?encMsg:/duplicate|unique/i.test(error.message||'')?'Uma dessas contas já foi encerrada por outra pessoa. A tela vai atualizar.':'Erro ao encerrar: '+error.message),renderEnc()}
+  ks.forEach(k=>ENC.sel.delete(k));MESENC=null;
+  toastDesfazer(`${rs.length===1?'Conta encerrada':rs.length+' contas encerradas'} em ${mesTxt}.`,async()=>{
+    const {error:e2}=await sb.from('fin_meses_encerrados').update({ativo:false,motivo:'Desfeito logo depois de encerrar'}).in('id',(data||[]).map(x=>x.id));
+    if(e2)alert('Não deu para desfazer: '+e2.message);else toast('Encerramento desfeito.');MESENC=null;renderEnc()});
+  renderEnc()}
+async function encDesbloqueia(id){const l=ENC.locks.find(x=>x.id===id);if(!l)return;const r=ENC.rows.find(x=>x.lock?.id===id);const nome=r?`${r.emp} · ${r.conta}`:'esta conta';
+  const meu=encMeu(l)&&!ehAdm();let motivo='Desfeito logo depois de encerrar';
+  if(!meu){motivo=prompt(`Desbloquear ${MESES[+ENC.mes.slice(5)-1].toLowerCase()}/${ENC.mes.slice(0,4)} em ${nome}?\n\nEscreva o motivo (fica no histórico):`,'');if(motivo==null)return;motivo=motivo.trim();if(!motivo)return alert('Escreva o motivo do desbloqueio.')}
+  else if(!confirm(`Desfazer o encerramento de ${nome}?`))return;
+  const {error}=await sb.from('fin_meses_encerrados').update({ativo:false,motivo,reaberto_por_nome:ME?.nome||ME?.email||null}).eq('id',id);
+  if(error){console.error(error);return alert(encV151(error)?encMsg:/row-level|policy|0 rows/i.test(error.message||'')?'Só o Master desbloqueia um mês encerrado.':'Erro ao desbloquear: '+error.message)}
+  MESENC=null;
+  if(!meu)toastDesfazer(`${nome}: mês desbloqueado.`,async()=>{const {error:e2}=await sb.from('fin_meses_encerrados').insert({cliente_id:l.cliente_id,conta_id:l.conta_id,competencia:l.competencia,fechado_por_nome:ME?.nome||ME?.email||null,obs:'Encerrado de novo (desfez o desbloqueio)'});
+    if(e2)alert('Não deu para encerrar de novo: '+e2.message);else toast('Encerrado de novo.');MESENC=null;renderEnc()});
+  else toast('Encerramento desfeito.');
+  renderEnc()}
+$('encMes').addEventListener('change',e=>{if(e.target.value){ENC.mes=e.target.value;ENC.sel.clear();renderEnc()}});
+$('encCli').addEventListener('change',e=>{ENC.cli=e.target.value;ENC.sel.clear();renderEnc()});
+$('encVer').addEventListener('change',e=>{ENC.ver=e.target.value;encDesenha()});
+$('encBusca').addEventListener('input',e=>{ENC.busca=e.target.value;clearTimeout(ENC.t);ENC.t=setTimeout(encDesenha,250)});
+$('viewEnc').addEventListener('input',e=>{const t=e.target;if(t.dataset.encf==null)return;ENC.f[t.dataset.encf]=t.value;clearTimeout(ENC.t);
+  ENC.t=setTimeout(()=>{encDesenha();const i=document.querySelector(`[data-encf="${t.dataset.encf}"]`);i?.focus();i?.setSelectionRange(99,99)},300)});
+$('viewEnc').addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.encsel){t.checked?ENC.sel.add(t.dataset.encsel):ENC.sel.delete(t.dataset.encsel);return encDesenha()}
+  if(t.id==='encTodas'){const bq=document.querySelectorAll('[data-encsel]');bq.forEach(c=>t.checked?ENC.sel.add(c.dataset.encsel):ENC.sel.delete(c.dataset.encsel));encDesenha()}});
+$('viewEnc').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.encone)return encEncerra([b.dataset.encone]);
+  if(b.dataset.encdes)return encDesbloqueia(b.dataset.encdes);
+  if(b.id==='encSel')return encEncerra([...ENC.sel]);
+  if(b.id==='encTodasBtn'){document.querySelectorAll('[data-encsel]').forEach(c=>ENC.sel.add(c.dataset.encsel));return encDesenha()}
+  if(b.id==='encXls'){const t=document.querySelector('.enc-t');const ws=XLSX.utils.table_to_sheet(t,{raw:false});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Encerramento');XLSX.writeFile(wb,`Encerramento de mês ${ENC.mes}.xlsx`)}});
+$('mesEncIr').addEventListener('click',()=>{$('mesEncDlg').close();go('gfencerra')});
+// encerramentos ativos (para a Apresentação marcar os meses encerrados); null = recarregar
+let MESENC=null;
+async function mesEncLista(){if(MESENC)return MESENC;try{MESENC=await todas(()=>sb.from('fin_meses_encerrados').select('cliente_id,conta_id,competencia').eq('ativo',true))}catch(e){MESENC=[]}return MESENC}
+// ---------- fim do Encerramento de mês ----------
 boot();
 })();
 
