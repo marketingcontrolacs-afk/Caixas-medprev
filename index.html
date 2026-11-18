@@ -168,6 +168,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--mute
 #folGrid tbody td:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
 .tablebox.cheia{position:fixed;inset:8px;z-index:60;max-height:none;margin:0;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 th:first-child,td:first-child,td.l,th.l{text-align:left}
+/* ordenar por coluna em todas as tabelas (Carol, 18/11) */
+th.so-ok{cursor:pointer;user-select:none}th.so-ok:hover{color:var(--ink)}th.so-ok::after{content:'↕';opacity:.35;margin-left:4px;font-size:.9em}th.so-asc::after{content:'▲';opacity:1}th.so-desc::after{content:'▼';opacity:1}
+@media print{th.so-ok::after{content:none}}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover{background:var(--sunk)}
 tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
@@ -2219,6 +2222,71 @@ function msFiltro(el){if(typeof el==='string')el=$(el);if(!el||el._msdd)return;
   d.querySelector('.msmenu').addEventListener('click',e=>{const b=e.target.closest('[data-ms]');if(!b)return;if(b.dataset.ms==='limpa'){msSet(el,[],true);monta()}else d.open=false});
   msPinta(el)}
 document.addEventListener('click',e=>{document.querySelectorAll('details.msdd[open]').forEach(dd=>{if(!dd.contains(e.target))dd.open=false})});
+// ===== Ordenar por coluna em TODAS as tabelas (Carol, 18/11) =====
+// Clique no nome da coluna: 1º clique ordena crescente (▲), o 2º decrescente (▼). Vale para toda tabela com cabeçalho,
+// inclusive as que forem criadas depois. Tabelas que já têm a ordem própria (Repasse, data da Movimentação) continuam como estão.
+// Contas a pagar/receber e Movimentação ordenam a lista inteira antes de dividir em páginas (SO.reg + SO.dados).
+const SO={st:new Map(),tb:new Map(),cb:{},col:new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'}),ocupado:false};
+SO.lab=th=>String(th.textContent||'').replace(/[▲▼↕]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+SO.chaveTb=tb=>{if(tb.id)return tb.id;const h=tb.tHead,b=tb.tBodies[0];if(h?.id)return h.id;if(b?.id)return b.id;
+  const c=tb.parentElement?.closest('[id]');if(!c)return null;return c.id+'#'+[...c.querySelectorAll('table')].indexOf(tb)};
+SO.filtroRow=tr=>!!(tr.classList.contains('gcfil')||tr.querySelector('input:not([type=checkbox]),select,textarea'));
+// mapa do cabeçalho: cada th vira {col, n (qual ocorrência do mesmo nome)}; só o th da última linha e sem colspan ordena
+SO.grade=tb=>{const rs=[...(tb.tHead?.rows||[])].filter(r=>!SO.filtroRow(r)),ocup=[],out=[];
+  rs.forEach((r,ri)=>{let c=0;[...r.cells].forEach(th=>{while(ocup[ri]?.[c])c++;const cs=th.colSpan||1,rp=th.rowSpan||1;
+    for(let a=ri;a<ri+rp;a++)for(let b=c;b<c+cs;b++)(ocup[a]||=[])[b]=1;out.push({th,c,cs,fim:ri+rp>=rs.length});c+=cs})});
+  const n={};out.forEach(o=>{const l=SO.lab(o.th);o.lab=l;o.n=n[l]=(n[l]||0)+1});return out};
+SO.pode=(tb,o)=>{const th=o.th;if(tb.classList.contains('nosort')||th.hasAttribute('data-ord')||th.classList.contains('click')||th.classList.contains('nosort'))return false;
+  if(o.cs>1||!o.fim||!o.lab)return false;if(th.querySelector('input,select,button,textarea'))return false;return true};
+SO.cel=(tr,c)=>{let i=0;for(const td of tr.cells){const cs=td.colSpan||1;if(c<i+cs)return cs===1?td:null;i+=cs}return null};
+SO.txt=td=>{if(!td)return '';if(td.dataset.sv!=null)return td.dataset.sv;const s=td.querySelector('select');if(s)return s.selectedOptions[0]?.text||'';
+  const i=td.querySelector('input:not([type=checkbox]):not([type=radio]),textarea');if(i)return i.value||'';
+  const t=String(td.textContent||'').replace(/\s+/g,' ').trim();if(t)return t;const ti=td.querySelector('[title]');return ti?ti.getAttribute('title'):''};
+// valor para comparar: data (dd/mm/aaaa, mm/aaaa, aaaa-mm-dd), número/dinheiro (1.234,56 · R$ · %) ou texto
+SO.val=v=>{if(v==null)return null;if(typeof v==='number')return Number.isFinite(v)?{t:'n',v}:null;let s=String(v).replace(/\s+/g,' ').trim();if(!s||/^[—–-]$/.test(s))return null;let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)))return {t:'d',v:+(m[1]+m[2]+m[3])};
+  if((m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?!\d)/)))return {t:'d',v:+(m[3]+m[2]+m[1])};
+  if((m=s.match(/^(\d{2})\/(\d{4})(?!\d)/)))return {t:'d',v:+(m[2]+m[1]+'00')};
+  const n=s.replace(/R\$|%| /g,'').replace(/\s/g,'').replace(/−/g,'-');
+  if(/^\(?-?\d{1,3}(\.\d{3})*(,\d+)?\)?$|^\(?-?\d+(,\d+)?\)?$/.test(n)){let x=+n.replace(/[()]/g,'').replace(/\./g,'').replace(',','.');if(/^\(.*\)$/.test(n))x=-Math.abs(x);return {t:'n',v:x}}
+  return {t:'s',v:s}};
+SO.cmp=(a,b)=>{if(!a&&!b)return 0;if(!a)return 1;if(!b)return -1;   // vazio sempre no fim
+  if(a.t===b.t&&a.t!=='s')return a.v-b.v;if(a.t!=='s'&&b.t!=='s')return a.v-b.v;if(a.t!=='s')return -1;if(b.t!=='s')return 1;return SO.col.compare(a.v,b.v)};
+SO.ordLista=(l,f,d)=>l.map((x,i)=>({x,i,k:SO.val(f(x))})).sort((a,b)=>{const c=(!a.k||!b.k)?SO.cmp(a.k,b.k):d*SO.cmp(a.k,b.k);return c||a.i-b.i}).map(o=>o.x);
+// listas desenhadas a partir dos dados (com páginas): a tela registra quem redesenha e ordena os dados por getters do nome da coluna
+SO.reg=(k,cb)=>{SO.cb[k]=cb};
+SO.dados=(k,rows,gets)=>{const s=SO.st.get(k);if(!s)return rows;const f=gets.find(g=>SO.lab({textContent:g[0]})===s.lab)?.[1];if(!f)return rows;return SO.ordLista(rows,f,s.d)};
+SO.limpa=k=>{SO.st.delete(k)};
+// reordena as linhas do tbody na tela; linha de uma célula só (grupo, total, aviso) fica no lugar e separa os blocos;
+// linha escondida ou com colspan (detalhe aberto embaixo) acompanha a linha de cima
+SO.ordTb=(tb,o,d,sk)=>{const W=Math.max(...SO.grade(tb).map(g=>g.c+g.cs),0);
+  [...tb.tBodies].forEach(tbd=>{const rows=[...tbd.rows];if(rows.length<2)return;
+    if(tbd._soK===sk&&tbd._soR?.length===rows.length&&tbd._soR.every((r,i)=>r===rows[i]))return;   // nada mudou desde a última vez
+    const blocos=[];let seg=[],cur=null;
+    const fecha=()=>{if(seg.length)blocos.push({seg}),seg=[]};
+    rows.forEach(tr=>{const cs=[...tr.cells].reduce((a,c)=>a+(c.colSpan||1),0),um=tr.cells.length===1&&W>1;
+      const tot=/^(total|subtotal|soma)\b/i.test(String(tr.cells[0]?.textContent||'').trim())||tr.classList.contains('tot');
+      if(um||tot){fecha();blocos.push({fixo:tr});cur=null;return}
+      if(cur&&(tr.hidden||tr.cells.length<W&&cs>=W&&[...tr.cells].some(c=>c.colSpan>1)||tr.classList.contains('gtsub')||tr.classList.contains('det'))){cur.push(tr);return}
+      cur=[tr];seg.push(cur)});fecha();
+    const nova=[];blocos.forEach(b=>{if(b.fixo)return nova.push(b.fixo);SO.ordLista(b.seg,g=>SO.txt(SO.cel(g[0],o.c)),d).forEach(g=>nova.push(...g))});
+    tbd._soK=sk;tbd._soR=nova;if(nova.every((r,i)=>r===rows[i]))return;nova.forEach(r=>tbd.appendChild(r))})};
+SO.pinta=tb=>{const k=SO.chaveTb(tb),s=k&&SO.st.get(k),g=SO.grade(tb);let alvo=null;
+  g.forEach(o=>{const ok=SO.pode(tb,o);o.th.classList.toggle('so-ok',ok);o.th.dataset.so=ok?'1':'0';
+    const sel=ok&&s&&s.lab===o.lab&&s.n===o.n;o.th.classList.toggle('so-asc',!!(sel&&s.d>0));o.th.classList.toggle('so-desc',!!(sel&&s.d<0));
+    if(ok&&!o.th.hasAttribute('tabindex'))o.th.tabIndex=0;if(ok&&!o.th.title)o.th.title='Clique para ordenar por esta coluna (clique de novo para inverter)';
+    if(ok)o.th.setAttribute('aria-sort',sel?(s.d>0?'ascending':'descending'):'none');if(sel)alvo=o});return {k,s,alvo}};
+SO.aplica=tb=>{const {k,s,alvo}=SO.pinta(tb);if(!s||!alvo||SO.cb[k])return;SO.ocupado=true;try{SO.ordTb(tb,alvo,s.d,s.lab+'|'+s.n+'|'+s.d+'|'+alvo.c)}finally{SO.ocupado=false}};
+SO.passo=()=>{SO.raf=0;document.querySelectorAll('table').forEach(tb=>{if(!tb.tHead||!tb.isConnected)return;
+  const k=SO.chaveTb(tb),novo=[...tb.tHead.querySelectorAll('th')].some(th=>!th.dataset.so);if(novo||k&&SO.st.has(k))SO.aplica(tb)})};
+SO.agenda=()=>{if(!SO.ocupado&&!SO.raf)SO.raf=requestAnimationFrame(SO.passo)};
+document.addEventListener('click',e=>{const th=e.target.closest('th.so-ok');if(!th||e.target.closest('input,select,button,a,label'))return;
+  const tb=th.closest('table'),k=tb&&SO.chaveTb(tb);if(!k)return;const o=SO.grade(tb).find(g=>g.th===th);if(!o)return;
+  const s=SO.st.get(k),d=s&&s.lab===o.lab&&s.n===o.n?-s.d:1;SO.st.set(k,{lab:o.lab,n:o.n,d});
+  if(SO.cb[k]){SO.cb[k]();SO.pinta(tb)}else SO.aplica(tb)});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('th.so-ok')){e.preventDefault();e.target.click()}});
+new MutationObserver(SO.agenda).observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',SO.agenda);
 const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
@@ -2226,6 +2294,7 @@ function limpaFiltros(){
   MOD=null;MV.lim=300;   // Contas a pagar e Tesouraria do cliente reabrem como na primeira vez
   NFP.cli=null;   // Notas fiscais › repasses pagos: volta para a empresa escolhida no alto
   if(typeof RC!=='undefined'){RC.col={};RC.aberto.clear()}
+  SO.st.clear();   // a ordem escolhida no cabeçalho volta ao normal ao trocar de tela, como os filtros
 }
 // ajusta: filtro que o link já quer aplicar (ex.: "a validar" do Dashboard), depois da limpeza
 function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ctl'))PORTAL_VOLTA=VIEW;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
@@ -8164,7 +8233,9 @@ function gtTabela(rows,vazio){
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="gtTodos" title="Selecionar todas as ${rows.length} contas do filtro"${todosSel?' checked':''}></th><th>Parcela</th>${TE?'<th class="l">Empresa</th>':''}<th>Tipo</th><th>${DPNOME[dp]}</th><th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Categoria</th><th class="l">Conta</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th><th style="width:30px"></th></tr>`;
   const rowH=(t,sub)=>{const s=gtSit(t),sl=GT.sel.has(t.id);return `<tr class="click${sl?' sel':''}${sub?' gtsub':''}" data-id="${t.id}" tabindex="0"><td><input type="checkbox" data-gtsel="${t.id}"${sl?' checked':''} aria-label="Selecionar"></td><td><span class="chip">${t.parcelas>1?t.parcela+'/'+t.parcelas:'Única'}</span></td>${TE?`<td class="l"><span class="chip c-done">${esc(gtEmpNome(t.cliente_id))}</span></td>`:''}<td>${tpIc(t.tipo==='pagar'?'s':'e',t.tipo==='pagar'?'A pagar':'A receber')}</td><td>${(d=>d?dBR(d):mu('—'))(dtT(t))}</td><td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b><div class="d2">${esc(t.descricao||'')||'—'}${t.documento?' · '+esc(t.documento):''}${faClip(t.id)}${t.origem==='boleto_cliente'?' · enviado pelo cliente':''}</div>${gtJuntos(t)?`<br><span class="chip c-done" title="Clique para abrir e detalhar">🔗 ${gtJuntos(t)} lançamentos juntos · detalhar</span>`:''}${(k=>k&&GT.somaN?.[k]>1?`<br><span class="chip c-done" data-gtsoma="${k}" style="cursor:pointer" title="Pago junto com outras contas numa linha só do banco (ex.: remessa). Clique para ver todas">🔗 ${GT.somaN[k]} pagos juntos · detalhar</span>`:'')(gtSomaDe(t))}</td><td class="l">${t.categoria?esc(t.categoria):mu('—')}</td><td class="l">${esc(ctT(t))||mu('—')}</td><td class="${t.tipo==='pagar'?'neg':'pos'}"><b>${fm(t.valor)}</b></td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l">${stIc(s[2]==='baixada',gtConc(t),t.tipo==='pagar')}<span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td><td><span class="gtolho" title="Ver ou corrigir">👁</span></td></tr>`};
   if(!GT3())$('gtPag').hidden=true;
-  $('gtBody').innerHTML=gtGrupoHTML(GT3()?gtPagina(rows):rows,rowH,MV,P,mu,{TE,dtT,cn})
+  // ordenar pelo cabeçalho: a lista inteira, antes de dividir em páginas (Carol, 18/11)
+  const rso=SO.dados('gtHead',rows,[['Parcela',t=>t.parcelas>1?t.parcela:0],['Empresa',t=>gtEmpNome(t.cliente_id)],['Tipo',t=>t.tipo==='pagar'?'A pagar':'A receber'],[DPNOME[dp],t=>dtT(t)],[MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente',t=>t.pessoa_nome||''],['Categoria',t=>t.categoria||''],['Conta',t=>ctT(t)],['Valor',t=>+t.valor],[MV?'Pago ou recebido':P?'Pago':'Recebido',t=>GT.pago[t.id]||null],['Falta',t=>gtFalta(t)],['Situação',t=>gtSit(t)[1]]]);
+  $('gtBody').innerHTML=gtGrupoHTML(GT3()?gtPagina(rso):rso,rowH,MV,P,mu,{TE,dtT,cn})
     ||`<tr><td class="l muted" colspan="${12+TE}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l" colspan="${6+TE}">${rows.length} ${rows.length===1?'conta':'contas'}</td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td colspan="2"></td></tr>`
@@ -8365,8 +8436,10 @@ const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tip
 function mvDesenha(){
   const L=mvLinhas();GT.mvL=L;mvOpcoes(L);gtOpcoesExtra();tlMapaSe();
   // datas no formato AAAA-MM-DD: comparar o texto direto dá a mesma ordem e é bem mais rápido que localeCompare
-  const rows=mvFiltra(L).sort((a,b)=>{const da=a.dd||a.data,db=b.dd||b.data;return (MV.asc?1:-1)*((da<db?-1:da>db?1:0)||(a.k==='t')-(b.k==='t'))});
+  let rows=mvFiltra(L).sort((a,b)=>{const da=a.dd||a.data,db=b.dd||b.data;return (MV.asc?1:-1)*((da<db?-1:da>db?1:0)||(a.k==='t')-(b.k==='t'))});
   const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>cnm.get(id)||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
+  // ordenar pelo cabeçalho as outras colunas, na lista inteira antes das páginas (Carol, 18/11); a data continua no ▲▼ dela
+  rows=SO.dados('gtHead',rows,[['Parcela',x=>x.parc||''],['Empresa',x=>gtEmpNome(x.cli)],['Tipo',x=>mvNat(x)],['Cliente / Fornecedor',x=>x.pessoa||''],['Categoria',x=>x.categoria||''],['Conta',x=>cn(x.conta_id)],['Valor (R$)',x=>x.tipo==='saida'?-x.valor:+x.valor],['Situação',x=>mvSt(x)[1]]]);
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id)),TE=GT.todasE?1:0,NC=10+TE;
   // colunas no modelo do Bom Controle (Carol, 15/11): parcela, empresa, tipo, data, cliente/fornecedor com a descrição embaixo, categoria, conta, valor e situação
@@ -8514,7 +8587,8 @@ function mvAbre(tr){
 }
 ['mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvDataPor'].forEach(id=>$(id).onchange=()=>{MV.lim=300;gtDesenha()});
 ['mvPessoa','mvVmin','mvVmax'].forEach(id=>$(id).oninput=()=>{MV.lim=300;clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,250)});
-$('gtHead').addEventListener('click',e=>{if(e.target.id==='mvOrd'){MV.asc=!MV.asc;gtDesenha()}});
+$('gtHead').addEventListener('click',e=>{if(e.target.id==='mvOrd'){MV.asc=!MV.asc;SO.limpa('gtHead');gtDesenha()}});
+SO.reg('gtHead',()=>gtDesenha());
 $('mvLimpa').onclick=()=>{['mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvPessoa','mvVmin','mvVmax','gtIni','gtFim','gtBusca'].forEach(id=>$(id).value='');MV.lim=300;gtDesenha()};
 // inadimplência: contas a receber vencidas, agrupadas por cliente
 function gtInad(){
@@ -14037,6 +14111,7 @@ const MANUAL=[
 <li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas. Se houver <b>grupos de empresas</b> (Configurações › Cadastro de empresas), aparecem também as opções <b>Grupo: …</b>, que somam só as empresas do grupo; a matriz com filiais vira um grupo sozinha.</li>
 <li><b>Módulos:</b> na faixa de módulos ficam Dashboard, Rotina diária, Gestão financeira e RH. No <b>canto direito do topo</b>, ao lado do seu nome, ficam os ícones <b>Contabilidade</b>, <b>Comunicação</b>, <b>Controlacs</b> (só a Master), <b>Configurações</b> (engrenagem) e <b>Ajuda</b> (?, com este manual). Passe o mouse (ou clique) num módulo ou num ícone para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
 <li><b>Exportar e Imprimir:</b> nas telas com lista de lançamentos, o botão <b>Exportar</b> gera o arquivo em <b>Excel</b> ou <b>PDF</b> e o botão <b>Imprimir</b> abre a impressão. Sai só o que está na tela: filtre primeiro (situação, empresa, período, busca) e depois exporte. Os filtros usados aparecem no alto do relatório.</li>
+<li><b>Ordenar a lista:</b> em toda tabela, clique no nome da coluna (a setinha <b>↕</b> ao lado mostra que dá para ordenar). O 1º clique ordena em ordem crescente (<b>▲</b>: A a Z, data mais antiga, menor valor) e o 2º, decrescente (<b>▼</b>). Ex.: em RH › Colaboradores, clique em <b>Colaborador</b> para a ordem alfabética ou em <b>Cargo</b> para juntar por cargo. Linhas vazias ficam sempre no fim. Ao trocar de tela, a lista volta à ordem normal.</li>
 <li><b>Esconder o resumo:</b> nas telas com quadros de resumo no alto (totais, pendentes, conciliadas…), clique em <b>▲ Esconder resumo</b> para recolher os quadros e ver mais da lista. Para ver de novo, clique em <b>▼ Mostrar resumo</b>. O portal lembra a escolha de cada tela neste aparelho.</li>
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
@@ -14885,6 +14960,8 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18ordenar',data:'2026-11-18',t:'Ordenar a lista clicando no nome da coluna, em todas as telas',itens:[
+    {x:'Em todas as telas com tabela (ex.: RH › Colaboradores e Controle de experiência, Contas a pagar e a receber, Movimentação, Notas fiscais, Conferências, Cadastros), clique no nome da coluna para ordenar a lista: o 1º clique põe em ordem crescente (▲: A a Z, data mais antiga, menor valor) e o 2º inverte (▼). Ex.: clique em “Colaborador” para ordem alfabética ou em “Cargo” para juntar por cargo. A setinha ↕ ao lado do nome mostra que a coluna pode ser ordenada. Ao trocar de tela, a lista volta à ordem normal.'}]},
   {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
     {x:'Nova tela Gestão financeira › Relatórios › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações), ou só até uma data (tudo até aquele dia fica travado). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
     {x:'Se tentar lançar, alterar ou excluir com data de um mês já encerrado, aparece o aviso: "Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."',mods:['caixa','tesouraria']},
