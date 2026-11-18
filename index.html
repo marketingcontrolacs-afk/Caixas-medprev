@@ -994,6 +994,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
           <label class="f">Mostrar<select id="nfPgF"><option value="pend">Falta emitir a NF</option><option value="feita">NF emitida</option><option value="nao">Não emitir NF</option><option value="todos">Todos os pagos</option></select></label>
           <input id="nfPgBusca" placeholder="Buscar clínica, CNPJ ou protocolo" style="max-width:240px" aria-label="Buscar nos repasses pagos">
           <button class="btn" id="nfPgQuem" title="Marca as clínicas que já emitiram NF antes (guardado no parceiro)">Selecionar quem emite NF</button>
+          <button class="btn primary" id="nfPgEmite" disabled hidden title="Emite as NFS-e no emissor nacional pela empresa que pagou, com o valor da NF">Emitir NF</button>
           <button class="btn primary" id="nfPgMarca" disabled>Marcar NF emitida</button>
           <button class="btn" id="nfPgNao" disabled title="Guarda no parceiro como “Não emitir NF”, para os próximos repasses">Não emite</button>
         </div>
@@ -15093,6 +15094,8 @@ const MANUAL=[
     {k:'gfnf',t:'Notas fiscais dos parceiros',img:'gfnf.png',
       txt:`<p>Em <b>Repasses pagos: notas a emitir</b> aparecem todas as clínicas pagas, separadas pela empresa que pagou, com o repasse e o <b>valor da NF</b>.</p>
 <ul><li><b>Selecionar quem emite NF</b> marca de uma vez as clínicas que já emitiram nota antes.</li>
+<li><b>Emitir NF</b> (só a Master): sai uma NFS-e por clínica pelo emissor nacional, emitida pela empresa que pagou, com o valor da NF e a alíquota do mês. Confira a competência, a descrição e o CNPJ de cada clínica na janela antes de emitir. A empresa precisa estar cadastrada em Controlacs › Notas fiscais › Dados fiscais, com o certificado A1. Desfazer uma nota emitida pelo portal cancela a NFS-e.</li>
+<li><b>Já emitida</b>: para a nota feita fora do portal (site da prefeitura ou emissor nacional).</li>
 <li><b>NF emitida</b> (na linha ou para as marcadas): informe a data e, se quiser, o número. A nota entra no mês da emissão na tabela de baixo, e o parceiro fica guardado como “Emite NF”.</li>
 <li><b>Não emite</b>: o repasse sai das notas a emitir e o parceiro fica guardado como “Não emitir NF”.</li>
 <li>A coluna <b>No parceiro</b> mostra o que está guardado; nos próximos repasses já vem preenchido. Tudo tem <b>Desfazer</b>.</li></ul>`},
@@ -15726,6 +15729,7 @@ const NOVIDADES=[
     {x:'Novo módulo Parceiros MP no alto, com Repasse da semana, Notas fiscais dos parceiros, Restituições efetuadas e o cadastro de Parceiros. Ele aparece só nas empresas com o serviço “Parceiros MP” marcado na ficha da empresa (ou na coluna Parceiros MP de Configurações › Cadastro de empresas). Os parceiros saíram da Gestão financeira: as outras empresas usam o cadastro de fornecedores.',mods:['gfrepasse','gfnf','gfrestit','repasse'],para:'esc'},
     {x:'Repasse da semana: “Importar relatório de repasses” aceita o relatório novo (Data, Parceiro, Identificador, Bruto, Repasse, Descontos…). Só entram as linhas com situação Pendente. O valor a pagar é a coluna Repasse, e o valor da nota fiscal é Bruto − (Repasse + Descontos), que aparece embaixo do valor de cada parceiro. O relatório antigo continua funcionando.',mods:['gfrepasse']},
     {x:'Notas fiscais dos parceiros: em “Repasses pagos: notas a emitir” aparecem todas as clínicas pagas, separadas pela empresa que pagou, com o valor da NF. Marque as que serão emitidas e use “NF emitida”, ou “Não emite”. A escolha fica guardada no parceiro (Emite NF ou Não emitir NF) e já vem preenchida nos próximos repasses. “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.',mods:['gfnf']},
+    {x:'Emitir NF pelo portal (Master): nas Notas fiscais dos parceiros, marque as clínicas e clique em “Emitir NF” (ou no botão da linha). Sai uma NFS-e por clínica, pela empresa que pagou, com o valor da NF e a alíquota do mês. A empresa precisa estar em Controlacs › Notas fiscais › Dados fiscais com o certificado. “Já emitida” serve para nota feita fora do portal. Desfazer uma nota emitida pelo portal cancela a NFS-e no emissor nacional.',mods:['gfnf'],para:'esc'},
     {x:'Novo relatório Restituições efetuadas: os repasses pagos, pela data do pagamento, com a empresa, a conta e a forma, o valor pago, o bruto, os descontos, o valor da NF e se a nota foi emitida. Filtros por período, empresa, conta, forma e nota fiscal, busca em todos os campos, Excel, PDF e impressão.',mods:['gfrestit']},
     {x:'NFS-e: em “Dados fiscais” entrou o quadro “Alíquota do mês”, onde vai a alíquota efetiva do Simples que a contabilidade passa todo mês. Todas as notas com competência no mês usam essa alíquota. Sem a alíquota do mês, o portal não deixa emitir e avisa qual mês falta.',para:'esc'}]},
   {k:'2026-11-18duplicar',data:'2026-11-18',t:'Duplicar lançamentos',itens:[
@@ -17669,9 +17673,9 @@ function nfPgDesenha(){
   const pend=base.filter(i=>nfPgCls(i)==='pend'),feita=base.filter(i=>i.nf_emitida_em);
   $('nfPgSub').innerHTML=`${emp?'Pagos pela '+esc(rnEmpNome(emp)):'Pagos pelas empresas do grupo'} em ${$('nfPgMes').value?MESES[$('nfPgMes').value-1].toLowerCase()+' de ':''}${NF.ano}: <b>${pend.length} ${pend.length===1?'nota a emitir':'notas a emitir'}</b> (${fm(soma(pend))} em notas) · ${feita.length} já ${feita.length===1?'emitida':'emitidas'} (${fm(soma(feita))}) · ${base.filter(i=>nfPgCls(i)==='nao').length} não ${base.filter(i=>nfPgCls(i)==='nao').length===1?'emite':'emitem'}.`;
   const sitChip=it=>{const s=nfPgSit(it);return `<span class="chip ${RNSIT[s][1]}">${RNSIT[s][0]}</span>`};
-  const nota=it=>it.nf_emitida_em?`<span class="chip c-ok">✓ Emitida ${dBR(it.nf_emitida_em)}</span>${it.nf_numero?' '+mu('nº '+esc(it.nf_numero)):''} <button type="button" class="btn small ghost" data-pg="desfaz">Desfazer</button>`
+  const nota=it=>it.nf_emitida_em?`<span class="chip c-ok"${it.nfse_nota_id?' title="Emitida pelo portal (NFS-e nacional)"':''}>✓ ${it.nfse_nota_id?'NFS-e emitida':'Emitida'} ${dBR(it.nf_emitida_em)}</span>${it.nf_numero?' '+mu('nº '+esc(it.nf_numero)):''} <button type="button" class="btn small ghost" data-pg="desfaz">Desfazer</button>`
     :it.nf_escolha==='nao_emite'?`<span class="chip c-none">Não emite</span> <button type="button" class="btn small ghost" data-pg="naoDesfaz">Desfazer</button>`
-    :`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button> <button type="button" class="btn small ghost" data-pg="nao" title="Guarda no parceiro como “Não emitir NF”">Não emite</button>`;
+    :(ehAdm()?`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="emite" title="Emite a NFS-e pelo portal">Emitir NF</button> <button type="button" class="btn small ghost" data-pg="marca" title="Nota emitida fora do portal">Já emitida</button>`:`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button>`)+` <button type="button" class="btn small ghost" data-pg="nao" title="Guarda no parceiro como “Não emitir NF”">Não emite</button>`;
   const todasSel=rows.filter(i=>!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');
   $('nfPgHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="nfPgTodas" style="width:auto" title="Selecionar todos do filtro"${todasSel.length&&todasSel.every(i=>NFP.sel.has(i.id))?' checked':''}></th><th class="l">Pago em</th><th class="l">Parceiro</th><th title="Valor repassado ao parceiro">Repasse</th><th title="Bruto − (Repasse + Descontos), do relatório de repasse. Nos relatórios antigos, sem o bruto, é o valor do repasse">Valor da NF</th>${emp?'':'<th class="l">Pago pela</th>'}<th class="l">Protocolo</th><th class="l" title="Guardado no parceiro para os próximos repasses">No parceiro</th><th class="l">Nota fiscal</th></tr>`;
   $('nfPgBody').innerHTML=rows.map(it=>{const p=nfPgParc(it);
@@ -17681,6 +17685,8 @@ function nfPgDesenha(){
     ||`<tr><td></td><td class="l muted" colspan="${emp?7:8}">${NFP.itens.length?'Nenhum repasse pago neste filtro.':'Nenhum repasse pago em '+NF.ano+' ainda. Os repasses aparecem aqui quando são marcados como pagos no Repasse de parceiros.'}</td></tr>`;
   const n=NFP.sel.size;$('nfPgMarca').disabled=!n;$('nfPgMarca').textContent=n?`Marcar NF emitida (${n})`:'Marcar NF emitida';
   $('nfPgNao').disabled=!n;$('nfPgNao').textContent=n?`Não emite (${n})`:'Não emite';
+  $('nfPgEmite').hidden=!ehAdm();$('nfPgEmite').disabled=!n;$('nfPgEmite').textContent=n?`Emitir NF (${n})`:'Emitir NF';
+  $('nfPgMarca').className=ehAdm()?'btn':'btn primary';$('nfPgMarca').title='Para nota emitida fora do portal (site da prefeitura ou emissor nacional)';
   $('nfPgNote').textContent=`${rows.length} de ${base.length} repasses pagos. O valor da NF é o Bruto menos o Repasse e os Descontos do relatório. Ao marcar “NF emitida”, a nota entra sozinha no mês da emissão na tabela de baixo e o parceiro fica guardado como “Emite NF”; “Não emite” guarda o parceiro como “Não emitir NF”. Nos próximos repasses isso já vem preenchido, e “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.`;
 }
 ['nfPgEmp','nfPgMes','nfPgF'].forEach(id=>$(id).addEventListener('change',()=>{NFP.sel.clear();nfPgDesenha()}));
@@ -17711,8 +17717,14 @@ $('nfPg').addEventListener('change',e=>{
 $('nfPgBody').addEventListener('click',async e=>{const b=e.target.closest('[data-pg]');if(!b)return;const it=NFP.itens.find(i=>i.id===b.closest('tr').dataset.id);if(!it)return;
   if(b.dataset.pg==='marca')return nfPgAbre([it]);
   if(b.dataset.pg==='nao')return nfPgNaoEmite([it]);
+  if(b.dataset.pg==='emite')return nfeAbre([it]);
   if(b.dataset.pg==='naoDesfaz')return nfPgNaoDesfaz(it);
-  if(!confirm(`Desfazer a nota de ${it.nome}? O repasse volta para “Falta emitir a NF” e a nota sai do mês da emissão.`))return;
+  if(it.nfse_nota_id){if(!ehAdm())return toast('Só a Master cancela NFS-e.');
+    const txt=prompt(`Desfazer = CANCELAR a NFS-e nº ${it.nf_numero||''} de ${it.nome.trim()} no emissor nacional (não tem volta). Escreva o motivo (pelo menos 15 letras):`,'Nota emitida por engano no repasse de parceiros');
+    if(txt==null)return;if(txt.trim().length<15)return alert('Explique o motivo com pelo menos 15 letras.');
+    b.disabled=true;try{await nsFn({acao:'cancelar',nota_id:it.nfse_nota_id,motivo:'1',texto:txt.trim()});await sb.from('repasse_itens').update({nfse_nota_id:null}).eq('id',it.id);it.nfse_nota_id=null;toast('NFS-e cancelada')}
+    catch(x){console.error(x);b.disabled=false;return alert('O emissor nacional não cancelou: '+(x.message||x)+(x.lista?.length?'\n'+x.lista.map(l=>(l.codigo?'['+l.codigo+'] ':'')+l.descricao).join('\n'):''))}}
+  else if(!confirm(`Desfazer a nota de ${it.nome}? O repasse volta para “Falta emitir a NF” e a nota sai do mês da emissão.`))return;
   b.disabled=true;
   try{if(it.nf_sit_ant){await nfPgVolta(it);await sb.from('repasse_itens').update({nf_sit_ant:null}).eq('id',it.id);it.nf_sit_ant=null}
     const {error}=await sb.from('repasse_itens').update({nf_emitida_em:null,nf_numero:null,nf_marcada_por:null,nf_marcada_em:null}).eq('id',it.id);if(error)throw error;
@@ -17720,7 +17732,7 @@ $('nfPgBody').addEventListener('click',async e=>{const b=e.target.closest('[data
   catch(x){console.error(x);alert(v93(x)?v93Msg:'Não foi possível desfazer: '+(x.message||x));b.disabled=false}});
 $('nfPgMarca').onclick=()=>{const l=NFP.itens.filter(i=>NFP.sel.has(i.id)&&!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');if(l.length)nfPgAbre(l)};
 function nfPgAbre(l){
-  NF.dlg={modo:'pg',l};
+  NF.dlg={modo:'pg',l};$('nfdFoot').querySelector('[data-act="salvar"]').textContent='Salvar';$('nfdFoot').querySelector('[data-act="salvar"]').hidden=false;dlgNF.classList.remove('cheia');
   $('nfdTit').textContent=l.length===1?'Nota fiscal de '+l[0].nome:`Notas fiscais de ${l.length} repasses`;
   const nao=l.filter(i=>nfPgCls(i)==='nao').length;
   $('nfdBody').innerHTML=`<p class="note" style="margin:0 0 10px">${l.length===1?`Repasse de ${fm(l[0].valor)} pago em ${dBR(l[0].pago_em)} pela ${esc(rnEmpNome(l[0].empresa_id))}. <b>Valor da NF: ${fm(nfPgV(l[0]))}</b>.`:`${l.length} repasses · <b>valor das notas ${fm(r2(l.reduce((x,i)=>x+nfPgV(i),0)))}</b>.`}</p>
@@ -17730,6 +17742,79 @@ function nfPgAbre(l){
     <p class="note" style="margin:8px 0 0">A nota entra também na tabela de notas do mês da emissão.</p><p class="err" id="nfdErr" hidden></p>`;
   $('nfdFoot').querySelector('[data-act="excluir"]').hidden=true;dlgNF.showModal();
 }
+// ---- Emitir NF dos parceiros pelo portal (Carol, 18/11): NFS-e nacional pela empresa que pagou, tomador = clínica, valor = valor da NF.
+// Só a Master (a função nfse só aceita a Master). A empresa precisa estar em Controlacs › Notas fiscais › Dados fiscais, com certificado,
+// e com a alíquota do mês (Simples). Cada nota emitida fica ligada ao repasse (nfse_nota_id); Desfazer = cancelar a NFS-e.
+const NFE={emit:[],pes:{},parc:[]};
+const nfeDig=v=>String(v||'').replace(/\D/g,'');
+async function nfeAbre(l){
+  NF.dlg={modo:'emit',l,linhas:[]};dlgNF.classList.add('cheia');
+  $('nfdTit').textContent=`Emitir NFS-e de ${l.length} ${l.length===1?'clínica':'clínicas'}`;$('nfdFoot').querySelector('[data-act="excluir"]').hidden=true;
+  const sv=$('nfdFoot').querySelector('[data-act="salvar"]');sv.hidden=true;$('nfdBody').innerHTML='<p class="muted">Conferindo as empresas emissoras e o cadastro das clínicas…</p>';dlgNF.showModal();
+  try{
+    const emps=[...new Set(l.map(i=>i.empresa_id).filter(Boolean))];
+    const [em,pe,pa]=await Promise.all([sb.from('nfse_emitentes').select('*').in('cliente_id',emps),sb.from('fin_pessoas').select('id,cliente_id,nome,fantasia,documento,email,cep,endereco,numero,complemento,bairro,cidade,uf,parceiro_id').in('cliente_id',emps).not('parceiro_id','is',null),
+      sb.from('parceiros').select('id,nome,nomes_locais,nome_global,titular,cpf_cnpj')]);
+    if(em.error)throw em.error;if(pe.error)throw pe.error;NFE.emit=(em.data||[]).filter(e=>e.ativo!==false);NFE.parc=pa.data||[];
+    NFE.pes={};(pe.data||[]).forEach(x=>(NFE.pes[x.cliente_id]||=[]).push(x));
+  }catch(x){console.error(x);$('nfdBody').innerHTML=`<p class="err">${/nfse_emitentes/.test(x.message||'')?'A emissão pelo portal precisa da atualização v131 do banco.':'Não consegui carregar os dados fiscais: '+esc(x.message||String(x))}</p>`;return}
+  const comp=TODAY;
+  NF.dlg.linhas=l.map(it=>{const e=NFE.emit.find(x=>x.cliente_id===it.empresa_id),pn=nfPgParc(it),k=chave(it.nome);
+    const cp=NFE.parc.find(p=>chave(p.nome)===k||(p.nomes_locais||[]).some(n=>chave(n)===k))||null;
+    const doc=nfeDig(pn?.cpf_cnpj)||nfeDig(cp?.cpf_cnpj);
+    const ps=(NFE.pes[it.empresa_id]||[]).find(x=>doc&&nfeDig(x.documento)===doc)||(NFE.pes[it.empresa_id]||[]).find(x=>cp&&x.parceiro_id===cp.id)||null;
+    return {it,e,doc:doc||nfeDig(ps?.documento),nome:pn?.nome_global||cp?.nome_global||cp?.titular||ps?.nome||it.nome.trim(),email:ps?.email||'',ps,valor:nfPgV(it),res:null}});
+  nfeDesenha();
+}
+function nfeDesenha(){const d=NF.dlg,mu=t=>`<span class="muted">${t}</span>`;
+  const porE=[...new Set(d.linhas.map(x=>x.it.empresa_id))];
+  const semE=porE.filter(id=>!d.linhas.find(x=>x.it.empresa_id===id).e);
+  const prontas=d.linhas.filter(x=>x.e&&!x.res?.ok&&(x.doc.length===11||x.doc.length===14)&&x.valor>0);
+  $('nfdBody').innerHTML=`<div class="fields"><label class="f">Competência *<input type="date" id="nfeComp" value="${esc(d.comp||TODAY)}"></label>
+      <label class="f wide">Descrição do serviço<textarea id="nfeDesc" rows="2" maxlength="1800" placeholder="Em branco: a descrição padrão de cada empresa (Dados fiscais)">${esc(d.desc||'')}</textarea></label></div>
+    <p class="note" style="margin:6px 0 10px">Uma NFS-e por clínica, emitida pela empresa que pagou o repasse, com o <b>valor da NF</b> (Bruto − Repasse − Descontos). Ao final da descrição entra “Referente ao repasse pago em dd/mm/aaaa”. Confira o CNPJ de cada clínica: dá para corrigir aqui.</p>
+    ${semE.length?`<div class="alerta bad" style="margin:0 0 10px"><b>${semE.map(id=>esc(rnEmpNome(id))).join(', ')} ainda ${semE.length===1?'não está cadastrada':'não estão cadastradas'} para emitir.</b><span>Cadastre em Controlacs › Notas fiscais › Dados fiscais (CNPJ, cidade, serviço, certificado A1) e a alíquota do mês. Enquanto isso, as clínicas dessas empresas ficam de fora; use “Marcar NF emitida” se a nota for feita em outro lugar. <button type="button" class="btn small" id="nfeCfg">Abrir Dados fiscais</button></span></div>`:''}
+    <div class="tablebox"><table><thead><tr><th class="l">Clínica (tomador)</th><th class="l">CNPJ/CPF</th><th>Valor da NF</th><th class="l">Emite pela</th><th class="l">Situação</th></tr></thead><tbody>${d.linhas.map((x,i)=>{
+      const okDoc=x.doc.length===11||x.doc.length===14;
+      const st=x.res?.ok?`<span class="chip c-ok">✓ NFS-e nº ${esc(x.res.numero||'')}</span>`:x.res?.erro?`<span class="chip c-bad">Recusada</span><br><span class="neg" style="font-size:12px">${esc(x.res.erro)}</span>`
+        :!x.e?'<span class="chip c-none">Empresa sem dados fiscais</span>':!okDoc?'<span class="chip c-warn">Falta o CNPJ</span>':!(x.valor>0)?'<span class="chip c-warn">Valor da NF zerado</span>':`<span class="chip c-ok">Pronta</span>${Number(x.e.ambiente)===2?' <span class="chip c-warn">teste</span>':''}`;
+      return `<tr data-i="${i}"><td class="l" style="white-space:normal;min-width:200px"><b>${esc(x.nome)}</b>${chave(x.nome)!==chave(x.it.nome)?'<br>'+mu(esc(x.it.nome.trim())):''}${x.ps?.cep?'':'<br>'+mu('sem endereço no cadastro (a nota sai sem o endereço)')}</td>
+        <td class="l">${x.res?.ok?esc(nsDoc(x.doc)):`<input class="nfedoc" value="${esc(nsDoc(x.doc))}" inputmode="numeric" style="max-width:170px" aria-label="CNPJ ou CPF de ${esc(x.nome)}">`}</td>
+        <td><b>${fm(x.valor)}</b></td><td class="l" style="white-space:nowrap">${esc(rnEmpNome(x.it.empresa_id))}</td><td class="l">${st}</td></tr>`}).join('')}</tbody></table></div>
+    <p class="note" id="nfeProg" style="margin:8px 0 0">${prontas.length?`${prontas.length} ${prontas.length===1?'nota pronta':'notas prontas'} · ${fm(r2(prontas.reduce((a,x)=>a+x.valor,0)))}.`:d.linhas.some(x=>x.res?.ok)?'Notas emitidas. Elas aparecem também em Controlacs › Notas fiscais.':'Nenhuma nota pronta para emitir.'}</p><p class="err" id="nfdErr" hidden></p>`;
+  const sv=$('nfdFoot').querySelector('[data-act="salvar"]');sv.hidden=!prontas.length;sv.disabled=false;sv.textContent=`Emitir ${prontas.length} ${prontas.length===1?'NFS-e':'NFS-e'}`;
+  $('nfeComp').onchange=()=>d.comp=$('nfeComp').value;$('nfeDesc').oninput=()=>d.desc=$('nfeDesc').value;
+  $('nfdBody').querySelectorAll('.nfedoc').forEach(inp=>inp.onchange=()=>{const x=d.linhas[+inp.closest('tr').dataset.i];x.doc=nfeDig(inp.value);nfeDesenha()});
+  if($('nfeCfg'))$('nfeCfg').onclick=()=>{dlgNF.close();go('ctlnfse')};
+}
+// endereço do tomador pelo cadastro (fornecedor ligado ao parceiro); o código IBGE vem do CEP (ViaCEP)
+async function nfeEnd(ps){const cep=nfeDig(ps?.cep);if(cep.length!==8||!ps.endereco)return null;
+  try{const r=await fetch(`https://viacep.com.br/ws/${cep}/json/`),j=await r.json();if(!j?.ibge)return null;
+    return {cep,cMun:j.ibge,xLgr:ps.endereco,nro:ps.numero||'S/N',xCpl:ps.complemento||'',xBairro:ps.bairro||j.bairro||'Centro'}}catch(e){return null}}
+dlgNF.addEventListener('close',()=>dlgNF.classList.remove('cheia'));
+$('nfdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-act="salvar"]'),d=NF.dlg;if(!b||d?.modo!=='emit')return;e.stopImmediatePropagation();
+  const comp=$('nfeComp').value;if(!comp)return($('nfdErr').textContent='Informe a competência.',$('nfdErr').hidden=false);
+  const fila=d.linhas.filter(x=>x.e&&!x.res?.ok&&(x.doc.length===11||x.doc.length===14)&&x.valor>0);if(!fila.length)return;
+  // alíquota do mês de cada empresa (Simples): sem ela, a empresa fica de fora
+  const semAq=[];for(const em of [...new Set(fila.map(x=>x.e))]){try{const a=await nsAqDoMes(em,comp);if(a.usa&&a.aliquota==null)semAq.push(em)}catch(x){semAq.push(em)}}
+  if(semAq.length){$('nfdErr').innerHTML=`Falta a alíquota de ${MESES[+comp.slice(5,7)-1].toLowerCase()}/${comp.slice(0,4)} em Dados fiscais: ${semAq.map(x=>esc(x.nome)).join(', ')}. Informe e tente de novo.`;$('nfdErr').hidden=false;return}
+  const teste=fila.some(x=>Number(x.e.ambiente)===2);
+  if(!confirm(`Emitir ${fila.length} NFS-e (${fm(r2(fila.reduce((a,x)=>a+x.valor,0)))})${teste?' — algumas em modo TESTE (não valem)':''}?\n\nDepois de emitida, só dá para corrigir cancelando e emitindo outra.`))return;
+  b.disabled=true;let n=0;
+  for(const x of fila){n++;$('nfeProg').textContent=`Emitindo ${n} de ${fila.length}: ${x.nome}…`;
+    try{const end=await nfeEnd(x.ps);const pago=x.it.pago_em?` Referente ao repasse pago em ${dBR(x.it.pago_em)}.`:'';
+      const desc=((d.desc||'').trim()||x.e.servico?.xDescServ||'Prestação de serviços')+pago;
+      const tomador={doc:x.doc,nome:x.nome,email:x.email||'',...(end?{end}:{})};
+      const r=await nsFn({acao:'emitir',emitente_id:x.e.id,tomador,valor:x.valor,competencia:comp,descricao:desc});
+      x.res={ok:true,numero:r.numero_nfse||'',nota:r.nota_id};const it=x.it,hoje=TODAY;
+      const upd={nf_emitida_em:hoje,nf_numero:r.numero_nfse||null,nfse_nota_id:r.nota_id||null,nf_marcada_por:ME?.user_id||null,nf_marcada_em:new Date().toISOString()};
+      const {error}=await sb.from('repasse_itens').update(upd).eq('id',it.id);if(error)console.error(error);Object.assign(it,upd);NFP.sel.delete(it.id);
+      try{await nfPgMensal(it,1,hoje,upd.nf_numero)}catch(z){console.error(z)}
+      try{if(nfPgSit(it)!=='emite'){const ant=await nfPgGuarda(it,'emite');await sb.from('repasse_itens').update({nf_sit_ant:ant}).eq('id',it.id);it.nf_sit_ant=ant}}catch(z){console.error(z)}
+    }catch(er){console.error(er);x.res={erro:(er.message||String(er))+(er.lista?.length?' — '+er.lista.map(l=>(l.codigo?'['+l.codigo+'] ':'')+l.descricao).join('; '):'')}}
+    nfeDesenha();$('nfeProg').textContent=`Emitindo ${n} de ${fila.length}…`}
+  const ok=fila.filter(x=>x.res?.ok).length;nfeDesenha();toast(`${ok} de ${fila.length} NFS-e emitidas`);nfDesenha();nfPgDesenha()},true);
+$('nfPgEmite').onclick=()=>{const l=NFP.itens.filter(i=>NFP.sel.has(i.id)&&!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');if(l.length)nfeAbre(l)};
 // soma (+1) ou tira (-1) a nota do repasse no controle do mês da emissão (nf_mensal)
 async function nfPgMensal(it,delta,data,numero){
   if(!data)return;const p=nfPgParc(it),nome=p?.nome||it.nome,comp=data.slice(0,7),ex=NF.nfs.find(n=>n.nome===nome&&n.competencia===comp);
