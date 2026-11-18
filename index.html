@@ -992,7 +992,10 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
           <label class="f">Empresa que pagou<select id="nfPgEmp"></select></label>
           <label class="f">Mês do pagamento<select id="nfPgMes"></select></label>
           <label class="f">Mostrar<select id="nfPgF"><option value="pend">Falta emitir a NF</option><option value="feita">NF emitida</option><option value="nao">Não emitir NF</option><option value="todos">Todos os pagos</option></select></label>
+          <input id="nfPgBusca" placeholder="Buscar clínica, CNPJ ou protocolo" style="max-width:240px" aria-label="Buscar nos repasses pagos">
+          <button class="btn" id="nfPgQuem" title="Marca as clínicas que já emitiram NF antes (guardado no parceiro)">Selecionar quem emite NF</button>
           <button class="btn primary" id="nfPgMarca" disabled>Marcar NF emitida</button>
+          <button class="btn" id="nfPgNao" disabled title="Guarda no parceiro como “Não emitir NF”, para os próximos repasses">Não emite</button>
         </div>
       </div>
       <div class="tablebox" style="margin-top:10px;max-height:420px;overflow:auto"><table><thead id="nfPgHead"></thead><tbody id="nfPgBody"></tbody></table></div>
@@ -1000,6 +1003,27 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     </div>
     <div class="card tablebox nfgrid"><table><thead id="nfHead"></thead><tbody id="nfBody"></tbody></table></div>
     <p class="note" id="nfNote"></p>
+  </section>
+
+  <!-- PARCEIROS MP › RESTITUIÇÕES EFETUADAS (Carol, 18/11): os repasses pagos, pelo pagamento -->
+  <section id="viewPR" hidden>
+    <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Restituições efetuadas</h1><p class="sub" id="prSub">Os repasses de parceiros já pagos, com a data, a empresa, a conta e a forma de cada pagamento, e o valor bruto, os descontos e o valor da nota fiscal do relatório.</p></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="prExp" data-exp="pr"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span></div>
+    </div>
+    <div class="toolbar" id="prBar">
+      <label class="f">Pago de<input type="date" id="prDe"></label>
+      <label class="f">até<input type="date" id="prAte"></label>
+      <label class="f">Empresa que pagou<select id="prEmp"></select></label>
+      <label class="f">Conta<select id="prConta"></select></label>
+      <label class="f">Forma<select id="prForma"></select></label>
+      <label class="f">Nota fiscal<select id="prNF"><option value="">Todas</option><option value="feita">NF emitida</option><option value="pend">Falta emitir</option><option value="nao">Não emite</option></select></label>
+      <input id="prBusca" placeholder="Buscar em todos os campos" style="max-width:240px" aria-label="Buscar nas restituições">
+    </div>
+    <div class="tiles" id="prTiles"></div>
+    <div class="card tablebox"><table id="prTab"><thead id="prHead"></thead><tbody id="prBody"></tbody><tfoot id="prFoot"></tfoot></table></div>
+    <p class="note" id="prNote"></p>
   </section>
 
   <section id="viewRN" hidden>
@@ -1981,7 +2005,7 @@ const eqPodeAnt=k=>(k=k==='docs'?'colab':k==='gfreceb'?'gfcartoes':k,!ehEsc()||e
 // perfis.permissoes = {tela:'ver'|'exec'}; sem ele (usuário ainda não salvo na tela nova) vale a regra antiga, sem mudar nada
 const PERM=()=>ME&&!ehAdm()&&ME.permissoes&&typeof ME.permissoes==='object'&&!Array.isArray(ME.permissoes)?ME.permissoes:null;
 // tela nova herda a permissão da tela parecida até a pessoa ser salva de novo no cadastro (Recebíveis de cartão = Conciliação de cartões, Carol 17/11)
-const PERMHERDA={gfreceb:'gfcartoes'};
+const PERMHERDA={gfreceb:'gfcartoes',gfrestit:'gfnf'};
 const permTela=k=>{if(!ME||ehAdm())return 'exec';const p=PERM();if(!p||SEMPRE.includes(k)||k==='avisos')return 'exec';if(p[k]===undefined&&PERMHERDA[k])k=PERMHERDA[k];return p[k]==='exec'||p[k]==='env'?'exec':p[k]==='ver'?'ver':''};
 const eqPode=k=>{if(!ME)return false;if(ehAdm())return true;const p=PERM();if(!p)return eqPodeAnt(k);if(ehEsc()&&SO_MASTER.includes(k))return false;return !!permTela(k)};
 // Executar: lança, altera, exclui e anexa na tela; só Visualizar: vê e baixa, sem gravar nada
@@ -1999,6 +2023,10 @@ const temEm=(cli,m)=>ACESSOS.some(a=>a.cliente_id===cli&&a.modulo===m);
 const temAcesso=m=>ehEsc()||ACESSOS.some(a=>a.modulo===m);
 // Gestão financeira: o escritório e o operador cliente com o acesso 'gestao' (gerado pelo cadastro do usuário, Carol 04/11)
 const okGestao=()=>temAcesso('gestao');
+// empresa com a modalidade de parceria MP (serviço "Parceiros MP" na ficha; Carol 18/11, v158). Com "Todas" ou um grupo, vale se alguma empresa tiver
+const pmEmp=c=>!!c?.bpo_parceiros_mp;
+function pmAtivo(){try{const e=escCli.value||EMP;if(!e||e==='int'||typeof CLIENTES==='undefined')return false;
+  if(e==='*')return CLIENTES.some(c=>c.ativo!==false&&pmEmp(c)&&noGrupo(c.id));return pmEmp(CLIENTES.find(c=>c.id===e))}catch(x){return false}}
 const podeVer=(cli,m)=>ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo));
 const podeLancar=(cli,m)=>(ehEsc()||ACESSOS.some(a=>a.cliente_id===cli&&(MODEQ[m]||[m]).includes(a.modulo)&&a.nivel==='lancamento'))&&(!VIEW||podeExec(VIEW));
 const ICO={
@@ -2029,6 +2057,8 @@ const ICO={
   gfcartoes:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
   gfreceb:'<rect x="2" y="5" width="14" height="10" rx="2"/><path d="M2 9h14"/><circle cx="18" cy="16" r="4"/><path d="M18 14v2l1.3 1"/>',
   gfnf:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/><path d="M4 7v14h11" opacity=".55"/>',
+  gfrestit:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/><path d="M15 16l1.5 1.5L19 15"/>',
+  m_pmp:'<circle cx="7" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M2 20a5 5 0 0 1 10 0M12 20a5 5 0 0 1 10 0"/><path d="M10 13h4"/>',
   gfrepasse:'<circle cx="8" cy="8" r="3"/><path d="M3 19a5 5 0 0 1 10 0M14 9h7M18 6l3 3-3 3M14 16h7"/>',
   gfpes:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M15 9h3M15 13h3"/>',
   gfcontas:'<path d="M3 10l9-6 9 6M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
@@ -2086,11 +2116,15 @@ const NAV=[
   {k:'gffatura',t:'Fatura do cartão de crédito',g:'Gestão financeira',s:'Bancos',ok:okGestao},
   // repasses da semana (relatório de restituições): separa quem emite NF e gera as contas a pagar em cada empresa do grupo (Carol, 30/10)
   // Parceiros saiu da Comunicação: é a tela única de parceiros na Gestão financeira, com as abas Cadastro, Repasse e Notas fiscais (Carol, 04/11)
-  {k:'repasse',t:'Parceiros',g:'Gestão financeira',s:'Caixa e tesouraria',ok:()=>temAcesso('repasse')},
+  // módulo Parceiros MP (Carol, 18/11; v158): tudo de parceiros fica num módulo próprio, só nas empresas marcadas com o serviço
+  // "Parceiros MP" (ficha da empresa). Saiu da Gestão financeira: as outras empresas usam o cadastro de fornecedores (Carol, 18/11)
+  {k:'repasse',t:'Parceiros',g:'Parceiros MP',s:'Cadastros',ok:()=>temAcesso('repasse')&&pmAtivo()},
   // Repasse e Notas fiscais viraram abas da tela Parceiros (aba:'repasse'): saem do menu, a tela continua igual (Carol, 04/11)
-  {k:'gfrepasse',t:'Parceiros › Repasse da semana',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
+  {k:'gfrepasse',t:'Repasse da semana',g:'Parceiros MP',s:'Dia a dia',ok:()=>okGestao()&&pmAtivo()},
   // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
-  {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
+  {k:'gfnf',t:'Notas fiscais dos parceiros',g:'Parceiros MP',s:'Dia a dia',ok:()=>okGestao()&&pmAtivo()},
+  // restituições efetuadas: os repasses pagos, pelo pagamento (data, empresa, conta e forma), com o valor bruto, o desconto e o valor da NF (Carol, 18/11)
+  {k:'gfrestit',t:'Restituições efetuadas',g:'Parceiros MP',s:'Relatórios',ok:()=>okGestao()&&pmAtivo()},
   // encerrar o mês de cada conta depois de conferir (Carol, 18/11; v151): toda a equipe Controlacs encerra, só o Master desbloqueia
   {k:'gfencerra',t:'Encerramento de mês',g:'Gestão financeira',s:'Cadastros',ok:()=>ehEsc()},
   // relatório dos meses e períodos encerrados, com filtros e Excel (Carol, 18/11)
@@ -2154,7 +2188,7 @@ const NAV=[
 ];
 const NAVBADGE={};
 // módulos no topo (um ícone cada); as seções e as telas abrem num painel, como no Bom Controle
-const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'cfg'}];
+const MODS=[{g:'Rotina diária',i:'m_fin'},{g:'Gestão financeira',i:'m_gf'},{g:'Parceiros MP',i:'m_pmp'},{g:'Contabilidade',i:'m_ctb'},{g:'Recursos humanos',i:'m_rh',c:'RH'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'cfg'}];
 // Contabilidade, Comunicação, Controlacs, Configurações e Ajuda saem da faixa de módulos e ficam no canto direito do topo, ao lado do nome (Carol, 15/11)
 const TOPMODS=[{g:'Contabilidade',i:'m_ctb'},{g:'Comunicação',i:'m_com'},{g:'Controlacs',i:'m_ctl'},{g:'Configurações',i:'engr'},{g:'Ajuda',i:'ajuda'}];
 // a Gestão financeira é dividida em Caixa e tesouraria, Bancos, Recebíveis, Cadastros e Relatórios (Carol, 17/11)
@@ -2231,6 +2265,8 @@ function empresasDe(m,semGrupo){
   const g=semGrupo?null:grupoSel();return g?r.filter(c=>g.empresas.includes(c.id)):r;
 }
 function empresasMod(m){
+  // módulo Parceiros MP (Carol, 18/11; v158): parceiros, repasse, notas e restituições só nas empresas com o serviço marcado na ficha
+  if(['repasse','gfrepasse','gfnf','gfrestit'].includes(m)&&!empresasMod._pm){empresasMod._pm=1;try{return empresasMod(m).filter(pmEmp)}finally{empresasMod._pm=0}}
   // dashboard: as empresas em que a pessoa tem algum acesso (o escritório, todas)
   if(m==='gfdash')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()||ACESSOS.some(a=>a.cliente_id===c.id)));
   if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh||m==='colab'&&c.bpo_beneficios:temEm(c.id,'colab')));
@@ -2429,7 +2465,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('.oc-x,.oc-m');if
   else{delete o[k];OCU.grava(o);OCU.passo()}},true);
 new MutationObserver(OCU.agenda).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',OCU.agenda);
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','nfPgBusca','prEmp','prConta','prForma','prNF','prBusca','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -2443,7 +2479,7 @@ function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ct
 // a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
 // tela única de Parceiros: Cadastro e contas, Repasse da semana e Notas fiscais em abas (Carol, 04/11)
 // cada aba é a tela de antes; quem só tem o cadastro (o cliente) não vê a barra de abas
-const PABAS=[['repasse','Cadastro e contas'],['gfrepasse','Repasse da semana'],['gfnf','Notas fiscais']];
+const PABAS=[['repasse','Cadastro e contas'],['gfrepasse','Repasse da semana'],['gfnf','Notas fiscais'],['gfrestit','Restituições efetuadas']];
 function parcAbas(){
   const ok=PABAS.filter(([k])=>{const n=NAV.find(x=>x.k===k);return n&&n.ok()&&eqPode(k)});
   document.querySelectorAll('.ptabs').forEach(d=>{d.hidden=ok.length<2;
@@ -2472,7 +2508,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2508,6 +2544,7 @@ function openView(){
   else if(VIEW==='gfreceb'){$('viewRC').hidden=false;renderRC()}
   else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;parcAbas();renderRN()}
   else if(VIEW==='gfnf'){$('viewNF').hidden=false;parcAbas();renderNF()}
+  else if(VIEW==='gfrestit'){$('viewPR').hidden=false;parcAbas();renderPR()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW==='gfapres'){$('viewApr').hidden=false;renderApr()}
@@ -3541,8 +3578,8 @@ const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a 
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th>${V154(CLIENTES[0])?'<th class="l">Ficha</th>':''}<th class="l">CNPJ</th>${'matriz_id' in (CLIENTES[0]||{})?'<th class="l" title="Deixe em branco se for matriz ou empresa sem filial">Filial de</th>':''}<th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}" style="min-width:170px" title="${esc(c.nome)}"></td>${V154(c)?(f=>`<td class="l" style="white-space:nowrap"><button type="button" class="btn small fcAbrir" title="${f.length?'Falta: '+esc(f.join(', ')):'Ficha completa'}">📋 <span class="chip ${f.length?'c-warn':'c-ok'}" style="pointer-events:none">${f.length?'Incompleta':'Completa'}</span></button></td>`)(fcFaltaCli(c)):''}<td><input data-k="cnpj" value="${esc(c.cnpj)}" placeholder="Obrigatório" inputmode="numeric" style="min-width:160px"></td>${'matriz_id' in c?`<td><select data-k="matriz_id" aria-label="Filial de" style="min-width:170px"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></td>`:''}<td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px">${V139(c)&&nCx(c)>1?`<button type="button" class="btn small ocAbrir" style="margin-left:6px;white-space:nowrap" title="Nomes de quem opera o caixa">👤 Operadores (${opersCx(c).length})</button>`:''}</td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th>${V154(CLIENTES[0])?'<th class="l">Ficha</th>':''}<th class="l">CNPJ</th>${'matriz_id' in (CLIENTES[0]||{})?'<th class="l" title="Deixe em branco se for matriz ou empresa sem filial">Filial de</th>':''}<th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}${'bpo_parceiros_mp' in (CLIENTES[0]||{})?'<th class="l" title="Módulo Parceiros MP: repasse com o relatório novo, notas fiscais dos parceiros e restituições efetuadas">Parceiros MP</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}" style="min-width:170px" title="${esc(c.nome)}"></td>${V154(c)?(f=>`<td class="l" style="white-space:nowrap"><button type="button" class="btn small fcAbrir" title="${f.length?'Falta: '+esc(f.join(', ')):'Ficha completa'}">📋 <span class="chip ${f.length?'c-warn':'c-ok'}" style="pointer-events:none">${f.length?'Incompleta':'Completa'}</span></button></td>`)(fcFaltaCli(c)):''}<td><input data-k="cnpj" value="${esc(c.cnpj)}" placeholder="Obrigatório" inputmode="numeric" style="min-width:160px"></td>${'matriz_id' in c?`<td><select data-k="matriz_id" aria-label="Filial de" style="min-width:170px"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></td>`:''}<td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px">${V139(c)&&nCx(c)>1?`<button type="button" class="btn small ocAbrir" style="margin-left:6px;white-space:nowrap" title="Nomes de quem opera o caixa">👤 Operadores (${opersCx(c).length})</button>`:''}</td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}${'bpo_parceiros_mp' in c?`<td class="l"><input type="checkbox" data-k="bpo_parceiros_mp" ${c.bpo_parceiros_mp?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
   fcAviso();fcFiltra();
   await grCarrega();grRender();
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
@@ -3577,7 +3614,7 @@ $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').d
     if(!dg||!fcCnpjOk(dg)||CLIENTES.some(x=>x.id!==id&&fcDig(x.cnpj)===dg)){toast(!dg?'O CNPJ é obrigatório. Para mudar os dados da empresa, abra a 📋 Ficha.':!fcCnpjOk(dg)?'Este CNPJ não existe (os dígitos finais não batem). Confira os números.':'Este CNPJ já é de outra empresa.');e.target.value=c0?.cnpj||'';return}
     e.target.value=v=fcCnpjFmt(dg)}
   if(k==='caixas')e.target.value=v=Math.max(1,Math.min(9,parseInt(v)||1));
-  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);const ant=c[k];c[k]=v;if(k==='matriz_id'||k==='nome'||k==='ativo')grRender();if(V154(c)){fcAviso();renderCadastroChip(c)}
+  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);const ant=c[k];c[k]=v;if(k==='matriz_id'||k==='nome'||k==='ativo')grRender();if(k==='bpo_parceiros_mp')renderNav();if(V154(c)){fcAviso();renderCadastroChip(c)}
     if(k==='caixas'&&V139(c)){renderCadastro();if(v>1&&!(+ant>1)&&!opersCx(c).length)ocAbre(id)}}});
 // cadastro dos operadores do caixa (Carol, 16/11): abre ao colocar mais de 1 caixa; Desfazer volta a lista anterior
 let OC=null;
@@ -3636,7 +3673,7 @@ const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origi
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
 const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
-  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfencrel:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfrestit:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfencrel:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -3820,7 +3857,7 @@ const dlgPerm=$('dlgPerm');let PERMU=null;
 function abrirPermissoes(u){
   PERMU=u;$('pmTitle').textContent='Permissões de '+(u.nome||u.email);
   const ms=u.modulos_equipe,es=u.empresas_equipe?.length?u.empresas_equipe:null,grp=n=>typeof n.g==='function'?'Gestão financeira':n.g;
-  const grupos=['Rotina diária','Gestão financeira','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k))})).filter(x=>x.itens.length);
+  const grupos=['Rotina diária','Gestão financeira','Parceiros MP','Contabilidade','Recursos humanos','Configurações'].map(g=>({g,itens:NAV.filter(n=>grp(n)===g&&!SEMPRE.includes(n.k)&&!SO_MASTER.includes(n.k))})).filter(x=>x.itens.length);
   const ck=(n)=>`<label><input type="checkbox" value="${n.k}"${!ms||ms.includes(n.k)?' checked':''}> ${n.t}</label>`;
   $('pmBody').innerHTML=`<p class="note" style="margin:0">Marque o que ${esc(u.nome||u.email)} vê no menu. <b>Tarefas e recados</b> e <b>Avisos e notícias</b> ficam sempre liberados para toda a equipe. <b>Configurações</b>, <b>Plano de contas</b> e as regras das categorias são só do master.</p>
     <div class="pick" id="pmMods" style="max-height:none"><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-pk="todos">Marcar todos</button><button type="button" class="btn small ghost" data-pk="nenhum">Desmarcar todos</button></div>
@@ -3958,6 +3995,7 @@ function fcAbre(id,op={}){const c=id?CLIENTES.find(x=>x.id===id):null;if(id&&!c)
     <label class="row" style="gap:6px"><input type="checkbox" id="fc_fin" style="width:auto"${s.fin?' checked':''}> BPO financeiro</label>
     <label class="row" style="gap:6px"><input type="checkbox" id="fc_rh" style="width:auto"${s.rh?' checked':''}> BPO RH (folha, ponto, documentos)</label>
     ${temBen?`<label class="row" style="gap:6px"><input type="checkbox" id="fc_ben" style="width:auto"${s.ben?' checked':''}> RH só benefícios</label>`:''}
+    ${'bpo_parceiros_mp' in (c||CLIENTES[0]||{})?`<label class="row" style="gap:6px" title="Repasse de parceiros com o relatório novo (bruto, repasse e desconto), notas fiscais dos parceiros e restituições efetuadas, num módulo próprio"><input type="checkbox" id="fc_pmp" style="width:auto"${c?.bpo_parceiros_mp?' checked':''}> Parceiros MP</label>`:''}
     <label class="row" style="gap:6px"><input type="checkbox" id="fc_ativo" style="width:auto"${c?.ativo!==false?' checked':''}> Empresa ativa</label></div>
     ${ehAdm()?`<div id="fcCtl" style="margin-top:10px"><span class="muted">Procurando o contrato…</span></div>`:''}`)}
   <div id="fcRhBox">${fcSec('RH e benefícios','Vale para o Pedido de benefícios, a folha e os documentos do RH. Estas são as mesmas regras que aparecem no fim do Pedido de benefícios: mudar aqui muda lá.',
@@ -4094,6 +4132,7 @@ async function fcSalva(){const {d,s}=fcLe(),err=$('fcErr'),c=FC.id?CLIENTES.find
   if(FC.receita_em)ficha.receita_em=FC.receita_em;
   const upd={nome:d.nome,cnpj:dg?fcCnpjFmt(dg):null,municipio:d.end.cidade||c?.municipio||null,uf:d.end.uf||c?.uf||null,doc_empresa:de,ficha,bpo_financeiro:s.fin,bpo_rh:s.rh,ativo:$('fc_ativo').checked};
   if($('fc_ben'))upd.bpo_beneficios=s.ben;
+  if($('fc_pmp'))upd.bpo_parceiros_mp=$('fc_pmp').checked;   // módulo Parceiros MP (Carol, 18/11; v158)
   if($('fc_matriz'))upd.matriz_id=$('fc_matriz').value||null;
   if(s.rh||s.ben){const fmA=c?.folha_modelo||{},b=d.ben,nv={...(fmA.beneficios||{}),tipos:b.tipos,forn:b.forn,dia_pedido:b.dia_pedido||null,entrega:b.entrega,
       entrega_end:b.entrega==='outro'?b.entrega_end:null,entrega_contato:b.entrega_contato||null,
@@ -7505,6 +7544,7 @@ const EXPT={
   rel:()=>expTela('viewRel','#relTable'),
   gc:()=>expTela('viewGC',$('gcHead').closest('table')),
   nf:()=>expTela('viewNF','.nfgrid table'),
+  pr:()=>expTela('viewPR','#prTab'),
   fat:()=>expTela('viewFat',$('ftHead').closest('table')),
   gt:()=>{
     // contas a pagar e a receber em páginas (15/11): exporta e imprime todas as linhas do filtro, não só a página aberta
@@ -7538,9 +7578,12 @@ const EXPT={
   rn:()=>{
     const l=rnFiltrados(),ord=rnOrdena(l);
     const rows=ord.map(it=>{const p=rnParc(it,it.empresa_id),nf=rnNf(it);return [it.nome.trim(),p?.cpf_cnpj||nf?.cpf_cnpj||'',it.guias==null?'':String(it.guias),+it.valor||0,rnLiq(it)??(+it.valor||0),RNSIT[rnSitDe(it)][0],it.empresa_id?rnEmpNome(it.empresa_id):'',RNST[rnStatus(it)][0],p?(p.titular||p.nome_global||''):'Parceiro não cadastrado',p?.banco||'',p?.agencia||'',p?.conta||'',p?.pix_chave||'',it.protocolo||'']});
+    // relatório novo (Parceiros MP): bruto, descontos e valor da NF no fim (Carol, 18/11)
+    const nfc=ord.some(i=>rnVNF(i)!=null);if(nfc)ord.forEach((it,i)=>rows[i].push(it.bruto!=null?+it.bruto:'',it.bruto!=null?+it.desconto_rel||0:'',rnVNF(it)??''));
+    const sm=k=>r2(ord.reduce((x,i)=>x+(+i[k]||0),0));
     return {titulo:`Repasse de parceiros ${RN.grupo?.nome||''}`.trim(),sub:expFiltros($('viewRN')),
-      H:['Parceiro','CPF/CNPJ','Guias','Valor','A pagar','Nota fiscal','Pagar em','Situação','Titular','Banco','Agência','Conta','Pix','Protocolo'],rows,
-      tot:rows.length?[[`${rows.length} ${rows.length===1?'parceiro':'parceiros'}`,'','',r2(ord.reduce((x,i)=>x+(+i.valor||0),0)),r2(ord.reduce((x,i)=>x+(rnLiq(i)??(+i.valor||0)),0)),'','','','','','','','','']]:[]};
+      H:['Parceiro','CPF/CNPJ','Guias','Valor','A pagar','Nota fiscal','Pagar em','Situação','Titular','Banco','Agência','Conta','Pix','Protocolo',...(nfc?['Bruto','Descontos','Valor da NF']:[])],rows,
+      tot:rows.length?[[`${rows.length} ${rows.length===1?'parceiro':'parceiros'}`,'','',r2(ord.reduce((x,i)=>x+(+i.valor||0),0)),r2(ord.reduce((x,i)=>x+(rnLiq(i)??(+i.valor||0)),0)),'','','','','','','','','',...(nfc?[sm('bruto'),sm('desconto_rel'),sm('liquidez')]:[])]]:[]};
   },
 };
 const expArq=(d,ext)=>`${d.titulo} ${expEmpresa()} ${dBR(TODAY).replace(/\//g,'-')}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,' ').trim()+'.'+ext;
@@ -14274,7 +14317,7 @@ function nsAbreEmit(lanc,base){
     <label class="f">Valor do serviço *<input class="money" inputmode="decimal" id="ns_valor" value="${showMoney(base?.valor??lanc?.valor)}"></label>
     <label class="f wide">Descrição do serviço *<textarea id="ns_desc" rows="3" maxlength="2000">${esc(base?.descricao||lanc?.descricao||sv.xDescServ||'')}</textarea></label>
     <label class="f wide">Informações complementares (opcional)<textarea id="ns_info" rows="2" maxlength="2000"></textarea></label></div>
-    <p class="note" style="margin:0">${esc(NSSN[e.op_simp_nac]||'')}: o ISS e os tributos federais são pagos no DAS, então a nota sai sem destaque de imposto, como a nº 13 emitida no site nacional.${lanc?` Fica ligada à receita “${esc(lanc.descricao)}”.`:''}</p>`,
+    <p class="note" style="margin:0">${esc(NSSN[e.op_simp_nac]||'')}: o ISS e os tributos federais são pagos no DAS, então a nota sai sem destaque de imposto, como a nº 13 emitida no site nacional.${Number(e.op_simp_nac)===3?' O percentual aproximado dos tributos sai com a alíquota efetiva do mês da competência, informada em “Dados fiscais”.':''}${lanc?` Fica ligada à receita “${esc(lanc.descricao)}”.`:''}</p>`,
     ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nsemite',Number(e.ambiente)===2?'Emitir nota de teste':'Emitir NFS-e','primary'));
   $('ns_cli').onchange=()=>{const c=ctCli($('ns_cli').value);if(!c)return;const f={...ctTomFicha(c),...(c.extra?.nfse||{})};
     $('ns_doc').value=nsDoc(f.doc||c.cnpj_cpf||'');$('ns_nome').value=f.nome||c.razao_social||c.nome||'';$('ns_email').value=f.email||c.email||'';$('ns_im').value=f.im||'';
@@ -14283,6 +14326,37 @@ function nsAbreEmit(lanc,base){
   if(!$('ns_doc').value)$('ns_doc').focus();
   if(base?._dup)dupMarca($('ctdBody').querySelector('.fields')||$('ctdBody'),['#ns_comp','~#ns_valor'],'Preencha a competência (veio em branco) e confira o valor.','O tomador, o serviço e a descrição vieram da nota original e podem ser alterados. A nota nova não fica ligada à receita da original.');
 }
+// ---- alíquota efetiva do Simples por mês (Carol, 18/11; v158): a contabilidade passa todo mês; todas as notas da competência usam a do mês
+const NSAQ={emit:null,l:[]};
+const nsAqPct=v=>String(+v).replace('.',',')+'%';
+async function nsAqCarrega(e){NSAQ.emit=e;const box=$('nc_aql');if(!box)return;
+  const {data,error}=await sb.from('nfse_aliquotas').select('*').eq('emitente_id',e.id).order('competencia',{ascending:false});
+  if(error){box.innerHTML=`<span class="neg">${/nfse_aliquotas/.test(error.message||'')||error.code==='42P01'||error.code==='PGRST205'?'Rode antes a atualização v158 do banco (Parceiros MP) no Supabase.':'Erro ao carregar as alíquotas.'}</span>`;return}
+  NSAQ.l=data||[];nsAqDesenha();
+  $('nc_aqm').onchange=()=>{const x=NSAQ.l.find(a=>a.competencia===$('nc_aqm').value);$('nc_aqv').value=x?String(+x.aliquota).replace('.',','):'';$('nc_aqo').value=x?.obs||''};$('nc_aqm').onchange();
+  $('nc_aqs').onclick=()=>nsAqSalva();
+  box.onclick=ev=>{const b=ev.target.closest('[data-aq]');if(!b)return;const x=NSAQ.l.find(a=>a.id===b.dataset.id);if(!x)return;
+    if(b.dataset.aq==='edita'){$('nc_aqm').value=x.competencia;$('nc_aqm').onchange();$('nc_aqv').focus();return}
+    if(b.dataset.aq==='exclui')nsAqExclui(x)}}
+function nsAqDesenha(){const box=$('nc_aql');if(!box)return;const atual=TODAY.slice(0,7),tem=NSAQ.l.some(a=>a.competencia===atual);
+  box.innerHTML=(Number(NSAQ.emit?.op_simp_nac)===3&&!tem?`<p class="note" style="margin:0 0 6px"><span class="chip c-bad">Falta</span> Informe a alíquota de ${MESES[+atual.slice(5)-1].toLowerCase()}/${atual.slice(0,4)} para emitir as notas deste mês.</p>`:'')
+    +(NSAQ.l.length?`<div class="tablebox"><table><thead><tr><th class="l">Mês</th><th>Alíquota efetiva</th><th class="l">Observação</th><th class="l">Atualizada em</th><th></th></tr></thead><tbody>${NSAQ.l.map(a=>`<tr><td class="l"><b>${MESES[+a.competencia.slice(5)-1]}/${a.competencia.slice(0,4)}</b></td><td><b>${nsAqPct(a.aliquota)}</b></td><td class="l">${esc(a.obs||'')}</td><td class="l muted">${dtBR(a.atualizado_em)}</td><td style="white-space:nowrap"><button type="button" class="btn small ghost" data-aq="edita" data-id="${a.id}">Alterar</button> <button type="button" class="btn small ghost" data-aq="exclui" data-id="${a.id}">Excluir</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:0">Nenhuma alíquota informada ainda.</p>')}
+async function nsAqSalva(){const e=NSAQ.emit,comp=$('nc_aqm').value,v=parseMoney($('nc_aqv').value),obs=$('nc_aqo').value.trim()||null;
+  if(!/^\d{4}-\d{2}$/.test(comp))return ctErr('Escolha o mês.');if(!(v>=0&&v<100)||$('nc_aqv').value.trim()==='')return ctErr('Informe a alíquota em %, por exemplo 6,54.');
+  const ant=NSAQ.l.find(a=>a.competencia===comp);if(ant&&+ant.aliquota!==v&&!confirm(`Trocar a alíquota de ${MESES[+comp.slice(5)-1].toLowerCase()}/${comp.slice(0,4)} de ${nsAqPct(ant.aliquota)} para ${nsAqPct(v)}? Vale para as próximas notas desse mês; as já emitidas não mudam.`))return;
+  const {data,error}=await sb.from('nfse_aliquotas').upsert({emitente_id:e.id,competencia:comp,aliquota:v,obs,criado_por:ant?.criado_por||ME?.user_id||null,atualizado_em:new Date().toISOString()},{onConflict:'emitente_id,competencia'}).select().single();
+  if(error)return ctErr('Não foi possível salvar: '+error.message);
+  NSAQ.l=[...NSAQ.l.filter(a=>a.competencia!==comp),data].sort((a,b)=>b.competencia.localeCompare(a.competencia));nsAqDesenha();
+  toastDesfazer(`Alíquota de ${MESES[+comp.slice(5)-1].toLowerCase()}/${comp.slice(0,4)}: ${nsAqPct(v)}`,async()=>{
+    const r=ant?await sb.from('nfse_aliquotas').update({aliquota:ant.aliquota,obs:ant.obs,atualizado_em:ant.atualizado_em}).eq('id',data.id).select().single():await sb.from('nfse_aliquotas').delete().eq('id',data.id);
+    if(r.error)return fail(r.error);NSAQ.l=NSAQ.l.filter(a=>a.id!==data.id);if(ant)NSAQ.l.push(r.data);NSAQ.l.sort((a,b)=>b.competencia.localeCompare(a.competencia));nsAqDesenha();toast('Desfeito')})}
+async function nsAqExclui(x){if(!confirm(`Excluir a alíquota de ${MESES[+x.competencia.slice(5)-1].toLowerCase()}/${x.competencia.slice(0,4)} (${nsAqPct(x.aliquota)})? Sem ela, as notas desse mês não podem ser emitidas.`))return;
+  const {error}=await sb.from('nfse_aliquotas').delete().eq('id',x.id);if(error)return fail(error);NSAQ.l=NSAQ.l.filter(a=>a.id!==x.id);nsAqDesenha();
+  toastDesfazer('Alíquota excluída',async()=>{const {id,...r}=x;const {data,error:e2}=await sb.from('nfse_aliquotas').insert(r).select().single();if(e2)return fail(e2);NSAQ.l.push(data);NSAQ.l.sort((a,b)=>b.competencia.localeCompare(a.competencia));nsAqDesenha();toast('Desfeito')})}
+// a alíquota da competência para a emissão (só Simples ME/EPP); null = falta informar
+async function nsAqDoMes(e,comp){if(Number(e?.op_simp_nac)!==3)return {usa:false};
+  const {data,error}=await sb.from('nfse_aliquotas').select('aliquota').eq('emitente_id',e.id).eq('competencia',String(comp).slice(0,7)).maybeSingle();
+  if(error)throw error;return {usa:true,aliquota:data?+data.aliquota:null}}
 async function nsEmite(bt){
   const {lanc,base}=CTL.dlg.obj||{},doc=nsSo(ctV('ns_doc')),valor=parseMoney($('ns_valor').value),e=nsEmitDe($('ns_emit').value);
   if(doc.length!==14&&doc.length!==11)return ctErr('Confira o CNPJ (14 números) ou CPF (11 números) do tomador.');
@@ -14295,7 +14369,11 @@ async function nsEmite(bt){
   if((end.cep||end.cMun||end.xLgr)&&!(end.cep.length===8&&end.cMun.length===7&&end.xLgr))return ctErr('Endereço do tomador: preencha CEP (8 números), código IBGE da cidade (7 números) e rua, ou deixe tudo em branco.');
   const tomador={doc,nome:ctV('ns_nome'),email:ctV('ns_email'),im:ctV('ns_im'),cliente_id:$('ns_cli').value||null,...(end.cep?{end}:{})};
   const teste=Number(e.ambiente)===2;
-  if(!confirm(`${teste?'Emitir nota de TESTE (não vale)':'Emitir NFS-e'} de ${fm(valor)} para ${tomador.nome}?${teste?'':' Depois de emitida, só dá para corrigir cancelando e emitindo outra.'}`))return;
+  // alíquota efetiva do Simples do mês da competência (Carol, 18/11): sem ela não emite
+  let aq;try{aq=await nsAqDoMes(e,ctV('ns_comp'))}catch(x){return ctErr(/nfse_aliquotas/.test(x.message||'')||x.code==='PGRST205'?'Rode antes a atualização v158 do banco (alíquota do mês).':'Não consegui conferir a alíquota do mês: '+(x.message||x))}
+  const cm=ctV('ns_comp').slice(0,7),cmTxt=`${MESES[+cm.slice(5)-1].toLowerCase()}/${cm.slice(0,4)}`;
+  if(aq.usa&&aq.aliquota==null)return ctErr(`Informe a alíquota de ${cmTxt} em “Dados fiscais” (${e.nome}) antes de emitir. A contabilidade passa a alíquota efetiva todo mês.`);
+  if(!confirm(`${teste?'Emitir nota de TESTE (não vale)':'Emitir NFS-e'} de ${fm(valor)} para ${tomador.nome}?${aq.usa?` Alíquota de ${cmTxt}: ${nsAqPct(aq.aliquota)}.`:''}${teste?'':' Depois de emitida, só dá para corrigir cancelando e emitindo outra.'}`))return;
   bt.disabled=true;bt.textContent='Emitindo…';
   try{
     const r=await nsFn({acao:'emitir',emitente_id:e.id,tomador,valor,competencia:ctV('ns_comp'),descricao:ctV('ns_desc'),info_compl:ctV('ns_info')||undefined,servico:{cTribNac:trib},ctl_lancamento_id:lanc?.id||base?.ctl_lancamento_id||null});
@@ -14549,9 +14627,13 @@ function nsAbreCfg(id){
     <label class="f wide">Ambiente<select id="nc_amb">${ctOpts(NSAMB,String(e?.ambiente||2))}</select></label>
     <label class="f">Série da DPS<input id="nc_serie" value="${esc(e?.serie||'1')}" title="A série 70000 é a do site nacional. O portal usa outra para os números não baterem."></label>
     <label class="f">Próximo número da DPS<input id="nc_prox" inputmode="numeric" value="${esc(e?.proximo_ndps||1)}"></label></div>
+    ${e?`<div class="card" style="padding:10px 12px;margin-top:12px;display:grid;gap:8px"><b>Alíquota do mês</b><span class="muted" style="font-size:13px">${Number(e.op_simp_nac)===3?'Alíquota efetiva do Simples que a contabilidade passa todo mês. Todas as notas com competência naquele mês usam essa alíquota. Sem a alíquota do mês, o portal não deixa emitir.':'Só é usada no Simples Nacional (ME/EPP). Para este regime, as notas não usam a alíquota do mês.'}</span>
+      <div class="row" style="gap:8px;align-items:flex-end;flex-wrap:wrap"><label class="f">Mês<input type="month" id="nc_aqm" value="${TODAY.slice(0,7)}"></label><label class="f">Alíquota efetiva (%)<input id="nc_aqv" inputmode="decimal" placeholder="Ex.: 6,54" style="max-width:120px"></label><label class="f" style="flex:1 1 180px">Observação<input id="nc_aqo" placeholder="Ex.: passada pela contabilidade em 05/12"></label><button type="button" class="btn primary" id="nc_aqs">Salvar alíquota</button></div>
+      <div id="nc_aql"><span class="muted">Carregando as alíquotas…</span></div></div>`:''}
     <div class="card" style="padding:10px 12px;margin-top:12px;display:grid;gap:6px"><b>Certificado digital A1</b><span class="muted" style="font-size:13px">Fica guardado criptografado no cofre do Supabase, nunca no navegador nem no GitHub. A senha fica em Edge Functions › Secrets com o nome NFSE_SENHA_${esc(nsSo(e?.cnpj)||'CNPJ')}.</span><div id="nc_teste"></div><div>${e?ctBtn('nstesta','Testar certificado e conexão'):''}</div></div>`,
     ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nssalvacfg','Salvar','primary'));
   $('nc_qual').onchange=()=>nsAbreCfg($('nc_qual').value);
+  if(e)nsAqCarrega(e);
   // empresa do portal com a ficha preenchida (Configurações › Cadastro de empresas): completa os campos vazios (Carol 18/11)
   $('nc_cli').onchange=()=>{const c=(typeof CLIENTES!=='undefined'?CLIENTES:[]).find(x=>x.id===$('nc_cli').value);if(!c||typeof fcDados!=='function')return;
     const d=fcDados(c),en=d.end,poe=(id,v)=>{const el=$(id);if(el&&v&&!el.value.trim()&&!el.readOnly)el.value=v};
@@ -15001,6 +15083,24 @@ const MANUAL=[
 <li><b>Na hora do lançamento:</b> nas contas a pagar e a receber, na conciliação e na movimentação, use <b>+ Cadastrar</b> embaixo do campo Fornecedor ou Cliente.</li>
 <li>Nos boletos e notas a pagar, no cartão e na tesouraria, ao digitar o fornecedor aparecem os nomes do cadastro para escolher.</li>
 </ul>`}]},
+  {g:'Parceiros MP',itens:[
+    {k:'gfrepasse',t:'Repasse da semana',img:'gfrepasse.png',
+      txt:`<p>O módulo <b>Parceiros MP</b> aparece só nas empresas com o serviço “Parceiros MP” marcado na ficha da empresa (ou na coluna Parceiros MP de Configurações › Cadastro de empresas).</p>
+<ol><li>Clique em <b>Importar relatório de repasses</b> e escolha o relatório de repasse em Excel (colunas Data, Parceiro, Identificador, Bruto, Repasse, Descontos…).</li>
+<li>Só entram as linhas com situação <b>Pendente</b>. Parceiro repetido vira uma linha só, com os valores somados.</li>
+<li>O <b>valor a pagar</b> é a coluna Repasse. Embaixo dele aparece o <b>valor da NF</b>: Bruto − (Repasse + Descontos). Ex.: bruto R$ 1.170,00, repasse R$ 870,00 e desconto R$ 0,00 dão NF de R$ 300,00.</li>
+<li>Marque os repasses e use <b>Pagar em</b> (empresa), <b>Marcar como pago</b> ou <b>Gerar remessa</b>, como antes.</li></ol>`},
+    {k:'gfnf',t:'Notas fiscais dos parceiros',img:'gfnf.png',
+      txt:`<p>Em <b>Repasses pagos: notas a emitir</b> aparecem todas as clínicas pagas, separadas pela empresa que pagou, com o repasse e o <b>valor da NF</b>.</p>
+<ul><li><b>Selecionar quem emite NF</b> marca de uma vez as clínicas que já emitiram nota antes.</li>
+<li><b>NF emitida</b> (na linha ou para as marcadas): informe a data e, se quiser, o número. A nota entra no mês da emissão na tabela de baixo, e o parceiro fica guardado como “Emite NF”.</li>
+<li><b>Não emite</b>: o repasse sai das notas a emitir e o parceiro fica guardado como “Não emitir NF”.</li>
+<li>A coluna <b>No parceiro</b> mostra o que está guardado; nos próximos repasses já vem preenchido. Tudo tem <b>Desfazer</b>.</li></ul>`},
+    {k:'gfrestit',t:'Restituições efetuadas',img:'gfrestit.png',
+      txt:`<p>Relatório dos repasses já pagos, pela data do pagamento: empresa que pagou, conta, forma, valor pago, bruto, descontos, valor da NF e se a nota foi emitida.</p>
+<ul><li>Filtre pelo período, empresa, conta, forma e nota fiscal; a busca acha por qualquer coluna.</li>
+<li>Os quadros do alto somam o que está no filtro. Use <b>Exportar</b> para Excel ou PDF, ou <b>Imprimir</b>.</li>
+<li>Relatórios antigos (antes do relatório novo) não trazem o bruto e aparecem com “—”.</li></ul>`}]},
   {g:'Comunicação',itens:[
     {k:'tarefas',t:'Tarefas e recados',img:'tarefas.png',
       txt:`<p>Um quadro com as tarefas da equipe e os recados trocados com os clientes, em quatro colunas: <b>A fazer</b>, <b>Em andamento</b>, <b>Aguardando terceiros</b> e <b>Concluída</b>.</p>
@@ -15622,6 +15722,12 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18parceirosmp',data:'2026-11-18',t:'Módulo Parceiros MP e notas fiscais dos parceiros',itens:[
+    {x:'Novo módulo Parceiros MP no alto, com Repasse da semana, Notas fiscais dos parceiros, Restituições efetuadas e o cadastro de Parceiros. Ele aparece só nas empresas com o serviço “Parceiros MP” marcado na ficha da empresa (ou na coluna Parceiros MP de Configurações › Cadastro de empresas). Os parceiros saíram da Gestão financeira: as outras empresas usam o cadastro de fornecedores.',mods:['gfrepasse','gfnf','gfrestit','repasse'],para:'esc'},
+    {x:'Repasse da semana: “Importar relatório de repasses” aceita o relatório novo (Data, Parceiro, Identificador, Bruto, Repasse, Descontos…). Só entram as linhas com situação Pendente. O valor a pagar é a coluna Repasse, e o valor da nota fiscal é Bruto − (Repasse + Descontos), que aparece embaixo do valor de cada parceiro. O relatório antigo continua funcionando.',mods:['gfrepasse']},
+    {x:'Notas fiscais dos parceiros: em “Repasses pagos: notas a emitir” aparecem todas as clínicas pagas, separadas pela empresa que pagou, com o valor da NF. Marque as que serão emitidas e use “NF emitida”, ou “Não emite”. A escolha fica guardada no parceiro (Emite NF ou Não emitir NF) e já vem preenchida nos próximos repasses. “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.',mods:['gfnf']},
+    {x:'Novo relatório Restituições efetuadas: os repasses pagos, pela data do pagamento, com a empresa, a conta e a forma, o valor pago, o bruto, os descontos, o valor da NF e se a nota foi emitida. Filtros por período, empresa, conta, forma e nota fiscal, busca em todos os campos, Excel, PDF e impressão.',mods:['gfrestit']},
+    {x:'NFS-e: em “Dados fiscais” entrou o quadro “Alíquota do mês”, onde vai a alíquota efetiva do Simples que a contabilidade passa todo mês. Todas as notas com competência no mês usam essa alíquota. Sem a alíquota do mês, o portal não deixa emitir e avisa qual mês falta.',para:'esc'}]},
   {k:'2026-11-18duplicar',data:'2026-11-18',t:'Duplicar lançamentos',itens:[
     {x:'Todo lançamento tem o símbolo ⧉ na linha (junto do 👁) e o botão ⧉ Duplicar dentro do lançamento aberto: contas a pagar e a receber, Movimentação, extrato da conta, fatura do cartão, boletos e notas, tesouraria, cartão de crédito, saídas do caixa, folha, financeiro da Controlacs e notas fiscais (NFS-e).'},
     {x:'Abre um lançamento novo já preenchido. As datas, o nº do documento, a competência e a observação vêm em branco (destacados em amarelo); o resto vem do original e pode ser alterado. Anexos, pagamentos e conciliação não são copiados. Depois de salvar, ↶ Desfazer apaga a cópia.'}]},
@@ -16667,7 +16773,7 @@ function rnDesenha(){
     const jaTag=jaPg?`<br><span class="rnjatag pg" title="Este repasse já foi pago: não pague de novo">✓ Já pago${it.empresa_id?' · '+esc(rnEmpNome(it.empresa_id)):''}</span>`:jaSep?`<br><span class="rnjatag" title="Este repasse já está separado nesta empresa, com a conta a pagar criada">➜ Já separado em ${esc(rnEmpNome(it.empresa_id))}</span>`:'';
     return `<tr data-id="${it.id}"${cls?` class="${cls}"`:''}><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
       <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${jaTag}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}${dsx?`<div class="rndescbox">⚠ <b>Desconto a fazer neste repasse</b>${ds.map(d=>`<br>${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''} <button type="button" class="btn small ghost" data-rn="descFeito" data-desc="${d.id}">Desconto feito</button>`).join('')}<br><b>Pagar ${fm(r2(rnLiq(it)-ds.reduce((x,d)=>x+(+d.valor),0)))}</b>${t?'<br><span class="muted">Clique em Desconto feito para tirar da conta a pagar agora. Ao gerar a remessa por aqui, ele sai sozinho.</span>':'<br><span class="muted">O desconto sai sozinho do valor ao criar a conta a pagar e ao gerar a remessa (a remessa vai com o valor líquido).</span>'}</div>`:''}</td>
-      <td>${it.guias??''}</td><td>${t&&Math.abs(+t.valor-(+it.valor))>0.004?`<span class="muted" style="text-decoration:line-through" title="Valor do relatório">${fm(it.valor)}</span><br><b title="Valor a pagar, já com o desconto">${fm(t.valor)}</b><br><span class="chip c-warn" title="Desconto já tirado da conta a pagar">− ${fm(r2(+it.valor-(+t.valor)))} desconto</span>`:`<b>${fm(it.valor)}</b>`}</td><td class="l">${opSit(it)}</td>
+      <td>${it.guias??''}</td><td>${t&&Math.abs(+t.valor-(+it.valor))>0.004?`<span class="muted" style="text-decoration:line-through" title="Valor do relatório">${fm(it.valor)}</span><br><b title="Valor a pagar, já com o desconto">${fm(t.valor)}</b><br><span class="chip c-warn" title="Desconto já tirado da conta a pagar">− ${fm(r2(+it.valor-(+t.valor)))} desconto</span>`:`<b>${fm(it.valor)}</b>`}${rnVNF(it)!=null?`<br><span class="muted" style="white-space:nowrap" title="Valor da nota fiscal: bruto ${fm(it.bruto)} − repasse ${fm(it.valor)} − descontos ${fm(+it.desconto_rel||0)}">NF ${fm(rnVNF(it))}</span>`:''}</td><td class="l">${opSit(it)}</td>
       <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${alt?rnAltBox(alt,it):''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
       <td>${opEmp(it)}</td><td class="l">${ct}</td><td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td></tr>`};
   const O=rnOrd(),th=(k,t,c)=>`<th${c?` class="${c}"`:''} data-ord="${k}" style="cursor:pointer;user-select:none;white-space:nowrap" title="Clique para ordenar por ${t.toLowerCase()} (clique de novo para inverter)">${t}${O.k===k?(O.d>0?' ▲':' ▼'):' <span class="muted" style="opacity:.5">↕</span>'}</th>`;
@@ -16680,6 +16786,8 @@ function rnDesenha(){
   $('rnTiles').innerHTML=[['Repasses',fm(soma(it)),`${it.length} parceiros${Math.abs(brutoRel-soma(it))>0.004?` · relatório ${fm(brutoRel)}, menos ${fm(r2(brutoRel-soma(it)))} de descontos`:''}`,'f:todos'],['Emitem NF',fm(soma(por('emite'))),`${por('emite').length} parceiros`,'f:emite'],['Não emitem NF',fm(soma(por('nao'))),`${por('nao').length} parceiros`,'f:nao'],
     ...(por('sem').length?[['Não encontrados',fm(soma(por('sem'))),`${por('sem').length} parceiros · escolha a situação`,'f:sem']]:[]),
     ...G.empresas.map(id=>{const l=it.filter(i=>i.empresa_id===id);return [esc(rnEmpNome(id)),fm(soma(l)),`${l.length} ${l.length===1?'repasse':'repasses'}${l.length?' · '+l.filter(i=>i.titulo_id).length+' com conta a pagar':''}`,'e:'+id]}),
+    // relatório novo (Parceiros MP): quanto dá de notas fiscais (Bruto − Repasse − Descontos) (Carol, 18/11)
+    ...(it.some(i=>rnVNF(i)!=null)?[['Valor das notas fiscais',fm(r2(it.reduce((x,i)=>x+(rnVNF(i)||0),0))),'bruto − repasse − descontos','n:nf']]:[]),
     ['Sem empresa',fm(soma(semE)),semE.length?`${semE.length} para escolher`:'todos escolhidos','e:-'],
     ...(()=>{const l=it.filter(i=>!rnPago(i)&&rnAlt(i));return l.length?[['Alteração de conta',String(l.length),'conferir antes de pagar','f:alt']]:[]})(),
     ...(()=>{const l=it.filter(i=>!rnPago(i)&&rnDescPend(rnParc(i,i.empresa_id)).length);return l.length?[['Desconto a fazer',String(l.length),'descontar antes de pagar','f:desc']]:[]})(),
@@ -16716,7 +16824,7 @@ $('rnHead').addEventListener('click',e=>{const t=e.target.closest('[data-ord]');
   try{localStorage.setItem(RNORDK,JSON.stringify({k,d:O.k===k?-O.d:1}))}catch(e){}rnDesenha()});
 ['rnFiltro','rnSitF','rnPixF','rnEmpF'].forEach(msFiltro);
 // filtros com caixinhas nas outras telas (Carol, 12/11: “todos os filtros, para escolher mais de um”)
-const MS_TELAS=['gtFiltro','mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','gcFiltro','pFiltro','nfFiltro','nfEmp','nfPgF','pjSit','pjTipo','tResp','fFiltro','cbFiltro','cvBand'];
+const MS_TELAS=['prEmp','prConta','prForma','prNF','gtFiltro','mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','gcFiltro','pFiltro','nfFiltro','nfEmp','nfPgF','pjSit','pjTipo','tResp','fFiltro','cbFiltro','cvBand'];
 MS_TELAS.forEach(id=>{try{msFiltro(id)}catch(e){console.error('msFiltro',id,e)}});
 ['rnLote','rnDe','rnAte'].forEach(id=>$(id).onchange=()=>renderRN(false));
 $('rnFiltro').onchange=$('rnEmpF').onchange=$('rnSitF').onchange=$('rnPixF').onchange=()=>rnDesenha();
@@ -16883,6 +16991,7 @@ async function rnSituacao(it,sit){
 function rnLeRelatorio(wb){
   const ws=wb.Sheets[wb.SheetNames[0]],L=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
   const txt=v=>v==null?'':String(v).replace(/ /g,' ').trim();
+  const novo=rnLeRelNovo(L,txt);if(novo)return novo;
   let h=-1,col={};
   for(let r=0;r<L.length&&h<0;r++){const row=L[r]||[];const ix=k=>row.findIndex(c=>chave(txt(c)).startsWith(k));
     if(ix('empresa')>=0&&ix('protocolo')>=0){h=r;col={nome:ix('empresa'),guias:ix('guias'),valor:ix('valor'),prot:ix('protocolo'),alt:ix('ultima altera')}}}
@@ -16901,18 +17010,40 @@ function rnLeRelatorio(wb){
   }
   return {data,itens:out};
 }
+// relatório novo do repasse (Parceiros MP, Carol 18/11): Data, Parceiro, Identificador, Bruto, Repasse, Prestação Serviço, Doação, Descontos,
+// Atendimentos e Situação. Repasse = valor a pagar; Bruto e Descontos só para a conta da NF: valor da NF = Bruto − (Repasse + Descontos).
+// As outras colunas não entram. Só entram as linhas com Situação “Pendente” (pagamento ainda não feito; Carol 18/11); as outras são contadas no aviso.
+function rnLeRelNovo(L,txt){
+  let h=-1,col={};
+  for(let r=0;r<L.length&&h<0;r++){const row=(L[r]||[]).map(c=>chave(txt(c)));const ix=k=>row.findIndex(c=>c===k||c.startsWith(k));
+    if(ix('parceiro')>=0&&ix('bruto')>=0&&ix('repasse')>=0){h=r;col={nome:ix('parceiro'),id:ix('identificador'),bruto:ix('bruto'),rep:ix('repasse'),desc:ix('desconto'),data:ix('data'),sit:ix('situacao')}}}
+  if(h<0)return null;
+  const num=v=>v==null||txt(v)===''?0:typeof v==='number'?v:parseMoney(String(v));
+  const dt=v=>v instanceof Date?v.toISOString().slice(0,10):/^(\d{2})\/(\d{2})\/(\d{4})/.test(txt(v))?txt(v).replace(/^(\d{2})\/(\d{2})\/(\d{4}).*/,'$3-$2-$1'):/^\d{4}-\d{2}-\d{2}/.test(txt(v))?txt(v).slice(0,10):null;
+  const out=[];let fora=0,data=null;
+  for(const row of L.slice(h+1)){if(!row)continue;const nome=txt(row[col.nome]);if(!nome||/^total/i.test(nome))continue;
+    if(col.sit>=0&&!chave(txt(row[col.sit])).startsWith('pendente')){fora++;continue}
+    const valor=r2(num(row[col.rep]));if(!(valor>0))continue;
+    const bruto=r2(num(row[col.bruto])),desc=col.desc>=0?r2(num(row[col.desc])):0,d=col.data>=0?dt(row[col.data]):null;if(d&&(!data||d>data))data=d;
+    out.push({nome,guias:null,valor,protocolo:col.id>=0?txt(row[col.id])||null:null,alterado_em:d,bruto,desconto_rel:desc,liquidez:r2(bruto-(valor+desc)),data_rel:d});
+  }
+  return {data,itens:out,novo:true,fora};
+}
+// valor da NF do repasse (relatório novo): Bruto − (Repasse + Descontos); null nos relatórios antigos, que não trazem o bruto
+const rnVNF=it=>it&&it.liquidez!=null&&it.bruto!=null?+it.liquidez:null;
 // parceiro repetido no relatório (mesmo nome): soma numa linha só, para pagar uma vez (Carol, 05/11).
 // Os protocolos ficam juntos ("W1 / W2"), para o próximo relatório saber que todos já entraram.
 function rnJunta(ls){const por=new Map();
   for(const i of ls){const k=chave(i.nome.trim()),j=por.get(k);
     if(!j){por.set(k,{...i,_n:1,_prots:i.protocolo?[i.protocolo]:[]});continue}
-    j._n++;j.valor=r2(j.valor+i.valor);j.guias=j.guias==null&&i.guias==null?null:(j.guias||0)+(i.guias||0);
+    j._n++;j.valor=r2(j.valor+i.valor);if(i.bruto!=null){j.bruto=r2((+j.bruto||0)+i.bruto);j.desconto_rel=r2((+j.desconto_rel||0)+(+i.desconto_rel||0));j.liquidez=r2((+j.liquidez||0)+(+i.liquidez||0))}j.guias=j.guias==null&&i.guias==null?null:(j.guias||0)+(i.guias||0);
     if(i.protocolo)j._prots.push(i.protocolo);if(i.alterado_em&&(!j.alterado_em||String(i.alterado_em)>String(j.alterado_em)))j.alterado_em=i.alterado_em}
   const out=[...por.values()],rep=out.filter(j=>j._n>1);
   return {itens:out.map(({_n,_prots,...j})=>_n>1?{...j,protocolo:_prots.join(' / ')||null}:j),rep:rep.map(j=>({nome:j.nome.trim(),n:j._n,valor:j.valor}))}}
 $('rnArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!RN.grupo)return;
   let rel;try{rel=rnLeRelatorio(XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true}))}catch(err){console.error(err);return alert(err.message||'Não foi possível ler o arquivo.')}
-  if(!rel.itens.length)return alert('O arquivo não tem repasses.');
+  if(!rel.itens.length)return alert('O arquivo não tem repasses'+(rel.fora?` pendentes (${rel.fora} com outra situação ficaram de fora).`:'.'));
+  if(rel.novo&&rel.itens.some(i=>i.bruto!=null)){try{const {error:ev}=await sb.from('repasse_itens').select('bruto').limit(1);if(ev)throw ev}catch(x){return alert('Para importar o relatório novo (com Bruto, Repasse e Descontos), rode antes a atualização v158 do banco (Parceiros MP) no Supabase.')}}
   // o relatório traz os pendentes: o que já veio num relatório anterior não entra de novo
   const prots=rel.itens.map(i=>i.protocolo).filter(Boolean),ja=new Set();
   try{for(let i=0;i<prots.length;i+=200){const {data,error}=await sb.from('repasse_itens').select('protocolo').eq('grupo_id',RN.grupo.id).in('protocolo',prots.slice(i,i+200));if(error)throw error;data.forEach(x=>ja.add(x.protocolo))}
@@ -16924,7 +17055,8 @@ $('rnArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f|
   if(!novos0.length)return alert(`Todos os ${rel.itens.length} repasses deste relatório já foram importados.`);
   const jn=rnJunta(novos0),novos=jn.itens,jaN=rel.itens.length-novos0.length;
   const repTxt=jn.rep.length?`\n\nParceiros repetidos somados numa linha só (um pagamento para cada):\n`+jn.rep.slice(0,15).map(r=>`• ${r.nome}: ${r.n} linhas · ${fm(r.valor)}`).join('\n')+(jn.rep.length>15?`\n… e mais ${jn.rep.length-15}`:''):'';
-  if(!confirm(`Relatório de ${rel.data?dBR(rel.data):'data não informada'}: ${rel.itens.length} repasses, ${fm(tot)}.`+(jaN?`\n${jaN} já estavam num relatório anterior e não entram de novo.`:'')+repTxt+`\n\nImportar ${novos.length} repasses?`))return;
+  const totNF=rel.novo?r2(novos.reduce((x,i)=>x+(+i.liquidez||0),0)):0;
+  if(!confirm(`Relatório de ${rel.data?dBR(rel.data):'data não informada'}: ${rel.itens.length} repasses, ${fm(tot)}.`+(rel.novo?`\nValor das notas fiscais (Bruto − Repasse − Descontos): ${fm(totNF)}.`:'')+(rel.fora?`\n${rel.fora} ${rel.fora===1?'linha':'linhas'} com situação diferente de Pendente ${rel.fora===1?'ficou':'ficaram'} de fora.`:'')+(jaN?`\n${jaN} já estavam num relatório anterior e não entram de novo.`:'')+repTxt+`\n\nImportar ${novos.length} repasses?`))return;
   try{
     const {data:lote,error}=await sb.from('repasse_lotes').insert({grupo_id:RN.grupo.id,data_relatorio:TODAY,arquivo:f.name,vencimento:proxQuinta()}).select().single();if(error)throw error;
     const rows=novos.map(i=>{const [nf,via]=rnAcha(i.nome,RN.nf,rnNfNomes);return {...i,lote_id:lote.id,grupo_id:RN.grupo.id,parceiro_nf_id:nf?.id||null,nf_via:nf?via:null}});
@@ -17279,6 +17411,62 @@ const NF={grupos:[],grupo:null,parc:[],nfs:[],ano:+TODAY.slice(0,4),dlg:null};
 const MES3=MESES.map(m=>m.slice(0,3));
 const v77=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/nf_mensal/.test(e.message||''));
 const v77Msg='Esta tela precisa da atualização v77 do banco (Controle de notas fiscais). Rode o SQL no Supabase.';
+// ---- Parceiros MP › Restituições efetuadas (Carol, 18/11): os repasses pagos, a partir dos pagamentos (fin_movimentos das contas a pagar do repasse)
+const PR={key:'',grupo:null,itens:[],contas:[]};
+async function renderPR(){
+  const cli=cliAtual();const vazio=t=>{$('prTiles').innerHTML='';$('prHead').innerHTML='';$('prFoot').innerHTML='';$('prBody').innerHTML=`<tr><td class="l muted">${t}</td></tr>`;$('prNote').textContent=''};
+  if(!cli)return vazio('Escolha uma empresa no alto.');
+  if(!$('prDe').value)$('prDe').value=TODAY.slice(0,8)+'01';if(!$('prAte').value)$('prAte').value=TODAY;
+  let gs;try{const {data,error}=await sb.from('repasse_grupos').select('*').order('nome');if(error)throw error;gs=data||[]}catch(e){console.error(e);return vazio(v75(e)?v75Msg:'Erro ao carregar. Verifique a internet e tente de novo.')}
+  const G=gs.find(g=>(g.empresas||[]).includes(cli.id));if(!G)return vazio(`${esc(cli.nome)} ainda não está em nenhum grupo de repasse. Crie o grupo em Repasse da semana › Empresas do grupo.`);
+  const ini=new Date($('prDe').value+'T12:00:00');ini.setDate(ini.getDate()-150);const desde=isoLocal(ini),key=G.id+'|'+desde;
+  if(PR.key!==key){vazio('Carregando as restituições pagas…');
+    try{const its=await todas(()=>sb.from('repasse_itens').select('*').eq('grupo_id',G.id).not('titulo_id','is',null).gte('criado_em',desde).order('nome'));
+      const ids=[...new Set(its.map(i=>i.titulo_id))],tits={};
+      for(let i=0;i<ids.length;i+=200){const c=ids.slice(i,i+200);
+        const [t,m]=await Promise.all([sb.from('fin_titulos').select('id,valor,cliente_id').in('id',c),sb.from('fin_movimentos').select('titulo_id,valor,juros,desconto,data,conta_id,forma').in('titulo_id',c)]);
+        if(t.error)throw t.error;if(m.error)throw m.error;t.data.forEach(x=>tits[x.id]={valor:+x.valor,pago:0,data:null,contas:new Set(),formas:new Set()});
+        m.data.forEach(x=>{const tt=tits[x.titulo_id];if(!tt)return;tt.pago=r2(tt.pago+abat(x));if(!tt.data||x.data>tt.data)tt.data=x.data;if(x.conta_id)tt.contas.add(x.conta_id);if(x.forma)tt.formas.add(x.forma)})}
+      const [pa,ct,lt]=await Promise.all([todas(()=>sb.from('parceiros_nf').select('*').eq('grupo_id',G.id)),todas(()=>sb.from('fin_contas').select('id,cliente_id,nome').in('cliente_id',G.empresas||[])),todas(()=>sb.from('repasse_lotes').select('id,data_relatorio').eq('grupo_id',G.id).gte('criado_em',desde))]);
+      const lotes=Object.fromEntries(lt.map(l=>[l.id,l.data_relatorio]));
+      PR.itens=its.filter(i=>tits[i.titulo_id]?.data).map(i=>{const t=tits[i.titulo_id];return {...i,pago_em:t.data,pago:t.pago,tvalor:t.valor,parcial:t.pago<t.valor-0.004,contas:[...t.contas],formas:[...t.formas],lote_data:lotes[i.lote_id]||null}});
+      PR.parc=pa;PR.contas=ct;PR.grupo=G;PR.key=key;
+    }catch(e){console.error(e);return vazio(v75(e)?v75Msg:'Erro ao carregar as restituições. Verifique a internet e tente de novo.')}}
+  // opções dos filtros (empresa do alto já vem escolhida)
+  const se=(id,ops,todos)=>{const el=$(id),v=msVals(el);el.innerHTML=`<option value="">${todos}</option>`+ops.map(([k,t])=>`<option value="${esc(k)}">${esc(t)}</option>`).join('');if(el._msdd)msSet(el,v.filter(x=>ops.some(o=>o[0]===x)));else el.value=ops.some(o=>o[0]===v[0])?v[0]:''};
+  const emps=G.empresas||[];se('prEmp',emps.map(id=>[id,rnEmpNome(id)]),'Todas do grupo');if(PR.cli!==cli.id){PR.cli=cli.id;const el=$('prEmp');if(el._msdd)msSet(el,[cli.id]);else el.value=cli.id}
+  se('prConta',PR.contas.map(c=>[c.id,`${c.nome} · ${rnEmpNome(c.cliente_id)}`]),'Todas');
+  se('prForma',[...new Set(PR.itens.flatMap(i=>i.formas))].sort().map(f=>[f,f]),'Todas');
+  $('prSub').textContent=`Grupo ${G.nome}${emps.length>1?' ('+emps.map(rnEmpNome).join(', ')+')':''}. Os repasses de parceiros já pagos, pela data do pagamento, com o valor bruto, os descontos e o valor da nota fiscal do relatório.`;
+  prDesenha();
+}
+const prNfSit=it=>{const p=(PR.parc||[]).find(x=>x.id===it.parceiro_nf_id)||(PR.parc||[]).find(x=>chave(x.nome)===chave(it.nome));return it.nf_emitida_em?'feita':it.nf_escolha==='nao_emite'||!it.nf_escolha&&p?.situacao==='nao_emitir'?'nao':'pend'};
+const prParc=it=>(PR.parc||[]).find(x=>x.id===it.parceiro_nf_id)||(PR.parc||[]).find(x=>chave(x.nome)===chave(it.nome))||null;
+function prFiltrados(){
+  const de=$('prDe').value,ate=$('prAte').value,E=msVals('prEmp'),C=msVals('prConta'),F=msVals('prForma'),N=msVals('prNF'),qd=$('prBusca').value.trim(),q=chave(qd);
+  const ctNome=id=>PR.contas.find(c=>c.id===id)?.nome||'';
+  return PR.itens.filter(i=>(!de||i.pago_em>=de)&&(!ate||i.pago_em<=ate)&&(!E.length||E.includes(i.empresa_id))&&(!C.length||i.contas.some(c=>C.includes(c)))&&(!F.length||i.formas.some(f=>F.includes(f)))&&(!N.length||N.includes(prNfSit(i)))
+    &&(!qd||[i.nome,prParc(i)?.nome_global,prParc(i)?.cpf_cnpj,rnEmpNome(i.empresa_id),...i.contas.map(ctNome),...i.formas,i.protocolo,i.nf_numero,dBR(i.pago_em),fm(i.pago),fm(i.valor),i.bruto!=null?fm(i.bruto):'',rnVNF(i)!=null?fm(rnVNF(i)):''].some(x=>x&&(chave(String(x)).includes(q)||String(x).includes(qd)))))
+    .sort((a,b)=>b.pago_em.localeCompare(a.pago_em)||a.nome.localeCompare(b.nome))}
+function prDesenha(){
+  if(!PR.key)return;const rows=prFiltrados(),mu=t=>`<span class="muted">${t}</span>`,sm=f=>r2(rows.reduce((x,i)=>x+(f(i)||0),0)),ctNome=id=>PR.contas.find(c=>c.id===id)?.nome||'';
+  const vnf=i=>rnVNF(i)??(+i.valor||0),cnt=k=>rows.filter(i=>prNfSit(i)===k);
+  $('prTiles').innerHTML=[['Restituições pagas',fm(sm(i=>i.pago)),`${rows.length} ${rows.length===1?'repasse':'repasses'}`],['Valor bruto',fm(sm(i=>+i.bruto)),'do relatório de repasse'],['Descontos do relatório',fm(sm(i=>+i.desconto_rel)),''],
+    ['Valor das notas fiscais',fm(sm(vnf)),'bruto − repasse − descontos'],['NF emitidas',String(cnt('feita').length),fm(r2(cnt('feita').reduce((x,i)=>x+vnf(i),0)))],['Falta emitir NF',String(cnt('pend').length),fm(r2(cnt('pend').reduce((x,i)=>x+vnf(i),0)))],['Não emitem NF',String(cnt('nao').length),'']]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('prHead').innerHTML='<tr><th>Pago em</th><th class="l">Parceiro</th><th class="l">CPF/CNPJ</th><th class="l">Empresa que pagou</th><th class="l">Conta</th><th class="l">Forma</th><th>Valor pago</th><th>Bruto</th><th>Descontos</th><th>Valor da NF</th><th class="l">Nota fiscal</th><th>Relatório</th><th class="l">Protocolo</th></tr>';
+  const nfc=i=>{const k=prNfSit(i);return k==='feita'?`<span class="chip c-ok">Emitida ${dBR(i.nf_emitida_em)}</span>${i.nf_numero?' '+mu('nº '+esc(i.nf_numero)):''}`:k==='nao'?'<span class="chip c-none">Não emite</span>':'<span class="chip c-warn">Falta emitir</span>'};
+  $('prBody').innerHTML=rows.map(i=>{const p=prParc(i);return `<tr><td style="white-space:nowrap">${dBR(i.pago_em)}</td><td class="l" style="white-space:normal;min-width:180px"><b>${esc(i.nome.trim())}</b>${p?.nome_global&&chave(p.nome_global)!==chave(i.nome)?'<br>'+mu(esc(p.nome_global)):''}</td><td class="l" style="white-space:nowrap">${esc(p?.cpf_cnpj||'')}</td>
+    <td class="l" style="white-space:nowrap">${esc(rnEmpNome(i.empresa_id))}</td><td class="l" style="min-width:150px">${esc(i.contas.map(ctNome).filter(Boolean).join(' + '))}</td><td class="l">${esc(i.formas.join(', '))}</td>
+    <td><b>${fm(i.pago)}</b>${i.parcial?`<br><span class="chip c-warn" title="Conta a pagar de ${fm(i.tvalor)}">parcial</span>`:''}</td><td>${i.bruto!=null?fm(i.bruto):mu('—')}</td><td>${i.bruto!=null?fm(+i.desconto_rel||0):mu('—')}</td><td>${rnVNF(i)!=null?'<b>'+fm(rnVNF(i))+'</b>':mu('—')}</td>
+    <td class="l" style="white-space:nowrap">${nfc(i)}</td><td style="white-space:nowrap">${i.lote_data?dBR(i.lote_data):''}</td><td class="l muted" style="white-space:nowrap">${esc(i.protocolo||'')}</td></tr>`}).join('')
+    ||`<tr><td class="l muted" colspan="13">${PR.itens.length?'Nenhuma restituição paga neste filtro.':'Nenhuma restituição paga ainda. Os repasses aparecem aqui quando são marcados como pagos no Repasse da semana.'}</td></tr>`;
+  $('prFoot').innerHTML=rows.length?`<tr><th class="l" colspan="6">${rows.length} ${rows.length===1?'restituição':'restituições'}</th><th>${fm(sm(i=>i.pago))}</th><th>${fm(sm(i=>+i.bruto))}</th><th>${fm(sm(i=>+i.desconto_rel))}</th><th>${fm(sm(i=>rnVNF(i)))}</th><th colspan="3"></th></tr>`:'';
+  $('prNote').textContent='Bruto, descontos e valor da NF vêm do relatório de repasse novo (os relatórios antigos não trazem o bruto e aparecem com “—”). Valor da NF = Bruto − (Repasse + Descontos). Pagamento em mais de uma conta aparece com as contas juntas. A busca acha por qualquer coluna.';
+}
+['prDe','prAte'].forEach(id=>$(id).addEventListener('change',()=>renderPR()));
+['prEmp','prConta','prForma','prNF'].forEach(id=>$(id).addEventListener('change',()=>prDesenha()));
+$('prBusca').addEventListener('input',()=>prDesenha());
 function nfVazio(t,cls){['nfBar','nfNovo','nfImp','nfXls','nfPg'].forEach(id=>$(id).hidden=true);$('nfTiles').innerHTML='';$('nfHead').innerHTML='';$('nfBody').innerHTML=`<tr><td class="l ${cls||'muted'}">${t}</td></tr>`;$('nfNote').innerHTML=''}
 async function renderNF(recarrega=true){
   const cli=cliAtual();
@@ -17430,7 +17618,21 @@ const v93=e=>e&&(e.code==='PGRST204'||e.code==='42703'||/nf_emitida|nf_numero|nf
 const v93Msg='Para marcar a nota como emitida, rode antes a atualização v93 do banco (Repasses pagos no Controle de notas fiscais) no Supabase.';
 const nfPgParc=it=>NF.parc.find(p=>p.id===it.parceiro_nf_id)||NF.parc.find(p=>chave(p.nome)===chave(it.nome)||(p.nomes||[]).some(n=>chave(n)===chave(it.nome)))||null;
 const nfPgSit=it=>nfPgParc(it)?.situacao||'sem';
-const nfPgCls=it=>it.nf_emitida_em?'feita':nfPgSit(it)==='nao_emitir'?'nao':'pend';
+// “Não emite” escolhido no repasse (nf_escolha, v158) ou o parceiro guardado como “Não emitir NF”
+const nfPgCls=it=>it.nf_emitida_em?'feita':it.nf_escolha==='nao_emite'||!it.nf_escolha&&nfPgSit(it)==='nao_emitir'?'nao':'pend';
+// valor da nota: no relatório novo, Bruto − (Repasse + Descontos); nos antigos, o valor do repasse (Carol, 18/11)
+const nfPgV=it=>rnVNF(it)??(+it.valor||0);
+const v158=e=>e&&(e.code==='PGRST204'||e.code==='42703'||/nf_escolha|nf_sit_ant|liquidez|bruto|bpo_parceiros_mp/.test(e.message||''));
+const v158Msg='Rode antes a atualização v158 do banco (Parceiros MP) no Supabase.';
+// guarda no parceiro (controle de NF do grupo) se emite ou não, para os próximos repasses; devolve a situação anterior (para o Desfazer)
+async function nfPgGuarda(it,sit){
+  let p=nfPgParc(it);const ant=p?.situacao||'sem';if(p&&p.situacao===sit)return ant;
+  if(p){const {error}=await sb.from('parceiros_nf').update({situacao:sit,atualizado_em:new Date().toISOString()}).eq('id',p.id);if(error)throw error;p.situacao=sit}
+  else{const nome=it.nome.trim(),{data,error}=await sb.from('parceiros_nf').insert({grupo_id:NF.grupo.id,nome,nomes:[nome],situacao:sit,obs:'Incluído pelas notas fiscais dos repasses pagos'}).select().single();if(error)throw error;
+    NF.parc.push(data);p=data;await sb.from('repasse_itens').update({parceiro_nf_id:data.id}).eq('id',it.id);it.parceiro_nf_id=data.id}
+  return ant}
+async function nfPgVolta(it){if(!it.nf_sit_ant)return;const p=nfPgParc(it);if(!p)return;
+  const sit=it.nf_sit_ant==='sem'?'nao_emitido':it.nf_sit_ant;const {error}=await sb.from('parceiros_nf').update({situacao:sit,atualizado_em:new Date().toISOString()}).eq('id',p.id);if(error)throw error;p.situacao=sit}
 async function nfPgCarrega(recarrega){
   const G=NF.grupo,cli=cliAtual();if(!G||!cli)return;$('nfPg').hidden=false;
   const emps=G.empresas||[],sel=$('nfPgEmp'),cur=sel.value;
@@ -17457,46 +17659,71 @@ async function nfPgCarrega(recarrega){
   }
   nfPgDesenha();
 }
-function nfPgFiltrados(){const emp=$('nfPgEmp').value,mes=$('nfPgMes').value;
-  return NFP.itens.filter(i=>(!emp||i.empresa_id===emp)&&(!mes||+i.pago_em.slice(5,7)===+mes))}
+function nfPgFiltrados(){const emp=$('nfPgEmp').value,mes=$('nfPgMes').value,qd=($('nfPgBusca')?.value||'').trim(),q=chave(qd);
+  return NFP.itens.filter(i=>(!emp||i.empresa_id===emp)&&(!mes||+i.pago_em.slice(5,7)===+mes)&&(!qd||(()=>{const p=nfPgParc(i);return chave(i.nome).includes(q)||chave(p?.nome_global||'').includes(q)||String(p?.cpf_cnpj||'').replace(/\D/g,'').includes(qd.replace(/\D/g,'')||'#')||String(i.protocolo||'').includes(qd)||fm(nfPgV(i)).includes(qd)})()))}
 function nfPgDesenha(){
   if(!NFP.key)return;
-  const base=nfPgFiltrados(),f=$('nfPgF').value,emp=$('nfPgEmp').value,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+(+i.valor||0),0));
+  const base=nfPgFiltrados(),f=$('nfPgF').value,emp=$('nfPgEmp').value,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+nfPgV(i),0));
   const PGF=msVals('nfPgF'),rows=base.filter(i=>!PGF.length||PGF.includes(nfPgCls(i))).sort((a,b)=>b.pago_em.localeCompare(a.pago_em)||a.nome.localeCompare(b.nome));
-  [...NFP.sel].forEach(id=>{if(!rows.some(r=>r.id===id&&!r.nf_emitida_em))NFP.sel.delete(id)});
+  [...NFP.sel].forEach(id=>{if(!rows.some(r=>r.id===id&&!r.nf_emitida_em&&r.nf_escolha!=='nao_emite'))NFP.sel.delete(id)});
   const pend=base.filter(i=>nfPgCls(i)==='pend'),feita=base.filter(i=>i.nf_emitida_em);
-  $('nfPgSub').innerHTML=`${emp?'Pagos pela '+esc(rnEmpNome(emp)):'Pagos pelas empresas do grupo'} em ${$('nfPgMes').value?MESES[$('nfPgMes').value-1].toLowerCase()+' de ':''}${NF.ano}: <b>${pend.length} ${pend.length===1?'nota a emitir':'notas a emitir'}</b> (${fm(soma(pend))}) · ${feita.length} já ${feita.length===1?'emitida':'emitidas'}.`;
+  $('nfPgSub').innerHTML=`${emp?'Pagos pela '+esc(rnEmpNome(emp)):'Pagos pelas empresas do grupo'} em ${$('nfPgMes').value?MESES[$('nfPgMes').value-1].toLowerCase()+' de ':''}${NF.ano}: <b>${pend.length} ${pend.length===1?'nota a emitir':'notas a emitir'}</b> (${fm(soma(pend))} em notas) · ${feita.length} já ${feita.length===1?'emitida':'emitidas'} (${fm(soma(feita))}) · ${base.filter(i=>nfPgCls(i)==='nao').length} não ${base.filter(i=>nfPgCls(i)==='nao').length===1?'emite':'emitem'}.`;
   const sitChip=it=>{const s=nfPgSit(it);return `<span class="chip ${RNSIT[s][1]}">${RNSIT[s][0]}</span>`};
   const nota=it=>it.nf_emitida_em?`<span class="chip c-ok">✓ Emitida ${dBR(it.nf_emitida_em)}</span>${it.nf_numero?' '+mu('nº '+esc(it.nf_numero)):''} <button type="button" class="btn small ghost" data-pg="desfaz">Desfazer</button>`
-    :`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button>`;
-  const todasSel=rows.filter(i=>!i.nf_emitida_em);
-  $('nfPgHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="nfPgTodas" style="width:auto" title="Selecionar todos do filtro"${todasSel.length&&todasSel.every(i=>NFP.sel.has(i.id))?' checked':''}></th><th class="l">Pago em</th><th class="l">Parceiro</th><th>Valor</th>${emp?'':'<th class="l">Pago pela</th>'}<th class="l">Protocolo</th><th class="l">Situação</th><th class="l">Nota fiscal</th></tr>`;
+    :it.nf_escolha==='nao_emite'?`<span class="chip c-none">Não emite</span> <button type="button" class="btn small ghost" data-pg="naoDesfaz">Desfazer</button>`
+    :`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button> <button type="button" class="btn small ghost" data-pg="nao" title="Guarda no parceiro como “Não emitir NF”">Não emite</button>`;
+  const todasSel=rows.filter(i=>!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');
+  $('nfPgHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="nfPgTodas" style="width:auto" title="Selecionar todos do filtro"${todasSel.length&&todasSel.every(i=>NFP.sel.has(i.id))?' checked':''}></th><th class="l">Pago em</th><th class="l">Parceiro</th><th title="Valor repassado ao parceiro">Repasse</th><th title="Bruto − (Repasse + Descontos), do relatório de repasse. Nos relatórios antigos, sem o bruto, é o valor do repasse">Valor da NF</th>${emp?'':'<th class="l">Pago pela</th>'}<th class="l">Protocolo</th><th class="l" title="Guardado no parceiro para os próximos repasses">No parceiro</th><th class="l">Nota fiscal</th></tr>`;
   $('nfPgBody').innerHTML=rows.map(it=>{const p=nfPgParc(it);
-    return `<tr data-id="${it.id}"><td>${it.nf_emitida_em?'':`<input type="checkbox" class="nfpgck" style="width:auto"${NFP.sel.has(it.id)?' checked':''}>`}</td><td class="l" style="white-space:nowrap">${dBR(it.pago_em)}</td>
+    return `<tr data-id="${it.id}"><td>${it.nf_emitida_em||it.nf_escolha==='nao_emite'?'':`<input type="checkbox" class="nfpgck" style="width:auto"${NFP.sel.has(it.id)?' checked':''}>`}</td><td class="l" style="white-space:nowrap">${dBR(it.pago_em)}</td>
       <td class="l" style="white-space:normal;min-width:200px"><b>${esc(it.nome)}</b>${p&&(p.nome_global||p.cpf_cnpj)?'<br>'+mu([p.nome_global&&chave(p.nome_global)!==chave(it.nome)?esc(p.nome_global):'',esc(p.cpf_cnpj||'')].filter(Boolean).join(' · ')):''}</td>
-      <td><b>${fm(it.valor)}</b></td>${emp?'':`<td class="l" style="white-space:nowrap">${esc(rnEmpNome(it.empresa_id))}</td>`}<td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td><td class="l">${sitChip(it)}</td><td class="l" style="white-space:nowrap">${nota(it)}</td></tr>`}).join('')
-    ||`<tr><td></td><td class="l muted" colspan="${emp?6:7}">${NFP.itens.length?'Nenhum repasse pago neste filtro.':'Nenhum repasse pago em '+NF.ano+' ainda. Os repasses aparecem aqui quando são marcados como pagos no Repasse de parceiros.'}</td></tr>`;
+      <td>${fm(it.valor)}</td><td>${rnVNF(it)!=null?`<b title="Bruto ${fm(it.bruto)} − repasse ${fm(it.valor)} − descontos ${fm(+it.desconto_rel||0)}">${fm(rnVNF(it))}</b>`:`<b>${fm(it.valor)}</b><br>${mu('sem o bruto')}`}</td>${emp?'':`<td class="l" style="white-space:nowrap">${esc(rnEmpNome(it.empresa_id))}</td>`}<td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td><td class="l">${sitChip(it)}</td><td class="l" style="white-space:nowrap">${nota(it)}</td></tr>`}).join('')
+    ||`<tr><td></td><td class="l muted" colspan="${emp?7:8}">${NFP.itens.length?'Nenhum repasse pago neste filtro.':'Nenhum repasse pago em '+NF.ano+' ainda. Os repasses aparecem aqui quando são marcados como pagos no Repasse de parceiros.'}</td></tr>`;
   const n=NFP.sel.size;$('nfPgMarca').disabled=!n;$('nfPgMarca').textContent=n?`Marcar NF emitida (${n})`:'Marcar NF emitida';
-  $('nfPgNote').textContent=`${rows.length} de ${base.length} repasses pagos. Ao marcar “NF emitida”, a nota entra sozinha no mês da emissão na tabela de baixo.`;
+  $('nfPgNao').disabled=!n;$('nfPgNao').textContent=n?`Não emite (${n})`:'Não emite';
+  $('nfPgNote').textContent=`${rows.length} de ${base.length} repasses pagos. O valor da NF é o Bruto menos o Repasse e os Descontos do relatório. Ao marcar “NF emitida”, a nota entra sozinha no mês da emissão na tabela de baixo e o parceiro fica guardado como “Emite NF”; “Não emite” guarda o parceiro como “Não emitir NF”. Nos próximos repasses isso já vem preenchido, e “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.`;
 }
 ['nfPgEmp','nfPgMes','nfPgF'].forEach(id=>$(id).addEventListener('change',()=>{NFP.sel.clear();nfPgDesenha()}));
+$('nfPgBusca').addEventListener('input',()=>nfPgDesenha());
+// marca de uma vez as clínicas guardadas como “Emite NF” que ainda estão sem nota (Carol, 18/11)
+$('nfPgQuem').onclick=()=>{const l=nfPgFiltrados().filter(i=>!i.nf_emitida_em&&i.nf_escolha!=='nao_emite'&&nfPgSit(i)==='emite');
+  if(!l.length)return toast('Nenhuma clínica que emite NF neste filtro está sem nota.');l.forEach(i=>NFP.sel.add(i.id));
+  if(!msVals('nfPgF').includes('pend')&&msVals('nfPgF').length)toast('Algumas selecionadas podem estar fora do filtro “Mostrar”.');nfPgDesenha();toast(`${l.length} ${l.length===1?'clínica selecionada':'clínicas selecionadas'}`)};
+// “Não emite”: o repasse sai das notas a emitir e o parceiro fica guardado como “Não emitir NF”; Desfazer volta os dois
+async function nfPgNaoEmite(l){
+  if(!confirm(l.length===1?`${l[0].nome.trim()} não emite NF? Fica guardado no parceiro para os próximos repasses.`:`Marcar ${l.length} clínicas como “Não emite NF”? Fica guardado em cada parceiro para os próximos repasses.`))return;
+  let feitos=0;
+  try{for(const it of l){const ant=await nfPgGuarda(it,'nao_emitir');
+      const r={nf_escolha:'nao_emite',nf_sit_ant:ant,nf_escolha_por:ME?.user_id||null,nf_escolha_em:new Date().toISOString()};
+      const {error}=await sb.from('repasse_itens').update(r).eq('id',it.id);if(error)throw error;Object.assign(it,r);NFP.sel.delete(it.id);feitos++}
+    toastDesfazer(feitos===1?'Marcado como não emite':feitos+' marcados como não emite',async()=>{for(const it of l)await nfPgNaoDesfaz(it,true);toast('Desfeito');nfDesenha();nfPgDesenha()});
+  }catch(x){console.error(x);alert((v158(x)?v158Msg:'Não foi possível salvar: '+(x.message||x))+(feitos?` (${feitos} já ${feitos===1?'foi marcado':'foram marcados'})`:''))}
+  nfDesenha();nfPgDesenha()}
+async function nfPgNaoDesfaz(it,quieto){
+  try{await nfPgVolta(it);const r={nf_escolha:null,nf_sit_ant:null,nf_escolha_por:null,nf_escolha_em:null};
+    const {error}=await sb.from('repasse_itens').update(r).eq('id',it.id);if(error)throw error;Object.assign(it,r);if(!quieto){toast('Desfeito');nfDesenha();nfPgDesenha()}}
+  catch(x){console.error(x);alert('Não foi possível desfazer: '+(x.message||x))}}
+$('nfPgNao').onclick=()=>{const l=NFP.itens.filter(i=>NFP.sel.has(i.id)&&!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');if(l.length)nfPgNaoEmite(l)};
 $('nfAno').addEventListener('change',()=>nfPgCarrega(false));
 $('nfPg').addEventListener('change',e=>{
   if(e.target.id==='nfPgTodas'){const PGF=msVals('nfPgF'),l=nfPgFiltrados().filter(i=>!i.nf_emitida_em&&(!PGF.length||PGF.includes(nfPgCls(i))));l.forEach(i=>e.target.checked?NFP.sel.add(i.id):NFP.sel.delete(i.id));return nfPgDesenha()}
   if(e.target.classList.contains('nfpgck')){const id=e.target.closest('tr').dataset.id;e.target.checked?NFP.sel.add(id):NFP.sel.delete(id);nfPgDesenha()}});
 $('nfPgBody').addEventListener('click',async e=>{const b=e.target.closest('[data-pg]');if(!b)return;const it=NFP.itens.find(i=>i.id===b.closest('tr').dataset.id);if(!it)return;
   if(b.dataset.pg==='marca')return nfPgAbre([it]);
+  if(b.dataset.pg==='nao')return nfPgNaoEmite([it]);
+  if(b.dataset.pg==='naoDesfaz')return nfPgNaoDesfaz(it);
   if(!confirm(`Desfazer a nota de ${it.nome}? O repasse volta para “Falta emitir a NF” e a nota sai do mês da emissão.`))return;
   b.disabled=true;
-  try{const {error}=await sb.from('repasse_itens').update({nf_emitida_em:null,nf_numero:null,nf_marcada_por:null,nf_marcada_em:null}).eq('id',it.id);if(error)throw error;
+  try{if(it.nf_sit_ant){await nfPgVolta(it);await sb.from('repasse_itens').update({nf_sit_ant:null}).eq('id',it.id);it.nf_sit_ant=null}
+    const {error}=await sb.from('repasse_itens').update({nf_emitida_em:null,nf_numero:null,nf_marcada_por:null,nf_marcada_em:null}).eq('id',it.id);if(error)throw error;
     await nfPgMensal(it,-1,it.nf_emitida_em,it.nf_numero);Object.assign(it,{nf_emitida_em:null,nf_numero:null});toast('Nota desfeita');nfDesenha();nfPgDesenha()}
   catch(x){console.error(x);alert(v93(x)?v93Msg:'Não foi possível desfazer: '+(x.message||x));b.disabled=false}});
-$('nfPgMarca').onclick=()=>{const l=NFP.itens.filter(i=>NFP.sel.has(i.id)&&!i.nf_emitida_em);if(l.length)nfPgAbre(l)};
+$('nfPgMarca').onclick=()=>{const l=NFP.itens.filter(i=>NFP.sel.has(i.id)&&!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');if(l.length)nfPgAbre(l)};
 function nfPgAbre(l){
   NF.dlg={modo:'pg',l};
   $('nfdTit').textContent=l.length===1?'Nota fiscal de '+l[0].nome:`Notas fiscais de ${l.length} repasses`;
   const nao=l.filter(i=>nfPgCls(i)==='nao').length;
-  $('nfdBody').innerHTML=`<p class="note" style="margin:0 0 10px">${l.length===1?`Repasse de ${fm(l[0].valor)} pago em ${dBR(l[0].pago_em)} pela ${esc(rnEmpNome(l[0].empresa_id))}.`:`${l.length} repasses · ${fm(r2(l.reduce((x,i)=>x+(+i.valor||0),0)))}.`}</p>
+  $('nfdBody').innerHTML=`<p class="note" style="margin:0 0 10px">${l.length===1?`Repasse de ${fm(l[0].valor)} pago em ${dBR(l[0].pago_em)} pela ${esc(rnEmpNome(l[0].empresa_id))}. <b>Valor da NF: ${fm(nfPgV(l[0]))}</b>.`:`${l.length} repasses · <b>valor das notas ${fm(r2(l.reduce((x,i)=>x+nfPgV(i),0)))}</b>.`}</p>
     <div class="fields"><label class="f">Data da emissão<input id="nfgD" type="date" value="${TODAY}"></label>
     ${l.length===1?'<label class="f">Número da nota (opcional)<input id="nfgN" placeholder="Ex.: 1234"></label>':''}</div>
     ${nao?`<p class="note" style="margin:8px 0 0"><span class="chip c-bad">Atenção</span> ${nao===1&&l.length===1?'Este parceiro está':nao+' parceiros estão'} como “Não emitir NF”. Confira antes de marcar.</p>`:''}
@@ -17509,9 +17736,9 @@ async function nfPgMensal(it,delta,data,numero){
   const nums=s=>String(s||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(delta<0){if(!ex)return;
     if(ex.quantidade<=1){const {error}=await sb.from('nf_mensal').delete().eq('id',ex.id);if(error)throw error;NF.nfs=NF.nfs.filter(n=>n.id!==ex.id);return}
-    const r={quantidade:ex.quantidade-1,valor:ex.valor!=null?Math.max(0,r2(+ex.valor-(+it.valor||0))):null,numeros:nums(ex.numeros).filter(x=>x!==String(numero||'').trim()).join(', ')||null,atualizado_em:new Date().toISOString()};
+    const r={quantidade:ex.quantidade-1,valor:ex.valor!=null?Math.max(0,r2(+ex.valor-nfPgV(it))):null,numeros:nums(ex.numeros).filter(x=>x!==String(numero||'').trim()).join(', ')||null,atualizado_em:new Date().toISOString()};
     const {error}=await sb.from('nf_mensal').update(r).eq('id',ex.id);if(error)throw error;Object.assign(ex,r);return}
-  const reg={grupo_id:NF.grupo.id,nome,competencia:comp,quantidade:(ex?.quantidade||0)+1,valor:ex?(ex.valor!=null?r2(+ex.valor+(+it.valor||0)):null):(+it.valor||null),
+  const reg={grupo_id:NF.grupo.id,nome,competencia:comp,quantidade:(ex?.quantidade||0)+1,valor:ex?(ex.valor!=null?r2(+ex.valor+nfPgV(it)):null):(nfPgV(it)||null),
     numeros:[...nums(ex?.numeros),...(numero?[String(numero).trim()]:[])].join(', ')||null,empresa_id:ex?.empresa_id||it.empresa_id||null,obs:ex?.obs||null,atualizado_em:new Date().toISOString()};
   const {data:d,error}=await sb.from('nf_mensal').upsert(reg,{onConflict:'grupo_id,nome,competencia'}).select().single();if(error)throw error;
   NF.nfs=[...NF.nfs.filter(n=>!(n.nome===nome&&n.competencia===comp)),d];if(p&&p.situacao==='nao_emitido')p.situacao='emite';
@@ -17524,6 +17751,8 @@ $('nfdFoot').addEventListener('click',async e=>{const b=e.target.closest('[data-
   try{for(const it of d.l){
       const {error}=await sb.from('repasse_itens').update({nf_emitida_em:data,nf_numero:num,nf_marcada_por:ME?.user_id||null,nf_marcada_em:new Date().toISOString()}).eq('id',it.id);if(error)throw error;
       Object.assign(it,{nf_emitida_em:data,nf_numero:num});NFP.sel.delete(it.id);feitos++;
+      // guarda no parceiro como “Emite NF” (Carol, 18/11); a situação anterior fica no repasse para o Desfazer
+      try{if(nfPgSit(it)!=='emite'){const ant=await nfPgGuarda(it,'emite');const {error:e3}=await sb.from('repasse_itens').update({nf_sit_ant:ant}).eq('id',it.id);if(!e3)it.nf_sit_ant=ant}}catch(x3){console.error(x3)}
       await nfPgMensal(it,1,data,num)}
     toast(feitos===1?'Nota marcada como emitida':feitos+' notas marcadas como emitidas');dlgNF.close();
   }catch(x){console.error(x);err((v93(x)?v93Msg:'Não foi possível salvar: '+(x.message||x))+(feitos?` (${feitos} já ${feitos===1?'foi marcada':'foram marcadas'})`:''))}
