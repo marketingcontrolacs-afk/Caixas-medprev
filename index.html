@@ -1429,7 +1429,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <section id="viewBen" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Pedido de benefícios</h1><p class="sub">Vale transporte, combustível e alimentação. O pedido é feito no fim do mês para o mês seguinte e já desconta as faltas, atestados e férias.</p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn" id="bnPlux" hidden title="Planilha de importação do pedido de vale alimentação na Pluxee">Planilha Pluxee</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="bnBar"></div><p class="note" id="bnRegTxt" hidden style="margin:10px 0 0"></p></div>
     <h2 style="margin-top:18px">Escala de sábados</h2>
@@ -6054,7 +6054,7 @@ async function renderBen(){
   if(!cli){vazio('<span class="muted">Nenhuma empresa liberada.</span>');return}
   const comp=BEN.comp=$('bnMes').value+'-01',ant=addMes(comp,-1),fim=fimMes(comp);
   const [rf,rp,rm,rpe,rl,rh,rv]=await Promise.all([
-    sb.from('funcionarios').select('id,nome,matricula,situacao,admissao,desligado_em,folha_fixos,folha_vt,vt_valor_dia,vt_empresa,va_valor,folha_ajuda_custo').eq('cliente_id',cli.id).order('nome'),
+    sb.from('funcionarios').select('id,nome,matricula,cpf,nascimento,telefone,situacao,admissao,desligado_em,folha_fixos,folha_vt,vt_valor_dia,vt_empresa,va_valor,folha_ajuda_custo').eq('cliente_id',cli.id).order('nome'),
     sb.from('beneficios_pedidos').select('*').eq('cliente_id',cli.id).eq('competencia',comp),
     sb.from('beneficios_meses').select('*').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
     sb.from('beneficios_pendencias').select('*').eq('cliente_id',cli.id).order('criado_em'),
@@ -6101,7 +6101,7 @@ async function renderBen(){
     <span class="spacer"></span>${R.desconta?`<span class="chip ${R.confirmado?'c-warn':'c-bad'}">Desconta na folha: 6% de VT e R$ 1,00 de VA${R.confirmado?'':' (regra padrão: conferir)'}</span>${!R.confirmado&&e?'<button class="btn small" data-bn="regra">Confirmar regra</button><button class="btn small ghost" data-bn="naodesc">Não desconta</button>':''}`:'<span class="chip c-ok">Não desconta VT e VA na folha</span>'}
     ${lanca&&BEN.salvo?st==='Pedido feito'?'<button class="btn small ghost" data-bn="reabrir">Voltar para rascunho</button>':'<button class="btn small" data-bn="feito">Marcar pedido como feito</button>':''}
     ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelo ponto (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
-  $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;
+  $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;$('bnPlux').hidden=!pluxLinhas().length;
   $('bnVtTit').textContent=R.combustivel?'Vale transporte e combustível':'Vale transporte';
   benEscala(lanca);benTabelas(lanca);renderBenPend(lanca);renderBenCp(lanca);
   $('bnCadBox').hidden=!e;if(e){renderBenCad();renderBenReg()}
@@ -6211,6 +6211,45 @@ $('bnBar').addEventListener('click',async ev=>{
   if(a==='feito'){if(await benGerarCps())toast('Pedido feito. Contas a pagar criadas: anexe o boleto de cada fornecedor.')}else
   toast({feito:'Pedido marcado como feito',reabrir:'Pedido voltou para rascunho',refazer:'Pedido montado de novo (ainda não salvo)',regra:'Regra confirmada',naodesc:'Regra salva: não desconta na folha'}[a]);renderBen();
 });
+// ---------- Planilha de importação da Pluxee (VA da Viva e da BJ; Carol 18/11) ----------
+// Layout "PLANSIPV7" versão 202103: cabeçalho nas linhas 5 a 7 e um beneficiário por linha a partir da 8.
+// Dados da empresa (entrega dos cartões, responsável, código Pluxee) vêm do cadastro da empresa; o que faltar é avisado.
+const PLUX_H=[["Código Cliente Pluxee", "Situação do beneficiário", "Nome completo", "CPF", "Data de nascimento", "Nome para gravação no cartão", "Matrícula", "Nome do departamento", "Código do departamento", "Centro de custo", "Tipo do pedido", "Produto", "Valor de crédito", "Data de crédito", "Mês de referência", "Local de entrega", "CEP", "Endereço", "Número", "Complemento", "Referência", "Bairro", "Cidade", "UF", "Responsável pelo recebimento", "DDD Responsável pelo Recebimento", "Telefone Responsável pelo Recebimento", "E-mail do Beneficiário", "Entrega Porta a Porta"], ["OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OPCIONAL", "OPCIONAL", "OPCIONAL", "OPCIONAL", "OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO PARA PEDIDO DE CRÉDITO\n(001 - Pedido Normal)", "OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OPCIONAL", "OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "Obrigatório o preenchimento de pelo menos uma das informações (Telefone ou E-mail)\nPara entrega do tipo Porta a Porta", "", "", "OPCIONAL"], ["Obrigatório para pedidos tipo Grupo Atacado, EDI e Pluxee Premium", "Selecione uma opção\n\nAtivo: Receberá benefício\nInativo: Não receberá benefício", "Nome completo do funcionário\n(Até 40 caracteres)\nExemplo: João da Silva Santos", "(exceto para o produto\nPluxee Refeição RH)\n\nCPF do benefíciário\n(11 dígitos)\nExemplo: 12345678900", "(exceto para o produto\nPluxee Refeição RH)\n\nData de nascimento do beneficiário\n(Formato DD/MM/AAAA)\nExemplo: 01/08/1990", "Nome para gravação personalizada no cartão\n(Até 24 caracteres)\nExemplo: João Santos", "Caso não preenchido, serão atribuídos os 09 primeiros dígitos do CPF\n\nObrigatório apenas para 2023 - Pluxee Refeição RH\n\nSe novo cartão Pluxee Refeição RH, informe em sequencia, começando com RH-0000001\n\nSe cartão Pluxee Refeição RH já existente, informe matrícula já existente", "Caso não preenchido, não será separado por departamento\n\nInforme o nome do departamento do funcionário\n(Até 35 caracteres) \nExemplo: RECURSOS HUMANOS\n\n\n", "Caso não preenchido, não será separado por departamento\n\nInforme o código do departamento do funcionário\n(Até 18 caracteres) \nExemplo: RH01\n\n\n", "Informe o centro de custo atrelado ao funcionário\n(Até 18 caracteres)\nExemplo: 123456", "Selecione um tipo de pedido\nExemplo: 001 - Pedido Normal", "Selecione um produto\nExemplo: 6001 - Pluxee Refeição", "Inserir valor do crédito do benefício\nExemplo: 100,00", "Data de disponibilização do valor de crédito\n(Formato DD/MM/AAAA)\nExemplo: 01/01/2020", "Inserir mês de referência do benefício\nExemplo: 04/2009", "Inserir um nome/título para o local da entrega do cartão\n(Até 18 caracteres) \nExemplo: MATRIZ", "Informe o CEP\n(8 dígitos sem traços)\nExemplo: 01310918", "Informe o endereço\n(Até 65 caracteres)\nExemplo: Avenida Paulista", "Informe o número do endereço\n(Até 10 dígitos)\nExemplo: 350", "Informe o complemento do endereço, caso possua\n(Até 30 caracteres)\nExemplo: Bloco A Andar 10 Apto 20", "Informe um ponto de referencia para o endereço, caso possua\n(Até 100 caracteres)\nExemplo: Próx. Escola ABCD", "Informe o bairro do endereço\n(Até 30 caracteres)\nExemplo: Vila Mariana", "Informe a cidade\n(Até 30 caracteres)\nExemplo: São Paulo", "Informe a UF\nExemplo: SP", "Entrega Porta a Porta: informe o nome  do beneficiário.\nEntrega no RH da empresa:  informe o nome   do responsável pelo recebimento  no local de entrega.\n(Até 30 caracteres)\nExemplo: João", "Informe o DDD\n(2 dígitos)\nExemplo: 11", "Entrega Porta a Porta: informe telefone celular do beneficiário.\nEntrega no RH da empresa:  informe telefone fixo ou celular do responsável pelo recebimento  no local de entrega.\n(Até 9 dígitos)\nExemplo: 990909090", "Informe o e-mail do beneficiário\n(Até 70 caracteres)\nExemplo: exemplo@email.com", "Selecione uma opção\n\nSim: Entrega  Porta a Porta\nNão: Entrega no RH da empresa\n\n(Células em branco serão consideradas como \"Não\")"]];
+const pluxLinhas=()=>BEN.rows.filter(r=>r.tipo==='va'&&(+r.total||0)>0&&(!r.empresa||/plux|sodexo/i.test(r.empresa)));
+// lê o primeiro campo preenchido entre vários nomes possíveis (a ficha da empresa ainda está sendo montada)
+const pxG=(o,...ks)=>{for(const k of ks){const v=o?.[k];if(v!=null&&String(v).trim()!=='')return String(v).trim()}return ''};
+function pluxEmp(cli){
+  const B=benRegra(cli),f=cli.ficha||{};
+  // a ficha da empresa (Cadastro de empresas) resolve o endereço de entrega: benEntrega(cli); senão lê as mesmas chaves
+  const e=typeof benEntrega==='function'?benEntrega(cli):(()=>{const src=B.entrega==='outro'?(B.entrega_end||{}):(f.end||{}),dg=String(B.entrega_fone||'').replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,'');
+    return {...src,local:B.entrega_local,responsavel:B.entrega_contato,ddd:dg.length>=10?dg.slice(0,2):'',telefone:dg.length>=10?dg.slice(2):dg,email:B.entrega_email,porta_a_porta:B.entrega_porta,forn_cod:B.forn_cod?.va}})();
+  const fc=e.forn_cod&&typeof e.forn_cod==='object'?e.forn_cod.va:e.forn_cod;
+  return {codigo:pxG({c:fc},'c')||pxG(B.forn_cod||{},'va'),produto:pxG(B.pluxee||{},'produto')||'6002 - Pluxee Alimentação',porta:e.porta_a_porta?'Sim':'Não',
+    local:pxG(e,'local')||cli.nome,cep:pxG(e,'cep').replace(/\D/g,''),endereco:pxG(e,'logradouro','endereco'),numero:pxG(e,'numero'),
+    complemento:pxG(e,'complemento'),referencia:pxG(e,'referencia'),bairro:pxG(e,'bairro'),cidade:pxG(e,'cidade','municipio'),uf:pxG(e,'uf').toUpperCase(),
+    responsavel:pxG(e,'responsavel'),ddd:pxG(e,'ddd'),telefone:pxG(e,'telefone').replace(/\D/g,''),email:pxG(e,'email')};
+}
+$('bnPlux').onclick=()=>{
+  const cli=BEN.cli,E=pluxEmp(cli),ls=pluxLinhas();if(!ls.length){toast('Ninguém com vale alimentação Pluxee neste pedido');return}
+  const fe=[['cep','CEP'],['endereco','Endereço'],['numero','Número'],['bairro','Bairro'],['cidade','Cidade'],['uf','UF'],['responsavel','Responsável pelo recebimento']].filter(([k])=>!E[k]).map(x=>x[1]);
+  if(!E.telefone&&!E.email)fe.push('Telefone ou e-mail do responsável');
+  const fu=ls.map(r=>{const f=BEN.func.find(x=>x.id===r.funcionario_id)||{},m=[];if(String(f.cpf||'').replace(/\D/g,'').length!==11)m.push('CPF');if(!f.nascimento)m.push('nascimento');return m.length?`${f.nome||'?'} (${m.join(' e ')})`:null}).filter(Boolean);
+  if(fe.length||fu.length){alert(`Falta preencher para gerar a planilha da Pluxee:\n\n${fe.length?'No cadastro da empresa ('+cli.nome+', Configurações › Cadastro de empresas, parte Benefícios/entrega dos cartões): '+fe.join(', ')+'.\n\n':''}${fu.length?'Na ficha dos colaboradores (RH › Colaboradores e prazos): '+fu.join('; ')+'.':''}`);return}
+  const [y,m]=BEN.comp.split('-'),cr=prompt('Data do crédito na Pluxee (dd/mm/aaaa):',dBR(BEN.comp));if(cr==null)return;
+  if(!/^\d{2}\/\d{2}\/\d{4}$/.test(cr.trim())){toast('Data no formato dd/mm/aaaa');return}
+  const ws={},put=(r,c,v,st)=>{if(v==null||v==='')return;ws[XLSX.utils.encode_cell({r,c})]={t:typeof v==='number'?'n':'s',v,...(typeof v==='number'?{z:'#,##0.00'}:{}),...(st?{s:st}:{})}};
+  const hs={font:{bold:true},alignment:{wrapText:true,vertical:'top'}},ws7={alignment:{wrapText:true,vertical:'top'},font:{sz:8}};
+  put(2,24,'versão 202103');PLUX_H.forEach((row,i)=>row.forEach((v,c)=>put(4+i,c,v,i===2?ws7:hs)));
+  const cut=(t,n)=>String(t||'').slice(0,n);
+  ls.forEach((r,i)=>{const f=BEN.func.find(x=>x.id===r.funcionario_id),R=7+i;
+    [E.codigo,'Ativo',cut(f.nome,40),String(f.cpf).replace(/\D/g,''),dBR(f.nascimento),'',cut(f.matricula,10),'','','','001 - Pedido Normal',E.produto,r2(+r.total),cr.trim(),`${m}/${y}`,cut(E.local,18),E.cep,cut(E.endereco,65),cut(E.numero,10),cut(E.complemento,30),cut(E.referencia,100),cut(E.bairro,30),cut(E.cidade,30),E.uf,cut(E.porta==='Sim'?f.nome:E.responsavel,30),E.ddd,E.telefone,cut(E.email,70),E.porta]
+      .forEach((v,c)=>put(R,c,v))});
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:7+ls.length-1,c:28}});ws['!merges']=[{s:{r:0,c:0},e:{r:2,c:0}},{s:{r:5,c:25},e:{r:5,c:27}}];
+  ws['!cols']=[26,28,41,29,26,33,26,31,26,20,46,41,21,25,21,26,20,51,26,36,41,20,20,26,41,26,31,41,28].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Dados dos Beneficiários');
+  XLSX.writeFile(wb,`Pluxee pedido ${cli.nome} ${m}.${y}.xlsx`);
+  toast(`Planilha da Pluxee gerada: ${ls.length} ${ls.length===1?'colaborador':'colaboradores'}, ${fm(ls.reduce((a,r)=>a+(+r.total||0),0))}`);
+};
 // ---------- Contas a pagar do pedido (v72) ----------
 // O mesmo boleto foi salvo em duas empresas e pago na errada (Carol, 29/10): o pedido feito gera uma conta por
 // fornecedor (pedido + taxa do boleto) e o boleto é anexado aqui, conferido com o pedido, com o CNPJ da empresa
@@ -7247,14 +7286,14 @@ async function renderColab(){
   const fl=$('cbFiltro').value,mes=TODAY.slice(5,7),nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
   const FL=msVals('cbFiltro'),rows=COLAB.filter(f=>!FL.length?f.situacao!=='Desligado':FL.some(fl=>fl==='exp'?[1,3,4].includes(f.exp.ord):fl==='aniv'?f.nascimento?.slice(5,7)===mes&&f.situacao!=='Desligado':f.situacao==='Desligado'))
     .sort((a,b)=>fl==='aniv'&&FL.length===1?a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)):a.exp.ord-b.exp.ord||String(a.exp.prazo||'').localeCompare(String(b.exp.prazo||''))||a.nome.localeCompare(b.nome));
-  $('cbTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Cargo</th><th>Nascimento</th><th>Admissão</th><th>Fim 1º período</th><th>Fim prorrogação</th><th class="l">Experiência</th><th class="l">Observação</th></tr></thead><tbody>${
+  $('cbTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Cargo</th><th class="l">CPF</th><th>Nascimento</th><th>Admissão</th><th>Fim 1º período</th><th>Fim prorrogação</th><th class="l">Experiência</th><th class="l">Observação</th></tr></thead><tbody>${
     rows.map(f=>{const fl=CB_ED?cbFaltam(f):[],ed=(k,tipo='date')=>`<input data-ce="${k}" type="${tipo}" value="${esc(f[k]||'')}" style="min-width:${tipo==='date'?130:150}px;padding:5px 6px${fl.includes(CB_ROT[k])?';background:var(--warn-soft)':''}" aria-label="${CB_ROT[k]}">`;
-      return (CB_ED?`<tr data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}${cbFaltam(f).length?`<div class="note neg" style="margin:2px 0 0;white-space:normal">Falta: ${esc(cbFaltam(f).join(', '))}</div>`:''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${ed('cargo','text')}</td>
+      return (CB_ED?`<tr data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}${cbFaltam(f).length?`<div class="note neg" style="margin:2px 0 0;white-space:normal">Falta: ${esc(cbFaltam(f).join(', '))}</div>`:''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${ed('cargo','text')}</td><td class="l">${ed('cpf','text')}</td>
       <td>${ed('nascimento')}</td><td>${ed('admissao')}</td><td>${ed('fim_experiencia1')}</td><td>${ed('fim_experiencia2')}</td>
-      `:`<tr class="click" data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${esc(f.cargo||'')}</td>
+      `:`<tr class="click" data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${esc(f.cargo||'')}</td><td class="l" style="white-space:nowrap">${esc(f.cpf||'')}</td>
       <td>${f.nascimento?`${dBR(f.nascimento)} <span class="muted">(${idade(f.nascimento)})</span>`:''}</td><td>${dCurto(f.admissao)}${f.inicio_trabalho&&f.admissao&&f.inicio_trabalho<f.admissao?`<div class="note">começou ${dBR(f.inicio_trabalho).slice(0,5)}</div>`:''}</td><td>${dCurto(f.fim_experiencia1)}</td><td>${dCurto(f.fim_experiencia2)}</td>
       `)+`<td class="l"><span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>${f.exp.alerta?`<div class="note neg" style="margin-top:3px">${esc(f.exp.alerta)}</div>`:''}</td><td class="l" style="white-space:normal;min-width:180px">${esc(f.prazos_obs||'')}</td></tr>`}).join('')
-    ||`<tr><td class="l muted" colspan="9">Ninguém neste filtro.</td></tr>`}</tbody>`;
+    ||`<tr><td class="l muted" colspan="10">Ninguém neste filtro.</td></tr>`}</tbody>`;
   const ativos=COLAB.filter(f=>f.situacao!=='Desligado');
   $('cbTiles').innerHTML=[['Decidir em até '+EXP_AVISO+' dias',ativos.filter(f=>f.exp.alerta).length,'prorrogação, efetivação ou desligamento'],
     ['Em experiência',ativos.filter(f=>[1,3,4].includes(f.exp.ord)).length,'1º período ou prorrogação'],
@@ -15048,7 +15087,8 @@ const NOVIDADES=[
     {x:'Cadastro novo de colaborador: ao salvar, o sistema avisa o que falta preencher (cargo, CPF, nascimento, WhatsApp, admissão e prazos da experiência).',para:'esc'},
     {x:'Pedido de benefícios: usa o Transporte, VT por dia, Empresa do VT e VA por mês da ficha de cada colaborador. Novo campo na ficha: “Prêmio no VA se não faltar”. Cada empresa tem as suas Regras de benefícios, no fim do pedido.',para:'esc'},
     {x:'Pedido de benefícios: “+ Dia fechado” para marcar os dias em que a clínica não abre (ex.: 24/12 e 31/12). O dia sai dos dias úteis e da escala de sábados, e o VT e o VA por dia são recalculados.',para:'esc'},
-    {x:'RH › Colaboradores e prazos: Exportar (Excel, PDF) e Imprimir, só com o que está filtrado na tela.',para:'esc'}]},
+    {x:'RH › Colaboradores e prazos: Exportar (Excel, PDF) e Imprimir, só com o que está filtrado na tela. A lista ganhou a coluna CPF.',para:'esc'},
+    {x:'Pedido de benefícios: botão “Planilha Pluxee” gera a planilha de importação do pedido de vale alimentação na Pluxee (Viva e BJ). Os dados de entrega dos cartões vêm do cadastro da empresa e o CPF e o nascimento, da ficha de cada colaborador; o que faltar é avisado antes.',para:'esc'}]},
   {k:'2026-11-18ordenar',data:'2026-11-18',t:'Ordenar a lista clicando no nome da coluna, em todas as telas',itens:[
     {x:'Em todas as telas com tabela (ex.: RH › Colaboradores e Controle de experiência, Contas a pagar e a receber, Movimentação, Notas fiscais, Conferências, Cadastros), clique no nome da coluna para ordenar a lista: o 1º clique põe em ordem crescente (▲: A a Z, data mais antiga, menor valor) e o 2º inverte (▼). Ex.: clique em “Colaborador” para ordem alfabética ou em “Cargo” para juntar por cargo. A setinha ↕ ao lado do nome mostra que a coluna pode ser ordenada. Ao trocar de tela, a lista volta à ordem normal.'}]},
   {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
