@@ -17222,7 +17222,7 @@ function encDesenha(){
   $('encNote').innerHTML='Encerrar não muda nenhum lançamento: só trava a conta naquele mês. O caixa diário aparece quando a empresa teve fechamento de caixa no mês; a tesouraria vale também para o que o cliente lança na Tesouraria.'
     +(adm?'':' Para desbloquear um mês, peça ao Master (a Carol).');
   const nomeConta=l=>ENC.rows.find(r=>encK(r)===encK(l))?.conta||(l.conta_id?'Conta':'Caixa diário');
-  $('encHist').innerHTML=[...ENC.locks].sort((a,b)=>(b.reaberto_em||b.fechado_em).localeCompare(a.reaberto_em||a.fechado_em)).map(l=>`<tr><td class="l">${esc(CLIENTES.find(c=>c.id===l.cliente_id)?.nome||'')}</td><td class="l">${esc(nomeConta(l))}</td>
+  $('encHist').innerHTML=[...ENC.locks].sort((a,b)=>String(b.reaberto_em||b.fechado_em||'').localeCompare(String(a.reaberto_em||a.fechado_em||''))).map(l=>`<tr><td class="l">${esc(CLIENTES.find(c=>c.id===l.cliente_id)?.nome||'')}</td><td class="l">${esc(nomeConta(l))}</td>
     <td class="l">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</td><td class="l">${l.ativo?'<span class="muted">Continua encerrado</span>':`${esc(l.reaberto_por_nome||'')} · ${encQuando(l.reaberto_em)}`}</td><td class="l">${esc(l.motivo||'')}</td></tr>`).join('')
     ||'<tr><td class="l muted" colspan="5">Nenhum encerramento neste mês ainda.</td></tr>';
 }
