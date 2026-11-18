@@ -4660,8 +4660,12 @@ function bolConfere(bol,ref){if(!bol)return '';const ms=[];
   const f5=ms.length?bolFora(bol):null;
   if(f5)return `o boleto foi emitido fora do padrão dos bancos (fator de vencimento com 5 números): o certo seria vencimento ${dBR(f5.venc)} e valor ${fm(f5.valor)}, mas o banco vai ler ${fm(bol.valor)} e ${dBR(bol.venc)}. Peça um boleto novo ao fornecedor ou pague por Pix/TED`;
   return ms.join(' e ')}
+// e monta a linha certa (fator da regra de 2025 + valor com 10 números + DV), que é a mesma do DDA do banco (Carol, 18/11: Sicredi DDA conferido)
 function bolFora(bol){const d=soDig(bol?.linha||'');if(bol?.tipo!=='banco'||d.length!==47||+d.slice(33,38)<10000)return null;
-  const venc=diasDe('1997-10-07',+d.slice(33,38)),valor=+d.slice(38)/100;return Math.abs(dObj(venc)-dObj(TODAY))<2*365*864e5&&valor>0?{venc,valor}:null}
+  const venc=diasDe('1997-10-07',+d.slice(33,38)),valor=+d.slice(38)/100;if(!(Math.abs(dObj(venc)-dObj(TODAY))<2*365*864e5&&valor>0))return null;
+  const f=String(1000+Math.round((dObj(venc)-dObj('2025-02-22'))/864e5)),v=d.slice(38).padStart(10,'0');
+  const sem=d.slice(0,4)+f+v+d.slice(4,9)+d.slice(10,20)+d.slice(21,31),linha=d.slice(0,32)+dvBanco(sem)+f+v;
+  return {venc,valor,linha}}
 // conta do mês anterior do mesmo fornecedor (para comparar o valor do boleto novo com o último, nunca com um antigo) (Carol, 18/11)
 function mesAnterior(t,lista){if(!t?.vencimento)return null;const k=pessoaChave(t.pessoa_nome||''),lim=somaMes(t.vencimento,-2);
   return (lista||GT.lista||[]).filter(y=>y.id!==t.id&&y.cliente_id===t.cliente_id&&y.tipo===t.tipo&&y.vencimento<t.vencimento&&y.vencimento>=lim&&!y.previsto
@@ -4685,7 +4689,10 @@ function boletoDe(digitos){
   if(dvBanco(bc.slice(0,4)+bc.slice(5))!==+bc[4])return null;
   const c1=bc.slice(0,4)+bc.slice(19,24),c2=bc.slice(24,34),c3=bc.slice(34,44);
   const linha=c1+mod10(c1)+c2+mod10(c2)+c3+mod10(c3)+bc[4]+bc.slice(5,19);
-  return {tipo:'banco',linha,barra:bc,valor:+bc.slice(9,19)/100||null,venc:fatorData(+bc.slice(5,9))};
+  const out={tipo:'banco',linha,barra:bc,valor:+bc.slice(9,19)/100||null,venc:fatorData(+bc.slice(5,9))};
+  // boleto emitido fora do padrão (fator de vencimento com 5 números): vale a linha certa, igual à do DDA (Carol, 18/11)
+  const f5=d.length===47?bolFora(out):null;if(f5){const b=boletoDe(f5.linha);if(b&&b.venc===f5.venc)return {...b,corrigida:linha}}
+  return out;
 }
 function nfeDe(digitos){const d=soDig(digitos);
   if(d.length!==44||!/^(55|65)$/.test(d.slice(20,22))||+d.slice(0,2)<11||+d.slice(0,2)>53||dvNFe(d.slice(0,43))!==+d[43])return null;
@@ -9452,6 +9459,7 @@ async function gtLeArquivo(f,mais,cat){
     if(!$('gt_pessoa').value.trim()){const fo=guiaForn(g,cli?.id,GFP.lista||[]);if(fo)poe('gt_pessoa',fo,'fornecedor');else avisos.push('escolha o fornecedor da guia (ex.: Receita Federal ou Ministério da Economia)')}
     if(g.itens.length>1&&Math.abs(g.soma-(g.valor||0))>=0.01)avisos.push(`a soma dos códigos da guia (${fm(g.soma)}) não bate com o total (${fm(g.valor)}): confira o rateio`)}
   // boleto: linha digitável (o campo já preenche valor e vencimento e avisa se o boleto estiver lançado em outra conta)
+  if(r.bol?.corrigida)avisos.push(`o boleto veio com a linha digitável fora do padrão dos bancos (vencimento com 5 números); usei a linha corrigida, que é a mesma do DDA (${fm(r.bol.valor)}, venc. ${dBR(r.bol.venc)}). Confira com o DDA antes de pagar`);
   if(r.bol){const el=$('gt_linha_digitavel');if(el&&!soDig(el.value)){el.value=r.bol.linha||r.bol.barra;el.dispatchEvent(new Event('input',{bubbles:true}));lidos.push('linha digitável')}
     poe('gt_valor',r.bol.valor,'valor',fm,true);poe('gt_vencimento',r.bol.venc,'vencimento',dBR);if(!$('gt_forma').value)$('gt_forma').value='Boleto'}
   // vencimento das duplicatas da nota (a próxima ainda não vencida; senão, a primeira)
@@ -9783,7 +9791,7 @@ function ltDesenha(){
       <td class="l"><select data-i="${i}" data-k="categoria" data-catnova="Despesa" aria-label="Categoria" ${st}>${opC(x.categoria||'')}</select>${x.catPartes?`<span class="chip c-done" title="${esc(x.catPartes.map(p=>p.categoria+' '+fm(p.valor)).join(' · '))}">➗ ${x.catPartes.length} categorias</span><div class="note" style="margin:0">${x.catPartes.map(p=>esc(p.categoria)+' '+fm(p.valor)).join('<br>')}</div>`:''}${x.catComo&&x.categoria?`<div class="note" style="margin:0">${x.catFraca?'⚠ ':''}${esc(x.catComo)}</div>`:''}</td>
       <td class="l"><select data-i="${i}" data-k="dest" aria-label="Lançar como" ${st}><option value="nova">Conta nova</option>${outras.length?`<optgroup label="Conta já lançada (prevista ou recorrente)">${outras.map(y=>bolOpt(y,{})).join('')}</optgroup>`:''}</select>
         ${t?`<span class="chip c-done">Vai para a conta já lançada${x.sugComo&&x.dest===x.sugT?' (achei '+esc(x.sugComo)+')':''}</span>${x.valor&&Math.abs(t.valor-x.valor)>0.004?`<span class="chip c-warn">Valor lançado ${fm(t.valor)} passa a ${fm(x.valor)}</span>`:''}`:''}
-        ${x.repetido?`<span class="chip c-bad">Boleto já lançado: ${esc(x.repetido)}</span>`:''}${x.susp?`<span class="chip c-bad">Linha digitável não confere: ${esc(x.susp)}</span>`:''}${x.ant&&x.valor&&Math.abs(x.ant.valor-x.valor)>0.004?`<div class="note" style="margin:2px 0 0">${esc(mesAntTxt(x.ant))}</div>`:''}${!x.valor||!x.venc?'<span class="chip c-warn">falta '+[!x.valor?'valor':'',!x.venc?'vencimento':''].filter(Boolean).join(' e ')+'</span>':''}</td>
+        ${x.repetido?`<span class="chip c-bad">Boleto já lançado: ${esc(x.repetido)}</span>`:''}${x.susp?`<span class="chip c-bad">Linha digitável não confere: ${esc(x.susp)}</span>`:''}${x.bol?.corrigida?'<span class="chip c-warn" title="O boleto veio com o vencimento da linha digitável fora do padrão dos bancos; o sistema usou a linha certa, igual à do DDA">Linha digitável corrigida: confira com o DDA</span>':''}${x.ant&&x.valor&&Math.abs(x.ant.valor-x.valor)>0.004?`<div class="note" style="margin:2px 0 0">${esc(mesAntTxt(x.ant))}</div>`:''}${!x.valor||!x.venc?'<span class="chip c-warn">falta '+[!x.valor?'valor':'',!x.venc?'vencimento':''].filter(Boolean).join(' e ')+'</span>':''}</td>
       <td><button type="button" class="btn small ghost" data-lt="tira" data-i="${i}" aria-label="Tirar da lista">✕</button></td></tr>`}).join('');
   $('ltBody').innerHTML=`<label id="ltDrop" style="border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;cursor:pointer;display:block">
       <b>Arraste aqui os boletos, notas fiscais, guias (DARF, INSS, FGTS, DAS), faturas e recibos</b><br><span class="muted">ou clique para escolher vários arquivos (PDF, foto ou XML da nota). A nota e o boleto do mesmo fornecedor com o mesmo valor viram um lançamento só.</span>
@@ -10148,6 +10156,7 @@ async function abrirGT(t,tipo,pre){
     $('gt_valor')?.addEventListener('input',()=>{const gv=$('gb_valor'),v=parseMoney($('gt_valor').value);if(!gv||gv.dataset.mexeu||!(v>0))return;gv.value=showMoney(Math.max(0,r2(v-pago)))})}
   $('gj_forma')?.addEventListener('change',e=>e.target.dataset.mexeu='1');
   $('gt_linha_digitavel')?.addEventListener('input',e=>{const b=boletoDe(e.target.value);if(!b)return;
+    if(b.corrigida&&soDig(e.target.value)===b.corrigida){e.target.value=b.linha;setTimeout(()=>alert(`Esta linha digitável veio fora do padrão dos bancos (vencimento com 5 números). O sistema trocou pela linha certa, a mesma do DDA: venc. ${dBR(b.venc)}, ${fm(b.valor)}. Confira com o DDA antes de pagar.`),0)}
     if(b.venc&&!$('gt_vencimento').value)$('gt_vencimento').value=b.venc;if(b.valor&&!parseMoney($('gt_valor').value))$('gt_valor').value=showMoney(b.valor);
     if(P&&!$('gt_forma').value)$('gt_forma').value='Boleto';
     // o mesmo boleto já lançado em outra conta, de qualquer empresa (v72)
