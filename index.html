@@ -1006,6 +1006,26 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     <p class="note" id="nfNote"></p>
   </section>
 
+  <!-- PARCEIROS MP › NOTAS FISCAIS EMITIDAS (Carol, 18/11): conferência para a contabilidade, Excel/PDF e XMLs -->
+  <section id="viewNR" hidden>
+    <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Notas fiscais emitidas</h1><p class="sub" id="nrSub">As notas fiscais emitidas pelas empresas do grupo: as NFS-e emitidas pelo portal e as marcadas como emitidas fora dele. Para conferir e mandar à contabilidade.</p></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="nrExp" data-exp="nr"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="nrXml" title="Baixa um .zip com o XML de cada nota filtrada (e do cancelamento) e a planilha da lista">Baixar XMLs (.zip)</button></div>
+    </div>
+    <div class="toolbar">
+      <label class="f">De<input type="date" id="nrDe"></label>
+      <label class="f">até<input type="date" id="nrAte"></label>
+      <label class="f">Período pela data de<select id="nrPor"><option value="emissao">Emissão</option><option value="competencia">Competência</option></select></label>
+      <label class="f">Empresa que emitiu<select id="nrEmp"></select></label>
+      <label class="f">Situação<select id="nrSit"><option value="">Todas</option><option value="emitida">Emitida pelo portal</option><option value="cancelada">Cancelada</option><option value="fora">Emitida fora do portal</option></select></label>
+      <label class="f">Ambiente<select id="nrAmb"><option value="1">Produção (valem como nota)</option><option value="2">Teste</option><option value="">Todos</option></select></label>
+      <input id="nrBusca" placeholder="Buscar em todos os campos" style="max-width:240px" aria-label="Buscar nas notas">
+    </div>
+    <div class="tiles" id="nrTiles"></div>
+    <div class="card tablebox"><table id="nrTab"><thead id="nrHead"></thead><tbody id="nrBody"></tbody><tfoot id="nrFoot"></tfoot></table></div>
+    <p class="note" id="nrNote"></p>
+  </section>
   <!-- PARCEIROS MP › RESTITUIÇÕES EFETUADAS (Carol, 18/11): os repasses pagos, pelo pagamento -->
   <section id="viewPR" hidden>
     <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
@@ -2126,6 +2146,8 @@ const NAV=[
   {k:'gfnf',t:'Notas fiscais dos parceiros',g:'Parceiros MP',s:'Dia a dia',ok:()=>okGestao()&&pmAtivo()},
   // restituições efetuadas: os repasses pagos, pelo pagamento (data, empresa, conta e forma), com o valor bruto, o desconto e o valor da NF (Carol, 18/11)
   {k:'gfrestit',t:'Restituições efetuadas',g:'Parceiros MP',s:'Relatórios',ok:()=>okGestao()&&pmAtivo()},
+  // notas fiscais emitidas pelas empresas do grupo (NFS-e do portal e as marcadas como emitidas fora), Excel/PDF e XMLs em .zip para a contabilidade (Carol, 18/11)
+  {k:'gfnfrel',t:'Notas fiscais emitidas',g:'Parceiros MP',s:'Relatórios',ok:()=>ehAdm()&&pmAtivo()},
   // encerrar o mês de cada conta depois de conferir (Carol, 18/11; v151): toda a equipe Controlacs encerra, só o Master desbloqueia
   {k:'gfencerra',t:'Encerramento de mês',g:'Gestão financeira',s:'Cadastros',ok:()=>ehEsc()},
   // relatório dos meses e períodos encerrados, com filtros e Excel (Carol, 18/11)
@@ -2267,7 +2289,7 @@ function empresasDe(m,semGrupo){
 }
 function empresasMod(m){
   // módulo Parceiros MP (Carol, 18/11; v158): parceiros, repasse, notas e restituições só nas empresas com o serviço marcado na ficha
-  if(['repasse','gfrepasse','gfnf','gfrestit'].includes(m)&&!empresasMod._pm){empresasMod._pm=1;try{return empresasMod(m).filter(pmEmp)}finally{empresasMod._pm=0}}
+  if(['repasse','gfrepasse','gfnf','gfrestit','gfnfrel'].includes(m)&&!empresasMod._pm){empresasMod._pm=1;try{return empresasMod(m).filter(pmEmp)}finally{empresasMod._pm=0}}
   // dashboard: as empresas em que a pessoa tem algum acesso (o escritório, todas)
   if(m==='gfdash')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()||ACESSOS.some(a=>a.cliente_id===c.id)));
   if(m==='colab'||m==='docs')return CLIENTES.filter(c=>c.ativo!==false&&(ehEsc()?c.bpo_rh||m==='colab'&&c.bpo_beneficios:temEm(c.id,'colab')));
@@ -2466,7 +2488,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('.oc-x,.oc-m');if
   else{delete o[k];OCU.grava(o);OCU.passo()}},true);
 new MutationObserver(OCU.agenda).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',OCU.agenda);
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','nfPgBusca','prEmp','prConta','prForma','prNF','prBusca','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','nfPgBusca','prEmp','prConta','prForma','prNF','prBusca','nrEmp','nrSit','nrBusca','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -2480,7 +2502,7 @@ function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ct
 // a empresa escolhida não tem a tela aberta (ex.: empresa só de RH): vai para uma tela dela, do mesmo módulo se houver
 // tela única de Parceiros: Cadastro e contas, Repasse da semana e Notas fiscais em abas (Carol, 04/11)
 // cada aba é a tela de antes; quem só tem o cadastro (o cliente) não vê a barra de abas
-const PABAS=[['repasse','Cadastro e contas'],['gfrepasse','Repasse da semana'],['gfnf','Notas fiscais'],['gfrestit','Restituições efetuadas']];
+const PABAS=[['repasse','Cadastro e contas'],['gfrepasse','Repasse da semana'],['gfnf','Notas fiscais'],['gfnfrel','Notas emitidas'],['gfrestit','Restituições efetuadas']];
 function parcAbas(){
   const ok=PABAS.filter(([k])=>{const n=NAV.find(x=>x.k===k);return n&&n.ok()&&eqPode(k)});
   document.querySelectorAll('.ptabs').forEach(d=>{d.hidden=ok.length<2;
@@ -2509,7 +2531,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewNR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2546,6 +2568,7 @@ function openView(){
   else if(VIEW==='gfrepasse'){$('viewRN').hidden=false;parcAbas();renderRN()}
   else if(VIEW==='gfnf'){$('viewNF').hidden=false;parcAbas();renderNF()}
   else if(VIEW==='gfrestit'){$('viewPR').hidden=false;parcAbas();renderPR()}
+  else if(VIEW==='gfnfrel'){$('viewNR').hidden=false;parcAbas();renderNR()}
   else if(VIEW==='gffatura'){$('viewFat').hidden=false;renderFat()}
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW==='gfapres'){$('viewApr').hidden=false;renderApr()}
@@ -3674,7 +3697,7 @@ const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origi
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
 const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
-  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfrestit:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfencrel:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfrestit:'gestao',gfnfrel:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfencrel:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -7546,6 +7569,7 @@ const EXPT={
   gc:()=>expTela('viewGC',$('gcHead').closest('table')),
   nf:()=>expTela('viewNF','.nfgrid table'),
   pr:()=>expTela('viewPR','#prTab'),
+  nr:()=>expTela('viewNR','#nrTab'),
   fat:()=>expTela('viewFat',$('ftHead').closest('table')),
   gt:()=>{
     // contas a pagar e a receber em páginas (15/11): exporta e imprime todas as linhas do filtro, não só a página aberta
@@ -15099,6 +15123,12 @@ const MANUAL=[
 <li><b>NF emitida</b> (na linha ou para as marcadas): informe a data e, se quiser, o número. A nota entra no mês da emissão na tabela de baixo, e o parceiro fica guardado como “Emite NF”.</li>
 <li><b>Não emite</b>: o repasse sai das notas a emitir e o parceiro fica guardado como “Não emitir NF”.</li>
 <li>A coluna <b>No parceiro</b> mostra o que está guardado; nos próximos repasses já vem preenchido. Tudo tem <b>Desfazer</b>.</li></ul>`},
+    {k:'gfnfrel',t:'Notas fiscais emitidas',img:'gfnfrel.png',
+      txt:`<p>Relatório das notas fiscais emitidas pelas empresas do grupo, para conferir e mandar à contabilidade (só a Master).</p>
+<ul><li>Escolha o período (pela data de emissão ou de competência), a empresa, a situação (emitida pelo portal, cancelada ou emitida fora do portal) e o ambiente. A busca acha por qualquer coluna.</li>
+<li><b>Exportar</b> gera o Excel ou o PDF só com o que está filtrado; <b>Imprimir</b> imprime a lista.</li>
+<li><b>Baixar XMLs (.zip)</b> baixa o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa, com a planilha da lista.</li>
+<li>Os quadros do alto somam as notas válidas (sem as canceladas) e mostram o total de cada empresa.</li></ul>`},
     {k:'gfrestit',t:'Restituições efetuadas',img:'gfrestit.png',
       txt:`<p>Relatório dos repasses já pagos, pela data do pagamento: empresa que pagou, conta, forma, valor pago, bruto, descontos, valor da NF e se a nota foi emitida.</p>
 <ul><li>Filtre pelo período, empresa, conta, forma e nota fiscal; a busca acha por qualquer coluna.</li>
@@ -15729,7 +15759,8 @@ const NOVIDADES=[
     {x:'Novo módulo Parceiros MP no alto, com Repasse da semana, Notas fiscais dos parceiros, Restituições efetuadas e o cadastro de Parceiros. Ele aparece só nas empresas com o serviço “Parceiros MP” marcado na ficha da empresa (ou na coluna Parceiros MP de Configurações › Cadastro de empresas). Os parceiros saíram da Gestão financeira: as outras empresas usam o cadastro de fornecedores.',mods:['gfrepasse','gfnf','gfrestit','repasse'],para:'esc'},
     {x:'Repasse da semana: “Importar relatório de repasses” aceita o relatório novo (Data, Parceiro, Identificador, Bruto, Repasse, Descontos…). Só entram as linhas com situação Pendente. O valor a pagar é a coluna Repasse, e o valor da nota fiscal é Bruto − (Repasse + Descontos), que aparece embaixo do valor de cada parceiro. O relatório antigo continua funcionando.',mods:['gfrepasse']},
     {x:'Notas fiscais dos parceiros: em “Repasses pagos: notas a emitir” aparecem todas as clínicas pagas, separadas pela empresa que pagou, com o valor da NF. Marque as que serão emitidas e use “NF emitida”, ou “Não emite”. A escolha fica guardada no parceiro (Emite NF ou Não emitir NF) e já vem preenchida nos próximos repasses. “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.',mods:['gfnf']},
-    {x:'Emitir NF pelo portal (Master): nas Notas fiscais dos parceiros, marque as clínicas e clique em “Emitir NF” (ou no botão da linha). Sai uma NFS-e por clínica, pela empresa que pagou, com o valor da NF e a alíquota do mês. A empresa precisa estar em Controlacs › Notas fiscais › Dados fiscais com o certificado. “Já emitida” serve para nota feita fora do portal. Desfazer uma nota emitida pelo portal cancela a NFS-e no emissor nacional.',mods:['gfnf'],para:'esc'},
+    {x:'Emitir NF pelo portal (Master): nas Notas fiscais dos parceiros, marque as clínicas e clique em “Emitir NF”. Sai uma NFS-e por clínica, pela empresa que pagou, com o valor da NF e a alíquota do mês. A empresa precisa estar em Controlacs › Notas fiscais › Dados fiscais com o certificado. “Já emitida” serve para nota feita fora do portal. Desfazer uma nota emitida pelo portal cancela a NFS-e no emissor nacional.',mods:['gfnf'],para:'esc'},
+    {x:'Novo relatório Notas fiscais emitidas (Master), em Parceiros MP › Relatórios: as NFS-e emitidas pelo portal e as marcadas como emitidas fora dele, com filtros por período (emissão ou competência), empresa, situação e busca. Exportar em Excel ou PDF, Imprimir, e “Baixar XMLs (.zip)” com o XML de todas as notas filtradas (uma pasta por empresa) e a planilha da lista, para mandar à contabilidade.',mods:['gfnfrel'],para:'esc'},
     {x:'Novo relatório Restituições efetuadas: os repasses pagos, pela data do pagamento, com a empresa, a conta e a forma, o valor pago, o bruto, os descontos, o valor da NF e se a nota foi emitida. Filtros por período, empresa, conta, forma e nota fiscal, busca em todos os campos, Excel, PDF e impressão.',mods:['gfrestit']},
     {x:'NFS-e: em “Dados fiscais” entrou o quadro “Alíquota do mês”, onde vai a alíquota efetiva do Simples que a contabilidade passa todo mês. Todas as notas com competência no mês usam essa alíquota. Sem a alíquota do mês, o portal não deixa emitir e avisa qual mês falta.',para:'esc'}]},
   {k:'2026-11-18duplicar',data:'2026-11-18',t:'Duplicar lançamentos',itens:[
@@ -16828,7 +16859,7 @@ $('rnHead').addEventListener('click',e=>{const t=e.target.closest('[data-ord]');
   try{localStorage.setItem(RNORDK,JSON.stringify({k,d:O.k===k?-O.d:1}))}catch(e){}rnDesenha()});
 ['rnFiltro','rnSitF','rnPixF','rnEmpF'].forEach(msFiltro);
 // filtros com caixinhas nas outras telas (Carol, 12/11: “todos os filtros, para escolher mais de um”)
-const MS_TELAS=['prEmp','prConta','prForma','prNF','gtFiltro','mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','gcFiltro','pFiltro','nfFiltro','nfEmp','nfPgF','pjSit','pjTipo','tResp','fFiltro','cbFiltro','cvBand'];
+const MS_TELAS=['nrEmp','nrSit','prEmp','prConta','prForma','prNF','gtFiltro','mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','gcFiltro','pFiltro','nfFiltro','nfEmp','nfPgF','pjSit','pjTipo','tResp','fFiltro','cbFiltro','cvBand'];
 MS_TELAS.forEach(id=>{try{msFiltro(id)}catch(e){console.error('msFiltro',id,e)}});
 ['rnLote','rnDe','rnAte'].forEach(id=>$(id).onchange=()=>renderRN(false));
 $('rnFiltro').onchange=$('rnEmpF').onchange=$('rnSitF').onchange=$('rnPixF').onchange=()=>rnDesenha();
@@ -17415,6 +17446,64 @@ const NF={grupos:[],grupo:null,parc:[],nfs:[],ano:+TODAY.slice(0,4),dlg:null};
 const MES3=MESES.map(m=>m.slice(0,3));
 const v77=e=>e&&(e.code==='42P01'||e.code==='PGRST205'||/nf_mensal/.test(e.message||''));
 const v77Msg='Esta tela precisa da atualização v77 do banco (Controle de notas fiscais). Rode o SQL no Supabase.';
+// ---- Parceiros MP › Notas fiscais emitidas (Carol, 18/11): NFS-e do portal (nfse_notas) + notas marcadas como emitidas fora (repasse_itens)
+const NR={key:'',l:[],emit:[]};
+async function renderNR(){
+  const cli=cliAtual(),vazio=t=>{$('nrTiles').innerHTML='';$('nrHead').innerHTML='';$('nrFoot').innerHTML='';$('nrBody').innerHTML=`<tr><td class="l muted">${t}</td></tr>`;$('nrNote').textContent=''};
+  if(!cli)return vazio('Escolha uma empresa no alto.');
+  if(!$('nrDe').value)$('nrDe').value=TODAY.slice(0,8)+'01';if(!$('nrAte').value)$('nrAte').value=TODAY;
+  const de=$('nrDe').value,ate=$('nrAte').value,por=$('nrPor').value,amb=$('nrAmb').value;
+  vazio('Carregando as notas…');
+  try{
+    const {data:gs,error:eg}=await sb.from('repasse_grupos').select('*');if(eg)throw eg;
+    const G=(gs||[]).find(g=>(g.empresas||[]).includes(cli.id)),emps=G?G.empresas:[cli.id];NR.grupo=G;NR.emps=emps;
+    const {data:em,error:ee}=await sb.from('nfse_emitentes').select('*').in('cliente_id',emps);if(ee)throw ee;NR.emit=em||[];
+    let ns=[];if(NR.emit.length){let q=sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,cancelada_em,cancel_motivo,tomador_nome,tomador_doc,descricao,ctribnac,valor,situacao').in('emitente_id',NR.emit.map(e=>e.id)).in('situacao',['emitida','cancelada']);
+      if(amb)q=q.eq('ambiente',Number(amb));
+      q=por==='competencia'?q.gte('competencia',de).lte('competencia',ate):q.gte('emitida_em',de+'T00:00:00-03:00').lte('emitida_em',ate+'T23:59:59-03:00');
+      ns=await todas(()=>q.order('emitida_em'))}
+    // notas marcadas como emitidas fora do portal (sem XML): só quando o período é pela emissão, e em produção
+    let fora=[];if(G&&amb!=='2'){fora=await todas(()=>sb.from('repasse_itens').select('id,nome,empresa_id,nf_emitida_em,nf_numero,liquidez,bruto,valor,parceiro_nf_id').eq('grupo_id',G.id).is('nfse_nota_id',null).gte('nf_emitida_em',de).lte('nf_emitida_em',ate));
+      const pa=await todas(()=>sb.from('parceiros_nf').select('id,cpf_cnpj,nome_global').eq('grupo_id',G.id));fora.forEach(f=>f._p=pa.find(p=>p.id===f.parceiro_nf_id))}
+    NR.l=[...ns.map(n=>{const e=NR.emit.find(x=>x.id===n.emitente_id);return {id:n.id,emp:e?.cliente_id,empNome:e?.nome||'',numero:n.numero_nfse||'',emissao:(n.emitida_em||'').slice(0,10),emitida_em:n.emitida_em,competencia:n.competencia,tomador:n.tomador_nome||'',doc:n.tomador_doc||'',descricao:n.descricao||'',valor:+n.valor||0,sit:n.situacao,amb:n.ambiente,chave:n.chave||'',cancel:n.cancelada_em}}),
+      ...fora.map(f=>({id:f.id,emp:f.empresa_id,empNome:rnEmpNome(f.empresa_id),numero:f.nf_numero||'',emissao:f.nf_emitida_em,competencia:null,tomador:f._p?.nome_global||f.nome.trim(),doc:f._p?.cpf_cnpj||'',descricao:'Marcada como emitida fora do portal',valor:f.bruto!=null?+f.liquidez:+f.valor,sit:'fora',amb:1,chave:''}))]
+      .sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
+  }catch(e){console.error(e);return vazio(/nfse_|permission|RLS/i.test(e.message||'')?'Só a Master vê as notas fiscais. Se for a Master, rode a atualização v131 do banco.':'Erro ao carregar as notas. Verifique a internet e tente de novo.')}
+  const el=$('nrEmp'),v=msVals(el);el.innerHTML='<option value="">Todas do grupo</option>'+NR.emps.map(id=>`<option value="${id}">${esc(rnEmpNome(id))}</option>`).join('');if(el._msdd)msSet(el,v.filter(x=>NR.emps.includes(x)));
+  $('nrSub').textContent=`${NR.grupo?'Grupo '+NR.grupo.nome+' ('+NR.emps.map(rnEmpNome).join(', ')+')':cli.nome}. NFS-e emitidas pelo portal e as notas marcadas como emitidas fora dele. ${NR.emit.length?'':'Nenhuma empresa do grupo está cadastrada para emitir pelo portal (Dados fiscais).'}`;
+  nrDesenha();
+}
+const NRSIT={emitida:['c-ok','Emitida'],cancelada:['c-bad','Cancelada'],fora:['c-none','Emitida fora do portal']};
+function nrFiltrados(){const E=msVals('nrEmp'),S=msVals('nrSit'),qd=$('nrBusca').value.trim(),q=chave(qd),d=qd.replace(/\D/g,'');
+  return NR.l.filter(n=>(!E.length||E.includes(n.emp))&&(!S.length||S.includes(n.sit))&&(!qd||[n.empNome,n.numero,dBR(n.emissao||''),n.competencia?dBR(n.competencia):'',n.tomador,n.descricao,fm(n.valor),NRSIT[n.sit][1],n.chave].some(x=>x&&chave(String(x)).includes(q))||(d&&(String(n.doc).replace(/\D/g,'').includes(d)||n.chave.includes(d)))))}
+function nrDesenha(){const l=nrFiltrados(),sm=x=>r2(x.reduce((a,n)=>a+n.valor,0)),k=s=>l.filter(n=>n.sit===s),mu=t=>`<span class="muted">${t}</span>`;
+  $('nrTiles').innerHTML=[['Notas válidas',fm(sm(l.filter(n=>n.sit!=='cancelada'))),`${l.filter(n=>n.sit!=='cancelada').length} notas`],['Emitidas pelo portal',String(k('emitida').length),fm(sm(k('emitida')))],['Canceladas',String(k('cancelada').length),fm(sm(k('cancelada')))],['Emitidas fora do portal',String(k('fora').length),k('fora').length?'sem XML no portal':''],
+    ...[...new Set(l.map(n=>n.emp))].map(id=>{const x=l.filter(n=>n.emp===id&&n.sit!=='cancelada');return [esc(rnEmpNome(id)),fm(sm(x)),`${x.length} notas válidas`]})]
+    .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+  $('nrHead').innerHTML='<tr><th class="l">Empresa que emitiu</th><th>Nº NFS-e</th><th>Emissão</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th class="l">Situação</th><th class="l">Chave de acesso</th></tr>';
+  $('nrBody').innerHTML=l.map(n=>`<tr><td class="l" style="white-space:nowrap">${esc(n.empNome)}</td><td><b>${esc(n.numero||'—')}</b>${Number(n.amb)===2?' '+nsAmbChip(2):''}</td><td style="white-space:nowrap">${n.emissao?dBR(n.emissao):''}</td><td style="white-space:nowrap">${n.competencia?dBR(n.competencia):mu('—')}</td>
+    <td class="l" style="white-space:normal;min-width:180px">${esc(n.tomador)}</td><td class="l" style="white-space:nowrap">${esc(nsDoc(n.doc))}</td><td class="l" style="white-space:normal;max-width:280px">${esc(n.descricao.slice(0,140))}</td><td><b>${fm(n.valor)}</b></td>
+    <td class="l"><span class="chip ${NRSIT[n.sit][0]}">${NRSIT[n.sit][1]}</span>${n.cancel?'<br>'+mu(dtBR(n.cancel)):''}</td><td class="l" style="font-size:11px;word-break:break-all;min-width:160px">${esc(n.chave)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="10">Nenhuma nota neste período e filtros.</td></tr>`;
+  $('nrFoot').innerHTML=l.length?`<tr><th class="l" colspan="7">${l.length} ${l.length===1?'nota':'notas'} · válidas (sem as canceladas)</th><th>${fm(sm(l.filter(n=>n.sit!=='cancelada')))}</th><th colspan="2"></th></tr>`:'';
+  $('nrXml').disabled=!l.some(n=>n.chave);
+  $('nrNote').textContent='Exportar gera o Excel ou o PDF só com o que está filtrado; Baixar XMLs gera um .zip com o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa e a planilha da lista. As notas emitidas fora do portal não têm XML aqui: entram só na lista. O total não soma as canceladas.';
+}
+['nrDe','nrAte','nrPor','nrAmb'].forEach(id=>$(id).addEventListener('change',()=>renderNR()));
+['nrEmp','nrSit'].forEach(id=>$(id).addEventListener('change',()=>nrDesenha()));
+$('nrBusca').addEventListener('input',()=>nrDesenha());
+$('nrXml').onclick=async()=>{const l=nrFiltrados(),ids=l.filter(n=>n.chave).map(n=>n.id);if(!ids.length)return toast('Nenhuma NFS-e com XML neste filtro.');
+  const bt=$('nrXml'),txt=bt.textContent;bt.disabled=true;bt.textContent='Preparando…';
+  try{let xs=[];for(let i=0;i<ids.length;i+=100){const {data,error}=await sb.from('nfse_notas').select('id,emitente_id,numero_nfse,ndps,chave,xml_nfse,cancel_xml').in('id',ids.slice(i,i+100));if(error)throw error;xs=xs.concat(data||[])}
+    const JSZip=await nsZipLib(),zip=new JSZip();
+    for(const x of xs){const e=NR.emit.find(y=>y.id===x.emitente_id)||{},pasta=zip.folder(`${String(e.nome||'Empresa').replace(/[\\/:*?"<>|]+/g,' ').trim()} ${nsSo(e.cnpj)}`.trim()),nome=`NFSe_${x.numero_nfse||x.ndps}_${x.chave}`;
+      if(x.xml_nfse)pasta.file(nome+'.xml',x.xml_nfse);if(x.cancel_xml)pasta.file(nome+'_cancelamento.xml',x.cancel_xml)}
+    const linhas=l.map(n=>({'Empresa':n.empNome,'Nº NFS-e':n.numero,'Emissão':n.emissao?dBR(n.emissao):'','Competência':n.competencia?dBR(n.competencia):'','Tomador':n.tomador,'CNPJ/CPF':nsDoc(n.doc),'Descrição':n.descricao,'Valor':n.valor,'Situação':NRSIT[n.sit][1],'Chave de acesso':n.chave}));
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(linhas),'Notas');zip.file('lista-de-notas.xlsx',XLSX.write(wb,{type:'array',bookType:'xlsx'}));
+    const blob=await zip.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`NFSe_XML_${$('nrDe').value}_a_${$('nrAte').value}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast(`${xs.length} ${xs.length===1?'nota':'notas'} no arquivo`)}
+  catch(e){console.error(e);alert('Não foi possível baixar: '+(e.message||e))}
+  bt.disabled=false;bt.textContent=txt};
 // ---- Parceiros MP › Restituições efetuadas (Carol, 18/11): os repasses pagos, a partir dos pagamentos (fin_movimentos das contas a pagar do repasse)
 const PR={key:'',grupo:null,itens:[],contas:[]};
 async function renderPR(){
@@ -17675,7 +17764,7 @@ function nfPgDesenha(){
   const sitChip=it=>{const s=nfPgSit(it);return `<span class="chip ${RNSIT[s][1]}">${RNSIT[s][0]}</span>`};
   const nota=it=>it.nf_emitida_em?`<span class="chip c-ok"${it.nfse_nota_id?' title="Emitida pelo portal (NFS-e nacional)"':''}>✓ ${it.nfse_nota_id?'NFS-e emitida':'Emitida'} ${dBR(it.nf_emitida_em)}</span>${it.nf_numero?' '+mu('nº '+esc(it.nf_numero)):''} <button type="button" class="btn small ghost" data-pg="desfaz">Desfazer</button>`
     :it.nf_escolha==='nao_emite'?`<span class="chip c-none">Não emite</span> <button type="button" class="btn small ghost" data-pg="naoDesfaz">Desfazer</button>`
-    :(ehAdm()?`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="emite" title="Emite a NFS-e pelo portal">Emitir NF</button> <button type="button" class="btn small ghost" data-pg="marca" title="Nota emitida fora do portal">Já emitida</button>`:`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button>`)+` <button type="button" class="btn small ghost" data-pg="nao" title="Guarda no parceiro como “Não emitir NF”">Não emite</button>`;
+    :(ehAdm()?`<button type="button" class="btn small ghost" data-pg="marca" title="Nota emitida fora do portal">Já emitida</button>`:`<button type="button" class="btn small ${nfPgCls(it)==='nao'?'ghost':'primary'}" data-pg="marca">NF emitida</button>`)+` <button type="button" class="btn small ghost" data-pg="nao" title="Guarda no parceiro como “Não emitir NF”">Não emite</button>`;
   const todasSel=rows.filter(i=>!i.nf_emitida_em&&i.nf_escolha!=='nao_emite');
   $('nfPgHead').innerHTML=`<tr><th style="width:28px"><input type="checkbox" id="nfPgTodas" style="width:auto" title="Selecionar todos do filtro"${todasSel.length&&todasSel.every(i=>NFP.sel.has(i.id))?' checked':''}></th><th class="l">Pago em</th><th class="l">Parceiro</th><th title="Valor repassado ao parceiro">Repasse</th><th title="Bruto − (Repasse + Descontos), do relatório de repasse. Nos relatórios antigos, sem o bruto, é o valor do repasse">Valor da NF</th>${emp?'':'<th class="l">Pago pela</th>'}<th class="l">Protocolo</th><th class="l" title="Guardado no parceiro para os próximos repasses">No parceiro</th><th class="l">Nota fiscal</th></tr>`;
   $('nfPgBody').innerHTML=rows.map(it=>{const p=nfPgParc(it);
