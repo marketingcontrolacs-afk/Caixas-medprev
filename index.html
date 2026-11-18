@@ -16315,6 +16315,12 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18guias',data:'2026-11-18',t:'Contas a pagar: guias, rateio na categoria, lote e recibos',itens:[
+    {x:'Importar documentos em lote: arraste vários boletos, notas, guias, faturas e recibos de uma vez. O sistema separa um lançamento por documento e junta a nota e o boleto do mesmo fornecedor e mesmo valor.',para:'esc'},
+    {x:'Guias de imposto (DARF, DCTFWeb, GPS, DAS e FGTS), inclusive as impressas como PDF: o sistema lê valor, vencimento, competência e os códigos, e escolhe a categoria pelo código (Configurações › Categorias › Códigos das guias).',para:'esc'},
+    {x:'Rateio na categoria: uma conta pode ter várias categorias (ex.: guia do INSS com IR e PIS/Cofins/CSLL retidos). Os relatórios e a DRE separam cada parte.',para:'esc'},
+    {x:'Categoria sugerida: conta recorrente usa a mesma categoria da última conta do fornecedor; senão, pelas palavras do documento (ex.: Royalties).',para:'esc'},
+    {x:'Recibos: leitura do recibo de aluguel (locador, CPF/CNPJ, mês e valor transferido) e o botão 🧾 Recibos para criar, imprimir e guardar recibos.',para:'esc'}]},
   {k:'2026-11-18dupbc',data:'2026-11-18',t:'Repasse e Bom Controle sem pagamento em dobro',itens:[
     {x:'Importar do Bom Controle: o pagamento de um repasse que já está nas Contas a pagar dá baixa nele mesmo quando o nome vem escrito diferente (ex.: “Caroline Balvedi Gaiewski - Mpa*” e “Caroline Balvedi Gaiewski”), pelo CNPJ/CPF ou pelo nome do relatório. O repasse já marcado como pago no portal com até 3 dias de diferença fica de fora, e um pagamento de mesmo valor de uma conta em aberto de outro nome entra “a validar”, para conferir.',para:'esc'},
     {x:'Repasse de parceiros › Marcar como pago: se o pagamento já entrou pelo Bom Controle ou pelo extrato (mesma conta e valor, até 3 dias, mesmo parceiro), o sistema liga a conta a pagar a ele em vez de lançar de novo.',para:'esc'}]},
