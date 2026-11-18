@@ -1456,7 +1456,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <section id="viewColab" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Colaboradores e prazos</h1><p class="sub">Cadastro dos colaboradores e o controle do contrato de experiência: o aviso aparece 10 dias antes de cada vencimento.</p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="cbFiltro"><option value="todos">Todos os ativos</option><option value="exp">Em experiência</option><option value="aniv">Aniversariantes do mês</option><option value="desl">Desligados</option></select></label><button class="btn" id="cbEditar" hidden title="Preencher cargo, nascimento, admissão e prazos da experiência direto na lista, sem abrir cada cadastro">✎ Preencher na lista</button><button class="btn primary" id="cbNovo">+ Colaborador</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="cbFiltro"><option value="todos">Todos os ativos</option><option value="exp">Em experiência</option><option value="aniv">Aniversariantes do mês</option><option value="desl">Desligados</option></select></label><span class="expgrp" id="cbExp" data-exp="colab"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn" id="cbEditar" hidden title="Preencher cargo, nascimento, admissão e prazos da experiência direto na lista, sem abrir cada cadastro">✎ Preencher na lista</button><button class="btn primary" id="cbNovo">+ Colaborador</button></div>
     </div>
     <div class="tiles" id="cbTiles"></div>
     <div class="card tablebox"><table id="cbTab"></table></div>
@@ -6063,8 +6063,10 @@ async function renderBen(){
     sb.from('v_ferias_parcelas').select('nome,matricula,inicio,fim_real,status').eq('cliente_id',cli.id).lte('inicio',fim).gte('fim_real',comp)]);
   const er=[rf,rp,rm,rpe].find(x=>x.error)?.error;
   if(er){console.error(er);vazio(er.code==='42P01'||er.code==='PGRST205'||/beneficios/.test(er.message||'')?'<span class="neg">Este módulo precisa da atualização v34 do banco. Rode o SQL no Supabase.</span>':'<span class="neg">Erro ao carregar. Verifique a internet e tente de novo.</span>');return}
-  const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
-  BEN.cal=benCal(comp,fer);BEN.mes=rm.data;BEN.pend=rpe.data||[];
+  // dias em que a clínica não abre (Carol 18/11): contam como feriado no pedido (saem dos dias úteis e dos sábados)
+  const fech=(benRegra(cli).fechados||[]).filter(d=>d>=comp&&d<=fim);BEN.fech=fech;
+  const fer=[...(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data),...fech];
+  BEN.cal=benCal(comp,fer);BEN.cal.ferDatas=BEN.cal.ferDatas.filter(d=>!fech.includes(d));BEN.mes=rm.data;BEN.pend=rpe.data||[];
   if(BEN.mes?.dias_uteis!=null)BEN.cal.uteis=BEN.mes.dias_uteis;
   BEN.func=(rf.data||[]).filter(f=>f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp);
   const R=benRegra(cli),lanca=podeLancar(cli.id,'folha');
@@ -6092,6 +6094,7 @@ async function renderBen(){
   const irPonto=temAcesso('ponto')&&eqPode('ponto')?`<button class="btn small" data-bn="ponto">${temPonto?'Ver':'Importar'} o ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()} ›</button>`:'';
   $('bnBar').innerHTML=`<span class="chip ${st==='Pedido feito'?'c-done':BEN.salvo?'c-warn':'c-none'}">${st==='Pedido feito'?'Pedido feito'+(BEN.mes?.pedido_em?' em '+dBR(BEN.mes.pedido_em.slice(0,10)):''):BEN.salvo?'Salvo, falta fazer o pedido':'Ainda não salvo'}</span>
     <label class="f" style="margin:0" title="Segunda a sexta, menos feriados. Mude se a empresa tiver outro calendário.">Dias úteis de ${MESES[+m-1].toLowerCase()}<input id="bnUteis" type="number" min="0" max="31" value="${C.uteis}" style="max-width:70px"${lanca?'':' disabled'}></label>
+    <div class="f" style="margin:0"><span class="note" style="margin:0">Dias fechados (a clínica não abre)</span><div class="row" style="gap:6px;align-items:center">${BEN.fech.map(d=>`<span class="chip c-warn">${dBR(d).slice(0,5)}${lanca?` <button type="button" class="btn small ghost" data-bnf="${d}" title="Tirar este dia" aria-label="Tirar ${dBR(d)}" style="padding:0 4px">✕</button>`:''}</span>`).join('')||'<span class="muted">nenhum</span>'}${lanca?`<input type="date" id="bnFechD" min="${comp}" max="${fim}" style="max-width:150px"><button type="button" class="btn small" data-bn="fechar">+ Dia fechado</button>`:''}</div></div>
     <span class="note">${C.ferDatas.length?'Feriados: '+C.ferDatas.map(d=>dBR(d).slice(0,5)).join(', ')+'. ':''}${C.sabs.length} sábados. Faltas e atestados do ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()}.</span>
     ${temPonto?'':`<span class="chip c-warn">Ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()} ainda não importado</span>`}${irPonto}
     ${mudou?st==='Pedido feito'?`<span class="chip c-bad">O ponto mudou depois do pedido: ${mudou} ${mudou===1?'linha':'linhas'} com outras faltas. Use “Voltar para rascunho” para atualizar.</span>`:`<span class="chip c-warn">Faltas atualizadas pelo ponto em ${mudou} ${mudou===1?'linha':'linhas'}: salve o pedido</span>`:''}
@@ -6178,9 +6181,26 @@ $('bnSalvar').onclick=async ev=>{
     toast('Pedido salvo');renderBen();
   }catch(ex){console.error(ex);toast(/taxa/.test(ex.message||'')?'Falta rodar a atualização v40 do banco no Supabase.':/sab_datas|dias_uteis|faltas_injust|assid/.test(ex.message||'')?'Falta rodar a atualização v35 do banco no Supabase.':'Não foi possível salvar. Verifique a internet e tente de novo.')}finally{b.disabled=false}
 };
+// dias fechados: grava na regra da empresa (folha_modelo.beneficios.fechados), com Desfazer; o pedido recalcula os dias
+async function benFechSalva(d,pondo){
+  const cli=BEN.cli,ant=cli.folha_modelo||{},R=benRegra(cli),l=new Set(R.fechados||[]);if(pondo)l.add(d);else l.delete(d);
+  const fm2={...ant,beneficios:{...(ant.beneficios||{}),fechados:[...l].sort()}};
+  const grava=async fm=>{const {error}=await sb.from('clientes').update({folha_modelo:fm}).eq('id',cli.id);if(error){fail(error);return false}cli.folha_modelo=fm;
+    const fs=new Set(fm.beneficios?.fechados||[]),ehMes=d.slice(0,7)===BEN.comp.slice(0,7),salvo=BEN.salvo;
+    await renderBen();
+    // pedido já salvo: atualiza os dias úteis e tira o sábado fechado da escala (falta salvar)
+    if(salvo&&ehMes){
+      const real=benCal(BEN.comp,[...BEN.cal.ferDatas,...BEN.fech]).uteis;BEN.cal.uteis=real;$('bnUteis').value=real;
+      BEN.rows.forEach(r=>{r.dias_uteis=real;r.sab_datas=(r.sab_datas||[]).filter(x=>!fs.has(x));r.sab_trab=r.sab_datas.length;benCalc(r)});benEscala(true);benTabelas(true)}
+    return true};
+  if(!await grava(fm2))return;
+  toastDesfazer(`${dBR(d)} ${pondo?'marcado como fechado':'voltou a ser dia normal'}${BEN.salvo?': salve o pedido':''}`,async()=>{if(await grava(ant))toast('Voltou como estava')});
+}
+$('bnBar').addEventListener('click',ev=>{const x=ev.target.closest('[data-bnf]');if(x)benFechSalva(x.dataset.bnf,false)});
 $('bnBar').addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn;
   if(a==='ponto'){PT_MES=addMes(BEN.comp,-1).slice(0,7);go('ponto');return}
+  if(a==='fechar'){const d=$('bnFechD').value;if(!d||d.slice(0,7)!==BEN.comp.slice(0,7)){toast('Escolha um dia deste mês');return}benFechSalva(d,true);return}
   b.disabled=true;let error;
   if(a==='feito'||a==='reabrir')({error}=await sb.from('beneficios_meses').upsert({cliente_id:BEN.cli.id,competencia:BEN.comp,status:a==='feito'?'Pedido feito':'Rascunho',pedido_em:a==='feito'?new Date().toISOString():null},{onConflict:'cliente_id,competencia'}));
   else if(a==='refazer'){if(!confirm('Montar o pedido de novo pelo cadastro e pelo ponto? O que foi mudado à mão neste mês se perde.')){b.disabled=false;return}
@@ -6976,6 +6996,7 @@ function expTela(secId,tblSel){
 // fornecedores por tela
 const EXPT={
   esc:()=>expTela('viewEsc','table'),
+  colab:()=>{if(CB_ED){CB_ED=false;renderColab()}return expTela('viewColab','#cbTab')},
   mod:()=>expTela('viewMod','table'),
   rep:()=>expTela('viewRep','table'),
   rel:()=>expTela('viewRel','#relTable'),
@@ -15025,7 +15046,9 @@ const NOVIDADES=[
   {k:'2026-11-18colab',data:'2026-11-18',t:'RH: preencher os colaboradores na lista e pedido de benefícios',itens:[
     {x:'RH › Colaboradores e prazos: botão “✎ Preencher na lista” para preencher cargo, nascimento, admissão e os prazos da experiência direto na lista, sem abrir cada cadastro. Cada campo grava ao sair dele, com Desfazer. O que falta preencher aparece em amarelo e embaixo do nome.',para:'esc'},
     {x:'Cadastro novo de colaborador: ao salvar, o sistema avisa o que falta preencher (cargo, CPF, nascimento, WhatsApp, admissão e prazos da experiência).',para:'esc'},
-    {x:'Pedido de benefícios: usa o Transporte, VT por dia, Empresa do VT e VA por mês da ficha de cada colaborador. Novo campo na ficha: “Prêmio no VA se não faltar”. Cada empresa tem as suas Regras de benefícios, no fim do pedido.',para:'esc'}]},
+    {x:'Pedido de benefícios: usa o Transporte, VT por dia, Empresa do VT e VA por mês da ficha de cada colaborador. Novo campo na ficha: “Prêmio no VA se não faltar”. Cada empresa tem as suas Regras de benefícios, no fim do pedido.',para:'esc'},
+    {x:'Pedido de benefícios: “+ Dia fechado” para marcar os dias em que a clínica não abre (ex.: 24/12 e 31/12). O dia sai dos dias úteis e da escala de sábados, e o VT e o VA por dia são recalculados.',para:'esc'},
+    {x:'RH › Colaboradores e prazos: Exportar (Excel, PDF) e Imprimir, só com o que está filtrado na tela.',para:'esc'}]},
   {k:'2026-11-18ordenar',data:'2026-11-18',t:'Ordenar a lista clicando no nome da coluna, em todas as telas',itens:[
     {x:'Em todas as telas com tabela (ex.: RH › Colaboradores e Controle de experiência, Contas a pagar e a receber, Movimentação, Notas fiscais, Conferências, Cadastros), clique no nome da coluna para ordenar a lista: o 1º clique põe em ordem crescente (▲: A a Z, data mais antiga, menor valor) e o 2º inverte (▼). Ex.: clique em “Colaborador” para ordem alfabética ou em “Cargo” para juntar por cargo. A setinha ↕ ao lado do nome mostra que a coluna pode ser ordenada. Ao trocar de tela, a lista volta à ordem normal.'}]},
   {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
