@@ -1139,7 +1139,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     <p class="note" id="encNote"></p>
     <h2 style="margin-top:18px">Histórico do mês</h2>
     <p class="sub">Todo encerramento e todo desbloqueio fica guardado aqui, com quem fez, quando e o motivo.</p>
-    <div class="card tablebox"><table><thead><tr><th class="l">Empresa</th><th class="l">Conta</th><th class="l">Encerrado por</th><th class="l">Desbloqueado por</th><th class="l">Motivo</th></tr></thead><tbody id="encHist"></tbody></table></div>
+    <div class="card tablebox"><table><thead><tr><th class="l">Empresa</th><th class="l">Conta</th><th class="l">Período</th><th class="l">Encerrado por</th><th class="l">Desbloqueado por</th><th class="l">Motivo</th></tr></thead><tbody id="encHist"></tbody></table></div>
   </section>
 
   <!-- GESTÃO FINANCEIRA › CADASTROS (escritório) -->
@@ -1612,6 +1612,11 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <div class="db" id="ctdBody"></div>
   <div class="df" id="ctdFoot"></div>
 </dialog>
+<dialog id="encAteDlg" style="width:min(520px,calc(100vw - 32px))">
+  <div class="dh"><h2>🔒 Encerrar até uma data</h2></div>
+  <div class="db"><p id="encAteTxt"></p><label class="f">Encerrado até (inclusive)<input type="date" id="encAteData"></label><p class="muted">Tudo com data até esse dia fica travado nessas contas, inclusive os meses anteriores. Depois dele continua aberto.</p><p class="neg" id="encAteErr"></p></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" onclick="this.closest('dialog').close()">Cancelar</button><button type="button" class="btn primary" id="encAteOk">🔒 Encerrar</button></div>
+</dialog>
 <dialog id="mesEncDlg" style="width:min(520px,calc(100vw - 32px))">
   <div class="dh"><h2>🔒 Mês encerrado</h2></div>
   <div class="db"><p id="mesEncTxt"></p><p class="muted">O lançamento não foi gravado. Depois do desbloqueio, faça de novo.</p></div>
@@ -1742,13 +1747,13 @@ const soVerResp=()=>{const r={data:null,error:{message:SOVER_MSG,code:'so_visual
   // Encerramento de mês (Carol, 18/11; v151): o banco recusa lançamento em mês/conta encerrado (hint MES_ENCERRADO).
   // Qualquer tela que tente gravar mostra o mesmo aviso, com o pedido de desbloqueio ao Master.
   try{let p=Object.getPrototypeOf(_from('clientes').select('id'));while(p&&!Object.prototype.hasOwnProperty.call(p,'then'))p=Object.getPrototypeOf(p);
-    if(p){const t0=p.then;p.then=function(ok,ko){return t0.call(this,r=>{try{if(r&&r.error&&(r.error.hint==='MES_ENCERRADO'||/já foi encerrado/.test(r.error.message||'')))mesEncAviso(r.error.message)}catch(e){}return ok?ok(r):r},ko)}}}catch(e){console.error(e)}}
+    if(p){const t0=p.then;p.then=function(ok,ko){return t0.call(this,r=>{try{if(r&&r.error&&(r.error.hint==='MES_ENCERRADO'||/já foi encerrad|está encerrada até/.test(r.error.message||'')))mesEncAviso(r.error.message)}catch(e){}return ok?ok(r):r},ko)}}}catch(e){console.error(e)}}
 let MESENC_T=0;
 function mesEncAviso(msg){MESENC_T=Date.now();const d=document.getElementById('mesEncDlg');if(!d)return;
   document.getElementById('mesEncTxt').textContent=msg||'Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período.';
   let adm=false;try{adm=ehAdm()}catch(e){}document.getElementById('mesEncIr').hidden=!adm;if(!d.open)d.showModal()}
 // a tela que pegou o erro costuma dar alert(error.message) logo depois: o aviso já apareceu, não repete
-{const a0=window.alert.bind(window);window.alert=m=>{if(/já foi encerrado/.test(String(m??''))&&Date.now()-MESENC_T<5000)return;return a0(m)}}
+{const a0=window.alert.bind(window);window.alert=m=>{if(/já foi encerrad|está encerrada até/.test(String(m??''))&&Date.now()-MESENC_T<5000)return;return a0(m)}}
 const $=id=>document.getElementById(id);
 
 // ---------- utilidades ----------
@@ -14179,7 +14184,8 @@ const MANUAL=[
 <ol>
 <li>Em <b>Gestão financeira › Relatórios › Encerramento de mês</b>, escolha o <b>Mês</b> e a <b>Empresa</b> (ou Todas as empresas).</li>
 <li>A lista mostra todas as contas (caixa diário, tesouraria, bancos, aplicações e cartão) com lançamentos, entradas, saídas, saldo no fim do mês e as <b>pendências</b> (a validar, sem categoria, sem conciliar, dias de caixa sem conferir).</li>
-<li>Clique em <b>🔒 Encerrar</b> na conta já conferida, ou marque várias e clique em <b>Encerrar as marcadas</b>. Se tiver pendência, o sistema avisa antes.</li>
+<li>Clique em <b>🔒 Encerrar o mês</b> na conta já conferida, ou marque várias e clique em <b>Encerrar as marcadas</b>. Se tiver pendência, o sistema avisa antes.</li>
+<li>Para travar só até um dia (por exemplo, conferiu até o dia 15), clique em <b>Até uma data…</b> (ou <b>Encerrar as marcadas até uma data…</b>) e escolha a data: tudo com data até esse dia fica travado, inclusive os meses anteriores; depois dele continua aberto.</li>
 <li>Errou o clique? O botão <b>Desfazer</b> aparece logo depois (e fica na linha por 15 minutos para quem encerrou).</li>
 <li>Só o <b>Master</b> desbloqueia: botão <b>🔓 Desbloquear</b>, com o motivo. Depois de corrigir, encerre de novo.</li>
 </ol>
@@ -14880,7 +14886,7 @@ $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crm
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
   {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
-    {x:'Nova tela Gestão financeira › Relatórios › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
+    {x:'Nova tela Gestão financeira › Relatórios › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações), ou só até uma data (tudo até aquele dia fica travado). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
     {x:'Se tentar lançar, alterar ou excluir com data de um mês já encerrado, aparece o aviso: "Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."',mods:['caixa','tesouraria']},
     {x:'Apresentação (DRE financeira): meses encerrados aparecem com 🔒 e há aviso dos que ainda têm conta aberta. A antecipação de recebíveis que entra no banco não abate mais as despesas (fica numa linha à parte, fora da DRE).',para:'esc'}]},
   {k:'2026-11-17bancos',data:'2026-11-17',t:'Lista de bancos da empresa',itens:[
@@ -16870,7 +16876,7 @@ async function aprCalcula(base){
       x.grupos=x.grupos.filter(([g,v])=>nz(v))})}
   Object.values(R).forEach(x=>x.semLiq=mostra.filter(m=>!x.liq[m]));
   // meses encerrados (Encerramento de mês, v151): a unidade só está encerrada no mês se todas as contas ativas dela estiverem
-  let enc=null;try{const ls=await mesEncLista();enc=new Set(ls.filter(l=>l.conta_id).map(l=>l.conta_id+'|'+aprMes(l.competencia)))}catch(e){}
+  let enc=null;try{const ls=await mesEncLista();enc={has:k=>{const [c,m]=k.split('|');return encCobre(ls,c,m)}}}catch(e){}
   Object.values(R).forEach(x=>{x.abertas={};if(!enc)return;const cs=contas.filter(c=>(x.u.empresas||[]).includes(c.cliente_id)&&c.ativo!==false);
     mostra.forEach(m=>{const ab=cs.filter(c=>!enc.has(c.id+'|'+m));if(ab.length)x.abertas[m]=ab.length})});
   return {meses:mostra,us,R,encOk:!!enc};
@@ -17178,19 +17184,27 @@ async function renderEnc(){
   const clis=ENC.cli==='*'?emps.map(c=>c.id):[ENC.cli];if(!clis.length){$('encBody').innerHTML='<tr><td class="l muted" colspan="11">Nenhuma empresa com Gestão financeira.</td></tr>';return}
   const comp=ENC.mes+'-01';
   const [r1,r2_]=await Promise.all([sb.rpc('fin_resumo_encerramento',{mes:comp,clis}),
-    todas(()=>sb.from('fin_meses_encerrados').select('*').eq('competencia',comp).in('cliente_id',clis).order('fechado_em')).then(d=>({data:d}),e=>({error:e}))]);
+    encLocksDoMes(comp,clis).then(d=>({data:d}),e=>({error:e}))]);
   const err=r1.error||r2_.error;if(err){console.error(err);$('encBody').innerHTML=`<tr><td class="l neg" colspan="11">${encV151(err)?encMsg:'Erro ao carregar: '+esc(err.message||err)}</td></tr>`;return}
   if(VIEW!=='gfencerra')return;
-  ENC.locks=r2_.data||[];const ativos={};ENC.locks.filter(l=>l.ativo).forEach(l=>ativos[encK(l)]=l);
+  ENC.locks=r2_.data||[];const fimM=fimMes(comp);
   const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'?';
   const ord={'Caixa diário':0,'Caixa / tesouraria':1,'Conta corrente':2,'Conta de pagamento':3,'Poupança':4,'Aplicação':5,'Cartão de crédito':6};
-  ENC.rows=(r1.data||[]).map(r=>({...r,emp:nomeCli(r.cliente_id),lock:ativos[encK(r)]||null}))
+  // lock = encerramento que cobre o mês inteiro; ateParcial = "encerrado até" um dia no meio do mês
+  ENC.rows=(r1.data||[]).map(r=>{const ls=ENC.locks.filter(l=>l.ativo&&encK(l)===encK(r));const cobre=ls.find(l=>l.ate>=fimM&&(!l.de||l.de<=comp))||null;
+      const ate=ls.filter(l=>!l.de).map(l=>l.ate).sort().pop()||null;return {...r,emp:nomeCli(r.cliente_id),locks:ls,lock:cobre,ateParcial:!cobre&&ate?ate:null}})
     .sort((a,b)=>a.emp.localeCompare(b.emp)||(ord[a.tipo]??9)-(ord[b.tipo]??9)||a.conta.localeCompare(b.conta));
   ENC.sel=new Set([...ENC.sel].filter(k=>ENC.rows.some(r=>encK(r)===k&&!r.lock)));
   encDesenha();
 }
 function encCols(r){const p=encPend(r);return [r.emp,r.conta,r.tipo,String(r.lancamentos),fm(r.entradas),r.conta_id?fm(r.saidas):'—',r.saldo_final==null?'—':fm(r.saldo_final),p.join(' · ')||'Nenhuma',
-  r.lock?`Encerrado · ${r.lock.fechado_por_nome||''} · ${encQuando(r.lock.fechado_em)}`:'Aberto']}
+  r.lock?`Encerrado ${encPer(r.lock)} · ${r.lock.fechado_por_nome||''} · ${encQuando(r.lock.fechado_em)}`:r.ateParcial?`Encerrado até ${dBR(r.ateParcial)}`:'Aberto']}
+const encPer=l=>l.de?(l.de.slice(8)==='01'&&l.ate===fimMes(l.de)?MESES[+l.de.slice(5,7)-1].toLowerCase()+'/'+l.de.slice(0,4):dBR(l.de)+' a '+dBR(l.ate)):'até '+dBR(l.ate);
+const encNorm=l=>({...l,de:l.ate?l.de:l.competencia,ate:l.ate||fimMes(l.competencia)});
+// encerramentos que tocam o mês: os do mês inteiro e os "encerrado até" uma data igual ou depois do dia 1 (antes da v152: só o mês)
+async function encLocksDoMes(comp,clis){const fim=fimMes(comp);
+  try{return (await todas(()=>sb.from('fin_meses_encerrados').select('*').in('cliente_id',clis).gte('ate',comp).or(`de.is.null,de.lte.${fim}`).order('fechado_em'))).map(encNorm)}
+  catch(e){if(!/ate|column|de\b/i.test(e.message||''))throw e;return (await todas(()=>sb.from('fin_meses_encerrados').select('*').eq('competencia',comp).in('cliente_id',clis).order('fechado_em'))).map(encNorm)}}
 const ENC_COLS=['Empresa','Conta','Tipo','Lançamentos','Entradas','Saídas','Saldo no fim do mês','Pendências','Situação'];
 function encDesenha(){
   const adm=ehAdm(),bq=chave(ENC.busca||'');
@@ -17202,14 +17216,15 @@ function encDesenha(){
     <tr class="enc-f"><th></th>${ENC_COLS.map((c,i)=>`<th><input data-encf="${i}" value="${esc(ENC.f[i]||'')}" placeholder="Filtrar" aria-label="Filtrar ${esc(c)}"></th>`).join('')}<th></th></tr>`;
   let emp='';
   $('encBody').innerHTML=vis.map(r=>{const k=encK(r),cs=encCols(r),p=encPend(r),l=r.lock;
-    const acao=l?(adm?`<button type="button" class="btn small" data-encdes="${l.id}">🔓 Desbloquear</button>`:encMeu(l)?`<button type="button" class="btn small ghost" data-encdes="${l.id}">↶ Desfazer</button>`:'<span class="muted">Só o Master desbloqueia</span>')
-      :`<button type="button" class="btn small primary" data-encone="${esc(k)}">🔒 Encerrar</button>`;
+    const des=r.locks.map(x=>adm?`<button type="button" class="btn small" data-encdes="${x.id}">🔓 Desbloquear${r.locks.length>1||!x.de?' '+esc(encPer(x)):''}</button>`:encMeu(x)?`<button type="button" class="btn small ghost" data-encdes="${x.id}">↶ Desfazer</button>`:'').join(' ');
+    const acao=(l?'':`<button type="button" class="btn small primary" data-encone="${esc(k)}">🔒 Encerrar o mês</button> <button type="button" class="btn small" data-encate="${esc(k)}">Até uma data…</button> `)
+      +(des||(r.locks.length?'<span class="muted">Só o Master desbloqueia</span>':''));
     const sep=r.emp!==emp;emp=r.emp;
     return `<tr${sep?' class="enc-sep"':''}><td>${l?'':`<input type="checkbox" data-encsel="${esc(k)}" style="width:auto"${ENC.sel.has(k)?' checked':''} aria-label="Marcar ${esc(r.conta)}">`}</td>
       <td class="l">${sep?`<b>${esc(r.emp)}</b>`:`<span class="muted">${esc(r.emp)}</span>`}</td><td class="l">${esc(r.conta)}</td><td class="l">${esc(r.tipo)}</td>
       <td>${r.lancamentos}</td><td>${cs[4]}</td><td>${cs[5]}</td><td>${r.saldo_final!=null&&r.saldo_final<-0.004?`<span class="neg">${cs[6]}</span>`:cs[6]}</td>
       <td class="l">${p.length?`<span class="enc-pend">${esc(p.join(' · '))}</span>`:'<span class="muted">Nenhuma</span>'}</td>
-      <td class="l">${l?`<span class="chip ok">🔒 Encerrado</span><br><span class="muted">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</span>`:'<span class="chip warn">Aberto</span>'}</td><td>${acao}</td></tr>`}).join('')
+      <td class="l">${l?`<span class="chip ok">🔒 Encerrado${l.de?'':' '+esc(encPer(l))}</span><br><span class="muted">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</span>`:r.ateParcial?`<span class="chip warn">🔒 Encerrado até ${dBR(r.ateParcial)}</span><br><span class="muted">Aberto depois</span>`:'<span class="chip warn">Aberto</span>'}</td><td class="enc-acao">${acao}</td></tr>`}).join('')
     ||`<tr><td class="l muted" colspan="11">${ENC.rows.length?'Nenhuma conta com esse filtro.':'Nenhuma conta nessas empresas.'}</td></tr>`;
   const tot=ENC.rows.length,enc=ENC.rows.filter(r=>r.lock).length,porEmp={};ENC.rows.forEach(r=>{porEmp[r.emp]=porEmp[r.emp]||[0,0];porEmp[r.emp][0]++;if(r.lock)porEmp[r.emp][1]++});
   const empOk=Object.values(porEmp).filter(([a,b])=>a===b).length,pend=ENC.rows.filter(r=>!r.lock&&encPend(r).length).length;
@@ -17217,35 +17232,36 @@ function encDesenha(){
     +`<div class="card tile"><div class="k">Empresas com o mês todo encerrado</div><div class="v">${empOk} de ${Object.keys(porEmp).length}</div><div class="n">Essas já podem ir para a Apresentação</div></div>`
     +`<div class="card tile"><div class="k">Contas abertas com pendência</div><div class="v ${pend?'neg':''}">${pend}</div><div class="n">A validar, sem categoria ou sem conciliar</div></div>`;
   $('encBar').innerHTML=`<button type="button" class="btn primary" id="encSel"${selVis.length?'':' disabled'}>🔒 Encerrar ${selVis.length?'as '+selVis.length+' marcadas':'as marcadas'}</button>`
+    +`<button type="button" class="btn" id="encAteSel"${selVis.length?'':' disabled'}>🔒 Encerrar as marcadas até uma data…</button>`
     +(abertas.length?`<button type="button" class="btn" id="encTodasBtn">Marcar as ${abertas.length} abertas mostradas</button>`:'')
     +`<button type="button" class="btn" id="encXls">Baixar Excel</button>`;
   $('encNote').innerHTML='Encerrar não muda nenhum lançamento: só trava a conta naquele mês. O caixa diário aparece quando a empresa teve fechamento de caixa no mês; a tesouraria vale também para o que o cliente lança na Tesouraria.'
     +(adm?'':' Para desbloquear um mês, peça ao Master (a Carol).');
   const nomeConta=l=>ENC.rows.find(r=>encK(r)===encK(l))?.conta||(l.conta_id?'Conta':'Caixa diário');
-  $('encHist').innerHTML=[...ENC.locks].sort((a,b)=>String(b.reaberto_em||b.fechado_em||'').localeCompare(String(a.reaberto_em||a.fechado_em||''))).map(l=>`<tr><td class="l">${esc(CLIENTES.find(c=>c.id===l.cliente_id)?.nome||'')}</td><td class="l">${esc(nomeConta(l))}</td>
+  $('encHist').innerHTML=[...ENC.locks].sort((a,b)=>String(b.reaberto_em||b.fechado_em||'').localeCompare(String(a.reaberto_em||a.fechado_em||''))).map(l=>`<tr><td class="l">${esc(CLIENTES.find(c=>c.id===l.cliente_id)?.nome||'')}</td><td class="l">${esc(nomeConta(l))}</td><td class="l">${esc(encPer(l))}</td>
     <td class="l">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</td><td class="l">${l.ativo?'<span class="muted">Continua encerrado</span>':`${esc(l.reaberto_por_nome||'')} · ${encQuando(l.reaberto_em)}`}</td><td class="l">${esc(l.motivo||'')}</td></tr>`).join('')
-    ||'<tr><td class="l muted" colspan="5">Nenhum encerramento neste mês ainda.</td></tr>';
+    ||'<tr><td class="l muted" colspan="6">Nenhum encerramento neste mês ainda.</td></tr>';
 }
-async function encEncerra(ks){const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&!r.lock);if(!rs.length)return;
-  const comPend=rs.filter(r=>encPend(r).length);const mesTxt=MESES[+ENC.mes.slice(5)-1].toLowerCase()+'/'+ENC.mes.slice(0,4);
-  let msg=`Encerrar ${mesTxt} em ${rs.length===1?'1 conta':rs.length+' contas'}? Depois disso ninguém inclui, altera ou exclui lançamentos ${rs.length===1?'dela':'delas'} nesse mês; só o Master desbloqueia.`;
+async function encEncerra(ks,ate){const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&!r.lock);if(!rs.length)return;
+  const comPend=rs.filter(r=>encPend(r).length);const mesTxt=ate?'até '+dBR(ate):MESES[+ENC.mes.slice(5)-1].toLowerCase()+'/'+ENC.mes.slice(0,4);
+  let msg=`Encerrar ${mesTxt} em ${rs.length===1?'1 conta':rs.length+' contas'}? Depois disso ninguém inclui, altera ou exclui lançamentos ${rs.length===1?'dela':'delas'} ${ate?'com data até esse dia':'nesse mês'}; só o Master desbloqueia.`;
   if(comPend.length)msg+=`\n\nAtenção: ${comPend.length===1?'1 conta tem':comPend.length+' contas têm'} pendência:\n`+comPend.slice(0,12).map(r=>`• ${r.emp} · ${r.conta}: ${encPend(r).join(', ')}`).join('\n')+(comPend.length>12?'\n• ...':'')+'\n\nEncerrar mesmo assim?';
-  if(!confirm(msg))return;
-  const {data,error}=await sb.from('fin_meses_encerrados').insert(rs.map(r=>({cliente_id:r.cliente_id,conta_id:r.conta_id||null,competencia:ENC.mes+'-01',fechado_por_nome:ME?.nome||ME?.email||null}))).select();
+  if(!ate&&!confirm(msg)||ate&&comPend.length&&!confirm(msg))return;
+  const {data,error}=await sb.from('fin_meses_encerrados').insert(rs.map(r=>({cliente_id:r.cliente_id,conta_id:r.conta_id||null,competencia:(ate||ENC.mes).slice(0,7)+'-01',...(ate?{de:null,ate}:{}),fechado_por_nome:ME?.nome||ME?.email||null}))).select();
   if(error){console.error(error);return alert(encV151(error)?encMsg:/duplicate|unique/i.test(error.message||'')?'Uma dessas contas já foi encerrada por outra pessoa. A tela vai atualizar.':'Erro ao encerrar: '+error.message),renderEnc()}
   ks.forEach(k=>ENC.sel.delete(k));MESENC=null;
-  toastDesfazer(`${rs.length===1?'Conta encerrada':rs.length+' contas encerradas'} em ${mesTxt}.`,async()=>{
+  toastDesfazer(`${rs.length===1?'Conta encerrada':rs.length+' contas encerradas'} ${ate?'':'em '}${mesTxt}.`,async()=>{
     const {error:e2}=await sb.from('fin_meses_encerrados').update({ativo:false,motivo:'Desfeito logo depois de encerrar'}).in('id',(data||[]).map(x=>x.id));
     if(e2)alert('Não deu para desfazer: '+e2.message);else toast('Encerramento desfeito.');MESENC=null;renderEnc()});
   renderEnc()}
-async function encDesbloqueia(id){const l=ENC.locks.find(x=>x.id===id);if(!l)return;const r=ENC.rows.find(x=>x.lock?.id===id);const nome=r?`${r.emp} · ${r.conta}`:'esta conta';
+async function encDesbloqueia(id){const l=ENC.locks.find(x=>x.id===id);if(!l)return;const r=ENC.rows.find(x=>x.locks.some(y=>y.id===id));const nome=r?`${r.emp} · ${r.conta}`:'esta conta';
   const meu=encMeu(l)&&!ehAdm();let motivo='Desfeito logo depois de encerrar';
-  if(!meu){motivo=prompt(`Desbloquear ${MESES[+ENC.mes.slice(5)-1].toLowerCase()}/${ENC.mes.slice(0,4)} em ${nome}?\n\nEscreva o motivo (fica no histórico):`,'');if(motivo==null)return;motivo=motivo.trim();if(!motivo)return alert('Escreva o motivo do desbloqueio.')}
+  if(!meu){motivo=prompt(`Desbloquear ${encPer(l)} em ${nome}?\n\nEscreva o motivo (fica no histórico):`,'');if(motivo==null)return;motivo=motivo.trim();if(!motivo)return alert('Escreva o motivo do desbloqueio.')}
   else if(!confirm(`Desfazer o encerramento de ${nome}?`))return;
   const {error}=await sb.from('fin_meses_encerrados').update({ativo:false,motivo,reaberto_por_nome:ME?.nome||ME?.email||null}).eq('id',id);
   if(error){console.error(error);return alert(encV151(error)?encMsg:/row-level|policy|0 rows/i.test(error.message||'')?'Só o Master desbloqueia um mês encerrado.':'Erro ao desbloquear: '+error.message)}
   MESENC=null;
-  if(!meu)toastDesfazer(`${nome}: mês desbloqueado.`,async()=>{const {error:e2}=await sb.from('fin_meses_encerrados').insert({cliente_id:l.cliente_id,conta_id:l.conta_id,competencia:l.competencia,fechado_por_nome:ME?.nome||ME?.email||null,obs:'Encerrado de novo (desfez o desbloqueio)'});
+  if(!meu)toastDesfazer(`${nome}: mês desbloqueado.`,async()=>{const {error:e2}=await sb.from('fin_meses_encerrados').insert({cliente_id:l.cliente_id,conta_id:l.conta_id,competencia:l.competencia,...(l.de?{}:{de:null,ate:l.ate}),fechado_por_nome:ME?.nome||ME?.email||null,obs:'Encerrado de novo (desfez o desbloqueio)'});
     if(e2)alert('Não deu para encerrar de novo: '+e2.message);else toast('Encerrado de novo.');MESENC=null;renderEnc()});
   else toast('Encerramento desfeito.');
   renderEnc()}
@@ -17260,14 +17276,23 @@ $('viewEnc').addEventListener('change',e=>{const t=e.target;
   if(t.id==='encTodas'){const bq=document.querySelectorAll('[data-encsel]');bq.forEach(c=>t.checked?ENC.sel.add(c.dataset.encsel):ENC.sel.delete(c.dataset.encsel));encDesenha()}});
 $('viewEnc').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.encone)return encEncerra([b.dataset.encone]);
+  if(b.dataset.encate)return encAteAbre([b.dataset.encate]);
+  if(b.id==='encAteSel')return encAteAbre([...ENC.sel]);
   if(b.dataset.encdes)return encDesbloqueia(b.dataset.encdes);
   if(b.id==='encSel')return encEncerra([...ENC.sel]);
   if(b.id==='encTodasBtn'){document.querySelectorAll('[data-encsel]').forEach(c=>ENC.sel.add(c.dataset.encsel));return encDesenha()}
   if(b.id==='encXls'){const t=document.querySelector('.enc-t');const ws=XLSX.utils.table_to_sheet(t,{raw:false});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Encerramento');XLSX.writeFile(wb,`Encerramento de mês ${ENC.mes}.xlsx`)}});
+// "Encerrar até uma data" (Carol, 18/11; v152): só a data final; tudo até ela fica travado
+function encAteAbre(ks){const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&!r.lock);if(!rs.length)return;ENC.ateKs=ks;
+  $('encAteTxt').textContent=rs.length===1?`${rs[0].emp} · ${rs[0].conta}`:`${rs.length} contas marcadas`;$('encAteData').value=fimMes(ENC.mes+'-01')>TODAY?TODAY:fimMes(ENC.mes+'-01');$('encAteErr').textContent='';$('encAteDlg').showModal()}
+$('encAteOk').addEventListener('click',async()=>{const d=$('encAteData').value;if(!d)return $('encAteErr').textContent='Escolha a data.';if(d>TODAY)return $('encAteErr').textContent='A data não pode ser depois de hoje.';
+  $('encAteDlg').close();await encEncerra(ENC.ateKs||[],d)});
 $('mesEncIr').addEventListener('click',()=>{$('mesEncDlg').close();go('gfencerra')});
 // encerramentos ativos (para a Apresentação marcar os meses encerrados); null = recarregar
 let MESENC=null;
-async function mesEncLista(){if(MESENC)return MESENC;try{MESENC=await todas(()=>sb.from('fin_meses_encerrados').select('cliente_id,conta_id,competencia').eq('ativo',true))}catch(e){MESENC=[]}return MESENC}
+async function mesEncLista(){if(MESENC)return MESENC;try{MESENC=(await todas(()=>sb.from('fin_meses_encerrados').select('*').eq('ativo',true))).map(encNorm)}catch(e){MESENC=[]}return MESENC}
+// a conta está encerrada no mês inteiro? (um encerramento do mês ou um "até" no último dia ou depois)
+const encCobre=(ls,conta,m)=>{const ini=m+'-01',fim=fimMes(ini);return ls.some(l=>l.conta_id===conta&&l.ate>=fim&&(!l.de||l.de<=ini))};
 // ---------- fim do Encerramento de mês ----------
 boot();
 })();
