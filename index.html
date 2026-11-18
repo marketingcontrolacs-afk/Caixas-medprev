@@ -3787,15 +3787,15 @@ let FC=null;
 const fcI=(id,t,v,o='')=>`<label class="f${/wide/.test(o)?' wide':''}">${t}<input id="${id}" value="${esc(v??'')}" ${o.replace('wide','')}></label>`;
 const fcSN=(id,t,v)=>`<label class="f">${t}<select id="${id}"><option value="1"${v?' selected':''}>Sim</option><option value="0"${v?'':' selected'}>Não</option></select></label>`;
 const fcSec=(t,sub,h,id='')=>`<section class="fcSec"${id?` id="${id}"`:''}><h3>${t}</h3>${sub?`<p class="note" style="margin:0 0 8px">${sub}</p>`:''}${h}</section>`;
-function fcAbre(id){const c=id?CLIENTES.find(x=>x.id===id):null;if(id&&!c)return;
+function fcAbre(id,op={}){const c=id?CLIENTES.find(x=>x.id===id):null;if(id&&!c)return;
   if(!V154(c||CLIENTES[0])){toast('Rode a atualização v154 do banco no Supabase para usar a ficha da empresa.');return}
   const d=fcDados(c),s=c?fcSrv(c):{fin:true,rh:false,ben:false},e=d.end,b=d.ben,ehM='matriz_id' in (c||CLIENTES[0]||{}),temBen='bpo_beneficios' in (c||CLIENTES[0]||{});
-  FC={id:c?.id||null,fb:d.fb,ctl:null};
+  FC={id:c?.id||null,fb:d.fb,ctl:null,deCtl:!!op.ctl};
   $('fcTitle').textContent=c?'Ficha da empresa · '+c.nome:'Cadastrar empresa';
   const ufs='AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
   const ufSel=(id,v)=>`<label class="f">UF *<select id="${id}"><option value="">—</option>${ufs.map(u=>`<option${u===v?' selected':''}>${u}</option>`).join('')}</select></label>`;
   const fornDL=[...new Set(CLIENTES.flatMap(x=>Object.values(x.folha_modelo?.beneficios?.forn||{})).filter(Boolean))];
-  $('fcBody').innerHTML=`<p class="err" id="fcErr" hidden></p>
+  $('fcBody').innerHTML=`${!c&&op.ctl?'<p class="note" style="margin:0 0 10px">Cliente novo da Controlacs: a ficha cria a empresa no portal e o cliente em Gestão Controlacs, ligados. Depois de salvar, cadastre o contrato. Cliente pessoa física ou sem empresa no portal? <button type="button" class="btn small" id="fcSimples">Cadastro simples</button></p>':''}<p class="err" id="fcErr" hidden></p>
   ${fcSec('Dados da Receita Federal','Digite o CNPJ: o sistema busca na Receita a razão social, o nome fantasia e o endereço. Campos com * são obrigatórios.',
     `<div class="fields"><label class="f">CNPJ *<input id="fc_cnpj" inputmode="numeric" value="${esc(fcCnpjFmt(d.cnpj))}" placeholder="00.000.000/0000-00"></label>
     <div class="f" style="align-self:end"><button type="button" class="btn" id="fcRec" title="Busca de novo e troca os dados pelos da Receita">🔎 Buscar na Receita</button></div>
@@ -3848,6 +3848,7 @@ function fcAbre(id){const c=id?CLIENTES.find(x=>x.id===id):null;if(id&&!c)return
   $('fcRec').onclick=()=>fcReceita(true);
   $('fc_cep').addEventListener('change',()=>fcCep('fc_',true));$('fc_ecep').addEventListener('change',()=>fcCep('fc_e',true));
   const ant=c?.ficha_ant;$('fcDesf').hidden=!ant;
+  if($('fcSimples'))$('fcSimples').onclick=()=>{$('dlgFicha').close();ctAbreCli(null)};
   fcChip();$('fcBody').addEventListener('input',fcChip);$('fcBody').addEventListener('change',fcChip);
   $('dlgFicha').showModal();$('fcBody').scrollTop=0;
   if(!c)setTimeout(()=>$('fc_cnpj').focus(),50);
@@ -3965,9 +3966,20 @@ async function fcSalva(){const {d,s}=fcLe(),err=$('fcErr'),c=FC.id?CLIENTES.find
   if(error){console.error(error);return erro(/duplicate|unique/i.test(error.message||'')?'Já existe uma empresa com este nome.':/ficha/.test(error.message||'')?'Rode a atualização v154 do banco no Supabase.':'Não foi possível salvar: '+error.message)}
   const i=CLIENTES.findIndex(x=>x.id===data.id);if(i>=0)CLIENTES[i]=data;else CLIENTES.push(data);
   if(!falta.length)fcTarefaOk(data);
-  $('dlgFicha').close();renderCadastro();if(VIEW==='ben'&&BEN.cli?.id===data.id)renderBen();
+  const ctlId=ehAdm()?await fcSyncCtl(data,!c):null;
+  $('dlgFicha').close();
+  if(!c&&FC.deCtl&&ctlId){try{await ctCarrega();ctDesenha();ctAbreCli(ctCli(ctlId))}catch(e){console.error(e)}}renderCadastro();if(VIEW==='ben'&&BEN.cli?.id===data.id)renderBen();
   if(c)toastDesfazer('Ficha da empresa salva',()=>fcDesfaz(data.id));else toast('Empresa cadastrada');
 }
+// cliente da Controlacs (Gestão Controlacs › Clientes) ligado à empresa: os dados cadastrais vêm da ficha
+async function fcSyncCtl(emp,criar){try{
+  const d=fcDados(emp),e=d.end,end=[e.logradouro,e.numero,e.complemento,e.bairro,[e.cidade,e.uf].filter(Boolean).join('/'),e.cep?'CEP '+fcCepFmt(e.cep):''].filter(Boolean).join(', ')||null;
+  const row={razao_social:d.razao||null,cnpj_cpf:fcCnpjFmt(d.cnpj)||null,contato:d.contato.responsavel||null,telefone:d.contato.telefone||null,email:d.contato.email||null,endereco:end,atualizado_em:new Date().toISOString()};
+  const {data:cs}=await sb.from('ctl_clientes').select('id').eq('empresa_id',emp.id);
+  if(cs?.length){await sb.from('ctl_clientes').update(row).eq('empresa_id',emp.id);return cs[0].id}
+  if(!criar)return null;
+  const {data,error}=await sb.from('ctl_clientes').insert({...row,nome:emp.nome,empresa_id:emp.id,situacao:emp.ativo===false?'encerrado':'ativo'}).select('id').single();
+  if(error)throw error;return data.id}catch(x){console.error(x);toast('A empresa foi salva, mas não consegui atualizar o cliente em Gestão Controlacs.');return null}}
 async function fcDesfaz(id){const c=CLIENTES.find(x=>x.id===id),ant=c?.ficha_ant;if(!ant){toast('Não há alteração para desfazer.');return}
   const {data,error}=await sb.from('clientes').update({...ant,ficha_ant:null}).eq('id',id).select().single();if(error){fail(error);return}
   const i=CLIENTES.findIndex(x=>x.id===id);CLIENTES[i]=data;toast('A ficha voltou como estava');if($('dlgFicha').open)$('dlgFicha').close();renderCadastro();if(VIEW==='ben'&&BEN.cli?.id===id)renderBen()}
@@ -13809,7 +13821,7 @@ $('ctAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-ctnovo
   if(t==='crmnova')return crmAbre(null);
   if(t==='nfxml')return nsAbreLote();if(t==='nfcfg')return nsAbreCfg();if(t==='nfemit')return nsAbreEmit();
   if(t==='gerar')return ctGera(b);if(t==='receita'||t==='despesa')return ctAbreLanc(null,t);
-  if(t==='cli')ctAbreCli(null);else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
+  if(t==='cli')(typeof fcAbre==='function'?fcAbre(null,{ctl:true}):ctAbreCli(null));else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
 async function ctBaixa(id){const d=CTL.docs.find(x=>x.id===id);if(!d?.caminho)return;
   const {data,error}=await sb.storage.from('controlacs').createSignedUrl(d.caminho,3600);if(error)return fail(error,'Não foi possível abrir o arquivo');window.open(data.signedUrl,'_blank','noopener')}
 document.addEventListener('click',e=>{
@@ -13842,17 +13854,20 @@ function ctMostra(tipo,obj,titulo,chip,corpo,foot){
 const ctDocsLista=l=>l.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Documento</th><th>Tipo</th><th>Validade</th><th>Arquivo</th></tr></thead><tbody>${l.map(d=>`<tr data-ctdoc="${d.id}"><td class="l">${esc(d.nome)}</td><td>${esc(CTDOC[d.tipo]||d.tipo)}</td><td>${d.validade?dBR(d.validade):'—'}</td><td>${d.caminho?`<a href="#" data-ctbaixa="${d.id}">📎 ${esc(d.nome_arquivo||'abrir')}</a>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum documento.</p>';
 function ctAbreCli(c){
   const cs=c?CTL.cont.filter(x=>x.cliente_id===c.id):[],ds=c?CTL.docs.filter(d=>d.cliente_id===c.id):[];
+  // cliente ligado a uma empresa do portal: razão social, CNPJ, contato e endereço vêm da ficha da empresa (Carol 18/11)
+  const emp=c?.empresa_id&&CLIENTES.find(x=>x.id===c.empresa_id),fic=emp&&typeof fcDados==='function'&&'ficha' in emp,ro=fic?' readonly title="Vem da ficha da empresa: altere pelo botão 📋 Ficha da empresa"':'';
   ctMostra('cli',c,c?c.nome:'Novo cliente',c?ctChip('ctlcli',c.situacao):'',
-    `<div class="fields"><label class="f wide">Nome (como você chama o cliente) *<input id="ct_nome" maxlength="160" value="${esc(c?.nome||'')}"></label>
-    <label class="f">Razão social<input id="ct_razao" value="${esc(c?.razao_social||'')}"></label>
-    <label class="f">CNPJ/CPF<input id="ct_doc" value="${esc(c?.cnpj_cpf||'')}"></label>
+    `${fic?`<div class="alerta" style="margin:0 0 10px"><b>Dados cadastrais da ficha da empresa ${esc(emp.nome)}</b><span>Razão social, CNPJ, contato, endereço, serviços, RH e benefícios ficam na ficha e valem para todo o sistema (notas fiscais, remessas, RH). ${fcFaltaCli(emp).length?'<b>Falta na ficha: '+esc(fcFaltaCli(emp).join(', '))+'.</b>':''}</span><div><button type="button" class="btn small" data-ctact="ficha">📋 Ficha da empresa</button></div></div>`:''}
+    <div class="fields"><label class="f wide">Nome (como você chama o cliente) *<input id="ct_nome" maxlength="160" value="${esc(c?.nome||'')}"></label>
+    <label class="f">Razão social<input id="ct_razao" value="${esc(c?.razao_social||'')}"${ro}></label>
+    <label class="f">CNPJ/CPF<input id="ct_doc" value="${esc(c?.cnpj_cpf||'')}"${ro}></label>
     <label class="f">Situação<select id="ct_sit">${ctOpts(CTSIT.ctlcli,c?.situacao||'ativo')}</select></label>
     <label class="f">Cliente desde<input type="date" id="ct_desde" value="${c?.cliente_desde||''}"></label>
-    <label class="f">Contato (pessoa)<input id="ct_contato" value="${esc(c?.contato||'')}"></label>
-    <label class="f">Telefone<input id="ct_tel" value="${esc(c?.telefone||'')}"></label>
-    <label class="f">E-mail<input type="email" id="ct_email" value="${esc(c?.email||'')}"></label>
+    <label class="f">Contato (pessoa)<input id="ct_contato" value="${esc(c?.contato||'')}"${ro}></label>
+    <label class="f">Telefone<input id="ct_tel" value="${esc(c?.telefone||'')}"${ro}></label>
+    <label class="f">E-mail<input type="email" id="ct_email" value="${esc(c?.email||'')}"${ro}></label>
     <label class="f">Empresa no portal<select id="ct_emp"><option value="">Nenhuma</option>${CLIENTES.map(x=>`<option value="${x.id}"${x.id===c?.empresa_id?' selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
-    <label class="f wide">Endereço<input id="ct_end" value="${esc(c?.endereco||'')}"></label>
+    <label class="f wide">Endereço<input id="ct_end" value="${esc(c?.endereco||'')}"${ro}></label>
     <label class="f wide">Anotações<textarea id="ct_obs" rows="3">${esc(c?.obs||'')}</textarea></label></div>
     ${c?`<div class="f wide" style="margin-top:14px"><span>Contratos</span>${cs.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Contrato</th><th>Situação</th><th>Valor mensal</th><th>Próximo reajuste</th></tr></thead><tbody>${cs.map(x=>`<tr data-ctcont="${x.id}"><td class="l">${esc(x.titulo)}</td><td>${ctChip('ctlcont',x.situacao)}</td><td>${fm(x.valor_mensal)}</td><td>${ctReajChip(x)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum contrato.</p>'}
       <div><button type="button" class="btn small" data-ctact="novocont">+ Novo contrato</button></div></div>
@@ -14008,10 +14023,15 @@ function nsDesenha(b,sit,tem){
   $('ctNote').textContent='Clique na nota para ver, imprimir, baixar o XML ou cancelar. A busca acha por qualquer coluna (número, tomador, CNPJ, descrição, valor ou data). As notas emitidas no site nacional não aparecem aqui.';
 }
 // ---- emitir ----
+// tomador da NFS-e pela ficha da empresa ligada ao cliente (Carol 18/11)
+function ctTomFicha(c){const emp=c?.empresa_id&&(typeof CLIENTES!=='undefined'?CLIENTES:[]).find(x=>x.id===c.empresa_id);
+  if(!emp||typeof fcDados!=='function'||!('ficha' in emp))return {};const d=fcDados(emp),e=d.end;
+  return {doc:fcDig(d.cnpj)||undefined,nome:d.razao||undefined,email:d.contato.email||undefined,im:d.im||undefined,
+    ...(fcDig(e.cep).length===8?{end:{cep:fcDig(e.cep),cMun:e.ibge||'',xLgr:e.logradouro||'',nro:e.numero||'',xCpl:e.complemento||'',xBairro:e.bairro||''}}:{})}}
 function nsAbreEmit(lanc,base){
   if(!CTL.nsOk)return toast('Rode a atualização v131 do banco antes.');
   if(!CTL.nsEmit.length)return nsAbreCfg();
-  const cli=ctCli(lanc?.cliente_id||base?.tomador?.cliente_id),tm=base?.tomador||cli?.extra?.nfse||{};
+  const cli=ctCli(lanc?.cliente_id||base?.tomador?.cliente_id),tm=base?.tomador||{...ctTomFicha(cli),...(cli?.extra?.nfse||{})};
   const e=nsEmitDe(base?.emitente_id)||CTL.nsEmit[0],sv=e.servico||{},end=tm.end||{};
   const comp=base?.competencia||lanc?.competencia||(lanc?.vencimento||TODAY).slice(0,10);
   ctMostra('nsemit',{lanc,base},'Emitir NFS-e',Number(e.ambiente)===2?'<span class="chip c-warn">Modo teste</span>':'<span class="chip c-ok">Produção</span>',
@@ -14037,7 +14057,7 @@ function nsAbreEmit(lanc,base){
     <label class="f wide">Informações complementares (opcional)<textarea id="ns_info" rows="2" maxlength="2000"></textarea></label></div>
     <p class="note" style="margin:0">${esc(NSSN[e.op_simp_nac]||'')}: o ISS e os tributos federais são pagos no DAS, então a nota sai sem destaque de imposto, como a nº 13 emitida no site nacional.${lanc?` Fica ligada à receita “${esc(lanc.descricao)}”.`:''}</p>`,
     ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nsemite',Number(e.ambiente)===2?'Emitir nota de teste':'Emitir NFS-e','primary'));
-  $('ns_cli').onchange=()=>{const c=ctCli($('ns_cli').value);if(!c)return;const f=c.extra?.nfse||{};
+  $('ns_cli').onchange=()=>{const c=ctCli($('ns_cli').value);if(!c)return;const f={...ctTomFicha(c),...(c.extra?.nfse||{})};
     $('ns_doc').value=nsDoc(f.doc||c.cnpj_cpf||'');$('ns_nome').value=f.nome||c.razao_social||c.nome||'';$('ns_email').value=f.email||c.email||'';$('ns_im').value=f.im||'';
     const d=f.end||{};$('ns_cep').value=d.cep||'';$('ns_cmun').value=d.cMun||'';$('ns_lgr').value=d.xLgr||'';$('ns_nro').value=d.nro||'';$('ns_cpl').value=d.xCpl||'';$('ns_bairro').value=d.xBairro||''};
   $('ns_emit').onchange=()=>nsAbreEmit(lanc,{...(base||{}),emitente_id:$('ns_emit').value});
@@ -14441,6 +14461,7 @@ async function ctAcao(act,bt){
   if(act==='fechar')return dlgCtl.close();
   if(act.startsWith('ns'))return nsAcao(act,bt);
   if(act==='novocont')return ctAbreCont(null,false,obj.id);
+  if(act==='ficha'&&obj?.empresa_id&&typeof fcAbre==='function'){dlgCtl.close();return fcAbre(obj.empresa_id)}
   if(act==='novodoc')return ctAbreDoc(null,tipo==='cli'?{cliente_id:obj.id}:{cliente_id:obj.cliente_id,contrato_id:obj.id});
   if(act==='assenvia')return ctAbreAss(obj);
   if(act==='voltacont')return ctAbreCont(obj);
