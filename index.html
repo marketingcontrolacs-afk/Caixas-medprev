@@ -838,7 +838,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <section id="viewGT" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="gtTitle"></h1><p class="sub" id="gtSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn" id="gtRepRel" hidden title="Repasses de parceiros pagos e em aberto no período, agrupados pela linha do banco (ex.: remessa)">Relatório de repasses</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button><details class="expdd" id="gtCriar" hidden><summary class="btn primary" title="Lançar na Movimentação financeira, como o Criar do Bom Controle">+ Criar ▾</summary><div class="expmenu"><button type="button" data-cr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-cr="receber">↑ Conta a receber (receita)</button><button type="button" data-cr="transf">⇄ Transferência entre contas</button><button type="button" data-cr="avulso">$ Lançamento já quitado direto na conta (ex.: tarifa)</button></div></details></div>
+      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtLote" hidden title="Arraste vários boletos, notas, guias e faturas de uma vez: o sistema separa em lançamentos e junta a nota com o boleto do mesmo fornecedor e valor">📥 Importar documentos em lote</button><button class="btn" id="gtRecibos" hidden title="Criar, imprimir e guardar recibos (aluguel, serviço e outros)">🧾 Recibos</button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn" id="gtRepRel" hidden title="Repasses de parceiros pagos e em aberto no período, agrupados pela linha do banco (ex.: remessa)">Relatório de repasses</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button><details class="expdd" id="gtCriar" hidden><summary class="btn primary" title="Lançar na Movimentação financeira, como o Criar do Bom Controle">+ Criar ▾</summary><div class="expmenu"><button type="button" data-cr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-cr="receber">↑ Conta a receber (receita)</button><button type="button" data-cr="transf">⇄ Transferência entre contas</button><button type="button" data-cr="avulso">$ Lançamento já quitado direto na conta (ex.: tarifa)</button></div></details></div>
     </div>
     <div class="alerta" id="mvAviso" hidden></div>
     <div class="tiles" id="gtTiles"></div>
@@ -1437,6 +1437,10 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
         <h2>Fornecedores aprendidos</h2>
         <p class="note" style="margin:0">Cada vez que o escritório salva uma conta a pagar ou nota do cartão com categoria, o sistema guarda a categoria daquele fornecedor e usa nas próximas.</p>
         <div class="tablebox" style="margin:0;max-height:320px;overflow:auto"><table class="cfg" id="tbForn"></table></div>
+      </div>
+      <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
+        <h2>Códigos das guias (DARF, DCTFWeb, GPS, DAS, FGTS)</h2>
+        <div id="guiasCfg"></div>
       </div>
       <datalist id="catsList"></datalist>
     </div>
@@ -3529,6 +3533,7 @@ const PALAVRAS={
   'Serviço de Transporte':['frete','uber','taxi','transporte','motoboy'],
   'Despesas com Viagens':['viagem','hotel','passagem','pedagio'],
   'Brindes':['brinde'],
+  'Royalties':['royalties','royalty','royaltie','taxa de franquia','fundo de propaganda'],
   'Confraternizações':['confraternizacao','festa'],
   'Certificado Digital':['certificado digital'],
   'Ações de Marketing e Publicidade':['marketing','publicidade','anuncio','panfleto','impulsionamento','grafica','banner','cartao de visita'],
@@ -3566,7 +3571,7 @@ async function aprenderCat(fornecedor,categoria,fbc){
   if(error)console.warn(error);else PCAT.forn[k]={...PCAT.forn[k],...row};
 }
 async function renderCats(){
-  await loadCats();
+  await loadCats();guiasCfgDesenha().catch(console.error);
   $('catAviso').innerHTML=PCAT.ok?'':'<span class="neg">Rode a atualização v8 do banco no Supabase para usar as categorias.</span>';
   $('catTotal').textContent=PCAT.plano.length+(PCAT.plano.length===1?' categoria':' categorias');
   $('catsList').innerHTML=catOpts();
@@ -4517,8 +4522,7 @@ async function ocrPagina(pg){
   return its;
 }
 async function lerRecibos(buf,cadastro,ocr){
-  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
-  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise,out=[];let semTexto=0;
+  const doc=await pdfAbre(buf,'recibos'),out=[];let semTexto=0;
   const cad=(cadastro||[]).map(n=>({n,k:semAc(n)})).filter(c=>c.k.split(' ').length>=2).sort((a,b)=>b.k.length-a.k.length);
   for(let p=1;p<=Math.min(doc.numPages,80);p++){
     const pg=await doc.getPage(p),vp=pg.getViewport({scale:1});
@@ -4682,12 +4686,23 @@ function lerTextoDoc(txt){
     if(b&&(b.valor||b.tipo==='banco')){bol=b;break}}
   return {bol,nfe};
 }
+// PDF com senha (fatura de telefone) abre com pdfAbre; lê até 10 páginas (a linha digitável da fatura às vezes fica no fim) (Carol, 18/11)
 async function pdfTexto(file){
-  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
-  const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let t='';
-  for(let p=1;p<=Math.min(doc.numPages,4);p++){const c=await (await doc.getPage(p)).getTextContent();t+=c.items.map(i=>i.str).join(' ')+'\n'}
+  const doc=await pdfAbre(await file.arrayBuffer(),file.name);pdfTexto.doc=doc;let t='',lay='';
+  for(let p=1;p<=Math.min(doc.numPages,10);p++){const c=await (await doc.getPage(p)).getTextContent();t+=c.items.map(i=>i.str).join(' ')+'\n';lay+=pdfLinhas(c.items)+'\n'}
+  pdfTexto.lay=lay;   // o mesmo texto na ordem da página (linha por linha), para os documentos em que o rótulo e o valor ficam lado a lado (recibo de aluguel)
   return t;
 }
+// fornecedor pela raiz do CNPJ (8 primeiros números): a fatura vem com o CNPJ da filial e o cadastro tem o da matriz (Vivo, 18/11)
+function cnpjRaiz(pes,d){if(String(d).length!==14)return null;const ls=(pes||[]).filter(x=>{const q=soDig(x.documento);return q.length===14&&q.slice(0,8)===d.slice(0,8)});return ls.length===1?ls[0]:null}
+// junta os pedaços de texto do PDF por linha (mesma altura), da esquerda para a direita (Carol, 18/11)
+function pdfLinhas(items){
+  const its=(items||[]).filter(i=>i.str&&i.str.trim()&&i.transform).map(i=>({s:i.str.trim(),x:i.transform[4],y:i.transform[5],h:Math.abs(i.transform[3])||8}));
+  its.sort((a,b)=>b.y-a.y||a.x-b.x);const ls=[];
+  its.forEach(i=>{const l=ls.find(l=>Math.abs(l.y-i.y)<=Math.max(2.5,Math.min(l.h,i.h)*0.45));if(l)l.its.push(i);else ls.push({y:i.y,h:i.h,its:[i]})});
+  return ls.map(l=>l.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ')).join('\n')}
+// conserta os erros mais comuns do OCR nos números: letra O no meio dos números, espaço depois da vírgula, travessão
+function ocrLimpa(t){return String(t||'').replace(/(\d)[Oo](?=[\d\s.,\-\/]|$)/gm,'$10').replace(/(^|[\s.])[Oo](\d)/gm,'$10$2').replace(/(\d),\s(\d{2})(?!\d)/g,'$1,$2').replace(/[—–]/g,'-')}
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
 async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem,mais){
@@ -8665,7 +8680,7 @@ async function renderGT(){
   const lista=M!=='gfinad'&&M!=='gfagenda';
   ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtFiltroBox').hidden=!lista||M==='gfmov';
   document.querySelectorAll('.mvf').forEach(x=>x.hidden=M!=='gfmov'&&!(x.classList.contains('gtf')&&(M==='gfpagar'||M==='gfrec')));(pt=>{if(pt?.classList.contains('per'))pt.firstElementChild.textContent=['gfmov','gfpagar','gfrec'].includes(M)?'Período':'Vencimento'})($('gtIniBox').previousElementSibling);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
-  $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';$('gtRepRel').hidden=!cli||M!=='gfpagar';
+  $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';$('gtLote').hidden=$('gtRecibos').hidden=!cli||tod||M!=='gfpagar';$('gtRepRel').hidden=!cli||M!=='gfpagar';
   $('gtBC').hidden=!cli||tod||M!=='gfmov'||!ehEsc();   // importar do Bom Controle (Carol, 03/11)
   // modelo do Bom Controle (Carol, 15/11): "+ Criar" na Movimentação (conta a pagar, a receber, transferência, lançamento na conta),
   // "Data por", filtro de empresas em Todas as empresas e os totais Saídas/Entradas/Resultado/Saldo hoje
@@ -8846,7 +8861,7 @@ function gtDesenha(){
     if(dp==='pag'){if((ini||fim)&&!(GT.movs[t.id]||[]).some(m=>(!ini||m.data>=ini)&&(!fim||m.data<=fim)))return false}
     else{const d=dp==='comp'?t.competencia||t.vencimento:t.vencimento;if(ini&&d<ini||fim&&d>fim)return false}
     if(CT.length&&!CT.includes(t.conta_id)&&!(GT.movs[t.id]||[]).some(m=>CT.includes(m.conta_id)))return false;
-    if(CAT.length&&!CAT.some(c=>c==='-'?!t.categoria:t.categoria===c))return false;
+    if(CAT.length&&!CAT.some(c=>c==='-'?!t.categoria:t.categoria===c||(t.cat_partes||[]).some(p=>p.categoria===c)))return false;
     if(!fx({cli:t.cliente_id,anexo:GT.anx?.has(t.id),forma:t.forma,conc:gtConc(t)}))return false;
     // filtros por coluna também nas contas a pagar/receber (Carol, 12/11): fornecedor/cliente e valor de/até
     if(pe&&!chave(t.pessoa_nome).includes(pe))return false;
@@ -8887,7 +8902,7 @@ function gtTabela(rows,vazio){
   const TE=GT.todasE?1:0,dp=gtDP(),dtT=t=>dp==='pag'?(GT.movs[t.id]||[]).map(m=>m.data).sort().pop()||null:dp==='comp'?t.competencia||t.vencimento:t.vencimento;
   const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>id?cnm.get(id)||contaNome(id)||'':'',ctT=t=>cn((GT.movs[t.id]||[])[0]?.conta_id||t.conta_id);
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="gtTodos" title="Selecionar todas as ${rows.length} contas do filtro"${todosSel?' checked':''}></th><th>Parcela</th>${TE?'<th class="l">Empresa</th>':''}<th>Tipo</th><th>${DPNOME[dp]}</th><th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Categoria</th><th class="l">Conta</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th><th style="width:30px"></th></tr>`;
-  const rowH=(t,sub)=>{const s=gtSit(t),sl=GT.sel.has(t.id);return `<tr class="click${sl?' sel':''}${sub?' gtsub':''}" data-id="${t.id}" tabindex="0"><td><input type="checkbox" data-gtsel="${t.id}"${sl?' checked':''} aria-label="Selecionar"></td><td><span class="chip">${t.parcelas>1?t.parcela+'/'+t.parcelas:'Única'}</span></td>${TE?`<td class="l"><span class="chip c-done">${esc(gtEmpNome(t.cliente_id))}</span></td>`:''}<td>${tpIc(t.tipo==='pagar'?'s':'e',t.tipo==='pagar'?'A pagar':'A receber')}</td><td>${(d=>d?dBR(d):mu('—'))(dtT(t))}</td><td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b><div class="d2">${esc(t.descricao||'')||'—'}${t.documento?' · '+esc(t.documento):''}${faClip(t.id)}${t.origem==='boleto_cliente'?' · enviado pelo cliente':''}</div>${gtJuntos(t)?`<br><span class="chip c-done" title="Clique para abrir e detalhar">🔗 ${gtJuntos(t)} lançamentos juntos · detalhar</span>`:''}${(k=>k&&GT.somaN?.[k]>1?`<br><span class="chip c-done" data-gtsoma="${k}" style="cursor:pointer" title="Pago junto com outras contas numa linha só do banco (ex.: remessa). Clique para ver todas">🔗 ${GT.somaN[k]} pagos juntos · detalhar</span>`:'')(gtSomaDe(t))}</td><td class="l">${t.categoria?esc(t.categoria):mu('—')}</td><td class="l">${esc(ctT(t))||mu('—')}</td><td class="${t.tipo==='pagar'?'neg':'pos'}"><b>${fm(t.valor)}</b></td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l">${stIc(s[2]==='baixada',gtConc(t),t.tipo==='pagar')}<span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td><td style="white-space:nowrap"><span class="gtolho" title="Ver ou corrigir">👁</span>${DUPIC}</td></tr>`};
+  const rowH=(t,sub)=>{const s=gtSit(t),sl=GT.sel.has(t.id);return `<tr class="click${sl?' sel':''}${sub?' gtsub':''}" data-id="${t.id}" tabindex="0"><td><input type="checkbox" data-gtsel="${t.id}"${sl?' checked':''} aria-label="Selecionar"></td><td><span class="chip">${t.parcelas>1?t.parcela+'/'+t.parcelas:'Única'}</span></td>${TE?`<td class="l"><span class="chip c-done">${esc(gtEmpNome(t.cliente_id))}</span></td>`:''}<td>${tpIc(t.tipo==='pagar'?'s':'e',t.tipo==='pagar'?'A pagar':'A receber')}</td><td>${(d=>d?dBR(d):mu('—'))(dtT(t))}</td><td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b><div class="d2">${esc(t.descricao||'')||'—'}${t.documento?' · '+esc(t.documento):''}${faClip(t.id)}${t.origem==='boleto_cliente'?' · enviado pelo cliente':''}</div>${gtJuntos(t)?`<br><span class="chip c-done" title="Clique para abrir e detalhar">🔗 ${gtJuntos(t)} lançamentos juntos · detalhar</span>`:''}${(k=>k&&GT.somaN?.[k]>1?`<br><span class="chip c-done" data-gtsoma="${k}" style="cursor:pointer" title="Pago junto com outras contas numa linha só do banco (ex.: remessa). Clique para ver todas">🔗 ${GT.somaN[k]} pagos juntos · detalhar</span>`:'')(gtSomaDe(t))}</td><td class="l">${t.categoria?esc(t.categoria):mu('—')}${Array.isArray(t.cat_partes)&&t.cat_partes.length>1?`<div class="d2" title="${esc(t.cat_partes.map(p=>p.categoria+' '+fm(p.valor)).join(' · '))}">➗ + ${t.cat_partes.length-1} categoria${t.cat_partes.length>2?'s':''}</div>`:''}</td><td class="l">${esc(ctT(t))||mu('—')}</td><td class="${t.tipo==='pagar'?'neg':'pos'}"><b>${fm(t.valor)}</b></td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l">${stIc(s[2]==='baixada',gtConc(t),t.tipo==='pagar')}<span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td><td style="white-space:nowrap"><span class="gtolho" title="Ver ou corrigir">👁</span>${DUPIC}</td></tr>`};
   if(!GT3())$('gtPag').hidden=true;
   // ordenar pelo cabeçalho: a lista inteira, antes de dividir em páginas (Carol, 18/11)
   const rso=SO.dados('gtHead',rows,[['Parcela',t=>t.parcelas>1?t.parcela:0],['Empresa',t=>gtEmpNome(t.cliente_id)],['Tipo',t=>t.tipo==='pagar'?'A pagar':'A receber'],[DPNOME[dp],t=>dtT(t)],[MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente',t=>t.pessoa_nome||''],['Categoria',t=>t.categoria||''],['Conta',t=>ctT(t)],['Valor',t=>+t.valor],[MV?'Pago ou recebido':P?'Pago':'Recebido',t=>GT.pago[t.id]||null],['Falta',t=>gtFalta(t)],['Situação',t=>gtSit(t)[1]]]);
@@ -9307,6 +9322,8 @@ $('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
 $('gtRem').onclick=()=>{RM.so=null;go('gfremessa')};
+$('gtLote').onclick=()=>ltAbre().catch(e=>fail(e,'Não foi possível abrir a importação'));
+$('gtRecibos').onclick=()=>rcAbre().catch(e=>fail(e,'Não foi possível abrir os recibos'));
 // ---------- Anexos dos lançamentos da Gestão financeira (Carol, 04/11; v94) ----------
 // Como no Bom Controle: escolha o tipo (Boleto ou fatura, Comprovante, Nota fiscal, Outros) e arraste ou clique
 // para enviar. Em conta parcelada dá para anexar em todas as parcelas. Lançamento novo: os arquivos sobem na hora
@@ -9371,14 +9388,27 @@ async function leArquivoDoc(f){
   if(xml){const x=xmlNota(await f.text());if(!x)return {erro:'Este XML não é de nota fiscal (NF-e ou NFC-e).'};return {...x,origem:'XML da nota',cnpjs:[x.cnpj].filter(Boolean)}}
   let t='',origem='PDF';
   if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(nome)){
-    t=await pdfTexto(f);
+    pdfTexto.lay='';try{t=await pdfTexto(f)}catch(e){if(e?.senha)return {erro:'Este PDF tem senha e não consegui abrir. Anexe de novo e digite a senha quando o sistema pedir.'};throw e}
     if(t.replace(/\s/g,'').length<40){ // PDF escaneado: lê a 1ª página com OCR
-      const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,its=await ocrPagina(await doc.getPage(1));t=its.map(i=>i.s).join(' ');origem='PDF escaneado'}
+      // impresso como PDF ou escaneado: OCR página por página (até 3), linha por linha; para quando achar o código de barras (Carol, 18/11)
+      const doc=pdfTexto.doc||await pdfAbre(await f.arrayBuffer(),f.name);t='';
+      for(let p=1;p<=Math.min(doc.numPages,3);p++){const its=await ocrPagina(await doc.getPage(p)),ls=[];
+        its.forEach(i=>{const l=ls.find(l=>Math.abs(l.y-i.y)<1);if(l)l.its.push(i);else ls.push({y:i.y,its:[i]})});
+        t+=ocrLimpa(ls.sort((a,b)=>a.y-b.y).map(l=>l.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ')).join('\n'))+'\n';
+        if(lerTextoDoc(t).bol)break}
+      pdfTexto.lay=t;origem='PDF escaneado'}
   }else if(/image/i.test(f.type||'')||/\.(jpe?g|png|webp)$/i.test(nome)){
-    const w=await tessW(),{data}=await w.recognize(f);t=data.text||'';origem='foto'}
+    const w=await tessW(),{data}=await w.recognize(f);t=ocrLimpa(data.text||'');pdfTexto.lay=t;origem='foto'}
   else return {erro:'Envie o boleto, a nota ou o cupom em PDF, foto ou XML.'};
   const r=lerTextoDoc(t),n=textoNota(t);
-  return {...n,...nfseDe(t),bol:r.bol,nfe:r.nfe,cnpjs:cnpjsDoTexto(t),origem,texto:t}}
+  // guia de imposto (DARF, DCTFWeb, GPS, DAS, FGTS) e recibo (ex.: de aluguel): os campos próprios valem mais que a leitura genérica (Carol, 18/11)
+  await guiasCarrega();const g=guiaDe(t),cli=typeof cliAtual==='function'?cliAtual():null,rc=g?null:reciboDe(pdfTexto.lay||t,cli?.cnpj);
+  const out={...n,...nfseDe(t),bol:r.bol,nfe:r.nfe,cnpjs:cnpjsDoTexto(t),origem,texto:t};
+  if(g){Object.assign(out,{guia:g,valor:g.valor||out.valor,venc:g.venc||out.venc,numero:g.numero||'',nfseNum:'',servico:'',origem:GUIA_NOME[g.guia]+(origem==='PDF'?'':' ('+origem+')')});
+    if(r.bol&&r.bol.tipo==='conc'&&!r.bol.venc&&g.venc)out.bol={...r.bol,venc:g.venc}}
+  if(!g&&!rc){const mr=String(t).replace(/\s+/g,' ').match(/m[êe]s\s+(?:de\s+)?refer[êe]ncia\D{0,12}(\d{2})\/(\d{4})\b/i);if(mr&&+mr[1]>=1&&+mr[1]<=12)out.competencia=`${mr[2]}-${mr[1]}`}
+  if(rc){Object.assign(out,{recibo:rc,valor:rc.valor||out.valor,servico:rc.servico||out.servico,emissao:rc.emissao||out.emissao,cnpjs:[...new Set([...(rc.docs||[]),...out.cnpjs])],nome:out.nome||rc.recebedor,nfseNum:'',competencia:rc.competencia||'',texto:rc.aluguel?'recibo de aluguel '+rc.servico:out.texto,origem:'recibo'+(origem==='PDF'?'':' ('+origem+')')})}
+  return out}
 // preenche a conta a pagar que está aberta com o que o arquivo trouxe (só o que está em branco; o diferente vira aviso)
 async function gtLeArquivo(f,mais,cat){
   // mais de um arquivo: cada leitura fica numa linha própria, com o nome do arquivo
@@ -9396,6 +9426,12 @@ async function gtLeArquivo(f,mais,cat){
     const atual=money?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=money?showMoney(v):v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));lidos.push(txt+' '+(fmt?fmt(v):v))}
     else if(String(money?r2(atual):atual)!==String(money?r2(v):v))avisos.push(`${txt} no arquivo: ${fmt?fmt(v):v}, diferente do digitado`)};
+  // guia de imposto: valor, vencimento, competência e nº do documento da guia; a categoria (ou o rateio) sai dos códigos (Carol, 18/11)
+  if(r.guia){const g=r.guia;poe('gt_valor',g.valor,'valor',fm,true);poe('gt_vencimento',g.venc,'vencimento',dBR);
+    if(g.competencia&&$('gt_competencia')?.dataset.auto==='1')$('gt_competencia').value='';if(g.competencia)poe('gt_competencia',g.competencia,'competência',v=>v.split('-').reverse().join('/'));
+    if(g.numero)poe('gt_documento',g.numero,'nº do documento');poe('gt_descricao',GUIA_NOME[g.guia]+(g.itens.length>1?' ('+g.itens.map(i=>i.codigo).join(', ')+')':''),'descrição');
+    if(!$('gt_pessoa').value.trim()){const fo=guiaForn(g,cli?.id,GFP.lista||[]);if(fo)poe('gt_pessoa',fo,'fornecedor');else avisos.push('escolha o fornecedor da guia (ex.: Receita Federal ou Ministério da Economia)')}
+    if(g.itens.length>1&&Math.abs(g.soma-(g.valor||0))>=0.01)avisos.push(`a soma dos códigos da guia (${fm(g.soma)}) não bate com o total (${fm(g.valor)}): confira o rateio`)}
   // boleto: linha digitável (o campo já preenche valor e vencimento e avisa se o boleto estiver lançado em outra conta)
   if(r.bol){const el=$('gt_linha_digitavel');if(el&&!soDig(el.value)){el.value=r.bol.linha||r.bol.barra;el.dispatchEvent(new Event('input',{bubbles:true}));lidos.push('linha digitável')}
     poe('gt_valor',r.bol.valor,'valor',fm,true);poe('gt_vencimento',r.bol.venc,'vencimento',dBR);if(!$('gt_forma').value)$('gt_forma').value='Boleto'}
@@ -9403,16 +9439,17 @@ async function gtLeArquivo(f,mais,cat){
   const dup=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0];
   poe('gt_valor',dup?.valor||r.valor,'valor',fm,true);
   poe('gt_vencimento',dup?.venc||r.venc,'vencimento',dBR);
-  poe('gt_documento',r.numero||r.nfe?.numero||r.nfseNum,r.modelo==='65'?'cupom nº':'NF nº');
+  if(!r.guia&&!r.recibo)poe('gt_documento',r.numero||r.nfe?.numero||r.nfseNum,r.modelo==='65'?'cupom nº':'NF nº');
   // descrição do serviço da nota: troca o texto automático "Previsto: …" da conta prevista; o resto só se estiver em branco
   if(r.servico){const de=$('gt_descricao');if(de&&!de.disabled&&/^previsto:/i.test(de.value.trim())){de.value=r.servico;lidos.push('descrição do serviço')}else poe('gt_descricao',r.servico,'descrição do serviço')}
   if(r.emissao&&$('gt_competencia')?.dataset.auto==='1')$('gt_competencia').value='';   // a emissão da nota manda na competência sugerida
-  if(r.emissao)poe('gt_competencia',r.emissao.slice(0,7),'competência',v=>v.split('-').reverse().join('/'));
+  if(r.emissao||r.competencia)poe('gt_competencia',r.competencia||r.emissao.slice(0,7),'competência',v=>v.split('-').reverse().join('/'));
   if(r.xml&&r.pix&&!$('gt_forma').value){$('gt_forma').value='Pix';$('gt_forma').dispatchEvent(new Event('change',{bubbles:true}))}
   // fornecedor pelo CNPJ (do XML, da chave da nota ou o primeiro CNPJ do arquivo que não seja o da empresa)
   const meu=soDig(cli?.cnpj),docs=[...new Set([r.nfe?.cnpj,...(r.cnpjs||[])].filter(d=>d&&d!==meu))];
   if(!$('gt_pessoa').value.trim()&&docs.length){
     let pe=null,doc=null;for(const d of docs){pe=(GFP.lista||[]).find(x=>soDig(x.documento)===d);if(pe){doc=d;break}}
+    if(!pe)for(const d of docs){pe=cnpjRaiz(GFP.lista,d);if(pe){doc=d;break}}
     if(pe)poe('gt_pessoa',pesNome(pe),'fornecedor');
     else{const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:docs[0]}).then(x=>x,()=>({data:null}));
       if(nome)poe('gt_pessoa',nome,'fornecedor');
@@ -9421,6 +9458,10 @@ async function gtLeArquivo(f,mais,cat){
         avisos.push(`fornecedor do CNPJ ${cnpj}${r.nome?' ('+r.nome+')':''} ainda não está cadastrado: use “+ Cadastrar” ao lado do nome`)}}}
   if(r.xml&&!$('gt_obs').value.trim()&&r.nfe)$('gt_obs').value=`Chave da nota: ${r.nfe.chave}`;
   if(r.xml)avisos.push('o XML só é lido e não fica guardado; para guardar a nota, anexe também o PDF');
+  // categoria sugerida: guia pelo código; conta recorrente pela última do mesmo fornecedor; senão, pelas palavras (Carol, 18/11)
+  if(GTR?.tipo!=='receber'&&GT.dlg!=='receber'){const s=await gtCatSug({pessoa:$('gt_pessoa')?.value||r.nome||'',texto:[r.servico,r.texto].filter(Boolean).join(' ').slice(0,3000),valor:parseMoney($('gt_valor')?.value)||r.valor,guia:r.guia}).catch(e=>{console.error(e);return null});
+    if(s)lidos.push('categoria'+(s.partes?' (rateio em '+s.partes.length+')':''))}
+  if(!$('dlgGT').open)return;
   if(!box)return;
   box.innerHTML=nm+(lidos.length?`<span class="pos">✓ Lido d${r.origem==='foto'?'a':'o'} ${esc(r.origem)}: ${esc(lidos.join(', '))}. Confira antes de salvar.</span> `:`<span class="muted">Li ${r.origem==='foto'?'a':'o'} ${esc(r.origem)}${r.bol||r.valor||r.nfe?', mas os campos já estavam preenchidos':', mas não achei linha digitável, chave da nota nem valor'}.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}.</span>`:'');
@@ -9430,6 +9471,457 @@ async function gtLeArquivo(f,mais,cat){
       $('gtPrevBox').innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(vb)}</b>${todas?` nesta conta e em ${serie.length===1?'mais 1 conta futura':'mais '+serie.length+' contas futuras'} (${serieDatas(serie)})`:' só nesta conta'}. Clique em Salvar para gravar.</span>`};
     $('gtPrevOk').onclick=()=>ok(false);if($('gtPrevTodas'))$('gtPrevTodas').onclick=()=>ok(true)}
 }
+// ===== Guias de impostos, rateio na categoria e categoria pelo histórico (Carol, 18/11) =====
+// DARF / DCTFWeb (INSS + retenções), GPS, DAS e FGTS: o sistema acha a guia pelo texto, lê vencimento, valor, competência e a
+// composição por código (1082, 0561, 1708, 5952...). Cada código tem a sua categoria (Configurações › Categorias › Códigos das guias,
+// tabela guia_codigos, v160; sem a v160 vale a lista padrão abaixo). Guia com vários tributos vira RATEIO NA CATEGORIA:
+// uma conta só (um pagamento), com o valor dividido em várias categorias (fin_titulos.cat_partes), e os relatórios abrem em partes.
+const GUIA_PAD={'1082':'INSS','1099':'INSS','1138':'INSS','1141':'INSS','1646':'INSS','1170':'INSS','1176':'INSS','1181':'INSS','1184':'INSS','1191':'INSS','1196':'INSS','1200':'INSS','1213':'INSS',
+  '2100':'INSS','2003':'INSS','2631':'INSS','1007':'INSS','0561':'IRRF Folha','0588':'IRRF Folha','3208':'3208 - IRRF Aluguel','1708':'1708 - IR Retenção',
+  '5952':'5952 - PIS / Cofins / CSLL Retenção','5960':'5952 - PIS / Cofins / CSLL Retenção','5979':'5952 - PIS / Cofins / CSLL Retenção','5987':'5952 - PIS / Cofins / CSLL Retenção','8109':'PIS',
+  'DAS':'DAS - Simples Nacional','FGTS':'FGTS'};
+let GUIAS=null,V160=null;
+async function v160ok(){if(V160!=null)return V160;try{const {error}=await sb.from('fin_titulos').select('cat_partes').limit(1);V160=!error}catch(e){V160=false}return V160}
+const v160Msg='Para dividir a conta em várias categorias, rode a atualização v160 do banco no Supabase (SQL Editor).';
+async function guiasCarrega(forca){
+  if(GUIAS&&!forca)return GUIAS;GUIAS={g:{...GUIA_PAD},c:{},rows:[],ok:false};
+  try{const {data,error}=await sb.from('guia_codigos').select('*').order('codigo');
+    if(!error){GUIAS.ok=true;GUIAS.rows=data||[];GUIAS.rows.forEach(r=>{if(r.cliente_id)(GUIAS.c[r.cliente_id]||={})[r.codigo]=r.categoria;else GUIAS.g[r.codigo]=r.categoria})}}catch(e){}
+  return GUIAS}
+const guiaCat=(cod,cliId)=>GUIAS?.c?.[cliId]?.[cod]||GUIAS?.g?.[cod]||GUIA_PAD[cod]||null;
+const GUIA_NOME={DARF:'DARF',DAS:'DAS do Simples Nacional',FGTS:'guia do FGTS',GPS:'guia do INSS (GPS)'};
+function guiaDe(txt){
+  const T=String(txt||'').replace(/\s+/g,' ');let tipo=null;
+  if(/documento\s+de\s+arrecada[çc][ãa]o\s+do\s+simples|simples\s+nacional.{0,120}documento\s+de\s+arrecada|\bDAS\b.{0,60}simples\s+nacional|PGDAS/i.test(T))tipo='DAS';
+  else if(/guia\s+do\s+fgts|fgts\s+digital|\bGFD\b|guia\s+de\s+recolhimento\s+do\s+fgts|\bGRF\b/i.test(T)||/\bFGTS\b/.test(T)&&/(recolher|vencimento|compet[êe]ncia|pagar\s+at)/i.test(T)&&!/receitas\s+federais/i.test(T))tipo='FGTS';
+  else if(/guia\s+da\s+previd[êe]ncia\s+social/i.test(T))tipo='GPS';
+  else if(/documento\s+de\s+arrecada[çc][ãa]o\s+de\s+receitas\s+federais|\bDARF\b|DCTF\s*Web/i.test(T))tipo='DARF';
+  if(!tipo)return null;
+  const data=re=>dBRiso((T.match(re)||[])[1]);
+  const venc=data(/(?:pagar\s+(?:este\s+documento\s+)?at[ée]|pag[áa]vel\s+at[ée]|data\s+(?:de\s+)?vencimento|data\s+limite(?:\s+para\s+pagamento)?|vencimento|validade(?:\s+do\s+c[áa]lculo)?)\D{0,25}(\d{2}\/\d{2}\/\d{4})/i);
+  const din=re=>{const m=T.match(re);return m?parseMoney(m[1]):null};
+  const valor=din(/(?:valor\s+total\s+do\s+documento|valor\s+total\s+a\s+recolher|total\s+a\s+recolher|valor\s+a\s+recolher|valor\s+a\s+pagar|11\s*-\s*total|valor\s+total)\D{0,25}(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+  const per=T.match(/(?:per[ií]odo\s+de\s+apura[çc][ãa]o|compet[êe]ncia|m[êe]s\s+de\s+refer[êe]ncia|refer[êe]ncia)\D{0,20}(?:(\d{2})\/)?(\d{2})\/(\d{4})/i);
+  const mesN=T.match(/(?:per[ií]odo\s+de\s+apura[çc][ãa]o|compet[êe]ncia|m[êe]s\s+de\s+refer[êe]ncia)\W{0,5}(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:\/|de)?\s*(\d{4})/i);
+  const mesN2=mesN||T.match(/per[ií]odo\s+de\s+apura[çc][ãa]o.{0,140}?\b(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s*(?:\/|de)?\s*(\d{4})/i);
+  const pa=T.match(/\bPA\s*:?\s*(\d{2})\/(\d{4})\b/);
+  const competencia=mesN2?`${mesN2[2]}-${String(1+MESES.findIndex(x=>chave(x)===chave(mesN2[1]))).padStart(2,'0')}`:per&&+per[2]>=1&&+per[2]<=12?`${per[3]}-${per[2]}`:pa&&+pa[1]>=1&&+pa[1]<=12?`${pa[2]}-${pa[1]}`:null;
+  const numero=soDig((T.match(/n[uú]mero\s+do\s+documento\D{0,12}([\d.\-\/ ]{8,30}\d)/i)||T.match(/\b(\d{2}\.\d{2}\.\d{5}\.\d{7}-\d)\b/)||T.match(/n[uú]mero\s*:\D{0,4}([\d.\-\/]{10,30}\d)/i)||[])[1]||'');
+  let itens=[];
+  if(tipo==='DAS'||tipo==='FGTS')itens=valor>0?[{codigo:tipo,descricao:GUIA_NOME[tipo],valor}]:[];
+  else{
+    // composição por código (DCTFWeb e DARF com vários tributos): código, descrição e os valores (o último é o total da linha)
+    const ini=T.search(/composi[çc][ãa]o\s+do\s+documento/i),C=ini>=0?T.slice(ini):T,vis=new Set();
+    const re=/(?:^|[^\d\/.,])(\d{4})(?:\s*[-–]\s*\d{2})?(?:\s*[-–—]\s*|\s+)([A-Za-zÀ-ú][^0-9]{2,160}?)\s+((?:\d{1,3}(?:\.\d{3})*,\d{2}\s*){1,5})/g;let m;
+    while((m=re.exec(C))){const cod=m[1];if(!guiaCat(cod)&&(ini<0||+cod>=1900&&+cod<=2099))continue;
+      const vs=m[3].match(/\d{1,3}(?:\.\d{3})*,\d{2}/g).map(parseMoney),v=vs[vs.length-1];if(!(v>0))continue;
+      const k=cod+'|'+v;if(vis.has(k))continue;vis.add(k);itens.push({codigo:cod,descricao:m[2].replace(/\s*[-–]\s*$/,'').trim().slice(0,80),valor:v})}
+    // DARF comum e GPS: um código só ("Código da receita" / "Código de pagamento")
+    if(!itens.length){const cod=(T.match(/c[óo]digo\s+(?:da\s+receita|de\s+pagamento|do\s+tributo)\D{0,12}(\d{4})/i)||[])[1];
+      if(cod&&valor>0)itens=[{codigo:cod,descricao:'',valor}];else if(tipo==='GPS'&&valor>0)itens=[{codigo:'2100',descricao:'GPS',valor}]}
+  }
+  const soma=r2(itens.reduce((a,i)=>a+i.valor,0));
+  return {guia:tipo,venc,valor:valor||soma||null,competencia,numero,itens,soma}}
+// partes de categoria da guia (códigos com a mesma categoria somam numa parte só)
+function guiaPartes(g,cliId){const by=new Map();(g?.itens||[]).forEach(i=>{const c=guiaCat(i.codigo,cliId)||'';by.set(c,r2((by.get(c)||0)+i.valor))});
+  return [...by].map(([categoria,valor])=>({categoria,valor})).sort((a,b)=>b.valor-a.valor)}
+// fornecedor da guia: o mesmo das guias anteriores da empresa; senão, um cadastro com o nome do órgão
+function guiaForn(g,cliId,pes){
+  const cats=new Set(Object.values(GUIA_PAD)),re=g.guia==='FGTS'?/fgts/i:g.guia==='DAS'?/\bdas\b|simples/i:/inss|darf|irrf|\bir\b|dctf|reten|guia/i;
+  const ant=(GT.lista||[]).filter(t=>t.cliente_id===cliId&&t.tipo==='pagar'&&t.pessoa_nome&&(g.guia==='FGTS'?/fgts/i.test(t.categoria||''):g.guia==='DAS'?/simples|das/i.test(t.categoria||''):cats.has(t.categoria)&&!/fgts|simples/i.test(t.categoria))||re.test(t.descricao||'')&&t.cliente_id===cliId&&t.tipo==='pagar'&&t.pessoa_nome)
+    .sort((a,b)=>String(b.vencimento).localeCompare(String(a.vencimento)))[0];
+  if(ant)return ant.pessoa_nome;
+  const p=(pes||[]).find(p=>(g.guia==='FGTS'?/fgts|caixa\s+econ/i:/receita\s+federal|minist[ée]rio\s+da\s+(economia|fazenda)|secretaria\s+da\s+receita/i).test(p.nome||''));
+  return p?pesNome(p):g.guia==='FGTS'?'CAIXA ECONOMICA FEDERAL':'RECEITA FEDERAL'}
+// ---- categoria sugerida (Carol, 18/11): 1º a guia (pelo código); 2º a última conta do MESMO fornecedor nesta empresa (conta
+// recorrente: a categoria, e o rateio na categoria, que já foram usados); 3º o fornecedor aprendido; 4º as palavras do documento.
+async function catHist(cliId,pessoa){
+  const k=pessoaChave(pessoa||'');if(!k||!cliId)return null;
+  const daLista=(GT.lista||[]).filter(t=>t.cliente_id===cliId&&t.tipo==='pagar'&&t.categoria&&pessoaChave(t.pessoa_nome)===k);
+  let ls=daLista;
+  if(!ls.length){try{const {data}=await sb.from('fin_titulos').select('*').eq('cliente_id',cliId).eq('tipo','pagar').not('categoria','is',null).ilike('pessoa_nome',String(pessoa).trim()).order('vencimento',{ascending:false}).limit(5);ls=data||[]}catch(e){ls=[]}}
+  // a mais recente que já venceu (a prevista lá na frente pode ter sido copiada de uma antiga); senão, a mais recente
+  ls=[...ls].sort((a,b)=>String(b.vencimento).localeCompare(String(a.vencimento)));
+  return ls.find(t=>t.vencimento<=TODAY)||ls[0]||null}
+function partesEscala(ps,valor){if(!Array.isArray(ps)||ps.length<2||!(valor>0))return null;const tot=ps.reduce((a,x)=>a+(+x.valor||0),0);if(!(tot>0))return null;
+  let resto=r2(valor);return ps.map((x,i)=>{const v=i===ps.length-1?resto:r2(valor*(+x.valor||0)/tot);resto=r2(resto-v);return {categoria:x.categoria,valor:v}})}
+async function catSugere({cli,pessoa,texto,valor,guia}){
+  if(!cli||cli.id==='*')return null;
+  let plano=[];try{plano=await planoDe(cli)}catch(e){}
+  const noPlano=c=>!!c&&(!plano.length||plano.some(p=>chave(p.categoria)===chave(c)));
+  if(guia){const ps=guiaPartes(guia,cli.id).filter(p=>p.categoria);
+    if(ps.length)return {categoria:ps[0].categoria,partes:ps.length>1?ps:null,como:'pelo código da guia'+(guia.itens.length>1?' ('+guia.itens.map(i=>i.codigo).join(', ')+')':'')}}
+  const h=await catHist(cli.id,pessoa);
+  if(h)return {categoria:h.categoria,partes:partesEscala(h.cat_partes,valor||+h.valor),como:`a mesma da última conta deste fornecedor (${dBR(h.vencimento)})`,desc:/^previsto:/i.test(h.descricao||'')?'':h.descricao||''};
+  try{if(!PCAT.ok)await loadCats()}catch(e){}
+  const k=chave(pessoa||'');if(k&&PCAT.forn?.[k]&&noPlano(PCAT.forn[k].categoria))return {categoria:PCAT.forn[k].categoria,como:'pelo fornecedor (aprendido nas conferências)'};
+  const s=sugerirCat('',[pessoa,texto].filter(Boolean).join(' '));if(s&&noPlano(s))return {categoria:s,como:'pelas palavras do documento',fraca:true};
+  return null}
+// ---- rateio na categoria na conta a pagar/receber (Carol, 18/11) ----
+// Ex.: a guia do INSS traz IR retido (0561, 1708, 3208) e PIS/Cofins/CSLL (5952): uma conta, um pagamento, várias categorias.
+// A categoria principal da conta fica a da maior parte; os relatórios (DRE, despesas por categoria, Apresentação,
+// contabilidade) dividem o lançamento pelas partes.
+function gtRatHTML(){return `<div class="wide" id="gtCatRat"></div>`}
+function gtRatDesenha(partes){
+  const box=$('gtCatRat');if(!box)return;const ed=!$('gt_categoria')?.disabled,cats=GT.catsDlg||[];
+  GT.ratP=Array.isArray(partes)&&partes.length?partes.map(p=>({categoria:p.categoria||'',valor:p.valor!=null?r2(+p.valor):null})):null;
+  if(!GT.ratP){box.innerHTML=ed?`<button type="button" class="btn small ghost" id="gtRatAbre" title="Para guias e boletos com vários tributos ou despesas na mesma conta (ex.: INSS + IR retido)">➗ Dividir em várias categorias (rateio na categoria)</button>`:'';return}
+  const op=c=>`<option value=""></option>`+[...cats,...(c&&!cats.includes(c)?[c]:[])].map(x=>`<option${x===c?' selected':''}>${esc(x)}</option>`).join('');
+  const dis=ed?'':' disabled';
+  box.innerHTML=`<div style="border:1px solid var(--line);border-radius:10px;padding:10px"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px"><b>➗ Rateio na categoria</b>${ed?'<button type="button" class="btn small ghost" id="gtRatTira" title="Volta a ter uma categoria só">Tirar o rateio</button>':''}</div>
+    ${GT.ratP.map((p,i)=>`<div class="row" style="gap:8px;margin-bottom:6px;flex-wrap:wrap"><select data-ratc="${i}" style="flex:2 1 220px;min-width:0" aria-label="Categoria da parte"${dis}>${op(p.categoria)}</select><input class="money" data-ratv="${i}" inputmode="decimal" value="${p.valor!=null?showMoney(p.valor):''}" placeholder="0,00" style="max-width:140px;text-align:right" aria-label="Valor da parte"${dis}>${ed?`<button type="button" class="btn small ghost" data-ratdel="${i}" aria-label="Tirar esta parte">✕</button>`:''}</div>`).join('')}
+    <div class="row" style="gap:8px;align-items:center">${ed?'<button type="button" class="btn small" id="gtRatAdd">+ Categoria</button>':''}<span class="note" id="gtRatRes" style="margin:0"></span></div></div>`;
+  gtRatConf()}
+function gtRatConf(){const el=$('gtRatRes');if(!el||!GT.ratP)return;const v=parseMoney($('gt_valor')?.value)||0,s=r2(GT.ratP.reduce((a,p)=>a+(+p.valor||0),0));
+  el.innerHTML=!(v>0)?`Soma das partes ${fm(s)}.`:Math.abs(s-v)<0.005?`<span class="pos">✓ Soma ${fm(s)}, igual ao valor da conta.</span> A categoria principal fica a da maior parte.`:`<span class="neg">Soma ${fm(s)}: ${s<v?'faltam':'passam'} ${fm(Math.abs(r2(v-s)))} ${s<v?'para o':'do'} valor da conta (${fm(v)}).</span>`}
+// lê as partes para salvar: {partes|null} ou {erro}
+function gtRatLe(valor){if(!GT.ratP)return {partes:null};const ps=GT.ratP.filter(p=>p.categoria||p.valor);
+  if(ps.length<2)return {erro:'No rateio na categoria, informe pelo menos duas categorias (ou clique em Tirar o rateio).'};
+  if(ps.some(p=>!p.categoria))return {erro:'Escolha a categoria de cada parte do rateio.'};
+  if(ps.some(p=>!(p.valor>0)))return {erro:'Informe o valor de cada parte do rateio.'};
+  if(Math.abs(r2(ps.reduce((a,p)=>a+p.valor,0))-r2(valor))>=0.005)return {erro:'A soma do rateio na categoria precisa bater com o valor da conta.'};
+  const by=new Map();ps.forEach(p=>by.set(p.categoria,r2((by.get(p.categoria)||0)+p.valor)));
+  const out=[...by].map(([categoria,valor])=>({categoria,valor})).sort((a,b)=>b.valor-a.valor);return {partes:out.length>1?out:null,principal:out[0].categoria}}
+document.addEventListener('click',e=>{const b=e.target.closest('#gtRatAbre,#gtRatTira,#gtRatAdd,[data-ratdel]');if(!b||!$('gtCatRat')?.contains(b))return;
+  if(b.id==='gtRatAbre'){const v=parseMoney($('gt_valor')?.value)||null,c=$('gt_categoria')?.value||'';gtRatDesenha([{categoria:c,valor:v},{categoria:'',valor:null}])}
+  else if(b.id==='gtRatTira'){if(confirm('Tirar o rateio na categoria? A conta fica com uma categoria só.'))gtRatDesenha(null)}
+  else if(b.id==='gtRatAdd'){const v=parseMoney($('gt_valor')?.value)||0,s=r2(GT.ratP.reduce((a,p)=>a+(+p.valor||0),0));GT.ratP.push({categoria:'',valor:v>s?r2(v-s):null});gtRatDesenha(GT.ratP)}
+  else{GT.ratP.splice(+b.dataset.ratdel,1);gtRatDesenha(GT.ratP.length?GT.ratP:null)}});
+document.addEventListener('change',e=>{const t=e.target;if(!$('gtCatRat')?.contains(t)||!GT.ratP)return;
+  if(t.dataset.ratc!=null){if(t.value==='__nova__')return;GT.ratP[+t.dataset.ratc].categoria=t.value}
+  if(t.dataset.ratv!=null){const n=parseMoney(t.value);GT.ratP[+t.dataset.ratv].valor=n>0?r2(n):null;if(n>0)t.value=showMoney(n)}
+  gtRatConf()});
+document.addEventListener('input',e=>{if(e.target.id==='gt_valor'&&GT.ratP)gtRatConf()});
+// coloca a sugestão na conta aberta (só se a categoria estiver em branco) e diz de onde veio
+async function gtCatSug(o){
+  const sel=$('gt_categoria');if(!sel||sel.disabled||sel.value||GT.ratP)return null;
+  const cli=cliAtual();const s=await catSugere({cli,...o});if(!s||!$('dlgGT').open||sel.value)return null;
+  if(![...sel.options].some(x=>x.value===s.categoria)){const op=document.createElement('option');op.value=op.textContent=s.categoria;sel.insertBefore(op,sel.options[1]||null)}
+  sel.value=s.categoria;sel.dispatchEvent(new Event('change',{bubbles:true}));
+  if(s.partes&&await v160ok())gtRatDesenha(s.partes);
+  if(s.desc){const de=$('gt_descricao');if(de&&!de.disabled&&!de.value.trim())de.value=s.desc}
+  let n=$('gtCatSugN');if(!n){n=document.createElement('span');n.id='gtCatSugN';n.className='note';n.style.margin='0';sel.closest('label')?.appendChild(n)}
+  n.innerHTML=`${s.fraca?'⚠ ':'✓ '}Sugerida ${esc(s.como)}${s.partes?' · dividida em '+s.partes.length+' categorias':''}. Confira.`;
+  sel.addEventListener('change',()=>n.remove(),{once:true});
+  return s}
+// relatórios: o lançamento com rateio na categoria vira uma linha por categoria (o valor, os juros e o desconto proporcionais)
+function catExp(ms){return (ms||[]).flatMap(m=>{const p=m.cat_partes;if(!Array.isArray(p)||p.length<2)return [m];
+  const tot=p.reduce((a,x)=>a+(+x.valor||0),0);if(!(tot>0))return [m];
+  const parte=(k,i)=>{const base=+m[k]||0;if(!base)return m[k];const fs=p.map(x=>r2(base*(+x.valor||0)/tot));fs[fs.length-1]=r2(base-fs.slice(0,-1).reduce((a,v)=>a+v,0));return fs[i]};
+  return p.map((x,i)=>({...m,categoria:x.categoria||m.categoria,valor:parte('valor',i),juros:parte('juros',i),desconto:parte('desconto',i),_parte:i+1,_partes:p.length}))})}
+// ---- recibo de aluguel (e outros recibos) anexado: valor, a que se refere, quem recebeu (nome e CPF/CNPJ) e a data ----
+function reciboDe(txt,meuDoc){
+  const L=String(txt||'').split(/\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean),T=L.join(' ');if(!/\brecibo\b/i.test(T))return null;
+  const MON='(\\d{1,3}(?:\\.\\d{3})*,\\d{2})',meu=soDig(meuDoc||'');
+  // valor: o total pago/transferido na mesma linha do rótulo (modelo de recibo de aluguel da Carol: "Total Transferido: R$ 4.500,00")
+  let valor=null;
+  for(const lab of ['total\\s+transferido','total\\s+pago','valor\\s+pago','valor\\s+transferido','total\\s+a\\s+pagar','aluguel\\s+a\\s+pagar','valor\\s+l[ií]quido','total\\s+l[ií]quido','total\\s+do\\s+aluguel','valor\\s+total']){
+    const re=new RegExp(lab+'\\s*(?:\\(.{1,3}\\))?\\s*:?\\s*(?:r\\$)?\\s*'+MON,'i');
+    const l=L.find(x=>re.test(x));if(l){valor=parseMoney(l.match(re)[1]);break}}
+  if(valor==null){const mv=T.match(/(?:import[âa]ncia|quantia|valor)\s+(?:l[ií]quid[ao]\s+)?(?:total\s+)?(?:de\s+)?(?:r\$)?\s*:?\s*(?:r\$)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i)||T.match(/r\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i);valor=mv?parseMoney(mv[1]):null}
+  // quem recebe: "LOCADOR: nome" com o CPF/CNPJ logo abaixo; senão "Eu, nome," ou o nome antes do CPF/CNPJ no fim
+  let nome='',docR='';
+  const li=L.findIndex(x=>/^(?:locador|recebedor|benefici[áa]rio|prestador)\s*:/i.test(x));
+  if(li>=0){nome=L[li].replace(/^[^:]+:\s*/,'').replace(/\s*(?:CPF|CNPJ)\b.*$/i,'').trim();
+    const dl=[L[li],L[li+1]||''].join(' ').match(/(?:CPF|CNPJ)\s*(?:n[º°o.]*)?\s*:?\s*([\d.\-\/]{11,18})/i);docR=dl?soDig(dl[1]):''}
+  if(!nome)nome=(T.match(/\b(?:eu|n[óo]s),?\s+([A-ZÀ-Ú][A-Za-zÀ-ú'´]+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ú][A-Za-zÀ-ú'´]+){1,6})\s*,/)||[])[1]||'';
+  if(!nome){const m=T.match(/([A-ZÀ-Ú][A-Za-zÀ-ú'´]+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ú][A-Za-zÀ-ú'´]+){1,6})\s*[-–,]?\s*(?:CPF|CNPJ)\s*(?:n[º°o.]*)?\s*:?\s*[\d.\-\/]{11,18}\s*$/i);nome=m?m[1]:''}
+  const docs=[...new Set([docR,...(T.match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/g)||[]).map(soDig)])].filter(d=>(d.length===11||d.length===14)&&d!==meu);
+  const pagador=((T.match(/recebi(?:mos)?\s+d[aeo]s?\s+(.{3,120}?)\s*,?\s*(?:a\s+(?:quantia|import[âa]ncia)|CNPJ|CPF|inscrit)/i)||[])[1]||'').trim();
+  // data do recibo: "Florianópolis, 16.11.2026" / "03/11/2026" / "16 de novembro de 2026"
+  const mes='janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro',md=T.match(new RegExp(`(\\d{1,2})\\s+de\\s+(${mes})\\s+de\\s+(\\d{4})`,'i'));
+  const dc=T.match(/[A-Za-zÀ-ú]\s*[,–-]\s*(\d{2})[./](\d{2})[./](\d{4})\b/)||T.match(/\b(\d{2})[./](\d{2})[./](\d{4})\b/);
+  const data=md?`${md[3]}-${String(1+MESES.findIndex(x=>chave(x)===chave(md[2]))).padStart(2,'0')}-${md[1].padStart(2,'0')}`:dc?`${dc[3]}-${dc[2]}-${dc[1]}`:null;
+  // mês de referência: "Aluguel referente: out/26", "10/2026", "outubro de 2026"
+  const MC=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];let competencia='';
+  const mr=T.match(/(?:referente|refer[êe]ncia|compet[êe]ncia)\s*(?:ao\s+m[êe]s\s+(?:de\s+)?)?:?\s*(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\s*(?:\/|de)\s*(\d{2,4})\b/i)
+    ||T.match(/\b(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\s*\/\s*(\d{2}|\d{4})\b/i);
+  if(mr)competencia=`${mr[2].length===2?'20'+mr[2]:mr[2]}-${String(1+MC.indexOf(mr[1].toLowerCase().replace('ç','c'))).padStart(2,'0')}`;
+  else{const mn=T.match(/(?:referente|refer[êe]ncia|compet[êe]ncia)[^0-9]{0,20}(\d{2})\/(\d{4})\b/i);if(mn&&+mn[1]>=1&&+mn[1]<=12)competencia=`${mn[2]}-${mn[1]}`}
+  // descrição: aluguel do mês e o imóvel ("referente imóvel situado na Rua ..., relacionados abaixo")
+  const imovel=((T.match(/im[óo]vel\s+(?:situado|localizado)\s+(?:na|no|à|a|em)\s+(.{4,140}?)\s*,\s*(?:relacionad|conforme|abaixo|no\s+valor|pelo\s+per)/i)||[])[1]||'').trim();
+  let ref=(T.match(/(?:referente|refer[êe]nte|relativo|correspondente)\s+(?:a|ao|aos|à|às)\s+(.{4,160}?)(?:[.;]|\s+(?:por\s+ser\s+verdade|pelo\s+que|dando|e\s+para\s+clareza|firmo|para\s+maior)|$)/i)||[])[1]||'';
+  ref=ref.replace(/\s+/g,' ').trim();
+  const aluguel=/recibo\s+de\s+aluguel|\baluguel\b/i.test(T),compTxt=competencia?competencia.split('-').reverse().join('/'):'';
+  const servico=aluguel?('Aluguel'+(compTxt?' '+compTxt:'')+(imovel?' – '+imovel:'')).slice(0,200):ref?('Recibo: '+ref).slice(0,200):'';
+  return {recibo:true,aluguel,valor,servico,recebedor:nome.trim(),docs,emissao:data,competencia,pagador}}
+// ---- PDF com senha (ex.: fatura da Vivo por e-mail): tenta as senhas mais comuns com o CNPJ da empresa e as que já
+// funcionaram; se nenhuma servir, pergunta a senha uma vez (Carol, 18/11)
+const PDFSENHAS=(()=>{try{return new Set(JSON.parse(localStorage.getItem('pdfSenhas')||'[]'))}catch(e){return new Set()}})();
+function pdfSenhasCand(){const out=[...PDFSENHAS],cli=typeof cliAtual==='function'?cliAtual():null;
+  const ds=(cli&&cli.id!=='*'?[cli]:CLIENTES||[]).map(c=>soDig(c.cnpj)).filter(d=>d.length>=11);
+  ds.forEach(d=>out.push(d.slice(0,4),d.slice(0,5),d.slice(0,6),d.slice(0,8),d));return [...new Set(out)].slice(0,80)}
+async function pdfAbre(buf,nome){
+  if(!window.pdfjsLib){await carregaJs(PDFJS+'pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}
+  const tenta=pw=>pdfjsLib.getDocument({data:new Uint8Array(buf.slice(0)),...(pw?{password:pw}:{})}).promise;
+  try{return await tenta()}catch(e){if(e?.name!=='PasswordException')throw e}
+  for(const pw of pdfSenhasCand()){try{return await tenta(pw)}catch(e){if(e?.name!=='PasswordException')throw e}}
+  const pw=prompt(`O arquivo “${nome||'PDF'}” tem senha. Digite a senha para o sistema ler o documento (as faturas de telefone costumam usar os primeiros números do CNPJ ou do CPF):`);
+  if(pw){try{const d=await tenta(pw.trim());PDFSENHAS.add(pw.trim());try{localStorage.setItem('pdfSenhas',JSON.stringify([...PDFSENHAS].slice(-30)))}catch(e){}return d}catch(e){}}
+  throw Object.assign(new Error('PDF com senha'),{senha:true})}
+// ===== Importar boletos, notas e guias EM LOTE (Carol, 18/11) =====
+// Arraste vários arquivos de uma vez: o sistema lê cada um, junta a nota e o boleto do MESMO fornecedor com o MESMO valor num
+// lançamento só, sugere a categoria (guia pelo código, conta recorrente pelo histórico) e mostra se já existe conta lançada
+// (prevista ou recorrente) para ligar. Nada é gravado antes de "Criar os lançamentos marcados", e tudo tem Desfazer.
+const LT_CATS=['Boleto ou fatura','Comprovante','Nota fiscal','Outros'];let LT=null;
+function ltDialogo(){if($('dlgLote'))return $('dlgLote');
+  document.head.insertAdjacentHTML('beforeend','<style>.ltTab td{vertical-align:top}.ltTab .mt4{margin-top:4px}.ltTab td>div.lt1{display:block;margin-top:4px}.ltTab td>div.lt1:first-child{margin-top:0}.ltTab .chip{display:inline-block;margin-top:4px;white-space:normal}</style>');
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="dlgLote" style="width:min(1320px,calc(100vw - 32px))"><div class="dh"><h2 id="ltTitle">Importar boletos, notas e guias em lote</h2></div>
+    <div class="db" id="ltBody"></div>
+    <div class="df"><span class="note" id="ltNote" style="margin:0"></span><span class="spacer"></span><button type="button" class="btn ghost" data-lt="fechar">Fechar</button><button type="button" class="btn primary" data-lt="criar" id="ltCriar" disabled>Criar os lançamentos marcados</button></div></dialog>`);
+  const d=$('dlgLote');
+  d.addEventListener('click',ev=>{const b=ev.target.closest('[data-lt]');if(!b)return;const a=b.dataset.lt;
+    if(a==='fechar')return d.close();if(a==='criar')return ltCriar();
+    if(a==='separar'){const x=LT.it[+b.dataset.i];if(!x||x.files.length<2)return;const novos=x.partes.map(pt=>({...pt.base,files:[pt.f],cats:[pt.cat],partes:[pt],juntou:false,ok:true}));LT.it.splice(+b.dataset.i,1,...novos);ltDesenha()}
+    if(a==='tira'){LT.it.splice(+b.dataset.i,1);ltDesenha()}});
+  d.addEventListener('change',ev=>{const t=ev.target,i=+t.dataset.i,x=LT?.it[i];if(!x)return;const k=t.dataset.k;
+    if(k==='ok')x.ok=t.checked;
+    else if(k==='valor'){const n=parseMoney(t.value);x.valor=n>0?r2(n):null;if(n>0)t.value=showMoney(n);if(x.catPartes)x.catPartes=partesEscala(x.catPartes,x.valor)}
+    else if(k==='dest'){x.dest=t.value;ltDesenha();return}
+    else if(k==='categoria'){if(t.value==='__nova__')return;x.categoria=t.value;x.catPartes=null;x.catComo='escolhida';ltDesenha();return}
+    else if(k)x[k]=t.value.trim();
+    ltConta()});
+  const drop=()=>$('ltDrop');
+  d.addEventListener('dragover',e=>{if(!e.target.closest('#ltDrop'))return;e.preventDefault();drop().style.borderColor='var(--accent, #0b6b5c)'});
+  d.addEventListener('dragleave',e=>{if(e.target.closest('#ltDrop'))drop().style.borderColor=''});
+  d.addEventListener('drop',e=>{if(!e.target.closest('#ltDrop'))return;e.preventDefault();drop().style.borderColor='';ltLe([...e.dataTransfer.files])});
+  d.addEventListener('change',e=>{if(e.target.id==='ltArq'){ltLe([...e.target.files]);e.target.value=''}});
+  return d}
+async function ltAbre(){
+  const cli=cliAtual();if(!cli||cli.id==='*')return toast('Escolha uma empresa para importar os documentos.');
+  ltDialogo();LT={cli,it:[],pes:[],plano:[],lendo:0};
+  try{[LT.pes,LT.plano]=await Promise.all([gfPessoasDe(cli.id,'fornecedor'),planoDe(cli)])}catch(e){console.error(e)}
+  await guiasCarrega();
+  $('ltTitle').textContent='Importar boletos, notas e guias em lote · '+cli.nome;ltDesenha();$('dlgLote').showModal()}
+// lê um arquivo e devolve o item da lista (um lançamento)
+async function ltItem(f){
+  const cli=LT.cli,r=await leArquivoDoc(f);if(r.erro)return {files:[f],cats:['Outros'],erro:r.erro,ok:false,partes:[]};
+  const xml=!!r.xml,cat=xml?'Nota fiscal':r.guia?'Boleto ou fatura':r.recibo?'Comprovante':catPeloNome(f.name,LT_CATS,r.bol?'Boleto ou fatura':(r.nfe||r.nfseNum)?'Nota fiscal':'Boleto ou fatura');
+  const meu=soDig(cli.cnpj),docs=[...new Set([r.nfe?.cnpj,...(r.cnpjs||[]),...(r.recibo?.docs||[])].filter(d=>d&&d!==meu))];
+  let forn='',doc='';
+  if(r.guia)forn=guiaForn(r.guia,cli.id,LT.pes);
+  else{for(const d of docs){const p=LT.pes.find(x=>soDig(x.documento)===d);if(p){forn=pesNome(p);doc=d;break}}
+    if(!forn)for(const d of docs){const p=cnpjRaiz(LT.pes,d);if(p){forn=pesNome(p);doc=d;break}}
+    if(!forn&&docs.length){const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:docs[0]}).then(x=>x,()=>({data:null}));forn=(typeof nome==='string'&&nome)||r.nome||r.recibo?.recebedor||'';doc=docs[0]}
+    if(!forn)forn=r.nome||r.recibo?.recebedor||''}
+  const dup=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0];
+  const valor=r2(+(r.bol?.valor||r.guia?.valor||dup?.valor||r.recibo?.valor||r.valor||0))||null;
+  const base={forn,doc,valor,venc:r.bol?.venc||r.guia?.venc||dup?.venc||r.venc||(r.recibo?r.recibo.emissao:null)||'',linha:r.bol?(r.bol.linha||r.bol.barra):'',
+    numero:r.guia?.numero||r.nfseNum||r.numero||r.nfe?.numero||'',competencia:(r.guia?.competencia||r.recibo?.competencia||r.competencia||(r.emissao||r.recibo?.emissao||'').slice(0,7)||''),
+    descricao:r.guia?(GUIA_NOME[r.guia.guia]+(r.guia.itens.length>1?' ('+r.guia.itens.map(i=>i.codigo).join(', ')+')':'')):(r.servico||r.recibo?.servico||''),
+    guia:r.guia||null,bol:r.bol||null,pix:!!r.pix,chave:xml&&r.nfe?r.nfe.chave:'',texto:(r.texto||'').slice(0,3000),origem:r.origem,ehNota:cat==='Nota fiscal'&&!r.bol,ehBol:!!r.bol||cat==='Boleto ou fatura'};
+  return {...base,files:[f],cats:[cat],partes:[{f,cat,base}],ok:true}}
+async function ltLe(files){
+  if(!LT||!files.length)return;const fs=files.filter(f=>/pdf|image|xml/i.test(f.type||'')||/\.(pdf|xml|jpe?g|png|webp)$/i.test(f.name||''));
+  if(fs.length<files.length)toast('Alguns arquivos foram ignorados: envie PDF, foto ou XML.');
+  LT.lendo+=fs.length;ltDesenha();
+  for(const f of fs){let x;try{x=await ltItem(f)}catch(e){console.error(e);x={files:[f],cats:['Outros'],erro:e?.senha?'PDF com senha: não consegui abrir.':'Não consegui ler este arquivo.',ok:false,partes:[]}}
+    LT.lendo--;if(!x.erro)ltJunta(x);else LT.it.push(x);ltDesenha()}
+  await Promise.all(LT.it.map(x=>x.sugFeita||x.erro?null:ltSug(x)));ltDesenha()}
+// nota + boleto: mesmo fornecedor (CNPJ ou nome) e mesmo valor (ou o valor de uma das duplicatas da nota) viram um lançamento só
+function ltJunta(x){
+  const mesmoF=(a,b)=>a.doc&&b.doc?a.doc===b.doc:!!a.forn&&pessoaChave(a.forn)===pessoaChave(b.forn);
+  const par=LT.it.find(y=>!y.erro&&y.files.length===1&&(x.ehNota&&!y.ehNota&&y.ehBol||y.ehNota&&!x.ehNota&&x.ehBol)&&mesmoF(x,y)&&x.valor>0&&y.valor>0&&Math.abs(x.valor-y.valor)<0.01);
+  if(!par){LT.it.push(x);return}
+  const [bol,nf]=x.ehNota?[par,x]:[x,par];
+  Object.assign(par,{...bol,files:[bol.files[0],nf.files[0]],cats:[bol.cats[0],nf.cats[0]],partes:[...bol.partes,...nf.partes],juntou:true,ok:true,
+    numero:nf.numero||bol.numero,descricao:bol.descricao||nf.descricao,competencia:nf.competencia||bol.competencia,doc:bol.doc||nf.doc,forn:bol.forn||nf.forn,chave:nf.chave||bol.chave,texto:bol.texto+' '+nf.texto,sugFeita:false})}
+async function ltSug(x){x.sugFeita=true;
+  const s=await catSugere({cli:LT.cli,pessoa:x.forn,texto:[x.descricao,x.texto].join(' '),valor:x.valor,guia:x.guia}).catch(()=>null);
+  if(s&&!x.categoria){x.categoria=s.categoria;x.catPartes=s.partes||null;x.catComo=s.como;x.catFraca=!!s.fraca}
+  if(s?.desc&&!x.descricao)x.descricao=s.desc;
+  // conta já lançada (prevista ou recorrente) do mesmo fornecedor, perto do vencimento
+  const livres=bolAbertas().filter(t=>t.cliente_id===LT.cli.id&&!LT.it.some(y=>y!==x&&y.dest===t.id));
+  const p=LT.pes.find(p=>pessoaChave(pesNome(p))===pessoaChave(x.forn)||pessoaChave(p.nome)===pessoaChave(x.forn));
+  let sg=x.forn&&x.venc?bolSugere({pessoa_id:p?.id||null,pessoa_nome:p?.nome||x.forn,vencimento:x.venc,valor:x.valor,descricao:x.descricao},livres):null;
+  // achou pelas palavras, mas a conta é de OUTRO fornecedor (ex.: dois recibos de aluguel de locadores diferentes): não junta
+  if(sg&&sg.como!=='pelo fornecedor'&&sg.t.pessoa_nome&&pessoaChave(sg.t.pessoa_nome)!==pessoaChave(p?.nome||x.forn)&&pessoaChave(sg.t.pessoa_nome)!==pessoaChave(x.forn))sg=null;
+  x.dest=sg?sg.t.id:'nova';x.sugT=sg?.t?.id||null;x.sugComo=sg?.como||null;
+  if(x.bol){const rp=await boletoRepetido(x.bol,null).catch(()=>[]);if(rp.length){x.repetido=repetidoTxt(rp);x.ok=false}}}
+function ltConta(){const n=LT.it.filter(x=>x.ok&&!x.erro).length;$('ltCriar').disabled=!n||LT.lendo>0;$('ltCriar').textContent=n?`Criar os ${n} lançamentos marcados`:'Criar os lançamentos marcados';
+  $('ltNote').textContent=LT.lendo?`Lendo ${LT.lendo} arquivo${LT.lendo>1?'s':''}…`:`${LT.it.length} lançamento${LT.it.length===1?'':'s'} na lista`}
+function ltDesenha(){
+  if(!LT)return;const cats=[...new Set(LT.plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')==='Despesa').map(c=>c.categoria).concat(LT.plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')!=='Despesa').map(c=>c.categoria)))];
+  const livres=bolAbertas().filter(t=>t.cliente_id===LT.cli.id);
+  const opC=c=>`<option value=""></option>`+[...cats,...(c&&!cats.includes(c)?[c]:[])].map(x=>`<option${x===c?' selected':''}>${esc(x)}</option>`).join('')+(typeof catNovaOpt==='string'?catNovaOpt:'');
+  const linhas=LT.it.map((x,i)=>{
+    const arqs=x.files.map((f,j)=>`<div>📎 <span class="chip">${esc(x.cats[j]||'')}</span> ${esc(f.name||'')}</div>`).join('');
+    if(x.erro)return `<tr><td></td><td class="l">${arqs}</td><td class="l neg" colspan="5">${esc(x.erro)}</td><td><button type="button" class="btn small ghost" data-lt="tira" data-i="${i}" aria-label="Tirar da lista">✕</button></td></tr>`;
+    const sem=LT.pes.length&&x.forn&&!LT.pes.some(p=>pessoaChave(pesNome(p))===pessoaChave(x.forn)||pessoaChave(p.nome)===pessoaChave(x.forn));
+    const t=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null;
+    const outras=livres.filter(y=>y.id===x.dest||!LT.it.some(z=>z!==x&&z.dest===y.id)).filter(y=>!x.venc||bolDias(y.vencimento,x.venc)<=45);
+    const st='style="width:100%;min-width:0"';
+    return `<tr><td><input type="checkbox" data-i="${i}" data-k="ok"${x.ok?' checked':''} aria-label="Criar este"></td>
+      <td class="l">${arqs}${x.juntou?'<span class="chip c-done" title="Nota e boleto do mesmo fornecedor e mesmo valor">🔗 nota + boleto juntos</span> <button type="button" class="btn small ghost" data-lt="separar" data-i="'+i+'">Separar</button>':''}${x.guia&&x.guia.itens.length>1?`<div class="note" style="margin:2px 0 0">${x.guia.itens.map(c=>esc(c.codigo)+' '+fm(c.valor)).join(' · ')}</div>`:''}</td>
+      <td class="l"><div class="lt1"><input data-i="${i}" data-k="forn" list="ltPesList" value="${esc(x.forn||'')}" placeholder="Fornecedor" aria-label="Fornecedor" ${st}>${sem?'<span class="chip c-warn" title="Cadastre em Clientes e fornecedores (ou use + Cadastrar na conta)">fornecedor não cadastrado</span>':''}</div>
+        <div class="lt1"><input data-i="${i}" data-k="descricao" value="${esc(x.descricao||'')}" placeholder="Do que se trata" aria-label="Descrição" ${st}></div></td>
+      <td><div class="lt1"><input type="date" data-i="${i}" data-k="venc" value="${esc(x.venc||'')}" aria-label="Vencimento" ${st}></div><div class="lt1"><input class="money" data-i="${i}" data-k="valor" inputmode="decimal" value="${x.valor?showMoney(x.valor):''}" placeholder="0,00" style="width:100%;text-align:right" aria-label="Valor"></div></td>
+      <td><div class="lt1"><input data-i="${i}" data-k="numero" value="${esc(x.numero||'')}" placeholder="Nº doc." aria-label="Documento" ${st}></div><div class="lt1"><input type="month" data-i="${i}" data-k="competencia" value="${esc(x.competencia||'')}" aria-label="Competência" ${st}></div></td>
+      <td class="l"><select data-i="${i}" data-k="categoria" data-catnova="Despesa" aria-label="Categoria" ${st}>${opC(x.categoria||'')}</select>${x.catPartes?`<span class="chip c-done" title="${esc(x.catPartes.map(p=>p.categoria+' '+fm(p.valor)).join(' · '))}">➗ ${x.catPartes.length} categorias</span><div class="note" style="margin:0">${x.catPartes.map(p=>esc(p.categoria)+' '+fm(p.valor)).join('<br>')}</div>`:''}${x.catComo&&x.categoria?`<div class="note" style="margin:0">${x.catFraca?'⚠ ':''}${esc(x.catComo)}</div>`:''}</td>
+      <td class="l"><select data-i="${i}" data-k="dest" aria-label="Lançar como" ${st}><option value="nova">Conta nova</option>${outras.length?`<optgroup label="Conta já lançada (prevista ou recorrente)">${outras.map(y=>bolOpt(y,{})).join('')}</optgroup>`:''}</select>
+        ${t?`<span class="chip c-done">Vai para a conta já lançada${x.sugComo&&x.dest===x.sugT?' (achei '+esc(x.sugComo)+')':''}</span>${x.valor&&Math.abs(t.valor-x.valor)>0.004?`<span class="chip c-warn">Valor lançado ${fm(t.valor)} passa a ${fm(x.valor)}</span>`:''}`:''}
+        ${x.repetido?`<span class="chip c-bad">Boleto já lançado: ${esc(x.repetido)}</span>`:''}${!x.valor||!x.venc?'<span class="chip c-warn">falta '+[!x.valor?'valor':'',!x.venc?'vencimento':''].filter(Boolean).join(' e ')+'</span>':''}</td>
+      <td><button type="button" class="btn small ghost" data-lt="tira" data-i="${i}" aria-label="Tirar da lista">✕</button></td></tr>`}).join('');
+  $('ltBody').innerHTML=`<label id="ltDrop" style="border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;cursor:pointer;display:block">
+      <b>Arraste aqui os boletos, notas fiscais, guias (DARF, INSS, FGTS, DAS), faturas e recibos</b><br><span class="muted">ou clique para escolher vários arquivos (PDF, foto ou XML da nota). A nota e o boleto do mesmo fornecedor com o mesmo valor viram um lançamento só.</span>
+      <input type="file" id="ltArq" accept="${ACCEPT},.xml,text/xml,application/xml" multiple hidden></label>
+    ${LT.it.length?`<div class="tablebox" style="max-height:none;margin-top:10px"><table class="nosort ltTab" style="table-layout:fixed;width:100%"><colgroup><col style="width:34px"><col style="width:17%"><col style="width:20%"><col style="width:13%"><col style="width:13%"><col style="width:16%"><col><col style="width:40px"></colgroup><thead><tr><th></th><th class="l">Arquivos</th><th class="l">Fornecedor e descrição</th><th>Vencimento e valor</th><th>Nº e competência</th><th class="l">Categoria</th><th class="l">Lançar como</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`:''}
+    <datalist id="ltPesList">${LT.pes.map(p=>`<option value="${esc(pesNome(p))}">`).join('')}</datalist>`;
+  ltConta()}
+async function ltCriar(){
+  const cli=LT.cli,sel=LT.it.filter(x=>x.ok&&!x.erro);if(!sel.length)return;
+  const falta=sel.find(x=>(x.dest==='nova'||!x.dest)&&(!x.forn||!x.venc||!(x.valor>0)));
+  if(falta)return alert(`Complete o fornecedor, o vencimento e o valor de “${falta.files[0].name}” (ou desmarque).`);
+  const v160=await v160ok();if(sel.some(x=>x.catPartes)&&!v160&&!confirm(v160Msg+'\n\nCriar assim mesmo, só com a categoria principal?'))return;
+  $('ltCriar').disabled=true;const feitos={novos:[],alterados:[],docs:[],arqs:[]};let n=0;
+  try{
+    for(const x of sel){
+      const p=LT.pes.find(p=>pessoaChave(pesNome(p))===pessoaChave(x.forn)||pessoaChave(p.nome)===pessoaChave(x.forn));
+      const ups=[];for(const [j,f] of x.files.entries()){if(/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||''))continue;const up=await uploadAnexo(f,cli.id,'financeiro');feitos.arqs.push(up.caminho);ups.push({...up,categoria:x.cats[j]})}
+      let id;const partes=v160&&x.catPartes?partesEscala(x.catPartes,x.valor):null;
+      if(x.dest&&x.dest!=='nova'){
+        const t=GT.lista.find(y=>y.id===x.dest);const upd={valor:x.valor||t.valor,vencimento:x.venc||t.vencimento,previsto:false};
+        if(x.linha)upd.linha_digitavel=soDig(x.linha);if(x.numero)upd.documento=x.numero;if(!t.descricao||/^previsto:/i.test(t.descricao))upd.descricao=x.descricao||t.descricao;
+        if(!t.categoria&&x.categoria)upd.categoria=x.categoria;if(x.competencia&&!t.competencia)upd.competencia=x.competencia+'-01';if(partes&&!t.cat_partes)upd.cat_partes=partes;
+        const antes=Object.fromEntries(Object.keys(upd).map(k=>[k,t[k]??null]));
+        const {error}=await sb.from('fin_titulos').update(upd).eq('id',t.id);if(error)throw error;feitos.alterados.push({id:t.id,antes});id=t.id}
+      else{
+        const row={cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||x.forn,descricao:x.descricao||null,documento:x.numero||null,categoria:x.categoria||null,
+          competencia:x.competencia?x.competencia+'-01':null,vencimento:x.venc,valor:x.valor,parcela:1,parcelas:1,grupo_id:null,conta_id:null,
+          forma:x.linha?'Boleto':x.pix?'Pix':null,linha_digitavel:x.linha?soDig(x.linha):null,pix_chave:x.pix?p?.pix_chave||null:null,obs:x.chave?`Chave da nota: ${x.chave}`:null};
+        if(partes)row.cat_partes=partes;
+        const {data,error}=await sb.from('fin_titulos').insert(row).select('id').single();if(error)throw error;feitos.novos.push(data.id);id=data.id}
+      if(ups.length){const {data,error}=await sb.from('documentos').insert(ups.map(u=>({cliente_id:cli.id,modulo:'financeiro',registro_id:id,categoria:u.categoria,nome_arquivo:u.nome_arquivo,caminho:u.caminho}))).select('id');
+        if(error)throw error;feitos.docs.push(...(data||[]).map(d=>d.id))}
+      if(x.categoria&&x.forn)aprenderCat(x.forn,x.categoria).catch(()=>{});
+      n++}
+  }catch(e){console.error(e);alert(`Parei no ${n+1}º lançamento: ${v94(e)?v94Msg:e.message||e}. Os ${n} anteriores foram criados (use Desfazer para tirar).`)}
+  $('dlgLote').close();GT.key='';renderGT();
+  if(n)toastDesfazer(`${n} lançamento${n>1?'s':''} criado${n>1?'s':''} a partir dos documentos${feitos.alterados.length?` (${feitos.alterados.length} em conta já lançada)`:''}.`,async()=>{
+    if(feitos.docs.length){const {error}=await sb.from('documentos').delete().in('id',feitos.docs);if(error)throw error}
+    for(const a of feitos.alterados){const {error}=await sb.from('fin_titulos').update(a.antes).eq('id',a.id);if(error)throw error}
+    if(feitos.novos.length){const {error}=await sb.from('fin_titulos').delete().in('id',feitos.novos);if(error)throw error}
+    if(feitos.arqs.length)await sb.storage.from('anexos').remove(feitos.arqs).catch(()=>{});
+    toast('Importação desfeita');GT.key='';renderGT()})}
+// ===== Recibos: criar, imprimir e guardar (aluguel, serviço e outros) (Carol, 18/11; v160) =====
+// Contas a pagar › 🧾 Recibos: lista com busca e filtro em todas as colunas, + Novo recibo, ⧉ Duplicar (ex.: o aluguel do mês
+// seguinte), Imprimir (2 vias para assinar) e Excluir com Desfazer. Na conta aberta, "🧾 Gerar recibo" já vem preenchido.
+let RCB=null;const RCTIPOS={aluguel:'Aluguel',servico:'Prestação de serviço',outro:'Outro'};
+function rcDialogo(){if($('dlgRec'))return;
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="dlgRec" style="width:min(1180px,calc(100vw - 32px))"><div class="dh"><h2 id="rcTitle">Recibos</h2></div><div class="db" id="recBody"></div>
+    <div class="df" id="recFoot"></div></dialog>`);
+  $('dlgRec').addEventListener('click',ev=>{const b=ev.target.closest('[data-rc]');if(!b)return;const a=b.dataset.rc,id=b.dataset.id;
+    if(a==='fechar')return $('dlgRec').close();if(a==='novo')return rcForm(null);if(a==='lista')return rcLista();if(a==='salvar')return rcSalvar(b.dataset.imp==='1');
+    const r=RCB.ls.find(x=>x.id===id);if(!r)return;
+    if(a==='ver')return rcForm(r);if(a==='imp')return rcImprime(r);if(a==='dup')return rcForm({...r,id:null,_dup:1,numero:null,data:TODAY,competencia:r.competencia?somaMes(r.competencia.slice(0,7)+'-01',1):null,titulo_id:null});
+    if(a==='del')return rcExclui(r)});
+  $('dlgRec').addEventListener('input',e=>{if(e.target.closest('[data-rcf]'))rcLista(true)});
+  $('dlgRec').addEventListener('change',e=>{if(e.target.id==='rc_rec'){const p=(RCB.pes||[]).find(p=>chave(pesNome(p))===chave(e.target.value)||chave(p.nome)===chave(e.target.value));
+      if(p&&p.documento&&!$('rc_doc').value.trim())$('rc_doc').value=p.documento;rcTitOpts()}
+    if(e.target.id==='rc_tipo'||e.target.id==='rc_comp'){const rf=$('rc_ref');if(rf&&(!rf.value.trim()||rf.dataset.auto)){rf.value=rcRefAuto();rf.dataset.auto='1'}}
+    if(e.target.id==='rc_tit'){const t=GT.lista.find(x=>x.id===e.target.value);if(t){if(!parseMoney($('rc_valor').value))$('rc_valor').value=showMoney(t.valor);
+      if(!$('rc_comp').value&&t.competencia)$('rc_comp').value=t.competencia.slice(0,7)}}});
+  $('dlgRec').addEventListener('input',e=>{if(e.target.id==='rc_ref')delete e.target.dataset.auto})}
+const rcRefAuto=()=>{const tp=$('rc_tipo')?.value,c=$('rc_comp')?.value;const mes=c?` do mês de ${MESES[+c.slice(5,7)-1].toLowerCase()} de ${c.slice(0,4)}`:'';
+  return tp==='aluguel'?'aluguel do imóvel'+mes:tp==='servico'?'prestação de serviço'+mes:mes.trim()};
+async function rcAbre(pre){
+  const cli=cliAtual();if(!cli||cli.id==='*')return toast('Escolha uma empresa para ver os recibos.');rcDialogo();
+  RCB={cli,ls:[],pes:[],f:{}};
+  try{RCB.pes=await gfPessoasDe(cli.id,'fornecedor')}catch(e){}
+  const {data,error}=await sb.from('recibos').select('*').eq('cliente_id',cli.id).is('excluido_em',null).order('data',{ascending:false}).order('numero',{ascending:false});
+  if(error){if(/recibos|relation|42P01/i.test(error.message||'')||error.code==='42P01')return alert('Os recibos precisam da atualização v160 do banco. Rode o SQL no Supabase (SQL Editor) e tente de novo.');return fail(error,'Não foi possível abrir os recibos')}
+  RCB.ls=data||[];$('rcTitle').textContent='Recibos · '+cli.nome;
+  if(!$('dlgRec').open)$('dlgRec').showModal();
+  if(pre)rcForm(pre);else rcLista()}
+function rcLista(soCorpo){
+  const f=RCB.f;document.querySelectorAll('#dlgRec [data-rcf]').forEach(el=>f[el.dataset.rcf]=el.value);
+  const ls=RCB.ls.filter(r=>(!f.q||buscaCasa(f.q,[r.recebedor_nome,r.recebedor_doc,r.referente,RCTIPOS[r.tipo],r.obs,String(r.numero||'')],[r.valor],[r.data,r.competencia]))
+    &&(!f.num||String(r.numero||'').includes(f.num))&&(!f.data||dBR(r.data).includes(f.data))&&(!f.tipo||chave(RCTIPOS[r.tipo]||'').includes(chave(f.tipo)))
+    &&(!f.rec||chave((r.recebedor_nome||'')+' '+(r.recebedor_doc||'')).includes(chave(f.rec)))&&(!f.ref||chave(r.referente||'').includes(chave(f.ref)))
+    &&(!f.comp||(r.competencia?r.competencia.slice(5,7)+'/'+r.competencia.slice(0,4):'').includes(f.comp))&&(!f.val||fm(r.valor).includes(f.val)));
+  const corpo=ls.length?ls.map(r=>`<tr><td>${r.numero||'—'}</td><td>${dBR(r.data)}</td><td class="l">${esc(RCTIPOS[r.tipo]||r.tipo)}</td><td class="l"><b>${esc(r.recebedor_nome)}</b>${r.recebedor_doc?'<br><span class="muted">'+esc(r.recebedor_doc)+'</span>':''}</td><td class="l">${esc(r.referente||'')}</td><td>${r.competencia?r.competencia.slice(5,7)+'/'+r.competencia.slice(0,4):'—'}</td><td><b>${fm(r.valor)}</b></td>
+      <td style="white-space:nowrap"><button type="button" class="btn small" data-rc="imp" data-id="${r.id}">Imprimir</button> <button type="button" class="btn small ghost" data-rc="ver" data-id="${r.id}">Abrir</button> <button type="button" class="btn small ghost" data-rc="dup" data-id="${r.id}" title="Novo recibo igual a este (ex.: o aluguel do mês seguinte)">⧉ Duplicar</button> <button type="button" class="btn small ghost" data-rc="del" data-id="${r.id}">Excluir</button></td></tr>`).join('')
+    :`<tr><td colspan="8" class="l muted">${RCB.ls.length?'Nenhum recibo com estes filtros.':'Nenhum recibo ainda. Clique em + Novo recibo.'}</td></tr>`;
+  const tot=r2(ls.reduce((a,r)=>a+(+r.valor||0),0));
+  if(soCorpo&&$('rcTb')){$('rcTb').innerHTML=corpo;$('rcTot').textContent=`${ls.length} recibo${ls.length===1?'':'s'} · ${fm(tot)}`;return}
+  const fi=(k,ph,w)=>`<input data-rcf="${k}" value="${esc(f[k]||'')}" placeholder="${ph}" aria-label="Filtrar ${ph}" style="width:100%;min-width:${w||60}px">`;
+  $('recBody').innerHTML=`<div class="toolbar" style="margin:0 0 8px"><input data-rcf="q" value="${esc(f.q||'')}" placeholder="Buscar em todos os campos" style="max-width:320px"><span class="spacer"></span><span class="note" id="rcTot" style="margin:0">${ls.length} recibo${ls.length===1?'':'s'} · ${fm(tot)}</span></div>
+    <div class="tablebox" style="max-height:60vh"><table><thead><tr><th>Nº</th><th>Data</th><th class="l">Tipo</th><th class="l">Quem recebeu</th><th class="l">Referente a</th><th>Competência</th><th>Valor</th><th></th></tr>
+      <tr class="gcfil"><td>${fi('num','Nº',40)}</td><td>${fi('data','dd/mm',70)}</td><td>${fi('tipo','Tipo')}</td><td>${fi('rec','Nome ou CPF',110)}</td><td>${fi('ref','Referente',110)}</td><td>${fi('comp','mm/aaaa',70)}</td><td>${fi('val','Valor',70)}</td><td></td></tr></thead><tbody id="rcTb">${corpo}</tbody></table></div>`;
+  $('recFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-rc="fechar">Fechar</button><button type="button" class="btn primary" data-rc="novo">+ Novo recibo</button>`}
+function rcTitOpts(){const s=$('rc_tit');if(!s)return;const nm=pessoaChave($('rc_rec').value),cur=s.value||RCB.cur?.titulo_id||'';
+  const ls=(GT.lista||[]).filter(t=>t.cliente_id===RCB.cli.id&&t.tipo==='pagar'&&(t.id===cur||!nm||pessoaChave(t.pessoa_nome)===nm)).sort((a,b)=>String(b.vencimento).localeCompare(String(a.vencimento))).slice(0,40);
+  s.innerHTML='<option value="">Nenhuma</option>'+ls.map(t=>`<option value="${t.id}"${t.id===cur?' selected':''}>${dBR(t.vencimento)} · ${esc(t.pessoa_nome||'')} · ${fm(t.valor)}${t.descricao?' · '+esc(t.descricao).slice(0,30):''}</option>`).join('')}
+function rcForm(r){
+  RCB.cur=r;const E=docEmp(RCB.cli),v=k=>esc(r?.[k]??''),novo=!r?.id;
+  $('recBody').innerHTML=`${r?._dup?'<p class="note" style="margin:0 0 8px">Cópia do recibo nº '+esc(String(RCB.ls.find(x=>x.recebedor_nome===r.recebedor_nome)?.numero||''))+': confira a data, a competência e o valor.</p>':''}<div class="fields">
+    <label class="f">Tipo<select id="rc_tipo">${Object.entries(RCTIPOS).map(([k,t])=>`<option value="${k}"${(r?.tipo||'aluguel')===k?' selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f wide">Quem recebe (nome) *<input id="rc_rec" list="rcPes" value="${v('recebedor_nome')}" autocomplete="off" placeholder="Ex.: o dono do imóvel"></label>
+    <label class="f">CPF ou CNPJ de quem recebe<input id="rc_doc" value="${v('recebedor_doc')}" inputmode="numeric"></label>
+    <label class="f wide">Quem paga<input id="rc_pag" value="${esc(r?.pagador_nome||empNome(E))}"></label>
+    <label class="f">CNPJ de quem paga<input id="rc_pagdoc" value="${esc(r?.pagador_doc||E.cnpj||'')}"></label>
+    <label class="f">Valor *<input id="rc_valor" class="money" inputmode="decimal" value="${r?.valor?showMoney(r.valor):''}" placeholder="0,00"></label>
+    <label class="f">Competência<input type="month" id="rc_comp" value="${(r?.competencia||'').slice(0,7)}"></label>
+    <label class="f">Data do recibo *<input type="date" id="rc_data" value="${esc(r?.data||TODAY)}"></label>
+    <label class="f">Cidade<input id="rc_cid" value="${esc(r?.cidade||[E.cidade||RCB.cli.municipio||'',E.uf||RCB.cli.uf||''].filter(Boolean).join('/'))}"></label>
+    <label class="f wide">Referente a *<input id="rc_ref" value="${v('referente')}" placeholder="Ex.: aluguel do imóvel referente ao mês de novembro de 2026"></label>
+    <label class="f wide">Conta a pagar ligada<select id="rc_tit"></select></label>
+    <label class="f wide">Observação<textarea id="rc_obs" rows="2">${v('obs')}</textarea></label></div><p class="err" id="rcErr" hidden></p>
+    <datalist id="rcPes">${(RCB.pes||[]).map(p=>`<option value="${esc(pesNome(p))}">`).join('')}</datalist>`;
+  if(!$('rc_ref').value){$('rc_ref').value=rcRefAuto();$('rc_ref').dataset.auto='1'}
+  rcTitOpts();
+  $('recFoot').innerHTML=`<button type="button" class="btn ghost" data-rc="lista">← Voltar à lista</button><span class="spacer"></span>${novo?'':`<button type="button" class="btn" data-rc="imp" data-id="${r.id}">Imprimir</button>`}<button type="button" class="btn" data-rc="salvar">Salvar</button><button type="button" class="btn primary" data-rc="salvar" data-imp="1">Salvar e imprimir</button>`;
+  if(novo)$('rc_rec').focus()}
+async function rcSalvar(imp){
+  const r=RCB.cur,g=id=>($(id)?.value||'').trim(),valor=parseMoney($('rc_valor').value),err=t=>{$('rcErr').textContent=t;$('rcErr').hidden=false};
+  if(!g('rc_rec'))return err('Informe quem recebe.');if(!(valor>0))return err('Informe o valor.');if(!g('rc_data'))return err('Informe a data do recibo.');if(!g('rc_ref'))return err('Informe a que se refere o recibo.');
+  const row={cliente_id:RCB.cli.id,tipo:g('rc_tipo'),recebedor_nome:g('rc_rec'),recebedor_doc:g('rc_doc')||null,pagador_nome:g('rc_pag')||null,pagador_doc:g('rc_pagdoc')||null,valor:r2(valor),
+    referente:g('rc_ref'),competencia:g('rc_comp')?g('rc_comp')+'-01':null,data:g('rc_data'),cidade:g('rc_cid')||null,titulo_id:g('rc_tit')||null,obs:g('rc_obs')||null};
+  try{let sv;
+    if(r?.id){const antes=RCB.ls.find(x=>x.id===r.id);const {data,error}=await sb.from('recibos').update(row).eq('id',r.id).select().single();if(error)throw error;sv=Array.isArray(data)?data[0]:data;
+      RCB.ls=RCB.ls.map(x=>x.id===sv.id?sv:x);toastDesfazer('Recibo salvo.',async()=>{const {id,criado_em,criado_por,...o}=antes;const {error}=await sb.from('recibos').update(o).eq('id',r.id);if(error)throw error;rcAbre()})}
+    else{const {data:mx}=await sb.from('recibos').select('numero').eq('cliente_id',RCB.cli.id).order('numero',{ascending:false,nullsFirst:false}).limit(1);row.numero=(mx?.[0]?.numero||0)+1;
+      const {data,error}=await sb.from('recibos').insert(row).select().single();if(error)throw error;sv=Array.isArray(data)?data[0]:data;RCB.ls.unshift(sv);
+      toastDesfazer(`Recibo nº ${sv.numero} criado.`,async()=>{const {error}=await sb.from('recibos').delete().eq('id',sv.id);if(error)throw error;toast('Recibo desfeito');if($('dlgRec').open)rcAbre()})}
+    if(imp)rcImprime(sv);rcLista()}catch(e){fail(e,'Não foi possível salvar o recibo')}}
+async function rcExclui(r){if(!confirm(`Excluir o recibo nº ${r.numero||''} de ${r.recebedor_nome}? Logo depois aparece o botão Desfazer.`))return;
+  const {error}=await sb.from('recibos').update({excluido_em:new Date().toISOString()}).eq('id',r.id);if(error)return fail(error,'Não foi possível excluir');
+  RCB.ls=RCB.ls.filter(x=>x.id!==r.id);rcLista();
+  toastDesfazer('Recibo excluído.',async()=>{const {error}=await sb.from('recibos').update({excluido_em:null}).eq('id',r.id);if(error)throw error;toast('Recibo de volta');if($('dlgRec').open)rcAbre()})}
+function rcImprime(r){
+  const w=window.open('','_blank');if(!w)return toast('Libere as janelas (pop-up) do portal para imprimir o recibo');
+  const doc=d=>{const x=soDig(d);return x.length===11?x.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4'):x.length===14?x.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):esc(d||'')};
+  const via=n=>`<div class="via"><div class="top"><h1>RECIBO${r.numero?' Nº '+r.numero:''}</h1><div class="vl">${fm(r.valor)}</div></div>
+    <p>Recebi${/\/|ltda|s\.?a\.?\b|me\b|eireli/i.test(r.recebedor_nome)?'(emos)':''} de <b>${esc(r.pagador_nome||'')}</b>${r.pagador_doc?', inscrito(a) no CPF/CNPJ sob o nº <b>'+doc(r.pagador_doc)+'</b>,':''} a importância de <b>${fm(r.valor)}</b> (${esc(extenso(r.valor))}), referente a <b>${esc(r.referente||'')}</b>.</p>
+    ${r.obs?`<p class="obs">${esc(r.obs)}</p>`:''}<p>Para maior clareza, firmo o presente recibo, dando plena e geral quitação do valor recebido.</p>
+    <p class="dt">${esc(r.cidade||'')}${r.cidade?', ':''}${dataExt(r.data).replace(/ de ([A-ZÇ])/,(m,l)=>' de '+l.toLowerCase())}.</p>
+    <div class="ass"><div class="lin"></div><b>${esc(r.recebedor_nome)}</b>${r.recebedor_doc?'<br>CPF/CNPJ '+doc(r.recebedor_doc):''}</div><div class="nv">${n}</div></div>`;
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Recibo ${r.numero||''} ${esc(r.recebedor_nome)}</title><style>
+    body{font:14px/1.55 Georgia,'Times New Roman',serif;color:#111;margin:0}.via{border:1.5px solid #333;border-radius:6px;padding:22px 28px;margin:14px 0;position:relative;page-break-inside:avoid}
+    .top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #999;padding-bottom:8px;margin-bottom:12px}h1{font-size:20px;margin:0;letter-spacing:2px}.vl{font-size:18px;font-weight:700;border:1.5px solid #333;padding:4px 12px;border-radius:4px}
+    p{margin:8px 0;text-align:justify}.dt{text-align:right;margin-top:14px}.ass{width:60%;margin:36px auto 6px;text-align:center}.lin{border-top:1px solid #111;margin-bottom:4px}.nv{position:absolute;bottom:6px;right:12px;font:11px system-ui,Arial;color:#777}
+    .obs{font-size:13px;color:#333}.corte{border-top:1px dashed #999;margin:6px 0}@page{size:A4;margin:12mm}</style></head><body>${via('1ª via · quem paga')}<div class="corte"></div>${via('2ª via · quem recebe')}
+    <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close()}
+// ===== Códigos das guias (Configurações › Categorias) =====
+async function guiasCfgHTML(){const G=await guiasCarrega(true);if(!G.ok)return '<p class="note">Os códigos das guias precisam da atualização v160 do banco. Até lá vale a lista padrão (INSS, IRRF, 1708, 5952, DAS, FGTS).</p>';
+  const nomeCli=id=>id?CLIENTES.find(c=>c.id===id)?.nome||'empresa':'Todas as empresas';
+  return `<p class="note">Cada código de receita da guia (DARF, DCTFWeb, GPS) vai para uma categoria. Guia com códigos de categorias diferentes vira rateio na categoria. Para uma empresa usar outra categoria, adicione o mesmo código só para ela.</p>
+    <div class="tablebox"><table><thead><tr><th>Código</th><th class="l">Descrição</th><th class="l">Categoria</th><th class="l">Vale para</th><th></th></tr></thead><tbody>${G.rows.map(r=>`<tr data-gcid="${r.id}"><td><b>${esc(r.codigo)}</b></td><td class="l">${esc(r.descricao||'')}</td><td class="l"><input data-gck="categoria" value="${esc(r.categoria)}" style="min-width:220px"></td><td class="l">${esc(nomeCli(r.cliente_id))}</td><td><button type="button" class="btn small ghost" data-gcdel="${r.id}" aria-label="Tirar">✕</button></td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><input id="gcNCod" placeholder="Código (ex.: 1708)" style="max-width:150px"><input id="gcNDesc" placeholder="Descrição" style="max-width:220px"><input id="gcNCat" placeholder="Categoria" list="gcCatList" style="max-width:240px"><select id="gcNCli" style="max-width:220px"><option value="">Todas as empresas</option>${(CLIENTES||[]).map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select><button type="button" class="btn small" id="gcNAdd">+ Adicionar código</button></div>
+    <datalist id="gcCatList">${(PCAT.plano||[]).map(p=>`<option value="${esc(p.categoria)}">`).join('')}</datalist>`}
+async function guiasCfgDesenha(){const box=$('guiasCfg');if(!box)return;box.innerHTML=await guiasCfgHTML()}
+document.addEventListener('click',async e=>{const box=$('guiasCfg');if(!box||!box.contains(e.target))return;
+  const del=e.target.closest('[data-gcdel]');
+  if(del){const r=GUIAS.rows.find(x=>x.id===del.dataset.gcdel);if(!r||!confirm(`Tirar o código ${r.codigo}?`))return;const {error}=await sb.from('guia_codigos').delete().eq('id',r.id);if(error)return fail(error,'Não foi possível tirar');
+    await guiasCfgDesenha();toastDesfazer(`Código ${r.codigo} tirado.`,async()=>{const {error}=await sb.from('guia_codigos').insert(r);if(error)throw error;guiasCfgDesenha()});return}
+  if(e.target.id==='gcNAdd'){const cod=$('gcNCod').value.trim().toUpperCase(),cat=$('gcNCat').value.trim();if(!cod||!cat)return toast('Informe o código e a categoria.');
+    const {data,error}=await sb.from('guia_codigos').insert({codigo:cod,descricao:$('gcNDesc').value.trim()||null,categoria:cat,cliente_id:$('gcNCli').value||null}).select().single();if(error)return fail(error,'Não foi possível adicionar (o código já existe para essas empresas?)');
+    await guiasCfgDesenha();toastDesfazer(`Código ${cod} adicionado.`,async()=>{const {error}=await sb.from('guia_codigos').delete().eq('id',data.id);if(error)throw error;guiasCfgDesenha()})}});
+document.addEventListener('change',async e=>{const box=$('guiasCfg');if(!box||!box.contains(e.target)||e.target.dataset.gck!=='categoria')return;
+  const id=e.target.closest('tr').dataset.gcid,r=GUIAS.rows.find(x=>x.id===id),v=e.target.value.trim();if(!r||!v)return;
+  const {error}=await sb.from('guia_codigos').update({categoria:v}).eq('id',id);if(error)return fail(error);const ant=r.categoria;r.categoria=v;await guiasCarrega(true);
+  toastDesfazer(`Código ${r.codigo}: categoria trocada.`,async()=>{const {error}=await sb.from('guia_codigos').update({categoria:ant}).eq('id',id);if(error)throw error;guiasCfgDesenha()})});
+
 // regs: ids dos lançamentos (null = novo); grupo: ids de todas as parcelas
 async function faInit(cli,regs,grupo){
   FA={cli,regs:regs||null,grupo:grupo||[],docs:[],pend:[],urls:{}};
@@ -9564,6 +10056,7 @@ async function abrirGT(t,tipo,pre){
     <label class="f">Competência<input type="month" id="gt_competencia" value="${((t||pre)?.competencia||'').slice(0,7)}"></label>
     <label class="f">Vencimento *<input type="date" id="gt_vencimento" value="${v('vencimento')}"></label>
     <label class="f">Valor *<input id="gt_valor" class="money" inputmode="decimal" value="${(t||pre)?.valor?showMoney((t||pre).valor):''}" placeholder="0,00"></label>
+    ${gtRatHTML()}
     ${t?'':`<label class="f">Parcelas (mensais)<input id="gt_parcelas" type="number" min="1" max="120" value="1"></label>
     <label class="f">O valor digitado é<select id="gt_vparc"><option value="total">O total (divide nas parcelas)</option><option value="parcela">O de cada parcela</option></select></label>`}
     <label class="f">Conta prevista<select id="gt_conta_id">${opt(ativas,(t||pre)?.conta_id||'',ativas.length?'':'Cadastre em Contas bancárias')}</select></label>
@@ -9610,10 +10103,10 @@ async function abrirGT(t,tipo,pre){
       ${dvHTML('gbDv',ativas,P,()=>parseMoney($('gb_valor')?.value)||0,()=>$('gb_forma')?.value||t.forma||'')}</div>`;
   }
   h+=`<p class="err" id="gtErr" hidden></p>`;
-  $('gtdBody').innerHTML=h;
+  $('gtdBody').innerHTML=h;GT.catsDlg=cats;GT.ratP=null;
   if(trava){$('gtdBody').querySelectorAll('[id^="gt_"]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true});
     $('gtdBody').querySelectorAll('[data-pesnova],[data-pesnova-btn],[data-catnova]').forEach(el=>{if(!(revCat&&el.id==='gt_categoria'))el.disabled=true})}
-  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>'+dupBtn('data-act="dup"'):''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" data-conc="1" title="Lança a conta já ${P?'paga':'recebida'} e conciliada com a linha do extrato já importado">🔗 Salvar quitado e conciliado</button><button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':proxN?`<button type="button" class="btn${falta>0.004?'':' primary'}" data-act="salvar" title="A correção vale só para esta parcela">Salvar só esta</button><button type="button" class="btn" data-act="salvar" data-prox="1" title="A mesma correção vale também para as próximas parcelas em aberto">Salvar esta e as próximas (${proxN})</button>`:`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
+  $('gtdFoot').innerHTML=`${t?'<button type="button" class="btn ghost" data-act="apagar">Apagar</button>'+dupBtn('data-act="dup"')+(P?'<button type="button" class="btn ghost" data-act="recibo" title="Gera o recibo desta conta (ex.: aluguel), já preenchido, para imprimir e assinar">🧾 Gerar recibo</button>':''):''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${t?'':`<button type="button" class="btn" data-act="salvar" data-quit="1" data-conc="1" title="Lança a conta já ${P?'paga':'recebida'} e conciliada com a linha do extrato já importado">🔗 Salvar quitado e conciliado</button><button type="button" class="btn" data-act="salvar" data-quit="1" title="Lança a conta já ${P?'paga':'recebida'} na data e na conta informadas">$ Salvar quitado</button>`}${trava&&!revCat?'':proxN?`<button type="button" class="btn${falta>0.004?'':' primary'}" data-act="salvar" title="A correção vale só para esta parcela">Salvar só esta</button><button type="button" class="btn" data-act="salvar" data-prox="1" title="A mesma correção vale também para as próximas parcelas em aberto">Salvar esta e as próximas (${proxN})</button>`:`<button type="button" class="btn${t&&falta>0.004?'':' primary'}" data-act="salvar">${t?'Salvar correções':'Salvar'}</button>`}`;
   // colar a linha digitável preenche o vencimento e o valor que estiverem vazios
   // a forma do pagamento acompanha a do lançamento até a pessoa trocar
   $('gt_forma')?.addEventListener('change',e=>{const g=$('gj_forma');if(g&&!g.dataset.mexeu)g.value=e.target.value});
@@ -9647,6 +10140,10 @@ async function abrirGT(t,tipo,pre){
     $('gj_data').addEventListener('change',()=>dMan=true);$('gj_conta').addEventListener('change',()=>cMan=true);
     ['gt_vencimento','gt_conta_id','gt_parcelas'].forEach(k=>{$(k).addEventListener('change',jp);$(k).addEventListener('input',jp)});jp()}
   if(!dlgGT.open)dlgGT.showModal();if(!t)$('gt_pessoa').focus();
+  // rateio na categoria (v160) e categoria sugerida pelo fornecedor na conta nova (Carol, 18/11)
+  gtRatDesenha((t||pre)?.cat_partes||null);
+  if(!t&&P){const sug=()=>{if(!$('gt_categoria')?.value&&$('gt_pessoa')?.value.trim())gtCatSug({pessoa:$('gt_pessoa').value,texto:$('gt_descricao')?.value||'',valor:parseMoney($('gt_valor')?.value)}).catch(console.error)};
+    $('gt_pessoa')?.addEventListener('change',sug);if(pre?.pessoa_nome&&!pre.categoria)sug()}
   // competência já vem preenchida pela categoria e pelo vencimento; quem digitar manda (Carol, 13/11)
   {const cp=$('gt_competencia');if(cp&&!cp.disabled){const sug=()=>{if(cp.value&&cp.dataset.auto!=='1')return;const v=compSugerida($('gt_categoria')?.value,$('gt_vencimento')?.value,GT.lista,t?.id);if(v){cp.value=v;cp.dataset.auto='1'}};
     cp.addEventListener('input',()=>{cp.dataset.auto=''});['gt_categoria','gt_vencimento'].forEach(k=>$(k)?.addEventListener('change',sug));sug()}}
@@ -9681,6 +10178,9 @@ async function gtAcao(a,b){
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=dP(),cli=cliAtual(),t=GTR;
   if(a==='dup')return gtDup(t);
+  if(a==='recibo'&&t){const pe=(GFP.lista||[]).find(x=>x.id===t.pessoa_id)||(GFP.lista||[]).find(x=>chave(x.nome)===chave(t.pessoa_nome));
+    return rcAbre({tipo:/alug/i.test([t.categoria,t.descricao].join(' '))?'aluguel':'outro',recebedor_nome:t.pessoa_nome||'',recebedor_doc:pe?.documento||'',valor:t.valor,competencia:t.competencia,data:TODAY,titulo_id:t.id,
+      referente:/alug/i.test([t.categoria,t.descricao].join(' '))?'':(t.descricao||'')})}
   if(a==='salvar'){
     const val=k=>($('gt_'+k)?.value||'').trim()||null,nome=val('pessoa'),valor=parseMoney($('gt_valor').value);
     if(!nome)return gtErr(`Informe o ${P?'fornecedor':'cliente'}.`);
@@ -9691,6 +10191,9 @@ async function gtAcao(a,b){
       competencia:val('competencia')?val('competencia')+'-01':null,vencimento:val('vencimento'),conta_id:val('conta_id'),forma:val('forma'),
       linha_digitavel:P?(val('linha_digitavel')||'').replace(/\D/g,'')||null:null,pix_chave:P?val('pix_chave')||p?.pix_chave||null:null,obs:val('obs')};
     if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
+    // rateio na categoria (v160): a categoria principal é a da maior parte
+    {const rt=gtRatLe(valor);if(rt.erro)return gtErr(rt.erro);
+      if(rt.partes||t?.cat_partes){if(!await v160ok())return gtErr(v160Msg);row.cat_partes=rt.partes;if(rt.partes)row.categoria=rt.principal}}
     let error,jaPago=false,jaErr=false;
     if(t){if(valor<(GT.pago[t.id]||0)-0.004)return gtErr(`O valor não pode ser menor que o já ${P?'pago':'recebido'} (${fm(GT.pago[t.id])}).`);
       const rev=t.cat_revisar||(GT.movs[t.id]||[]).some(m=>m.cat_revisar);if(rev)row.cat_revisar=false;
@@ -9717,6 +10220,7 @@ async function gtAcao(a,b){
       const base=tot?Math.floor(valor/n*100)/100:valor,grupo=n>1?crypto.randomUUID():null;
       const rows=[...Array(n).keys()].map(i=>({...row,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
         vencimento:somaMes(row.vencimento,i),competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
+      if(row.cat_partes)rows.forEach(r=>r.cat_partes=partesEscala(row.cat_partes,r.valor));
       if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
       jaPago=b?.dataset.quit==='1';const jData=$('gj_data')?.value,jConta=$('gj_conta')?.value,jTodas=n>1&&$('gj_parc')?.value==='todas';
       if(jaPago&&!jData)return gtErr(`Informe a data do ${P?'pagamento':'recebimento'}.`);
@@ -10342,8 +10846,9 @@ async function relCarrega(cli){
   // boletos e notas que o cliente enviou na Rotina diária e o escritório ainda não validou (Carol, 04/11)
   REL.bolEnv=await todas(()=>emp(sb.from('contas_pagar').select('id')).eq('conferido',false)).then(l=>{const ja=new Set(tits.map(t=>t.origem_id).filter(Boolean));return l.filter(r=>!ja.has(r.id)).length}).catch(()=>0);
   REL.cart=new Set(contas.filter(ehCartao).map(c=>c.id));REL.trCart=new Set(movs.filter(m=>m.transf_id&&REL.cart.has(m.conta_id)).map(m=>m.transf_id));
-  REL.movs=movs;REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
+  REL.tits=tits;REL.contas=contas;REL.tit=Object.fromEntries(tits.map(t=>[t.id,t]));REL.pago={};
   movs.forEach(m=>{if(m.titulo_id)REL.pago[m.titulo_id]=r2((REL.pago[m.titulo_id]||0)+abat(m))});
+  REL.movs=catExp(movs);   // rateio na categoria: uma linha por categoria nos relatórios (Carol, 18/11)
 }
 async function renderRel(){
   const M=VIEW,cli=cliOuTodas();
@@ -15810,6 +16315,12 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18guias',data:'2026-11-18',t:'Contas a pagar: guias, rateio na categoria, lote e recibos',itens:[
+    {x:'Importar documentos em lote: arraste vários boletos, notas, guias, faturas e recibos de uma vez. O sistema separa um lançamento por documento e junta a nota e o boleto do mesmo fornecedor e mesmo valor.',para:'esc'},
+    {x:'Guias de imposto (DARF, DCTFWeb, GPS, DAS e FGTS), inclusive as impressas como PDF: o sistema lê valor, vencimento, competência e os códigos, e escolhe a categoria pelo código (Configurações › Categorias › Códigos das guias).',para:'esc'},
+    {x:'Rateio na categoria: uma conta pode ter várias categorias (ex.: guia do INSS com IR e PIS/Cofins/CSLL retidos). Os relatórios e a DRE separam cada parte.',para:'esc'},
+    {x:'Categoria sugerida: conta recorrente usa a mesma categoria da última conta do fornecedor; senão, pelas palavras do documento (ex.: Royalties).',para:'esc'},
+    {x:'Recibos: leitura do recibo de aluguel (locador, CPF/CNPJ, mês e valor transferido) e o botão 🧾 Recibos para criar, imprimir e guardar recibos.',para:'esc'}]},
   {k:'2026-11-18dupbc',data:'2026-11-18',t:'Repasse e Bom Controle sem pagamento em dobro',itens:[
     {x:'Importar do Bom Controle: o pagamento de um repasse que já está nas Contas a pagar dá baixa nele mesmo quando o nome vem escrito diferente (ex.: “Caroline Balvedi Gaiewski - Mpa*” e “Caroline Balvedi Gaiewski”), pelo CNPJ/CPF ou pelo nome do relatório. O repasse já marcado como pago no portal com até 3 dias de diferença fica de fora, e um pagamento de mesmo valor de uma conta em aberto de outro nome entra “a validar”, para conferir.',para:'esc'},
     {x:'Repasse de parceiros › Marcar como pago: se o pagamento já entrou pelo Bom Controle ou pelo extrato (mesma conta e valor, até 3 dias, mesmo parceiro), o sistema liga a conta a pagar a ele em vez de lançar de novo.',para:'esc'}]},
@@ -16625,7 +17136,7 @@ function ctbExp(){
 }
 // lançamentos realizados do mês em partidas dobradas, com o que falta para exportar
 async function ctbLinhas(k){
-  const [ini,fim]=monthRange(k),movs=await todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',CTB.cli.id).gte('data',ini).lte('data',fim).order('data').order('criado_em'));
+  const [ini,fim]=monthRange(k),movs=catExp(await todas(()=>sb.from('fin_movimentos').select('*').eq('cliente_id',CTB.cli.id).gte('data',ini).lte('data',fim).order('data').order('criado_em')));
   const cod=(t,o)=>{const d=CTB.depara[ctbChave(t,o)];return d?.conta_codigo&&d.confirmado?d.conta_codigo:''};
   const nomeC=id=>CTB.contas.find(c=>c.id===id)?.nome||'conta de outra empresa',out=[];
   for(const m of movs){
@@ -18060,7 +18571,7 @@ async function aprCalcula(base){
   const meses=aprMeses(ini0,APR.ate),ini=ini0+'-01',fim=fimMes(APR.ate+'-01');
   const uDe={};us.forEach(u=>(u.empresas||[]).forEach(id=>uDe[id]=u.id));
   const [movs,contas,fechs,vendas]=await Promise.all([
-    ids.length?todas(()=>sb.from('fin_movimentos').select('cliente_id,conta_id,data,tipo,valor,categoria,descricao,transf_id,cat_revisar').in('cliente_id',ids).gte('data',ini).lte('data',fim).order('data')):[],
+    ids.length?(async()=>{const cp=await v160ok()?',cat_partes':'';return catExp(await todas(()=>sb.from('fin_movimentos').select('cliente_id,conta_id,data,tipo,valor,categoria,descricao,transf_id,cat_revisar'+cp).in('cliente_id',ids).gte('data',ini).lte('data',fim).order('data')))})():[],
     ids.length?todas(()=>sb.from('fin_contas').select('id,cliente_id,tipo,ativo,nome').in('cliente_id',ids)):[],
     ids.length?todas(()=>sb.from('fechamentos').select('cliente_id,data,cred_sis,cred_maq').in('cliente_id',ids).gte('data',ini).lte('data',fim)):[],
     ids.length?todas(()=>sb.from('cartao_vendas').select('cliente_id,data_venda,adquirente,valor_bruto,taxa,valor_liquido').in('cliente_id',ids).gte('data_venda',ini).lte('data_venda',fim)).catch(()=>[]):[]]);
