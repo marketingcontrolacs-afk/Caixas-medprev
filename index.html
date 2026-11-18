@@ -4650,6 +4650,17 @@ const dvConc=n=>{const r=soma11(n)%11;return r===0||r===1?0:r===10?1:11-r};   //
 const dvNFe=n=>{const r=soma11(n)%11;return r<2?0:11-r};
 const diasDe=(base,n)=>isoLocal(new Date(dObj(base).getTime()+n*864e5));
 // o fator de vencimento recomeçou em 1000 em 22/02/2025; fica a data mais perto de hoje
+// leitura do boleto que não confere (Carol, 18/11: Royalties lido com R$ 60.009.278,75 e vencimento 26/04/2025): vencimento muito
+// antigo ou valor muito diferente do lançado/do mês anterior = linha digitável lida errada ou boleto com a linha errada; não preenche
+function bolConfere(bol,ref){if(!bol)return '';const ms=[];
+  if(bol.venc&&dObj(bol.venc)<dObj(TODAY)-90*864e5)ms.push(`o vencimento do código de barras (${dBR(bol.venc)}) é antigo`);
+  if(ref>0&&bol.valor>0&&(bol.valor/ref>5||ref/bol.valor>5))ms.push(`o valor do código de barras (${fm(bol.valor)}) é muito diferente de ${fm(ref)}`);
+  return ms.join(' e ')}
+// conta do mês anterior do mesmo fornecedor (para comparar o valor do boleto novo com o último, nunca com um antigo) (Carol, 18/11)
+function mesAnterior(t,lista){if(!t?.vencimento)return null;const k=pessoaChave(t.pessoa_nome||''),lim=somaMes(t.vencimento,-2);
+  return (lista||GT.lista||[]).filter(y=>y.id!==t.id&&y.cliente_id===t.cliente_id&&y.tipo===t.tipo&&y.vencimento<t.vencimento&&y.vencimento>=lim&&!y.previsto
+    &&(k?pessoaChave(y.pessoa_nome||'')===k:(t.categoria&&y.categoria===t.categoria))).sort((a,b)=>String(b.vencimento).localeCompare(String(a.vencimento)))[0]||null}
+const mesAntTxt=a=>a?`No mês anterior (venc. ${dBR(a.vencimento)}) foi ${fm(+a.valor)}.`:'';
 function fatorData(f){if(!f)return null;const c=[diasDe('1997-10-07',f)];if(f>=1000)c.push(diasDe('2025-02-22',f-1000));
   return c.sort((a,b)=>Math.abs(dObj(a)-dObj(TODAY))-Math.abs(dObj(b)-dObj(TODAY)))[0]}
 function boletoDe(digitos){
@@ -8773,7 +8784,7 @@ function bolDesenha(){
       <td class="l">${(BOL.docs[b.id]||[]).map(d=>`<a href="${BOL.urls[d.caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(d.categoria||'Anexo')}</a>`).join('<br>')||'<span class="neg">sem anexo</span>'}</td>
       <td class="l"><select data-boldest="${i}" aria-label="Lançar como" style="max-width:340px"><option value="nova">Conta nova</option>${mesmo.length?`<optgroup label="Contas lançadas deste fornecedor">${mesmo.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}${outras.length?`<optgroup label="Outras contas em aberto perto do vencimento">${outras.map(y=>bolOpt(y,r)).join('')}</optgroup>`:''}</select>
       <br><button type="button" class="btn small" data-bolcria="${i}" title="Abre a tela completa do lançamento (pagar ou receber), com categoria, parcelas e nº da nota, já com os dados e os anexos deste documento">✚ Criar lançamento</button>
-      ${t?`<br><span class="chip c-done">Vai para a conta já lançada${x.como&&x.dest===x.sug?' (achei '+x.como+')':''}</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`+bolDifTxt(x,t,i):''}`:x.sug?'':`<br><span class="chip c-bad" title="Não achei conta em aberto parecida: confira se é algo novo e cadastre o fornecedor se precisar">Novo: não achei conta lançada</span>`}</td></tr>`}).join('')}</tbody></table></div>
+      ${t?`<br><span class="chip c-done">Vai para a conta já lançada${x.como&&x.dest===x.sug?' (achei '+x.como+')':''}</span>${dif?` <span class="chip c-warn">Valor lançado ${fm(t.valor)}: passa a ${fm(r.valor)}</span>`+(mesAnterior(t)?`<br><span class="muted">${esc(mesAntTxt(mesAnterior(t)))}</span>`:'')+bolDifTxt(x,t,i):''}`:x.sug?'':`<br><span class="chip c-bad" title="Não achei conta em aberto parecida: confira se é algo novo e cadastre o fornecedor se precisar">Novo: não achei conta lançada</span>`}</td></tr>`}).join('')}</tbody></table></div>
   <datalist id="bolPesList">${(BOL.pes||[]).map(p=>`<option value="${esc(p.nome)}">`).join('')}</datalist>`;
   BOL.it.forEach((x,i)=>{const s=document.querySelector(`[data-boldest="${i}"]`);if(s)s.value=x.dest||'nova'});
 }
@@ -9421,7 +9432,9 @@ async function gtLeArquivo(f,mais,cat){
   const lidos=[],avisos=[],cli=cliAtual();
   // conta já lançada com valor diferente do boleto: pergunta antes de trocar e oferece atualizar as próximas previstas (Carol, 13/11)
   const t0=GTR,dup0=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0],vb=r2(+(r.bol?.valor||dup0?.valor||r.valor||0)),va=parseMoney($('gt_valor')?.value);
-  const difP=!!(t0&&t0.tipo==='pagar'&&cat!=='Nota fiscal'&&vb>0&&va>0&&Math.abs(va-vb)>0.004);
+  const ant=t0?mesAnterior(t0):null,susp=r.bol?bolConfere(r.bol,va||t0?.valor||ant?.valor):'';
+  if(susp){avisos.push(`a linha digitável lida não confere: ${susp}. Não preenchi o valor, o vencimento nem a linha; confira o boleto (a linha digitável impressa pode estar errada)`);r.bol=null}
+  const difP=!!(t0&&t0.tipo==='pagar'&&cat!=='Nota fiscal'&&vb>0&&va>0&&Math.abs(va-vb)>0.004)&&!susp;
   const poe=(id,v,txt,fmt,money)=>{const el=$(id);if(!el||el.disabled||v==null||v==='')return;if(id==='gt_valor'&&difP)return;
     const atual=money?parseMoney(el.value):el.value.trim();
     if(atual==null||atual===''||Number.isNaN(atual)){el.value=money?showMoney(v):v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));lidos.push(txt+' '+(fmt?fmt(v):v))}
@@ -9466,7 +9479,7 @@ async function gtLeArquivo(f,mais,cat){
   box.innerHTML=nm+(lidos.length?`<span class="pos">✓ Lido d${r.origem==='foto'?'a':'o'} ${esc(r.origem)}: ${esc(lidos.join(', '))}. Confira antes de salvar.</span> `:`<span class="muted">Li ${r.origem==='foto'?'a':'o'} ${esc(r.origem)}${r.bol||r.valor||r.nfe?', mas os campos já estavam preenchidos':', mas não achei linha digitável, chave da nota nem valor'}.</span> `)
     +(avisos.length?`<span class="neg">${esc(avisos.join('; '))}.</span>`:'');
   if(difP){const serie=await serieProximas(t0).catch(()=>[]);if(!$('dlgGT').open||GTR!==t0)return;
-    box.insertAdjacentHTML('beforeend',`<div class="alerta" id="gtPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto (${fm(vb)}) é diferente do ${t0.previsto?'previsto':'lançado'} (${fm(va)}).</b> Confirma a atualização do valor?${serie.length?`<br><b>Deseja alterar também as contas futuras?</b> <span class="muted">(${serie.length===1?'a próxima conta prevista':'as próximas '+serie.length+' contas previstas'} desta série: ${serieDatas(serie)})</span>`:''}<br><button type="button" class="btn small primary" id="gtPrevOk" style="margin-top:6px">${serie.length?'Só esta conta':'Sim, atualizar'} para ${fm(vb)}</button>${serie.length?` <button type="button" class="btn small primary" id="gtPrevTodas" style="margin-top:6px">Esta e as futuras para ${fm(vb)}</button>`:''}</div>`);
+    box.insertAdjacentHTML('beforeend',`<div class="alerta" id="gtPrevBox" style="display:block;margin:8px 0 0">⚠ <b>O valor do boleto (${fm(vb)}) é diferente do ${t0.previsto?'previsto':'lançado'} (${fm(va)}).</b>${ant?' '+esc(mesAntTxt(ant)):''} Confirma a atualização do valor?${serie.length?`<br><b>Deseja alterar também as contas futuras?</b> <span class="muted">(${serie.length===1?'a próxima conta prevista':'as próximas '+serie.length+' contas previstas'} desta série: ${serieDatas(serie)})</span>`:''}<br><button type="button" class="btn small primary" id="gtPrevOk" style="margin-top:6px">${serie.length?'Só esta conta':'Sim, atualizar'} para ${fm(vb)}</button>${serie.length?` <button type="button" class="btn small primary" id="gtPrevTodas" style="margin-top:6px">Esta e as futuras para ${fm(vb)}</button>`:''}</div>`);
     const ok=todas=>{const el=$('gt_valor');el.value=showMoney(vb);el.dispatchEvent(new Event('input',{bubbles:true}));GT.serieV=todas?{ids:serie.map(s=>s.id),valor:vb}:null;
       $('gtPrevBox').innerHTML=`<span class="pos">✓ Valor atualizado para <b>${fm(vb)}</b>${todas?` nesta conta e em ${serie.length===1?'mais 1 conta futura':'mais '+serie.length+' contas futuras'} (${serieDatas(serie)})`:' só nesta conta'}. Clique em Salvar para gravar.</span>`};
     $('gtPrevOk').onclick=()=>ok(false);if($('gtPrevTodas'))$('gtPrevTodas').onclick=()=>ok(true)}
@@ -9737,7 +9750,11 @@ async function ltSug(x){x.sugFeita=true;
   // achou pelas palavras, mas a conta é de OUTRO fornecedor (ex.: dois recibos de aluguel de locadores diferentes): não junta
   if(sg&&sg.como!=='pelo fornecedor'&&sg.t.pessoa_nome&&pessoaChave(sg.t.pessoa_nome)!==pessoaChave(p?.nome||x.forn)&&pessoaChave(sg.t.pessoa_nome)!==pessoaChave(x.forn))sg=null;
   x.dest=sg?sg.t.id:'nova';x.sugT=sg?.t?.id||null;x.sugComo=sg?.como||null;
-  if(x.bol){const rp=await boletoRepetido(x.bol,null).catch(()=>[]);if(rp.length){x.repetido=repetidoTxt(rp);x.ok=false}}}
+  if(x.bol){const rp=await boletoRepetido(x.bol,null).catch(()=>[]);if(rp.length){x.repetido=repetidoTxt(rp);x.ok=false}}
+  // linha digitável que não confere com a conta lançada ou com o mês anterior do fornecedor: não cria sem conferir (Carol, 18/11)
+  if(x.bol){const td=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null,an=mesAnterior({id:null,cliente_id:LT.cli.id,tipo:'pagar',pessoa_nome:x.forn,vencimento:somaMes(TODAY,1)});
+    x.susp=bolConfere(x.bol,td?.valor||an?.valor);x.ant=an;
+    if(x.susp){const n=textoNota(x.texto||'');x.ok=false;x.valor=n.valor||null;x.venc=n.venc||'';x.linha='';x.bol=null}}}
 function ltConta(){const n=LT.it.filter(x=>x.ok&&!x.erro).length;$('ltCriar').disabled=!n||LT.lendo>0;$('ltCriar').textContent=n?`Criar os ${n} lançamentos marcados`:'Criar os lançamentos marcados';
   $('ltNote').textContent=LT.lendo?`Lendo ${LT.lendo} arquivo${LT.lendo>1?'s':''}…`:`${LT.it.length} lançamento${LT.it.length===1?'':'s'} na lista`}
 function ltDesenha(){
@@ -9760,7 +9777,7 @@ function ltDesenha(){
       <td class="l"><select data-i="${i}" data-k="categoria" data-catnova="Despesa" aria-label="Categoria" ${st}>${opC(x.categoria||'')}</select>${x.catPartes?`<span class="chip c-done" title="${esc(x.catPartes.map(p=>p.categoria+' '+fm(p.valor)).join(' · '))}">➗ ${x.catPartes.length} categorias</span><div class="note" style="margin:0">${x.catPartes.map(p=>esc(p.categoria)+' '+fm(p.valor)).join('<br>')}</div>`:''}${x.catComo&&x.categoria?`<div class="note" style="margin:0">${x.catFraca?'⚠ ':''}${esc(x.catComo)}</div>`:''}</td>
       <td class="l"><select data-i="${i}" data-k="dest" aria-label="Lançar como" ${st}><option value="nova">Conta nova</option>${outras.length?`<optgroup label="Conta já lançada (prevista ou recorrente)">${outras.map(y=>bolOpt(y,{})).join('')}</optgroup>`:''}</select>
         ${t?`<span class="chip c-done">Vai para a conta já lançada${x.sugComo&&x.dest===x.sugT?' (achei '+esc(x.sugComo)+')':''}</span>${x.valor&&Math.abs(t.valor-x.valor)>0.004?`<span class="chip c-warn">Valor lançado ${fm(t.valor)} passa a ${fm(x.valor)}</span>`:''}`:''}
-        ${x.repetido?`<span class="chip c-bad">Boleto já lançado: ${esc(x.repetido)}</span>`:''}${!x.valor||!x.venc?'<span class="chip c-warn">falta '+[!x.valor?'valor':'',!x.venc?'vencimento':''].filter(Boolean).join(' e ')+'</span>':''}</td>
+        ${x.repetido?`<span class="chip c-bad">Boleto já lançado: ${esc(x.repetido)}</span>`:''}${x.susp?`<span class="chip c-bad">Linha digitável não confere: ${esc(x.susp)}</span>`:''}${x.ant&&x.valor&&Math.abs(x.ant.valor-x.valor)>0.004?`<div class="note" style="margin:2px 0 0">${esc(mesAntTxt(x.ant))}</div>`:''}${!x.valor||!x.venc?'<span class="chip c-warn">falta '+[!x.valor?'valor':'',!x.venc?'vencimento':''].filter(Boolean).join(' e ')+'</span>':''}</td>
       <td><button type="button" class="btn small ghost" data-lt="tira" data-i="${i}" aria-label="Tirar da lista">✕</button></td></tr>`}).join('');
   $('ltBody').innerHTML=`<label id="ltDrop" style="border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;cursor:pointer;display:block">
       <b>Arraste aqui os boletos, notas fiscais, guias (DARF, INSS, FGTS, DAS), faturas e recibos</b><br><span class="muted">ou clique para escolher vários arquivos (PDF, foto ou XML da nota). A nota e o boleto do mesmo fornecedor com o mesmo valor viram um lançamento só.</span>
