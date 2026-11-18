@@ -168,6 +168,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--mute
 #folGrid tbody td:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
 .tablebox.cheia{position:fixed;inset:8px;z-index:60;max-height:none;margin:0;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 th:first-child,td:first-child,td.l,th.l{text-align:left}
+/* ordenar por coluna em todas as tabelas (Carol, 18/11) */
+th.so-ok{cursor:pointer;user-select:none}th.so-ok:hover{color:var(--ink)}th.so-ok::after{content:'↕';opacity:.35;margin-left:4px;font-size:.9em}th.so-asc::after{content:'▲';opacity:1}th.so-desc::after{content:'▼';opacity:1}
+@media print{th.so-ok::after{content:none}}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover{background:var(--sunk)}
 tbody tr.pend td{background:var(--bad-soft);color:var(--bad)}
@@ -200,6 +203,7 @@ dialog[open]#dlgBCI{display:flex;flex-direction:column}#dlgBCI .db{flex:1;min-he
 .ccgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}.ccgrid>*{min-width:0}
 @media (max-width:900px){.ccgrid{grid-template-columns:minmax(0,1fr)}}
 #ccDoc img{max-width:100%;border:1px solid var(--line);border-radius:8px}#ccDoc iframe{width:100%;height:68vh;border:1px solid var(--line);border-radius:8px;background:#fff} #dlgRep .db>*{min-width:0}
+#dlgFicha .fcSec{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px}#dlgFicha .fcSec h3{margin:0 0 6px;font-size:15px}#dlgFicha .fields{margin:0}#dlgFicha .err{margin:0 0 10px}
 .alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
 .alerta b{color:var(--warn)}
 .alerta.bad{border-color:var(--bad);background:var(--bad-soft)}.alerta.bad b{color:var(--bad)}
@@ -1303,9 +1307,10 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     </div>
     <div id="tabCadastro">
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px">
-        <h2>Empresas</h2>
+        <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Empresas</h2><span class="spacer"></span><input id="fcBusca" type="search" placeholder="Buscar em todas as colunas" style="max-width:240px" aria-label="Buscar empresa"><select id="fcFiltro" style="max-width:190px" aria-label="Filtrar pela ficha"><option value="">Todas as fichas</option><option value="inc">Ficha incompleta</option><option value="ok">Ficha completa</option><option value="rh">Com RH ou benefícios</option><option value="fin">Com BPO financeiro</option><option value="ina">Inativas</option></select><button type="button" class="btn small primary" id="fcNova">+ Cadastrar empresa</button></div>
+        <div class="alerta" id="fcAviso" hidden style="margin:0"></div>
         <div class="tablebox" style="margin:0"><table class="cfg" id="tbCli"></table></div>
-        <form class="row" id="formCli"><input id="novoCli" placeholder="Nome da nova empresa" style="max-width:280px"><button class="btn small primary" type="submit">Adicionar empresa</button></form>
+        <p class="note" style="margin:0">Clique em <b>📋 Ficha</b> para ver e completar todos os dados da empresa: CNPJ e dados da Receita, endereço, contato, serviços, contrato, RH e benefícios. O que é usado para gerar arquivo ou documento (remessa CNAB, NFS-e, recibos, documentos do RH, pedido de benefícios) é obrigatório.</p>
       </div>
       <div class="card" style="padding:16px 18px;margin-top:16px;display:grid;gap:12px" id="grCard">
         <div class="row" style="align-items:center;gap:10px"><h2 style="margin:0">Grupos de empresas</h2><span class="spacer"></span><input id="grBusca" type="search" placeholder="Buscar grupo ou empresa" style="max-width:260px" aria-label="Buscar grupo"><button type="button" class="btn small primary" id="grNovo">Novo grupo</button></div>
@@ -1426,7 +1431,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <section id="viewBen" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Pedido de benefícios</h1><p class="sub">Vale transporte, combustível e alimentação. O pedido é feito no fim do mês para o mês seguinte e já desconta as faltas, atestados e férias.</p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn" id="bnPlux" hidden title="Planilha de importação do pedido de vale alimentação na Pluxee">Planilha Pluxee</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
     </div>
     <div class="card block" style="margin-top:16px"><div class="row" id="bnBar"></div><p class="note" id="bnRegTxt" hidden style="margin:10px 0 0"></p></div>
     <h2 style="margin-top:18px">Escala de sábados</h2>
@@ -1453,7 +1458,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <section id="viewColab" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Colaboradores e prazos</h1><p class="sub">Cadastro dos colaboradores e o controle do contrato de experiência: o aviso aparece 10 dias antes de cada vencimento.</p></div>
-      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="cbFiltro"><option value="todos">Todos os ativos</option><option value="exp">Em experiência</option><option value="aniv">Aniversariantes do mês</option><option value="desl">Desligados</option></select></label><button class="btn primary" id="cbNovo">+ Colaborador</button></div>
+      <div class="row" style="align-items:flex-end"><label class="f">Mostrar<select id="cbFiltro"><option value="todos">Todos os ativos</option><option value="exp">Em experiência</option><option value="aniv">Aniversariantes do mês</option><option value="desl">Desligados</option></select></label><span class="expgrp" id="cbExp" data-exp="colab"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn" id="cbEditar" hidden title="Preencher cargo, nascimento, admissão e prazos da experiência direto na lista, sem abrir cada cadastro">✎ Preencher na lista</button><button class="btn primary" id="cbNovo">+ Colaborador</button></div>
     </div>
     <div class="tiles" id="cbTiles"></div>
     <div class="card tablebox"><table id="cbTab"></table></div>
@@ -1525,6 +1530,11 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     <div class="db"><div class="fields" id="rFields"></div><div id="rRat"></div><div id="rDocs" style="display:grid;gap:8px"></div><div id="rLiq" style="display:grid;gap:8px"></div><div id="rBaixa"></div><p class="err" id="rErr" hidden></p></div>
     <div class="df"><button type="button" class="btn ghost" id="rDel">Apagar</button><span class="spacer"></span><button type="button" class="btn ghost" id="rClose">Fechar</button><button type="button" class="btn" id="rConf"></button><button type="submit" class="btn primary" id="rSave">Salvar</button></div>
   </form>
+</dialog>
+<dialog id="dlgFicha" style="max-width:920px;width:calc(100% - 32px)">
+  <div class="dh"><h2 id="fcTitle">Ficha da empresa</h2><span class="spacer"></span><span id="fcChip"></span></div>
+  <div class="db" id="fcBody"></div>
+  <div class="df"><button type="button" class="btn ghost" id="fcDesf" hidden title="Volta a ficha para como estava antes da última alteração salva">Desfazer última alteração</button><span class="spacer"></span><button type="button" class="btn ghost" id="fcClose">Fechar</button><button type="button" class="btn primary" id="fcSave">Salvar ficha</button></div>
 </dialog>
 <dialog id="dlgOpCx" style="max-width:520px;width:calc(100% - 32px)">
   <div class="dh"><h2 id="ocTitle">Operadores do caixa</h2></div>
@@ -2221,6 +2231,71 @@ function msFiltro(el){if(typeof el==='string')el=$(el);if(!el||el._msdd)return;
   d.querySelector('.msmenu').addEventListener('click',e=>{const b=e.target.closest('[data-ms]');if(!b)return;if(b.dataset.ms==='limpa'){msSet(el,[],true);monta()}else d.open=false});
   msPinta(el)}
 document.addEventListener('click',e=>{document.querySelectorAll('details.msdd[open]').forEach(dd=>{if(!dd.contains(e.target))dd.open=false})});
+// ===== Ordenar por coluna em TODAS as tabelas (Carol, 18/11) =====
+// Clique no nome da coluna: 1º clique ordena crescente (▲), o 2º decrescente (▼). Vale para toda tabela com cabeçalho,
+// inclusive as que forem criadas depois. Tabelas que já têm a ordem própria (Repasse, data da Movimentação) continuam como estão.
+// Contas a pagar/receber e Movimentação ordenam a lista inteira antes de dividir em páginas (SO.reg + SO.dados).
+const SO={st:new Map(),tb:new Map(),cb:{},col:new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'}),ocupado:false};
+SO.lab=th=>String(th.textContent||'').replace(/[▲▼↕]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+SO.chaveTb=tb=>{if(tb.id)return tb.id;const h=tb.tHead,b=tb.tBodies[0];if(h?.id)return h.id;if(b?.id)return b.id;
+  const c=tb.parentElement?.closest('[id]');if(!c)return null;return c.id+'#'+[...c.querySelectorAll('table')].indexOf(tb)};
+SO.filtroRow=tr=>!!(tr.classList.contains('gcfil')||tr.querySelector('input:not([type=checkbox]),select,textarea'));
+// mapa do cabeçalho: cada th vira {col, n (qual ocorrência do mesmo nome)}; só o th da última linha e sem colspan ordena
+SO.grade=tb=>{const rs=[...(tb.tHead?.rows||[])].filter(r=>!SO.filtroRow(r)),ocup=[],out=[];
+  rs.forEach((r,ri)=>{let c=0;[...r.cells].forEach(th=>{while(ocup[ri]?.[c])c++;const cs=th.colSpan||1,rp=th.rowSpan||1;
+    for(let a=ri;a<ri+rp;a++)for(let b=c;b<c+cs;b++)(ocup[a]||=[])[b]=1;out.push({th,c,cs,fim:ri+rp>=rs.length});c+=cs})});
+  const n={};out.forEach(o=>{const l=SO.lab(o.th);o.lab=l;o.n=n[l]=(n[l]||0)+1});return out};
+SO.pode=(tb,o)=>{const th=o.th;if(tb.classList.contains('nosort')||th.hasAttribute('data-ord')||th.classList.contains('click')||th.classList.contains('nosort'))return false;
+  if(o.cs>1||!o.fim||!o.lab)return false;if(th.querySelector('input,select,button,textarea'))return false;return true};
+SO.cel=(tr,c)=>{let i=0;for(const td of tr.cells){const cs=td.colSpan||1;if(c<i+cs)return cs===1?td:null;i+=cs}return null};
+SO.txt=td=>{if(!td)return '';if(td.dataset.sv!=null)return td.dataset.sv;const s=td.querySelector('select');if(s)return s.selectedOptions[0]?.text||'';
+  const i=td.querySelector('input:not([type=checkbox]):not([type=radio]),textarea');if(i)return i.value||'';
+  const t=String(td.textContent||'').replace(/\s+/g,' ').trim();if(t)return t;const ti=td.querySelector('[title]');return ti?ti.getAttribute('title'):''};
+// valor para comparar: data (dd/mm/aaaa, mm/aaaa, aaaa-mm-dd), número/dinheiro (1.234,56 · R$ · %) ou texto
+SO.val=v=>{if(v==null)return null;if(typeof v==='number')return Number.isFinite(v)?{t:'n',v}:null;let s=String(v).replace(/\s+/g,' ').trim();if(!s||/^[—–-]$/.test(s))return null;let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)))return {t:'d',v:+(m[1]+m[2]+m[3])};
+  if((m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?!\d)/)))return {t:'d',v:+(m[3]+m[2]+m[1])};
+  if((m=s.match(/^(\d{2})\/(\d{4})(?!\d)/)))return {t:'d',v:+(m[2]+m[1]+'00')};
+  const n=s.replace(/R\$|%| /g,'').replace(/\s/g,'').replace(/−/g,'-');
+  if(/^\(?-?\d{1,3}(\.\d{3})*(,\d+)?\)?$|^\(?-?\d+(,\d+)?\)?$/.test(n)){let x=+n.replace(/[()]/g,'').replace(/\./g,'').replace(',','.');if(/^\(.*\)$/.test(n))x=-Math.abs(x);return {t:'n',v:x}}
+  return {t:'s',v:s}};
+SO.cmp=(a,b)=>{if(!a&&!b)return 0;if(!a)return 1;if(!b)return -1;   // vazio sempre no fim
+  if(a.t===b.t&&a.t!=='s')return a.v-b.v;if(a.t!=='s'&&b.t!=='s')return a.v-b.v;if(a.t!=='s')return -1;if(b.t!=='s')return 1;return SO.col.compare(a.v,b.v)};
+SO.ordLista=(l,f,d)=>l.map((x,i)=>({x,i,k:SO.val(f(x))})).sort((a,b)=>{const c=(!a.k||!b.k)?SO.cmp(a.k,b.k):d*SO.cmp(a.k,b.k);return c||a.i-b.i}).map(o=>o.x);
+// listas desenhadas a partir dos dados (com páginas): a tela registra quem redesenha e ordena os dados por getters do nome da coluna
+SO.reg=(k,cb)=>{SO.cb[k]=cb};
+SO.dados=(k,rows,gets)=>{const s=SO.st.get(k);if(!s)return rows;const f=gets.find(g=>SO.lab({textContent:g[0]})===s.lab)?.[1];if(!f)return rows;return SO.ordLista(rows,f,s.d)};
+SO.limpa=k=>{SO.st.delete(k)};
+// reordena as linhas do tbody na tela; linha de uma célula só (grupo, total, aviso) fica no lugar e separa os blocos;
+// linha escondida ou com colspan (detalhe aberto embaixo) acompanha a linha de cima
+SO.ordTb=(tb,o,d,sk)=>{const W=Math.max(...SO.grade(tb).map(g=>g.c+g.cs),0);
+  [...tb.tBodies].forEach(tbd=>{const rows=[...tbd.rows];if(rows.length<2)return;
+    if(tbd._soK===sk&&tbd._soR?.length===rows.length&&tbd._soR.every((r,i)=>r===rows[i]))return;   // nada mudou desde a última vez
+    const blocos=[];let seg=[],cur=null;
+    const fecha=()=>{if(seg.length)blocos.push({seg}),seg=[]};
+    rows.forEach(tr=>{const cs=[...tr.cells].reduce((a,c)=>a+(c.colSpan||1),0),um=tr.cells.length===1&&W>1;
+      const tot=/^(total|subtotal|soma)\b/i.test(String(tr.cells[0]?.textContent||'').trim())||tr.classList.contains('tot');
+      if(um||tot){fecha();blocos.push({fixo:tr});cur=null;return}
+      if(cur&&(tr.hidden||tr.cells.length<W&&cs>=W&&[...tr.cells].some(c=>c.colSpan>1)||tr.classList.contains('gtsub')||tr.classList.contains('det'))){cur.push(tr);return}
+      cur=[tr];seg.push(cur)});fecha();
+    const nova=[];blocos.forEach(b=>{if(b.fixo)return nova.push(b.fixo);SO.ordLista(b.seg,g=>SO.txt(SO.cel(g[0],o.c)),d).forEach(g=>nova.push(...g))});
+    tbd._soK=sk;tbd._soR=nova;if(nova.every((r,i)=>r===rows[i]))return;nova.forEach(r=>tbd.appendChild(r))})};
+SO.pinta=tb=>{const k=SO.chaveTb(tb),s=k&&SO.st.get(k),g=SO.grade(tb);let alvo=null;
+  g.forEach(o=>{const ok=SO.pode(tb,o);o.th.classList.toggle('so-ok',ok);o.th.dataset.so=ok?'1':'0';
+    const sel=ok&&s&&s.lab===o.lab&&s.n===o.n;o.th.classList.toggle('so-asc',!!(sel&&s.d>0));o.th.classList.toggle('so-desc',!!(sel&&s.d<0));
+    if(ok&&!o.th.hasAttribute('tabindex'))o.th.tabIndex=0;if(ok&&!o.th.title)o.th.title='Clique para ordenar por esta coluna (clique de novo para inverter)';
+    if(ok)o.th.setAttribute('aria-sort',sel?(s.d>0?'ascending':'descending'):'none');if(sel)alvo=o});return {k,s,alvo}};
+SO.aplica=tb=>{const {k,s,alvo}=SO.pinta(tb);if(!s||!alvo||SO.cb[k])return;SO.ocupado=true;try{SO.ordTb(tb,alvo,s.d,s.lab+'|'+s.n+'|'+s.d+'|'+alvo.c)}finally{SO.ocupado=false}};
+SO.passo=()=>{SO.raf=0;document.querySelectorAll('table').forEach(tb=>{if(!tb.tHead||!tb.isConnected)return;
+  const k=SO.chaveTb(tb),novo=[...tb.tHead.querySelectorAll('th')].some(th=>!th.dataset.so);if(novo||k&&SO.st.has(k))SO.aplica(tb)})};
+SO.agenda=()=>{if(!SO.ocupado&&!SO.raf)SO.raf=requestAnimationFrame(SO.passo)};
+document.addEventListener('click',e=>{const th=e.target.closest('th.so-ok');if(!th||e.target.closest('input,select,button,a,label'))return;
+  const tb=th.closest('table'),k=tb&&SO.chaveTb(tb);if(!k)return;const o=SO.grade(tb).find(g=>g.th===th);if(!o)return;
+  const s=SO.st.get(k),d=s&&s.lab===o.lab&&s.n===o.n?-s.d:1;SO.st.set(k,{lab:o.lab,n:o.n,d});
+  if(SO.cb[k]){SO.cb[k]();SO.pinta(tb)}else SO.aplica(tb)});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('th.so-ok')){e.preventDefault();e.target.click()}});
+new MutationObserver(SO.agenda).observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',SO.agenda);
 const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
@@ -2228,6 +2303,7 @@ function limpaFiltros(){
   MOD=null;MV.lim=300;   // Contas a pagar e Tesouraria do cliente reabrem como na primeira vez
   NFP.cli=null;   // Notas fiscais › repasses pagos: volta para a empresa escolhida no alto
   if(typeof RC!=='undefined'){RC.col={};RC.aberto.clear()}
+  SO.st.clear();   // a ordem escolhida no cabeçalho volta ao normal ao trocar de tela, como os filtros
 }
 // ajusta: filtro que o link já quer aplicar (ex.: "a validar" do Dashboard), depois da limpeza
 function go(v,ajusta){if(!eqPode(v))return;if(VIEW&&!String(VIEW).startsWith('ctl'))PORTAL_VOLTA=VIEW;if(v!==VIEW)limpaFiltros();if(ajusta)ajusta();VIEW=v;try{localStorage.setItem(SECK,v)}catch(e){}fillClientes();openView()}
@@ -3325,8 +3401,9 @@ const TIPOSUSR=[['pendente','Pendente (sem acesso)'],['admin','Master (acesso a 
 const tipoUsr=u=>u.papel==='pendente'?'pendente':u.tipo||(u.papel==='escritorio'?(u.admin?'admin':'equipe'):'cliente');
 async function renderCadastro(){
   const {data:cl}=await sb.from('clientes').select('*').order('nome');CLIENTES=cl||[];
-  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th><th class="l">CNPJ</th>${'matriz_id' in (CLIENTES[0]||{})?'<th class="l" title="Deixe em branco se for matriz ou empresa sem filial">Filial de</th>':''}<th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
-    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}"></td><td><input data-k="cnpj" value="${esc(c.cnpj)}"></td>${'matriz_id' in c?`<td><select data-k="matriz_id" aria-label="Filial de" style="min-width:170px"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></td>`:''}<td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px">${V139(c)&&nCx(c)>1?`<button type="button" class="btn small ocAbrir" style="margin-left:6px;white-space:nowrap" title="Nomes de quem opera o caixa">👤 Operadores (${opersCx(c).length})</button>`:''}</td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  $('tbCli').innerHTML=`<thead><tr><th class="l">Empresa</th>${V154(CLIENTES[0])?'<th class="l">Ficha</th>':''}<th class="l">CNPJ</th>${'matriz_id' in (CLIENTES[0]||{})?'<th class="l" title="Deixe em branco se for matriz ou empresa sem filial">Filial de</th>':''}<th class="l">Abre domingo</th>${V43(CLIENTES[0])?'<th class="l">Caixas por dia</th>':''}<th class="l">Tem cartão de crédito</th><th class="l">Final do cartão</th><th class="l">Município</th><th class="l">BPO financeiro</th><th class="l">BPO RH</th>${'bpo_beneficios' in (CLIENTES[0]||{})?'<th class="l" title="Do RH, só o Pedido de benefícios e os colaboradores">RH só benefícios</th>':''}<th class="l">Conta Tesouraria no Bom Controle</th><th class="l">Banco dos depósitos no Bom Controle</th><th class="l">Filiais para rateio</th><th class="l">Ativa</th></tr></thead><tbody>${
+    CLIENTES.map(c=>`<tr data-id="${c.id}"><td><input data-k="nome" value="${esc(c.nome)}" style="min-width:170px" title="${esc(c.nome)}"></td>${V154(c)?(f=>`<td class="l" style="white-space:nowrap"><button type="button" class="btn small fcAbrir" title="${f.length?'Falta: '+esc(f.join(', ')):'Ficha completa'}">📋 <span class="chip ${f.length?'c-warn':'c-ok'}" style="pointer-events:none">${f.length?'Incompleta':'Completa'}</span></button></td>`)(fcFaltaCli(c)):''}<td><input data-k="cnpj" value="${esc(c.cnpj)}" placeholder="Obrigatório" inputmode="numeric" style="min-width:160px"></td>${'matriz_id' in c?`<td><select data-k="matriz_id" aria-label="Filial de" style="min-width:170px"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></td>`:''}<td class="l"><input type="checkbox" data-k="abre_domingo" ${c.abre_domingo?'checked':''} style="width:auto"></td>${V43(c)?`<td><input type="number" data-k="caixas" min="1" max="9" value="${nCx(c)}" style="width:70px">${V139(c)&&nCx(c)>1?`<button type="button" class="btn small ocAbrir" style="margin-left:6px;white-space:nowrap" title="Nomes de quem opera o caixa">👤 Operadores (${opersCx(c).length})</button>`:''}</td>`:''}<td class="l"><input type="checkbox" data-k="tem_cartao" ${c.tem_cartao?'checked':''} style="width:auto"></td><td><input data-k="cartao_final" value="${esc(c.cartao_final)}" maxlength="4" style="max-width:90px"></td><td><input data-k="municipio" value="${esc(c.municipio)}" placeholder="Para os feriados"></td><td class="l"><input type="checkbox" data-k="bpo_financeiro" ${c.bpo_financeiro!==false?'checked':''} style="width:auto"></td><td class="l"><input type="checkbox" data-k="bpo_rh" ${c.bpo_rh?'checked':''} style="width:auto"></td>${'bpo_beneficios' in c?`<td class="l"><input type="checkbox" data-k="bpo_beneficios" ${c.bpo_beneficios?'checked':''} style="width:auto"></td>`:''}<td><input data-k="conta_tesouraria_bc" value="${esc(c.conta_tesouraria_bc)}" placeholder="Tesouraria - ..."></td><td><input data-k="conta_deposito_bc" value="${esc(c.conta_deposito_bc)}" placeholder="Ex.: Sicredi - ..."></td><td><input data-k="filiais_rateio" value="${esc(c.filiais_rateio)}" placeholder="Matriz 0001, Filial 0002"></td><td class="l"><input type="checkbox" data-k="ativo" ${c.ativo?'checked':''} style="width:auto"></td></tr>`).join('')}</tbody>`;
+  fcAviso();fcFiltra();
   await grCarrega();grRender();
   const [{data:us},{data:acs}]=await Promise.all([sb.from('perfis').select('*').order('email'),sb.from('acessos').select('*')]);USERS=us||[];
   ACS_TODOS=acs||[];
@@ -3354,8 +3431,13 @@ async function renderAcessos(){if(!$('tbAc'))return;
     ||'<tr><td class="l muted" colspan="4">Nenhum acesso liberado ainda.</td></tr>'}</tbody>`;
 }
 $('tbCli').addEventListener('change',async e=>{const id=e.target.closest('tr').dataset.id,k=e.target.dataset.k;let v=e.target.type==='checkbox'?e.target.checked:e.target.value.trim()||null;
+  if(!k)return;
+  // CNPJ obrigatório e conferido (Carol 18/11): a remessa CNAB, a NFS-e e os documentos usam
+  if(k==='cnpj'){const c0=CLIENTES.find(x=>x.id===id),dg=fcDig(v);
+    if(!dg||!fcCnpjOk(dg)||CLIENTES.some(x=>x.id!==id&&fcDig(x.cnpj)===dg)){toast(!dg?'O CNPJ é obrigatório. Para mudar os dados da empresa, abra a 📋 Ficha.':!fcCnpjOk(dg)?'Este CNPJ não existe (os dígitos finais não batem). Confira os números.':'Este CNPJ já é de outra empresa.');e.target.value=c0?.cnpj||'';return}
+    e.target.value=v=fcCnpjFmt(dg)}
   if(k==='caixas')e.target.value=v=Math.max(1,Math.min(9,parseInt(v)||1));
-  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);const ant=c[k];c[k]=v;if(k==='matriz_id'||k==='nome'||k==='ativo')grRender();
+  const {error}=await sb.from('clientes').update({[k]:v}).eq('id',id);if(error)fail(error);else{toast('Empresa salva');const c=CLIENTES.find(x=>x.id===id);const ant=c[k];c[k]=v;if(k==='matriz_id'||k==='nome'||k==='ativo')grRender();if(V154(c)){fcAviso();renderCadastroChip(c)}
     if(k==='caixas'&&V139(c)){renderCadastro();if(v>1&&!(+ant>1)&&!opersCx(c).length)ocAbre(id)}}});
 // cadastro dos operadores do caixa (Carol, 16/11): abre ao colocar mais de 1 caixa; Desfazer volta a lista anterior
 let OC=null;
@@ -3629,8 +3711,271 @@ $('tbUsr').addEventListener('change',async e=>{const id=e.target.closest('tr').d
   const {error}=await sb.from('perfis').update(r).eq('user_id',id);
   if(error){console.error(error);toast(/tipo/.test(error.message||'')&&!/administradora|master|perfis_um_master/.test(error.message)?'Rode a atualização v33 do banco para guardar o tipo de usuário.':/administradora|master/.test(error.message||'')?'Só o master muda o tipo de usuário.':'Não foi possível salvar. Verifique a internet e tente de novo.');renderCadastro();return}
   toast('Usuário salvo');if(k==='tipo'){DIRUS=null;renderCadastro()}});
-$('formCli').addEventListener('submit',async e=>{e.preventDefault();const nome=$('novoCli').value.trim();if(!nome)return;
-  const {error}=await sb.from('clientes').insert({nome});if(error)fail(error,'Não foi possível criar (o nome já existe?)');else{$('novoCli').value='';toast('Empresa criada');renderCadastro()}});
+// ---------- ficha da empresa (Carol 18/11/2026) ----------
+// Cadastro completo e obrigatório: CNPJ (com busca na Receita pela BrasilAPI), razão social, endereço (ViaCEP), contato,
+// serviços, contrato, RH e benefícios. Fica em clientes.ficha (v154). O que as outras telas já usam continua onde estava,
+// atualizado junto: nome, cnpj, municipio e uf (feriados), doc_empresa (documentos do RH e remessas) e
+// folha_modelo.beneficios (as mesmas "Regras de benefícios desta empresa" do Pedido de benefícios, sem duplicar).
+// Empresa antiga com ficha incompleta não é bloqueada: aparece o aviso aqui e a tarefa para completar.
+const V154=c=>!!c&&'ficha' in c;
+// chip da ficha na linha, depois de mudar um campo direto na tabela
+function renderCadastroChip(c){const tr=$('tbCli').querySelector(`tr[data-id="${c.id}"]`),ch=tr?.querySelector('.chip');if(!ch)return;const f=fcFaltaCli(c);
+  ch.className='chip '+(f.length?'c-warn':'c-ok');ch.textContent=f.length?'Incompleta':'Completa';ch.title=f.join(', ');tr.querySelector('.fcAbrir').title=f.length?'Falta: '+f.join(', '):'Ficha completa'}
+const fcDig=s=>String(s||'').replace(/\D/g,'');
+const fcCnpjFmt=d=>(d=fcDig(d)).length===14?d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5'):d;
+const fcCepFmt=d=>(d=fcDig(d)).length===8?d.replace(/^(\d{5})(\d{3})$/,'$1-$2'):d;
+function fcCnpjOk(v){const d=fcDig(v);if(d.length!==14||/^(\d)\1+$/.test(d))return false;
+  const dv=n=>{let s=0,p=n-7;for(let i=0;i<n;i++){s+=+d[i]*p--;if(p<2)p=9}const r=s%11;return r<2?0:11-r};
+  return dv(12)===+d[12]&&dv(13)===+d[13]}
+const FC_BEN=[['vt','Vale transporte'],['va','Vale alimentação'],['vr','Vale refeição'],['comb','Vale combustível'],['ajuda','Ajuda de custo (transporte)'],['saude','Plano de saúde'],['odonto','Plano odontológico'],['outro','Outro benefício']];
+const FC_CARTAO=['vt','va','vr','comb'];
+const fcSrv=c=>({fin:c?.bpo_financeiro!==false,rh:!!c?.bpo_rh,ben:!!c?.bpo_beneficios});
+// dados da ficha: o que já existia nas outras colunas entra como ponto de partida (fb = veio de outro lugar)
+function fcDados(c){const f=c?.ficha||{},de=c?.doc_empresa||{},R=c?benRegra(c):{...BEN_PADRAO},b=c?.folha_modelo?.beneficios||{};
+  return {nome:c?.nome||'',cnpj:c?.cnpj||'',razao:f.razao||de.razao||'',fantasia:f.fantasia||'',unidade:de.unidade||f.unidade||'',
+    situacao:f.situacao||'',situacao_data:f.situacao_data||'',abertura:f.abertura||'',cnae:f.cnae||'',natureza:f.natureza||'',porte:f.porte||'',simples:f.simples??null,
+    ie:f.ie||'',im:f.im||'',receita_em:f.receita_em||'',fb:!f.end,
+    end:{cep:'',logradouro:'',numero:'',complemento:'',bairro:'',cidade:de.cidade||c?.municipio||'',uf:de.uf||c?.uf||'',ibge:'',...(f.end||{})},
+    contato:{responsavel:'',telefone:'',email:'',...(f.contato||{})},regras:f.regras||'',bh_ini:de.bh_ini||'',bh_fim:de.bh_fim||'',
+    ben:{tipos:Array.isArray(b.tipos)?b.tipos:null,forn:{...(b.forn||{})},dia_pedido:b.dia_pedido||'',entrega:b.entrega||'empresa',entrega_end:{...(b.entrega_end||{})},entrega_contato:b.entrega_contato||'',
+      entrega_local:b.entrega_local||'',entrega_fone:b.entrega_fone||'',entrega_email:b.entrega_email||'',entrega_porta:!!b.entrega_porta,forn_cod:{...(b.forn_cod||{})},
+      desconta:!!R.desconta,premio_atestado:!!R.premio_atestado,texto:R.texto||''}};
+}
+// o que falta para a ficha ficar completa (tudo que algum arquivo ou documento usa)
+function fcFalta(d,s){const m=[],e=d.end||{};
+  if(!fcCnpjOk(d.cnpj))m.push(fcDig(d.cnpj)?'CNPJ válido':'CNPJ');
+  if(!String(d.razao).trim())m.push('Razão social');if(!String(d.nome).trim())m.push('Nome no portal');
+  if(fcDig(e.cep).length!==8||!e.logradouro||!e.numero||!e.bairro||!e.cidade||!e.uf)m.push('Endereço completo');
+  if(!s.fin&&!s.rh&&!s.ben)m.push('Serviços contratados');
+  if(s.rh||s.ben){const b=d.ben;
+    if(!b.tipos||!b.tipos.length)m.push('Benefícios que a empresa usa');
+    else if(!b.tipos.includes('nenhum')){
+      if(b.tipos.some(t=>t!=='ajuda'&&!String(b.forn[t]||'').trim()))m.push('Empresa de cada benefício');
+      if(!(+b.dia_pedido>=1&&+b.dia_pedido<=31))m.push('Dia do pedido');
+      if(b.tipos.some(t=>FC_CARTAO.includes(t))){
+        if(!String(b.entrega_local||'').trim())m.push('Nome do local de entrega');if(!String(b.entrega_contato||'').trim())m.push('Quem recebe os cartões');
+        if(fcDig(b.entrega_fone).length<10&&!String(b.entrega_email||'').includes('@'))m.push('Telefone (com DDD) ou e-mail de quem recebe')}
+      if(b.tipos.some(t=>FC_CARTAO.includes(t))&&b.entrega==='outro'){const x=b.entrega_end||{};
+        if(fcDig(x.cep).length!==8||!x.logradouro||!x.numero||!x.bairro||!x.cidade||!x.uf)m.push('Endereço de entrega dos cartões')}}}
+  return m}
+const fcFaltaCli=c=>V154(c)?fcFalta(fcDados(c),fcSrv(c)):[];
+// endereço e contato da entrega dos cartões, já resolvido (endereço da empresa ou o outro), para as planilhas de pedido
+// das empresas de benefícios (ex.: Pluxee). falta = o que a ficha ainda não tem.
+function benEntrega(c){const d=fcDados(c),b=d.ben,e=b.entrega==='outro'?b.entrega_end:d.end,fone=fcDig(b.entrega_fone);
+  const r={local:b.entrega_local||'',cep:fcDig(e.cep),logradouro:e.logradouro||'',numero:e.numero||'',complemento:e.complemento||'',referencia:e.referencia||'',bairro:e.bairro||'',cidade:e.cidade||'',uf:e.uf||'',
+    responsavel:b.entrega_contato||'',ddd:fone.slice(0,2),telefone:fone.slice(2),email:b.entrega_email||'',porta_a_porta:!!b.entrega_porta,forn:b.forn,forn_cod:b.forn_cod};
+  r.falta=fcFalta({...d,ben:{...b,tipos:['va']}},{rh:true}).filter(x=>/entrega|local|recebe/i.test(x)||x==='Endereço completo'&&b.entrega!=='outro');return r}
+// ---- lista: busca em todas as colunas, filtro e aviso das fichas incompletas ----
+function fcFiltra(){const q=$('fcBusca').value,fl=$('fcFiltro').value;
+  $('tbCli').querySelectorAll('tbody tr[data-id]').forEach(tr=>{const c=CLIENTES.find(x=>x.id===tr.dataset.id);if(!c)return;
+    const falta=fcFaltaCli(c),s=fcSrv(c),fd=fcDados(c);
+    const txt=[...tr.querySelectorAll('input:not([type=checkbox]),select')].map(i=>i.tagName==='SELECT'?i.selectedOptions[0]?.textContent:i.value)
+      .concat([fd.razao,fd.fantasia,fcDig(fd.cnpj),fd.end.logradouro,fd.end.bairro,fd.end.cidade,fd.end.uf,fd.contato.responsavel,fd.contato.email,falta.length?'incompleta '+falta.join(' '):'completa',
+        s.fin?'BPO financeiro':'',s.rh?'BPO RH':'',s.ben?'benefícios':'',c.ativo===false?'inativa':'ativa',...Object.values(fd.ben.forn||{})]);
+    const ok=!fl||(fl==='inc'?falta.length>0:fl==='ok'?!falta.length:fl==='rh'?(s.rh||s.ben):fl==='fin'?s.fin:fl==='ina'?c.ativo===false:true);
+    tr.hidden=!(ok&&buscaCasa(q,txt))})}
+$('fcBusca').addEventListener('input',fcFiltra);$('fcFiltro').addEventListener('change',fcFiltra);
+function fcAviso(){const el=$('fcAviso');if(!V154(CLIENTES[0])){el.hidden=false;el.innerHTML='<b>Ficha da empresa</b><span>Falta rodar a atualização v154 do banco no Supabase.</span>';return}
+  const inc=CLIENTES.filter(c=>c.ativo!==false).map(c=>({c,f:fcFaltaCli(c)})).filter(x=>x.f.length);
+  el.hidden=!inc.length;if(!inc.length)return;
+  el.innerHTML=`<b>${inc.length} ${inc.length===1?'empresa está':'empresas estão'} com a ficha incompleta</b><span>Nada foi bloqueado: os lançamentos continuam normais. Complete a ficha para que remessas, notas, recibos e o pedido de benefícios saiam sem erro.</span>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${inc.map(x=>`<button type="button" class="btn small fcAbrir" data-fc="${x.c.id}" title="Falta: ${esc(x.f.join(', '))}">📋 ${esc(x.c.nome)} · falta ${esc(x.f.join(', '))}</button>`).join('')}</div>`}
+document.addEventListener('click',e=>{const b=e.target.closest('.fcAbrir');if(!b)return;const id=b.dataset.fc||b.closest('tr')?.dataset.id;if(id)fcAbre(id)});
+$('fcNova').addEventListener('click',()=>fcAbre(null));
+// ---- a ficha ----
+let FC=null;
+const fcI=(id,t,v,o='')=>`<label class="f${/wide/.test(o)?' wide':''}">${t}<input id="${id}" value="${esc(v??'')}" ${o.replace('wide','')}></label>`;
+const fcSN=(id,t,v)=>`<label class="f">${t}<select id="${id}"><option value="1"${v?' selected':''}>Sim</option><option value="0"${v?'':' selected'}>Não</option></select></label>`;
+const fcSec=(t,sub,h,id='')=>`<section class="fcSec"${id?` id="${id}"`:''}><h3>${t}</h3>${sub?`<p class="note" style="margin:0 0 8px">${sub}</p>`:''}${h}</section>`;
+function fcAbre(id){const c=id?CLIENTES.find(x=>x.id===id):null;if(id&&!c)return;
+  if(!V154(c||CLIENTES[0])){toast('Rode a atualização v154 do banco no Supabase para usar a ficha da empresa.');return}
+  const d=fcDados(c),s=c?fcSrv(c):{fin:true,rh:false,ben:false},e=d.end,b=d.ben,ehM='matriz_id' in (c||CLIENTES[0]||{}),temBen='bpo_beneficios' in (c||CLIENTES[0]||{});
+  FC={id:c?.id||null,fb:d.fb,ctl:null};
+  $('fcTitle').textContent=c?'Ficha da empresa · '+c.nome:'Cadastrar empresa';
+  const ufs='AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
+  const ufSel=(id,v)=>`<label class="f">UF *<select id="${id}"><option value="">—</option>${ufs.map(u=>`<option${u===v?' selected':''}>${u}</option>`).join('')}</select></label>`;
+  const fornDL=[...new Set(CLIENTES.flatMap(x=>Object.values(x.folha_modelo?.beneficios?.forn||{})).filter(Boolean))];
+  $('fcBody').innerHTML=`<p class="err" id="fcErr" hidden></p>
+  ${fcSec('Dados da Receita Federal','Digite o CNPJ: o sistema busca na Receita a razão social, o nome fantasia e o endereço. Campos com * são obrigatórios.',
+    `<div class="fields"><label class="f">CNPJ *<input id="fc_cnpj" inputmode="numeric" value="${esc(fcCnpjFmt(d.cnpj))}" placeholder="00.000.000/0000-00"></label>
+    <div class="f" style="align-self:end"><button type="button" class="btn" id="fcRec" title="Busca de novo e troca os dados pelos da Receita">🔎 Buscar na Receita</button></div>
+    ${fcI('fc_razao','Razão social *',d.razao)}
+    ${fcI('fc_fantasia','Nome fantasia',d.fantasia)}${fcI('fc_nome','Nome no portal * <span class="muted" style="font-weight:400">(como aparece no alto da tela)</span>',d.nome)}
+    <label class="f">Matriz ou filial<select id="fc_unidade"><option value="">—</option>${['Matriz','Filial'].map(u=>`<option${u===d.unidade?' selected':''}>${u}</option>`).join('')}</select></label>
+    ${ehM?`<label class="f">Filial de<select id="fc_matriz"><option value="">— (matriz / sem filial)</option>${CLIENTES.filter(m=>m.id!==c?.id&&!m.matriz_id).map(m=>`<option value="${m.id}"${m.id===c?.matriz_id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></label>`:''}
+    ${fcI('fc_ie','Inscrição estadual',d.ie,'placeholder="Isento, se não tiver"')}${fcI('fc_im','Inscrição municipal',d.im,'placeholder="Usada na NFS-e"')}
+    ${fcI('fc_abertura','Data de abertura',d.abertura,'type="date"')}${fcI('fc_cnae','Atividade principal (CNAE)',d.cnae)}
+    ${fcI('fc_natureza','Natureza jurídica',d.natureza)}${fcI('fc_porte','Porte',d.porte)}
+    <label class="f">Simples Nacional<select id="fc_simples"><option value="">—</option><option value="1"${d.simples===true?' selected':''}>Sim</option><option value="0"${d.simples===false?' selected':''}>Não</option></select></label>
+    <label class="f">Situação na Receita<input id="fc_situacao" value="${esc(d.situacao)}" readonly title="Vem da Receita"></label></div>
+    <p class="note" id="fcRecNote" style="margin:6px 0 0">${d.receita_em?`Dados conferidos na Receita em ${dBR(d.receita_em)}.`:''}</p>`)}
+  ${fcSec('Endereço da empresa','Vem da Receita. A cidade e a UF também valem para os feriados e para os documentos do RH. Ao digitar o CEP, a rua, o bairro e a cidade vêm dos Correios.',
+    `<div class="fields">${fcI('fc_cep','CEP *',fcCepFmt(e.cep),'inputmode="numeric" placeholder="00000-000"')}${fcI('fc_lgr','Rua *',e.logradouro)}${fcI('fc_nro','Número *',e.numero)}${fcI('fc_compl','Complemento',e.complemento)}
+    ${fcI('fc_bairro','Bairro *',e.bairro)}${fcI('fc_cidade','Cidade *',e.cidade,FC.fb&&e.cidade?'data-fb="1"':'')}${ufSel('fc_uf',e.uf)}${fcI('fc_ibge','Código IBGE da cidade',e.ibge,'inputmode="numeric" readonly title="Vem dos Correios"')}</div>`)}
+  ${fcSec('Contato','',`<div class="fields">${fcI('fc_resp','Responsável',d.contato.responsavel)}${fcI('fc_fone','Telefone',d.contato.telefone,'inputmode="tel"')}${fcI('fc_email','E-mail',d.contato.email,'type="email"')}</div>`)}
+  ${fcSec('Serviços contratados','Marque o que a Controlacs faz para esta empresa. Isso decide quais ferramentas aparecem para ela.',
+    `<div class="row" style="gap:18px;flex-wrap:wrap">
+    <label class="row" style="gap:6px"><input type="checkbox" id="fc_fin" style="width:auto"${s.fin?' checked':''}> BPO financeiro</label>
+    <label class="row" style="gap:6px"><input type="checkbox" id="fc_rh" style="width:auto"${s.rh?' checked':''}> BPO RH (folha, ponto, documentos)</label>
+    ${temBen?`<label class="row" style="gap:6px"><input type="checkbox" id="fc_ben" style="width:auto"${s.ben?' checked':''}> RH só benefícios</label>`:''}
+    <label class="row" style="gap:6px"><input type="checkbox" id="fc_ativo" style="width:auto"${c?.ativo!==false?' checked':''}> Empresa ativa</label></div>
+    ${ehAdm()?`<div id="fcCtl" style="margin-top:10px"><span class="muted">Procurando o contrato…</span></div>`:''}`)}
+  <div id="fcRhBox">${fcSec('RH e benefícios','Vale para o Pedido de benefícios, a folha e os documentos do RH. Estas são as mesmas regras que aparecem no fim do Pedido de benefícios: mudar aqui muda lá.',
+    `<div class="f wide"><span>Benefícios que a empresa usa *</span><div class="row" style="gap:6px 16px;flex-wrap:wrap;margin-top:4px">${FC_BEN.map(([k,t])=>`<label class="row" style="gap:6px"><input type="checkbox" data-fcben="${k}" style="width:auto"${b.tipos?.includes(k)?' checked':''}> ${t}</label>`).join('')}
+      <label class="row" style="gap:6px"><input type="checkbox" data-fcben="nenhum" style="width:auto"${b.tipos?.includes('nenhum')?' checked':''}> Não usa benefícios</label></div></div>
+    <datalist id="fcFornDL">${fornDL.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+    <div class="fields" id="fcForn" style="margin-top:8px"></div>
+    <div class="fields" style="margin-top:8px">${fcI('fc_dia','Dia do pedido * <span class="muted" style="font-weight:400">(todo mês, até o dia)</span>',b.dia_pedido,'type="number" min="1" max="31" style="max-width:110px"')}
+      ${fcSN('fc_desc','Desconta na folha (6% de VT e R$ 1,00 de VA)',b.desconta)}${fcSN('fc_premio','Atestado tira o prêmio no VA',b.premio_atestado)}
+      ${fcI('fc_bhini','Banco de horas de',d.bh_ini,'type="date"')}${fcI('fc_bhfim','Banco de horas até',d.bh_fim,'type="date"')}</div>
+    <div id="fcEntBox" style="margin-top:10px"><div class="f wide"><span>Onde chegam os cartões dos benefícios *</span>
+      <div class="row" style="gap:6px 18px;flex-wrap:wrap;margin-top:4px"><label class="row" style="gap:6px"><input type="radio" name="fc_ent" value="empresa" style="width:auto"${b.entrega!=='outro'?' checked':''}> No endereço da empresa (acima)</label>
+      <label class="row" style="gap:6px"><input type="radio" name="fc_ent" value="outro" style="width:auto"${b.entrega==='outro'?' checked':''}> Em outro endereço</label></div></div>
+      <div class="fields" id="fcEntEnd" style="margin-top:6px">${fcI('fc_ecep','CEP *',fcCepFmt(b.entrega_end.cep),'inputmode="numeric"')}${fcI('fc_elgr','Rua *',b.entrega_end.logradouro)}${fcI('fc_enro','Número *',b.entrega_end.numero)}${fcI('fc_ecompl','Complemento',b.entrega_end.complemento)}
+        ${fcI('fc_eref','Ponto de referência',b.entrega_end.referencia)}${fcI('fc_ebairro','Bairro *',b.entrega_end.bairro)}${fcI('fc_ecidade','Cidade *',b.entrega_end.cidade)}${ufSel('fc_euf',b.entrega_end.uf)}</div>
+      <div class="fields" style="margin-top:6px">${fcI('fc_eloc','Nome do local de entrega * <span class="muted" style="font-weight:400">(até 18 letras)</span>',b.entrega_local,'maxlength="18" placeholder="Ex.: Recepção Centro"')}${fcI('fc_eac','Quem recebe os cartões *',b.entrega_contato)}
+        ${fcI('fc_efone','Telefone de quem recebe (com DDD) *',b.entrega_fone,'inputmode="tel" placeholder="(48) 99999-9999"')}${fcI('fc_eemail','E-mail de quem recebe',b.entrega_email,'type="email" placeholder="Ou o e-mail, se não tiver telefone"')}
+        <label class="f">Entrega porta a porta<select id="fc_eporta"><option value="0"${b.entrega_porta?'':' selected'}>Não</option><option value="1"${b.entrega_porta?' selected':''}>Sim</option></select></label></div></div>
+    <label class="f wide" style="margin-top:8px">Regras escritas dos benefícios (aparecem no alto do pedido)<textarea id="fc_btxt" rows="2">${esc(b.texto)}</textarea></label>`)}</div>
+  ${fcSec('Regras e observações gerais','Combinados com o cliente que a equipe precisa saber (horários, quem aprova pagamentos, prazos de envio etc.).',`<textarea id="fc_regras" rows="3" style="width:100%">${esc(d.regras)}</textarea>`)}`;
+  FC.cod=b.forn_cod;fcRh();fcFornDesenha(b.forn,b.forn_cod);
+  $('fcBody').querySelectorAll('[data-fcben],#fc_rh,#fc_ben,[name=fc_ent]').forEach(x=>x.addEventListener('change',ev=>{
+    if(ev.target.dataset.fcben==='nenhum'&&ev.target.checked)$('fcBody').querySelectorAll('[data-fcben]:not([data-fcben=nenhum])').forEach(y=>y.checked=false);
+    else if(ev.target.dataset.fcben&&ev.target.checked)$('fcBody').querySelector('[data-fcben=nenhum]').checked=false;
+    fcFornDesenha(fcFornLe(),fcCodLe());fcRh()}));
+  $('fc_cnpj').addEventListener('input',()=>{const d=fcDig($('fc_cnpj').value);if(d.length===14&&d!==FC.ultCnpj){FC.ultCnpj=d;fcReceita(false)}});
+  $('fc_cnpj').addEventListener('blur',()=>{$('fc_cnpj').value=fcCnpjFmt($('fc_cnpj').value)});
+  $('fcRec').onclick=()=>fcReceita(true);
+  $('fc_cep').addEventListener('change',()=>fcCep('fc_',true));$('fc_ecep').addEventListener('change',()=>fcCep('fc_e',true));
+  const ant=c?.ficha_ant;$('fcDesf').hidden=!ant;
+  fcChip();$('fcBody').addEventListener('input',fcChip);$('fcBody').addEventListener('change',fcChip);
+  $('dlgFicha').showModal();$('fcBody').scrollTop=0;
+  if(!c)setTimeout(()=>$('fc_cnpj').focus(),50);
+  if(ehAdm())fcContrato(c);
+}
+const fcV=id=>($(id)?.value||'').trim();
+function fcCodLe(){const o={};$('fcBody').querySelectorAll('[data-fccod]').forEach(i=>{if(i.value.trim())o[i.dataset.fccod]=i.value.trim()});return o}
+function fcFornLe(){const o={};$('fcBody').querySelectorAll('[data-fcforn]').forEach(i=>{if(i.value.trim())o[i.dataset.fcforn]=i.value.trim()});return o}
+function fcFornDesenha(forn,cod){cod=cod||(FC?.cod)||{};const ts=[...$('fcBody').querySelectorAll('[data-fcben]:checked')].map(x=>x.dataset.fcben).filter(t=>t!=='nenhum'&&t!=='ajuda');
+  $('fcForn').innerHTML=ts.map(t=>`<label class="f">Empresa do ${esc(FC_BEN.find(x=>x[0]===t)[1].replace(/^Vale /,'vale ').replace(/^Plano /,'plano ').replace(/^Outro benefício/,'outro benefício'))} *<input data-fcforn="${t}" list="fcFornDL" value="${esc(forn?.[t]||'')}" placeholder="Ex.: Pluxee, VR, Ticket, Alelo"></label><label class="f">Código do cliente nessa empresa<input data-fccod="${t}" value="${esc(cod?.[t]||'')}" placeholder="Opcional (ex.: código Pluxee)"></label>`).join('')}
+function fcRh(){const rh=$('fc_rh').checked||!!$('fc_ben')?.checked,ts=[...$('fcBody').querySelectorAll('[data-fcben]:checked')].map(x=>x.dataset.fcben);
+  $('fcRhBox').hidden=!rh;const cart=ts.some(t=>FC_CARTAO.includes(t));$('fcEntBox').hidden=!cart;
+  $('fcEntEnd').hidden=$('fcBody').querySelector('[name=fc_ent]:checked')?.value!=='outro'}
+// lê a ficha da tela
+function fcLe(){const tipos=[...$('fcBody').querySelectorAll('[data-fcben]:checked')].map(x=>x.dataset.fcben);
+  const sm=$('fc_simples').value;
+  return {d:{nome:fcV('fc_nome'),cnpj:fcV('fc_cnpj'),razao:fcV('fc_razao'),fantasia:fcV('fc_fantasia'),unidade:$('fc_unidade').value,ie:fcV('fc_ie'),im:fcV('fc_im'),abertura:fcV('fc_abertura'),
+      cnae:fcV('fc_cnae'),natureza:fcV('fc_natureza'),porte:fcV('fc_porte'),simples:sm===''?null:sm==='1',situacao:fcV('fc_situacao'),
+      end:{cep:fcDig(fcV('fc_cep')),logradouro:fcV('fc_lgr'),numero:fcV('fc_nro'),complemento:fcV('fc_compl'),bairro:fcV('fc_bairro'),cidade:fcV('fc_cidade'),uf:$('fc_uf').value,ibge:fcDig(fcV('fc_ibge'))},
+      contato:{responsavel:fcV('fc_resp'),telefone:fcV('fc_fone'),email:fcV('fc_email')},regras:$('fc_regras').value.trim(),bh_ini:fcV('fc_bhini'),bh_fim:fcV('fc_bhfim'),
+      ben:{tipos:tipos.length?tipos:null,forn:fcFornLe(),dia_pedido:+fcV('fc_dia')||'',entrega:$('fcBody').querySelector('[name=fc_ent]:checked')?.value||'empresa',
+        entrega_end:{cep:fcDig(fcV('fc_ecep')),logradouro:fcV('fc_elgr'),numero:fcV('fc_enro'),complemento:fcV('fc_ecompl'),referencia:fcV('fc_eref'),bairro:fcV('fc_ebairro'),cidade:fcV('fc_ecidade'),uf:$('fc_euf').value},
+        entrega_local:fcV('fc_eloc'),entrega_fone:fcV('fc_efone'),entrega_email:fcV('fc_eemail'),entrega_porta:$('fc_eporta').value==='1',forn_cod:fcCodLe(),
+        entrega_contato:fcV('fc_eac'),desconta:$('fc_desc').value==='1',premio_atestado:$('fc_premio').value==='1',texto:$('fc_btxt').value.trim()}},
+    s:{fin:$('fc_fin').checked,rh:$('fc_rh').checked,ben:!!$('fc_ben')?.checked}}}
+function fcChip(){if(!FC)return;const {d,s}=fcLe(),f=fcFalta(d,s);
+  $('fcChip').innerHTML=f.length?`<span class="chip c-warn" title="${esc(f.join(', '))}">Falta: ${esc(f.join(', '))}</span>`:'<span class="chip c-ok">Ficha completa</span>'}
+// Receita (BrasilAPI) e Correios (ViaCEP), sem custo e sem chave. troca=true: o botão troca tudo pelos dados da Receita
+async function fcReceita(troca){
+  const d=fcDig($('fc_cnpj').value),nota=$('fcRecNote');
+  if(d.length!==14){nota.innerHTML='<span class="neg">O CNPJ tem 14 números.</span>';return}
+  if(!fcCnpjOk(d)){nota.innerHTML='<span class="neg">Este CNPJ não existe (os dígitos finais não batem). Confira os números.</span>';return}
+  const dup=CLIENTES.find(x=>x.id!==FC.id&&fcDig(x.cnpj)===d);
+  if(dup)nota.innerHTML=`<span class="neg">Este CNPJ já é da empresa ${esc(dup.nome)}.</span> `;else nota.innerHTML='';
+  nota.innerHTML+='<span class="muted">Consultando a Receita…</span>';
+  try{const r=await fetch('https://brasilapi.com.br/api/cnpj/v1/'+d);
+    if(r.status===404||r.status===400){nota.innerHTML='<span class="neg">CNPJ não encontrado na Receita. Confira os números.</span>';return}
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const x=await r.json(),poe=(id,v)=>{const el=$(id);if(!el||v==null||v==='')return;if(troca||!el.value.trim()||el.dataset.fb){el.value=v;delete el.dataset.fb}};
+    const sit=(x.descricao_situacao_cadastral||'').toUpperCase(),tel=x.ddd_telefone_1?String(x.ddd_telefone_1).replace(/^(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3'):'';
+    $('fc_cnpj').value=fcCnpjFmt(d);
+    poe('fc_razao',x.razao_social);poe('fc_fantasia',x.nome_fantasia);if(!FC.id)poe('fc_nome',x.nome_fantasia||x.razao_social);
+    poe('fc_unidade',x.identificador_matriz_filial===1?'Matriz':x.identificador_matriz_filial===2?'Filial':'');
+    poe('fc_abertura',x.data_inicio_atividade);poe('fc_cnae',[x.cnae_fiscal,x.cnae_fiscal_descricao].filter(Boolean).join(' - '));
+    poe('fc_natureza',x.natureza_juridica);poe('fc_porte',x.porte||x.descricao_porte);
+    if(x.opcao_pelo_simples!=null&&(troca||!$('fc_simples').value))$('fc_simples').value=x.opcao_pelo_simples?'1':'0';
+    $('fc_situacao').value=sit;poe('fc_fone',tel);poe('fc_email',(x.email||'').toLowerCase());
+    poe('fc_cep',fcCepFmt(x.cep));poe('fc_lgr',[x.descricao_tipo_de_logradouro,x.logradouro].filter(Boolean).join(' '));poe('fc_nro',x.numero);poe('fc_compl',x.complemento);poe('fc_bairro',x.bairro);
+    if(troca||!$('fc_uf').value||FC.fb)$('fc_uf').value=x.uf||$('fc_uf').value;
+    poe('fc_ibge',x.codigo_municipio_ibge);
+    FC.receita_em=TODAY;
+    // cidade com acento e o código IBGE vêm dos Correios (a Receita manda em maiúsculas e sem acento)
+    await fcCep('fc_',troca||FC.fb,true);
+    const ok=sit==='ATIVA';
+    nota.innerHTML=`${dup?`<span class="neg">Este CNPJ já é da empresa ${esc(dup.nome)}.</span> `:''}Situação na Receita: <b class="${ok?'pos':'neg'}">${esc(sit||'não informada')}</b>${!ok&&x.data_situacao_cadastral?' desde '+dBR(x.data_situacao_cadastral):''}. ${ok?(troca?'Os dados foram trocados pelos da Receita.':'Os campos vazios foram preenchidos com os dados da Receita.'):'<span class="neg">Atenção: a empresa não está ativa na Receita.</span>'}`;
+    fcChip();
+  }catch(e){console.error(e);nota.innerHTML='<span class="neg">Não consegui consultar a Receita agora. Preencha à mão ou tente de novo daqui a pouco.</span>'}
+}
+async function fcCep(p,troca,quieto){
+  const d=fcDig($(p+'cep').value);if(d.length!==8){if(!quieto&&d)$('fcRecNote').innerHTML='<span class="neg">O CEP tem 8 números.</span>';return}
+  try{const r=await fetch(`https://viacep.com.br/ws/${d}/json/`),x=await r.json();
+    if(x.erro){if(!quieto)toast('CEP não encontrado nos Correios.');return}
+    $(p+'cep').value=fcCepFmt(d);const poe=(id,v)=>{const el=$(p+id);if(el&&v&&(troca||!el.value.trim()||el.dataset.fb)){el.value=v;delete el.dataset.fb}};
+    poe('lgr',x.logradouro);poe('bairro',x.bairro);poe('cidade',x.localidade);if(x.uf&&$(p+'uf'))$(p+'uf').value=x.uf;
+    if($(p+'ibge')&&x.ibge)$(p+'ibge').value=x.ibge;fcChip();if(!quieto)$(p+'nro')?.focus();
+  }catch(e){console.error(e)}
+}
+// contrato com a Controlacs: o que está em Gestão Controlacs › Contratos (cliente ligado a esta empresa), sem copiar
+async function fcContrato(c){const el=$('fcCtl');if(!el)return;
+  if(!c){el.innerHTML='<span class="muted">Depois de salvar a ficha, cadastre aqui o contrato com a Controlacs.</span>';return}
+  try{const {data:cs}=await sb.from('ctl_clientes').select('id,nome').eq('empresa_id',c.id);FC.ctl=cs||[];
+    const ids=FC.ctl.map(x=>x.id),{data:ks}=ids.length?await sb.from('ctl_contratos').select('id,cliente_id,titulo,numero,situacao,inicio,fim,valor_mensal,dia_vencimento,data_reajuste,indice_reajuste,servicos').in('cliente_id',ids):{data:[]};
+    if(!FC||FC.id!==c.id)return;
+    el.innerHTML=`<b>Contrato com a Controlacs</b> ${ks?.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Contrato</th><th class="l">Situação</th><th class="l">Início</th><th>Valor mensal</th><th>Vence dia</th><th class="l">Próximo reajuste</th></tr></thead><tbody>${ks.map(k=>`<tr><td class="l">${esc(k.titulo||'')}${k.numero?' nº '+esc(k.numero):''}</td><td class="l">${esc(k.situacao||'')}</td><td class="l">${k.inicio?dBR(k.inicio):'—'}</td><td>${k.valor_mensal!=null?fm(k.valor_mensal):'—'}</td><td>${k.dia_vencimento||'—'}</td><td class="l">${k.data_reajuste?dBR(k.data_reajuste)+(k.indice_reajuste?' ('+esc(k.indice_reajuste)+')':''):'—'}</td></tr>`).join('')}</tbody></table></div>`
+      :'<span class="muted">Nenhum contrato ligado a esta empresa em Gestão Controlacs.</span>'}
+      <div class="row" style="margin-top:6px"><button type="button" class="btn small" id="fcCtlNovo">${ks?.length?'Abrir contratos':'+ Cadastrar contrato'}</button><span class="note">Fica em Gestão Controlacs › Contratos e reajustes (valor, vencimento, reajuste e serviços). ${FC.ctl.length?'':'O cliente da Controlacs é criado com os dados desta ficha.'}</span></div>`;
+    $('fcCtlNovo').onclick=()=>fcContratoNovo(c,ks?.length);
+  }catch(e){console.error(e);el.innerHTML='<span class="muted">Não consegui ler os contratos agora.</span>'}
+}
+async function fcContratoNovo(c,tem){let cid=FC.ctl?.[0]?.id;
+  if(!cid){const d=fcDados(c),e=d.end;
+    const {data,error}=await sb.from('ctl_clientes').insert({nome:c.nome,razao_social:d.razao||null,cnpj_cpf:fcCnpjFmt(d.cnpj)||null,empresa_id:c.id,situacao:'ativo',
+      contato:d.contato.responsavel||null,telefone:d.contato.telefone||null,email:d.contato.email||null,
+      endereco:[e.logradouro,e.numero,e.complemento,e.bairro,[e.cidade,e.uf].filter(Boolean).join('/'),e.cep?'CEP '+fcCepFmt(e.cep):''].filter(Boolean).join(', ')||null}).select('id').single();
+    if(error){fail(error,'Não foi possível criar o cliente em Gestão Controlacs');return}cid=data.id}
+  $('dlgFicha').close();go('ctlcont');
+  if(!tem)setTimeout(async()=>{try{await ctCarrega();ctAbreCont(null,null,cid)}catch(e){console.error(e)}},600)}
+// salvar: nova empresa só entra com a ficha completa; empresa antiga pode salvar aos poucos (fica o aviso e a tarefa)
+async function fcSalva(){const {d,s}=fcLe(),err=$('fcErr'),c=FC.id?CLIENTES.find(x=>x.id===FC.id):null,falta=fcFalta(d,s);
+  const erro=t=>{err.textContent=t;err.hidden=false;$('fcBody').scrollTop=0;return false};err.hidden=true;
+  const dg=fcDig(d.cnpj);
+  if(dg&&!fcCnpjOk(dg))return erro('Este CNPJ não existe (os dígitos finais não batem). Confira os números.');
+  const dup=dg&&CLIENTES.find(x=>x.id!==FC.id&&fcDig(x.cnpj)===dg);if(dup)return erro(`Este CNPJ já é da empresa ${dup.nome}.`);
+  if(!d.nome)return erro('Informe o nome da empresa no portal.');
+  if(CLIENTES.some(x=>x.id!==FC.id&&chave(x.nome)===chave(d.nome)))return erro('Já existe uma empresa com este nome no portal.');
+  if(!c&&falta.length)return erro('Para cadastrar, preencha: '+falta.join(', ')+'.');
+  if(c&&falta.length&&!confirm(`A ficha continua incompleta. Falta: ${falta.join(', ')}.\n\nSalvar assim mesmo? A empresa continua com o aviso e a tarefa para completar.`))return;
+  const de={...(c?.doc_empresa||{})};if(d.razao)de.razao=d.razao;else delete de.razao;
+  if(d.end.cidade)de.cidade=d.end.cidade;if(d.end.uf)de.uf=d.end.uf;if(d.unidade)de.unidade=d.unidade;else delete de.unidade;
+  if(d.bh_ini)de.bh_ini=d.bh_ini;else delete de.bh_ini;if(d.bh_fim)de.bh_fim=d.bh_fim;else delete de.bh_fim;
+  const ficha={...(c?.ficha||{}),razao:d.razao,fantasia:d.fantasia||null,ie:d.ie||null,im:d.im||null,abertura:d.abertura||null,cnae:d.cnae||null,natureza:d.natureza||null,porte:d.porte||null,
+    simples:d.simples,situacao:d.situacao||null,end:d.end,contato:d.contato,regras:d.regras||null,atualizado_em:new Date().toISOString(),atualizado_por:ME?.nome||ME?.email||null};
+  if(FC.receita_em)ficha.receita_em=FC.receita_em;
+  const upd={nome:d.nome,cnpj:dg?fcCnpjFmt(dg):null,municipio:d.end.cidade||c?.municipio||null,uf:d.end.uf||c?.uf||null,doc_empresa:de,ficha,bpo_financeiro:s.fin,bpo_rh:s.rh,ativo:$('fc_ativo').checked};
+  if($('fc_ben'))upd.bpo_beneficios=s.ben;
+  if($('fc_matriz'))upd.matriz_id=$('fc_matriz').value||null;
+  if(s.rh||s.ben){const fmA=c?.folha_modelo||{},b=d.ben,nv={...(fmA.beneficios||{}),tipos:b.tipos,forn:b.forn,dia_pedido:b.dia_pedido||null,entrega:b.entrega,
+      entrega_end:b.entrega==='outro'?b.entrega_end:null,entrega_contato:b.entrega_contato||null,
+      entrega_local:b.entrega_local||null,entrega_fone:b.entrega_fone||null,entrega_email:b.entrega_email||null,entrega_porta:b.entrega_porta,forn_cod:Object.keys(b.forn_cod).length?b.forn_cod:null,combustivel:!!b.tipos?.includes('comb'),desconta:b.desconta,premio_atestado:b.premio_atestado,confirmado:true,texto:b.texto||null};
+    Object.keys(nv).forEach(k=>{if(nv[k]==null)delete nv[k]});upd.folha_modelo={...fmA,beneficios:nv}}
+  const campos=Object.keys(upd),ant=c?Object.fromEntries(campos.map(k=>[k,c[k]??null])):null;
+  $('fcSave').disabled=true;
+  const q=c?sb.from('clientes').update({...upd,ficha_ant:ant}).eq('id',c.id):sb.from('clientes').insert(upd);
+  const {data,error}=await q.select().single();$('fcSave').disabled=false;
+  if(error){console.error(error);return erro(/duplicate|unique/i.test(error.message||'')?'Já existe uma empresa com este nome.':/ficha/.test(error.message||'')?'Rode a atualização v154 do banco no Supabase.':'Não foi possível salvar: '+error.message)}
+  const i=CLIENTES.findIndex(x=>x.id===data.id);if(i>=0)CLIENTES[i]=data;else CLIENTES.push(data);
+  if(!falta.length)fcTarefaOk(data);
+  $('dlgFicha').close();renderCadastro();if(VIEW==='ben'&&BEN.cli?.id===data.id)renderBen();
+  if(c)toastDesfazer('Ficha da empresa salva',()=>fcDesfaz(data.id));else toast('Empresa cadastrada');
+}
+async function fcDesfaz(id){const c=CLIENTES.find(x=>x.id===id),ant=c?.ficha_ant;if(!ant){toast('Não há alteração para desfazer.');return}
+  const {data,error}=await sb.from('clientes').update({...ant,ficha_ant:null}).eq('id',id).select().single();if(error){fail(error);return}
+  const i=CLIENTES.findIndex(x=>x.id===id);CLIENTES[i]=data;toast('A ficha voltou como estava');if($('dlgFicha').open)$('dlgFicha').close();renderCadastro();if(VIEW==='ben'&&BEN.cli?.id===id)renderBen()}
+// ficha completa: conclui a tarefa "Completar a ficha" da empresa, se existir
+async function fcTarefaOk(c){try{await sb.from('tarefas').update({status:'concluida',concluida_em:new Date().toISOString()}).eq('cliente_id',c.id).eq('status','afazer').like('titulo','Completar a ficha da empresa%')}catch(e){console.error(e)}}
+$('fcSave').addEventListener('click',fcSalva);
+$('fcClose').addEventListener('click',()=>$('dlgFicha').close());
+$('fcDesf').addEventListener('click',()=>{if(FC?.id&&confirm('Voltar a ficha para como estava antes da última alteração salva?'))fcDesfaz(FC.id)});
 async function renderMapa(){
   await loadMapa();const cols=[['lancamento','Lançamento'],['tipo','Tipo'],['conta','Conta bancária'],['forma','Forma de pagamento'],['categoria','Categoria financeira'],['departamento','Departamento'],['nome','Nome cliente/fornecedor'],['status','Status']];
   $('tbCfg').innerHTML=`<thead><tr>${cols.map(c=>`<th class="l">${c[1]}</th>`).join('')}</tr></thead><tbody>${
@@ -5964,8 +6309,9 @@ const bff=(f,k)=>{const v=ff(f,k)??benFb(f,k);return v==='nenhum'?null:v},bffNum
 // linha do pedido a partir do cadastro (ff.vt_* e ff.va_*, ou a ficha do colaborador) e das faltas
 function benLinha(f,tipo,fa){
   const sd=benSabPadrao(f),r={funcionario_id:f.id,tipo,faltas:fa.n,faltas_injust:fa.inj,obs:fa.t||null,dias_uteis:BEN.cal.uteis,sab_datas:sd,sab_trab:sd.length};
-  if(tipo==='va')Object.assign(r,{empresa:ff(f,'va_empresa')||'',va_tipo:bff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:bffNum(f,'va_valor')||0,assid:bff(f,'va_tipo')==='fixo'?ffNum(f,'va_assid'):null});
-  else Object.assign(r,{empresa:bff(f,'vt_empresa')||'',unitario:bffNum(f,'vt_unit')||0});
+  const fo=BEN.cli?.folha_modelo?.beneficios?.forn||{};   // vazio no colaborador: a empresa do benefício da ficha da empresa (Carol 18/11)
+  if(tipo==='va')Object.assign(r,{empresa:ff(f,'va_empresa')||fo.va||fo.vr||'',va_tipo:bff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:bffNum(f,'va_valor')||0,assid:bff(f,'va_tipo')==='fixo'?ffNum(f,'va_assid'):null});
+  else Object.assign(r,{empresa:bff(f,'vt_empresa')||fo[tipo]||fo.vt||'',unitario:bffNum(f,'vt_unit')||0});
   return benCalc(r);
 }
 const benDias=r=>Math.max(0,(+r.dias_uteis||0)+(+r.sab_trab||0)-(+r.faltas||0));
@@ -5985,7 +6331,7 @@ async function renderBen(){
   if(!cli){vazio('<span class="muted">Nenhuma empresa liberada.</span>');return}
   const comp=BEN.comp=$('bnMes').value+'-01',ant=addMes(comp,-1),fim=fimMes(comp);
   const [rf,rp,rm,rpe,rl,rh,rv]=await Promise.all([
-    sb.from('funcionarios').select('id,nome,matricula,situacao,admissao,desligado_em,folha_fixos,folha_vt,vt_valor_dia,vt_empresa,va_valor,folha_ajuda_custo').eq('cliente_id',cli.id).order('nome'),
+    sb.from('funcionarios').select('id,nome,matricula,cpf,nascimento,telefone,situacao,admissao,desligado_em,folha_fixos,folha_vt,vt_valor_dia,vt_empresa,va_valor,folha_ajuda_custo').eq('cliente_id',cli.id).order('nome'),
     sb.from('beneficios_pedidos').select('*').eq('cliente_id',cli.id).eq('competencia',comp),
     sb.from('beneficios_meses').select('*').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
     sb.from('beneficios_pendencias').select('*').eq('cliente_id',cli.id).order('criado_em'),
@@ -5994,8 +6340,10 @@ async function renderBen(){
     sb.from('v_ferias_parcelas').select('nome,matricula,inicio,fim_real,status').eq('cliente_id',cli.id).lte('inicio',fim).gte('fim_real',comp)]);
   const er=[rf,rp,rm,rpe].find(x=>x.error)?.error;
   if(er){console.error(er);vazio(er.code==='42P01'||er.code==='PGRST205'||/beneficios/.test(er.message||'')?'<span class="neg">Este módulo precisa da atualização v34 do banco. Rode o SQL no Supabase.</span>':'<span class="neg">Erro ao carregar. Verifique a internet e tente de novo.</span>');return}
-  const fer=(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data);
-  BEN.cal=benCal(comp,fer);BEN.mes=rm.data;BEN.pend=rpe.data||[];
+  // dias em que a clínica não abre (Carol 18/11): contam como feriado no pedido (saem dos dias úteis e dos sábados)
+  const fech=(benRegra(cli).fechados||[]).filter(d=>d>=comp&&d<=fim);BEN.fech=fech;
+  const fer=[...(rh.data||[]).filter(x=>!x.uf||x.uf===cli.uf&&(!x.municipio||x.municipio===cli.municipio)).map(x=>x.data),...fech];
+  BEN.cal=benCal(comp,fer);BEN.cal.ferDatas=BEN.cal.ferDatas.filter(d=>!fech.includes(d));BEN.mes=rm.data;BEN.pend=rpe.data||[];
   if(BEN.mes?.dias_uteis!=null)BEN.cal.uteis=BEN.mes.dias_uteis;
   BEN.func=(rf.data||[]).filter(f=>f.situacao!=='Desligado'||f.desligado_em&&f.desligado_em>=comp);
   const R=benRegra(cli),lanca=podeLancar(cli.id,'folha');
@@ -6023,29 +6371,42 @@ async function renderBen(){
   const irPonto=temAcesso('ponto')&&eqPode('ponto')?`<button class="btn small" data-bn="ponto">${temPonto?'Ver':'Importar'} o ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()} ›</button>`:'';
   $('bnBar').innerHTML=`<span class="chip ${st==='Pedido feito'?'c-done':BEN.salvo?'c-warn':'c-none'}">${st==='Pedido feito'?'Pedido feito'+(BEN.mes?.pedido_em?' em '+dBR(BEN.mes.pedido_em.slice(0,10)):''):BEN.salvo?'Salvo, falta fazer o pedido':'Ainda não salvo'}</span>
     <label class="f" style="margin:0" title="Segunda a sexta, menos feriados. Mude se a empresa tiver outro calendário.">Dias úteis de ${MESES[+m-1].toLowerCase()}<input id="bnUteis" type="number" min="0" max="31" value="${C.uteis}" style="max-width:70px"${lanca?'':' disabled'}></label>
+    <div class="f" style="margin:0"><span class="note" style="margin:0">Dias fechados (a clínica não abre)</span><div class="row" style="gap:6px;align-items:center">${BEN.fech.map(d=>`<span class="chip c-warn">${dBR(d).slice(0,5)}${lanca?` <button type="button" class="btn small ghost" data-bnf="${d}" title="Tirar este dia" aria-label="Tirar ${dBR(d)}" style="padding:0 4px">✕</button>`:''}</span>`).join('')||'<span class="muted">nenhum</span>'}${lanca?`<input type="date" id="bnFechD" min="${comp}" max="${fim}" style="max-width:150px"><button type="button" class="btn small" data-bn="fechar">+ Dia fechado</button>`:''}</div></div>
     <span class="note">${C.ferDatas.length?'Feriados: '+C.ferDatas.map(d=>dBR(d).slice(0,5)).join(', ')+'. ':''}${C.sabs.length} sábados. Faltas e atestados do ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()}.</span>
     ${temPonto?'':`<span class="chip c-warn">Ponto de ${MESES[+ant.slice(5,7)-1].toLowerCase()} ainda não importado</span>`}${irPonto}
     ${mudou?st==='Pedido feito'?`<span class="chip c-bad">O ponto mudou depois do pedido: ${mudou} ${mudou===1?'linha':'linhas'} com outras faltas. Use “Voltar para rascunho” para atualizar.</span>`:`<span class="chip c-warn">Faltas atualizadas pelo ponto em ${mudou} ${mudou===1?'linha':'linhas'}: salve o pedido</span>`:''}
     <span class="spacer"></span>${R.desconta?`<span class="chip ${R.confirmado?'c-warn':'c-bad'}">Desconta na folha: 6% de VT e R$ 1,00 de VA${R.confirmado?'':' (regra padrão: conferir)'}</span>${!R.confirmado&&e?'<button class="btn small" data-bn="regra">Confirmar regra</button><button class="btn small ghost" data-bn="naodesc">Não desconta</button>':''}`:'<span class="chip c-ok">Não desconta VT e VA na folha</span>'}
     ${lanca&&BEN.salvo?st==='Pedido feito'?'<button class="btn small ghost" data-bn="reabrir">Voltar para rascunho</button>':'<button class="btn small" data-bn="feito">Marcar pedido como feito</button>':''}
     ${lanca&&BEN.salvo?'<button class="btn small ghost" data-bn="refazer" title="Monta de novo pelo cadastro e pelo ponto (perde o que foi mudado à mão)">Montar de novo</button>':''}`;
-  $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;
+  $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;$('bnPlux').hidden=!pluxLinhas().length;
   $('bnVtTit').textContent=R.combustivel?'Vale transporte e combustível':'Vale transporte';
   benEscala(lanca);benTabelas(lanca);renderBenPend(lanca);renderBenCp(lanca);
   $('bnCadBox').hidden=!e;if(e){renderBenCad();renderBenReg()}
-  $('bnRegTxt').hidden=!R.texto;$('bnRegTxt').innerHTML=R.texto?`<b>Regras de benefícios desta empresa:</b> ${esc(R.texto).replace(/\n/g,'<br>')}`:'';
+  const fic=benFichaTxt(R);$('bnRegTxt').hidden=!R.texto&&!fic;$('bnRegTxt').innerHTML=(R.texto?`<b>Regras de benefícios desta empresa:</b> ${esc(R.texto).replace(/\n/g,'<br>')}`:'')+(fic?(R.texto?'<br>':'')+fic:'');
 }
+// o que a ficha da empresa diz dos benefícios (Configurações › Cadastro de empresas › Ficha, Carol 18/11)
+function benFichaTxt(R){const p=[],ts=(R.tipos||[]).filter(t=>t!=='nenhum'),nm=t=>FC_BEN.find(x=>x[0]===t)?.[1]||t;
+  if(R.tipos?.includes('nenhum'))return '<b>Ficha da empresa:</b> não usa benefícios.';
+  if(ts.length)p.push('Benefícios: '+ts.map(t=>esc(nm(t))+(R.forn?.[t]?' ('+esc(R.forn[t])+')':'')).join(', '));
+  if(R.dia_pedido)p.push(`Pedido até o dia <b>${+R.dia_pedido}</b> de cada mês`);
+  if(ts.some(t=>FC_CARTAO.includes(t))&&R.entrega){const e=R.entrega_end||{};
+    p.push('Cartões chegam '+(R.entrega==='outro'?'em: '+esc([e.logradouro,e.numero,e.complemento,e.bairro,[e.cidade,e.uf].filter(Boolean).join('/'),e.cep?'CEP '+fcCepFmt(e.cep):''].filter(Boolean).join(', ')):'no endereço da empresa')+(R.entrega_contato?' (a/c '+esc(R.entrega_contato)+')':''))}
+  return p.length?'<b>Ficha da empresa:</b> '+p.join(' · ')+'.':''}
 // Regras de benefícios de cada empresa (Carol 18/11): cada empresa tem as suas; ficam em clientes.folha_modelo.beneficios
 function renderBenReg(){
   const R=benRegra(BEN.cli),sn=(k,v,t)=>`<label class="f">${t}<select data-rg="${k}"><option value="1"${v?' selected':''}>Sim</option><option value="0"${v?'':' selected'}>Não</option></select></label>`;
   $('bnReg').innerHTML=`<div class="fields">${sn('desconta',R.desconta,'Desconta na folha (6% de VT e R$ 1,00 de VA)')}${sn('combustivel',R.combustivel,'Tem vale combustível')}${sn('premio_atestado',R.premio_atestado,'Atestado tira o prêmio no VA')}</div>
     <p class="note" style="margin:6px 0">Prêmio no VA se não faltar: o valor é de cada colaborador (na ficha dele). Falta do ponto sempre tira, compensada ou não; férias não tiram. Folga de aniversário e folga do banco de horas não aparecem como falta no ponto.</p>
-    <label class="f">Regras escritas (aparecem no alto do pedido)<textarea id="bnRegT" rows="3" placeholder="Ex.: perde o prêmio com qualquer falta ou atestado; não perde com folga de aniversário ou de banco de horas.">${esc(R.texto||'')}</textarea></label>`;
+    <label class="f">Regras escritas (aparecem no alto do pedido)<textarea id="bnRegT" rows="3" placeholder="Ex.: perde o prêmio com qualquer falta ou atestado; não perde com folga de aniversário ou de banco de horas.">${esc(R.texto||'')}</textarea></label>
+    ${ehEsc()&&typeof fcAbre==='function'?`<p class="note" style="margin:6px 0 0">${benFichaTxt(R)||'A ficha da empresa ainda não diz quais benefícios ela usa, de qual empresa e o dia do pedido.'} <button type="button" class="btn small" id="bnRegFicha">📋 Abrir a ficha da empresa</button></p>`:''}`;
+  if($('bnRegFicha'))$('bnRegFicha').onclick=async()=>{if(!CLIENTES.some(x=>x.id===BEN.cli.id)||!('ficha' in (CLIENTES.find(x=>x.id===BEN.cli.id)||{}))){const {data}=await sb.from('clientes').select('*').order('nome');if(data)CLIENTES=data}fcAbre(BEN.cli.id)};
 }
 $('bnRegSalvar').onclick=async ev=>{
   const b=ev.target,cli=BEN.cli,ant=cli.folha_modelo||{},R=benRegra(cli),nv={...R,confirmado:true,texto:$('bnRegT').value.trim()||null};
   document.querySelectorAll('#bnReg [data-rg]').forEach(x=>nv[x.dataset.rg]=x.value==='1');
-  if(!nv.texto)delete nv.texto;const fm2={...ant,beneficios:nv};
+  if(!nv.texto)delete nv.texto;
+  if(Array.isArray(nv.tipos)){const t=nv.tipos.filter(x=>x!=='comb');if(nv.combustivel)t.push('comb');nv.tipos=t}   // a ficha da empresa acompanha o "Tem vale combustível"
+  const fm2={...ant,beneficios:nv};
   b.disabled=true;const {error}=await sb.from('clientes').update({folha_modelo:fm2}).eq('id',cli.id);b.disabled=false;
   if(error){fail(error);return}cli.folha_modelo=fm2;renderBen();
   toastDesfazer('Regras de benefícios salvas',async()=>{const {error:e2}=await sb.from('clientes').update({folha_modelo:ant}).eq('id',cli.id);if(e2){fail(e2);return}cli.folha_modelo=ant;renderBen();toast('Regras voltaram como estavam')});
@@ -6109,9 +6470,26 @@ $('bnSalvar').onclick=async ev=>{
     toast('Pedido salvo');renderBen();
   }catch(ex){console.error(ex);toast(/taxa/.test(ex.message||'')?'Falta rodar a atualização v40 do banco no Supabase.':/sab_datas|dias_uteis|faltas_injust|assid/.test(ex.message||'')?'Falta rodar a atualização v35 do banco no Supabase.':'Não foi possível salvar. Verifique a internet e tente de novo.')}finally{b.disabled=false}
 };
+// dias fechados: grava na regra da empresa (folha_modelo.beneficios.fechados), com Desfazer; o pedido recalcula os dias
+async function benFechSalva(d,pondo){
+  const cli=BEN.cli,ant=cli.folha_modelo||{},R=benRegra(cli),l=new Set(R.fechados||[]);if(pondo)l.add(d);else l.delete(d);
+  const fm2={...ant,beneficios:{...(ant.beneficios||{}),fechados:[...l].sort()}};
+  const grava=async fm=>{const {error}=await sb.from('clientes').update({folha_modelo:fm}).eq('id',cli.id);if(error){fail(error);return false}cli.folha_modelo=fm;
+    const fs=new Set(fm.beneficios?.fechados||[]),ehMes=d.slice(0,7)===BEN.comp.slice(0,7),salvo=BEN.salvo;
+    await renderBen();
+    // pedido já salvo: atualiza os dias úteis e tira o sábado fechado da escala (falta salvar)
+    if(salvo&&ehMes){
+      const real=benCal(BEN.comp,[...BEN.cal.ferDatas,...BEN.fech]).uteis;BEN.cal.uteis=real;$('bnUteis').value=real;
+      BEN.rows.forEach(r=>{r.dias_uteis=real;r.sab_datas=(r.sab_datas||[]).filter(x=>!fs.has(x));r.sab_trab=r.sab_datas.length;benCalc(r)});benEscala(true);benTabelas(true)}
+    return true};
+  if(!await grava(fm2))return;
+  toastDesfazer(`${dBR(d)} ${pondo?'marcado como fechado':'voltou a ser dia normal'}${BEN.salvo?': salve o pedido':''}`,async()=>{if(await grava(ant))toast('Voltou como estava')});
+}
+$('bnBar').addEventListener('click',ev=>{const x=ev.target.closest('[data-bnf]');if(x)benFechSalva(x.dataset.bnf,false)});
 $('bnBar').addEventListener('click',async ev=>{
   const b=ev.target.closest('[data-bn]');if(!b)return;const a=b.dataset.bn;
   if(a==='ponto'){PT_MES=addMes(BEN.comp,-1).slice(0,7);go('ponto');return}
+  if(a==='fechar'){const d=$('bnFechD').value;if(!d||d.slice(0,7)!==BEN.comp.slice(0,7)){toast('Escolha um dia deste mês');return}benFechSalva(d,true);return}
   b.disabled=true;let error;
   if(a==='feito'||a==='reabrir')({error}=await sb.from('beneficios_meses').upsert({cliente_id:BEN.cli.id,competencia:BEN.comp,status:a==='feito'?'Pedido feito':'Rascunho',pedido_em:a==='feito'?new Date().toISOString():null},{onConflict:'cliente_id,competencia'}));
   else if(a==='refazer'){if(!confirm('Montar o pedido de novo pelo cadastro e pelo ponto? O que foi mudado à mão neste mês se perde.')){b.disabled=false;return}
@@ -6122,6 +6500,45 @@ $('bnBar').addEventListener('click',async ev=>{
   if(a==='feito'){if(await benGerarCps())toast('Pedido feito. Contas a pagar criadas: anexe o boleto de cada fornecedor.')}else
   toast({feito:'Pedido marcado como feito',reabrir:'Pedido voltou para rascunho',refazer:'Pedido montado de novo (ainda não salvo)',regra:'Regra confirmada',naodesc:'Regra salva: não desconta na folha'}[a]);renderBen();
 });
+// ---------- Planilha de importação da Pluxee (VA da Viva e da BJ; Carol 18/11) ----------
+// Layout "PLANSIPV7" versão 202103: cabeçalho nas linhas 5 a 7 e um beneficiário por linha a partir da 8.
+// Dados da empresa (entrega dos cartões, responsável, código Pluxee) vêm do cadastro da empresa; o que faltar é avisado.
+const PLUX_H=[["Código Cliente Pluxee", "Situação do beneficiário", "Nome completo", "CPF", "Data de nascimento", "Nome para gravação no cartão", "Matrícula", "Nome do departamento", "Código do departamento", "Centro de custo", "Tipo do pedido", "Produto", "Valor de crédito", "Data de crédito", "Mês de referência", "Local de entrega", "CEP", "Endereço", "Número", "Complemento", "Referência", "Bairro", "Cidade", "UF", "Responsável pelo recebimento", "DDD Responsável pelo Recebimento", "Telefone Responsável pelo Recebimento", "E-mail do Beneficiário", "Entrega Porta a Porta"], ["OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OPCIONAL", "OPCIONAL", "OPCIONAL", "OPCIONAL", "OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO PARA PEDIDO DE CRÉDITO\n(001 - Pedido Normal)", "OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OPCIONAL", "OPCIONAL", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "OBRIGATÓRIO", "Obrigatório o preenchimento de pelo menos uma das informações (Telefone ou E-mail)\nPara entrega do tipo Porta a Porta", "", "", "OPCIONAL"], ["Obrigatório para pedidos tipo Grupo Atacado, EDI e Pluxee Premium", "Selecione uma opção\n\nAtivo: Receberá benefício\nInativo: Não receberá benefício", "Nome completo do funcionário\n(Até 40 caracteres)\nExemplo: João da Silva Santos", "(exceto para o produto\nPluxee Refeição RH)\n\nCPF do benefíciário\n(11 dígitos)\nExemplo: 12345678900", "(exceto para o produto\nPluxee Refeição RH)\n\nData de nascimento do beneficiário\n(Formato DD/MM/AAAA)\nExemplo: 01/08/1990", "Nome para gravação personalizada no cartão\n(Até 24 caracteres)\nExemplo: João Santos", "Caso não preenchido, serão atribuídos os 09 primeiros dígitos do CPF\n\nObrigatório apenas para 2023 - Pluxee Refeição RH\n\nSe novo cartão Pluxee Refeição RH, informe em sequencia, começando com RH-0000001\n\nSe cartão Pluxee Refeição RH já existente, informe matrícula já existente", "Caso não preenchido, não será separado por departamento\n\nInforme o nome do departamento do funcionário\n(Até 35 caracteres) \nExemplo: RECURSOS HUMANOS\n\n\n", "Caso não preenchido, não será separado por departamento\n\nInforme o código do departamento do funcionário\n(Até 18 caracteres) \nExemplo: RH01\n\n\n", "Informe o centro de custo atrelado ao funcionário\n(Até 18 caracteres)\nExemplo: 123456", "Selecione um tipo de pedido\nExemplo: 001 - Pedido Normal", "Selecione um produto\nExemplo: 6001 - Pluxee Refeição", "Inserir valor do crédito do benefício\nExemplo: 100,00", "Data de disponibilização do valor de crédito\n(Formato DD/MM/AAAA)\nExemplo: 01/01/2020", "Inserir mês de referência do benefício\nExemplo: 04/2009", "Inserir um nome/título para o local da entrega do cartão\n(Até 18 caracteres) \nExemplo: MATRIZ", "Informe o CEP\n(8 dígitos sem traços)\nExemplo: 01310918", "Informe o endereço\n(Até 65 caracteres)\nExemplo: Avenida Paulista", "Informe o número do endereço\n(Até 10 dígitos)\nExemplo: 350", "Informe o complemento do endereço, caso possua\n(Até 30 caracteres)\nExemplo: Bloco A Andar 10 Apto 20", "Informe um ponto de referencia para o endereço, caso possua\n(Até 100 caracteres)\nExemplo: Próx. Escola ABCD", "Informe o bairro do endereço\n(Até 30 caracteres)\nExemplo: Vila Mariana", "Informe a cidade\n(Até 30 caracteres)\nExemplo: São Paulo", "Informe a UF\nExemplo: SP", "Entrega Porta a Porta: informe o nome  do beneficiário.\nEntrega no RH da empresa:  informe o nome   do responsável pelo recebimento  no local de entrega.\n(Até 30 caracteres)\nExemplo: João", "Informe o DDD\n(2 dígitos)\nExemplo: 11", "Entrega Porta a Porta: informe telefone celular do beneficiário.\nEntrega no RH da empresa:  informe telefone fixo ou celular do responsável pelo recebimento  no local de entrega.\n(Até 9 dígitos)\nExemplo: 990909090", "Informe o e-mail do beneficiário\n(Até 70 caracteres)\nExemplo: exemplo@email.com", "Selecione uma opção\n\nSim: Entrega  Porta a Porta\nNão: Entrega no RH da empresa\n\n(Células em branco serão consideradas como \"Não\")"]];
+const pluxLinhas=()=>BEN.rows.filter(r=>r.tipo==='va'&&(+r.total||0)>0&&(!r.empresa||/plux|sodexo/i.test(r.empresa)));
+// lê o primeiro campo preenchido entre vários nomes possíveis (a ficha da empresa ainda está sendo montada)
+const pxG=(o,...ks)=>{for(const k of ks){const v=o?.[k];if(v!=null&&String(v).trim()!=='')return String(v).trim()}return ''};
+function pluxEmp(cli){
+  const B=benRegra(cli),f=cli.ficha||{};
+  // a ficha da empresa (Cadastro de empresas) resolve o endereço de entrega: benEntrega(cli); senão lê as mesmas chaves
+  const e=typeof benEntrega==='function'?benEntrega(cli):(()=>{const src=B.entrega==='outro'?(B.entrega_end||{}):(f.end||{}),dg=String(B.entrega_fone||'').replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,'');
+    return {...src,local:B.entrega_local,responsavel:B.entrega_contato,ddd:dg.length>=10?dg.slice(0,2):'',telefone:dg.length>=10?dg.slice(2):dg,email:B.entrega_email,porta_a_porta:B.entrega_porta,forn_cod:B.forn_cod?.va}})();
+  const fc=e.forn_cod&&typeof e.forn_cod==='object'?e.forn_cod.va:e.forn_cod;
+  return {codigo:pxG({c:fc},'c')||pxG(B.forn_cod||{},'va'),produto:pxG(B.pluxee||{},'produto')||'6002 - Pluxee Alimentação',porta:e.porta_a_porta?'Sim':'Não',
+    local:pxG(e,'local')||cli.nome,cep:pxG(e,'cep').replace(/\D/g,''),endereco:pxG(e,'logradouro','endereco'),numero:pxG(e,'numero'),
+    complemento:pxG(e,'complemento'),referencia:pxG(e,'referencia'),bairro:pxG(e,'bairro'),cidade:pxG(e,'cidade','municipio'),uf:pxG(e,'uf').toUpperCase(),
+    responsavel:pxG(e,'responsavel'),ddd:pxG(e,'ddd'),telefone:pxG(e,'telefone').replace(/\D/g,''),email:pxG(e,'email')};
+}
+$('bnPlux').onclick=()=>{
+  const cli=BEN.cli,E=pluxEmp(cli),ls=pluxLinhas();if(!ls.length){toast('Ninguém com vale alimentação Pluxee neste pedido');return}
+  const fe=[['cep','CEP'],['endereco','Endereço'],['numero','Número'],['bairro','Bairro'],['cidade','Cidade'],['uf','UF'],['responsavel','Responsável pelo recebimento']].filter(([k])=>!E[k]).map(x=>x[1]);
+  if(!E.telefone&&!E.email)fe.push('Telefone ou e-mail do responsável');
+  const fu=ls.map(r=>{const f=BEN.func.find(x=>x.id===r.funcionario_id)||{},m=[];if(String(f.cpf||'').replace(/\D/g,'').length!==11)m.push('CPF');if(!f.nascimento)m.push('nascimento');return m.length?`${f.nome||'?'} (${m.join(' e ')})`:null}).filter(Boolean);
+  if(fe.length||fu.length){alert(`Falta preencher para gerar a planilha da Pluxee:\n\n${fe.length?'No cadastro da empresa ('+cli.nome+', Configurações › Cadastro de empresas, parte Benefícios/entrega dos cartões): '+fe.join(', ')+'.\n\n':''}${fu.length?'Na ficha dos colaboradores (RH › Colaboradores e prazos): '+fu.join('; ')+'.':''}`);return}
+  const [y,m]=BEN.comp.split('-'),cr=prompt('Data do crédito na Pluxee (dd/mm/aaaa):',dBR(BEN.comp));if(cr==null)return;
+  if(!/^\d{2}\/\d{2}\/\d{4}$/.test(cr.trim())){toast('Data no formato dd/mm/aaaa');return}
+  const ws={},put=(r,c,v,st)=>{if(v==null||v==='')return;ws[XLSX.utils.encode_cell({r,c})]={t:typeof v==='number'?'n':'s',v,...(typeof v==='number'?{z:'#,##0.00'}:{}),...(st?{s:st}:{})}};
+  const hs={font:{bold:true},alignment:{wrapText:true,vertical:'top'}},ws7={alignment:{wrapText:true,vertical:'top'},font:{sz:8}};
+  put(2,24,'versão 202103');PLUX_H.forEach((row,i)=>row.forEach((v,c)=>put(4+i,c,v,i===2?ws7:hs)));
+  const cut=(t,n)=>String(t||'').slice(0,n);
+  ls.forEach((r,i)=>{const f=BEN.func.find(x=>x.id===r.funcionario_id),R=7+i;
+    [E.codigo,'Ativo',cut(f.nome,40),String(f.cpf).replace(/\D/g,''),dBR(f.nascimento),'',cut(f.matricula,10),'','','','001 - Pedido Normal',E.produto,r2(+r.total),cr.trim(),`${m}/${y}`,cut(E.local,18),E.cep,cut(E.endereco,65),cut(E.numero,10),cut(E.complemento,30),cut(E.referencia,100),cut(E.bairro,30),cut(E.cidade,30),E.uf,cut(E.porta==='Sim'?f.nome:E.responsavel,30),E.ddd,E.telefone,cut(E.email,70),E.porta]
+      .forEach((v,c)=>put(R,c,v))});
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:7+ls.length-1,c:28}});ws['!merges']=[{s:{r:0,c:0},e:{r:2,c:0}},{s:{r:5,c:25},e:{r:5,c:27}}];
+  ws['!cols']=[26,28,41,29,26,33,26,31,26,20,46,41,21,25,21,26,20,51,26,36,41,20,20,26,41,26,31,41,28].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Dados dos Beneficiários');
+  XLSX.writeFile(wb,`Pluxee pedido ${cli.nome} ${m}.${y}.xlsx`);
+  toast(`Planilha da Pluxee gerada: ${ls.length} ${ls.length===1?'colaborador':'colaboradores'}, ${fm(ls.reduce((a,r)=>a+(+r.total||0),0))}`);
+};
 // ---------- Contas a pagar do pedido (v72) ----------
 // O mesmo boleto foi salvo em duas empresas e pago na errada (Carol, 29/10): o pedido feito gera uma conta por
 // fornecedor (pedido + taxa do boleto) e o boleto é anexado aqui, conferido com o pedido, com o CNPJ da empresa
@@ -6907,6 +7324,7 @@ function expTela(secId,tblSel){
 // fornecedores por tela
 const EXPT={
   esc:()=>expTela('viewEsc','table'),
+  colab:()=>{if(CB_ED){CB_ED=false;renderColab()}return expTela('viewColab','#cbTab')},
   mod:()=>expTela('viewMod','table'),
   rep:()=>expTela('viewRep','table'),
   rel:()=>expTela('viewRel','#relTable'),
@@ -7127,7 +7545,12 @@ $('folRescBaixar').onclick=()=>{
 // Cadastro dos colaboradores (supabase/v15_rh_prazos.sql) e o controle do contrato de experiência:
 // fim do 1º período (prorrogar ou desligar) e fim da prorrogação (efetivar ou desligar).
 const EXP_AVISO=10; // dias de antecedência para o alerta
-let COLAB=[], COLABDLG=null;
+let COLAB=[], COLABDLG=null, CB_ED=false;
+const CB_ROT={cargo:'Cargo',cpf:'CPF',nascimento:'Nascimento',telefone:'WhatsApp',admissao:'Admissão',fim_experiencia1:'Fim do 1º período',fim_experiencia2:'Fim da prorrogação'};
+// dados que todo cadastro deveria ter (Carol, 18/11): avisa o que falta no cadastro novo e na lista
+// os prazos da experiência só contam para quem foi admitido há menos de 90 dias (ou sem admissão)
+function cbFaltam(o){const m=[['cargo','Cargo'],['cpf','CPF'],['nascimento','Nascimento'],['telefone','WhatsApp'],['admissao','Admissão']].filter(([k])=>!o[k]).map(x=>x[1]);
+  if(!o.admissao||diasAte(o.admissao)>-90){if(!o.fim_experiencia1)m.push('Fim do 1º período');if(!o.fim_experiencia2)m.push('Fim da prorrogação')}return m}
 const trAtual=v=>ff(v,'vt_tipo')||(+v.folha_ajuda_custo>0?'ajuda':v.folha_vt?'vt':'');
 const diasAte=s=>Math.round((dObj(s)-dObj(TODAY))/864e5);
 function expSit(f){
@@ -7144,7 +7567,7 @@ const idade=s=>{if(!s)return '';const n=dObj(s),h=dObj(TODAY);let a=h.getFullYea
 $('cbFiltro').onchange=()=>renderColab();
 async function renderColab(){
   const lista=empresasDe('colab'),todas=escCli.value==='*',ids=todas?lista.map(c=>c.id):escCli.value?[escCli.value]:[],e=ehEsc();
-  $('cbNovo').hidden=!e||todas;
+  $('cbNovo').hidden=!e||todas;$('cbEditar').hidden=!e;$('cbEditar').textContent=CB_ED?'✓ Terminar de preencher':'✎ Preencher na lista';$('cbEditar').classList.toggle('primary',CB_ED);
   if(!ids.length){$('cbTab').innerHTML=`<tbody><tr><td class="l muted">${e?'Nenhuma empresa com BPO de RH.':'Nenhuma empresa liberada.'}</td></tr></tbody>`;$('cbTiles').innerHTML='';return}
   const {data,error}=await sb.from('funcionarios').select('*').in('cliente_id',ids);
   if(error){console.error(error);$('cbTab').innerHTML=`<tbody><tr><td class="l neg">${/fim_experiencia|nascimento/.test(error.message||'')?'Esta tela precisa da atualização v15 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.'}</td></tr></tbody>`;return}
@@ -7152,11 +7575,14 @@ async function renderColab(){
   const fl=$('cbFiltro').value,mes=TODAY.slice(5,7),nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
   const FL=msVals('cbFiltro'),rows=COLAB.filter(f=>!FL.length?f.situacao!=='Desligado':FL.some(fl=>fl==='exp'?[1,3,4].includes(f.exp.ord):fl==='aniv'?f.nascimento?.slice(5,7)===mes&&f.situacao!=='Desligado':f.situacao==='Desligado'))
     .sort((a,b)=>fl==='aniv'&&FL.length===1?a.nascimento.slice(8).localeCompare(b.nascimento.slice(8)):a.exp.ord-b.exp.ord||String(a.exp.prazo||'').localeCompare(String(b.exp.prazo||''))||a.nome.localeCompare(b.nome));
-  $('cbTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Cargo</th><th>Nascimento</th><th>Admissão</th><th>Fim 1º período</th><th>Fim prorrogação</th><th class="l">Experiência</th><th class="l">Observação</th></tr></thead><tbody>${
-    rows.map(f=>`<tr class="click" data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${esc(f.cargo||'')}</td>
+  $('cbTab').innerHTML=`<thead><tr><th class="l">Colaborador</th>${todas?'<th class="l">Empresa</th>':''}<th class="l">Cargo</th><th class="l">CPF</th><th>Nascimento</th><th>Admissão</th><th>Fim 1º período</th><th>Fim prorrogação</th><th class="l">Experiência</th><th class="l">Observação</th></tr></thead><tbody>${
+    rows.map(f=>{const fl=CB_ED?cbFaltam(f):[],ed=(k,tipo='date')=>`<input data-ce="${k}" type="${tipo}" value="${esc(f[k]||'')}" style="min-width:${tipo==='date'?130:150}px;padding:5px 6px${fl.includes(CB_ROT[k])?';background:var(--warn-soft)':''}" aria-label="${CB_ROT[k]}">`;
+      return (CB_ED?`<tr data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}${cbFaltam(f).length?`<div class="note neg" style="margin:2px 0 0;white-space:normal">Falta: ${esc(cbFaltam(f).join(', '))}</div>`:''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${ed('cargo','text')}</td><td class="l">${ed('cpf','text')}</td>
+      <td>${ed('nascimento')}</td><td>${ed('admissao')}</td><td>${ed('fim_experiencia1')}</td><td>${ed('fim_experiencia2')}</td>
+      `:`<tr class="click" data-cb="${f.id}"><td class="l"><b>${esc(f.nome)}</b>${f.situacao==='Afastado'?' <span class="chip c-none">Afastado</span>':''}</td>${todas?`<td class="l">${esc(nomeCli(f.cliente_id))}</td>`:''}<td class="l">${esc(f.cargo||'')}</td><td class="l" style="white-space:nowrap">${esc(f.cpf||'')}</td>
       <td>${f.nascimento?`${dBR(f.nascimento)} <span class="muted">(${idade(f.nascimento)})</span>`:''}</td><td>${dCurto(f.admissao)}${f.inicio_trabalho&&f.admissao&&f.inicio_trabalho<f.admissao?`<div class="note">começou ${dBR(f.inicio_trabalho).slice(0,5)}</div>`:''}</td><td>${dCurto(f.fim_experiencia1)}</td><td>${dCurto(f.fim_experiencia2)}</td>
-      <td class="l"><span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>${f.exp.alerta?`<div class="note neg" style="margin-top:3px">${esc(f.exp.alerta)}</div>`:''}</td><td class="l" style="white-space:normal;min-width:180px">${esc(f.prazos_obs||'')}</td></tr>`).join('')
-    ||`<tr><td class="l muted" colspan="9">Ninguém neste filtro.</td></tr>`}</tbody>`;
+      `)+`<td class="l"><span class="chip ${f.exp.c}">${esc(f.exp.t)}</span>${f.exp.alerta?`<div class="note neg" style="margin-top:3px">${esc(f.exp.alerta)}</div>`:''}</td><td class="l" style="white-space:normal;min-width:180px">${esc(f.prazos_obs||'')}</td></tr>`}).join('')
+    ||`<tr><td class="l muted" colspan="10">Ninguém neste filtro.</td></tr>`}</tbody>`;
   const ativos=COLAB.filter(f=>f.situacao!=='Desligado');
   $('cbTiles').innerHTML=[['Decidir em até '+EXP_AVISO+' dias',ativos.filter(f=>f.exp.alerta).length,'prorrogação, efetivação ou desligamento'],
     ['Em experiência',ativos.filter(f=>[1,3,4].includes(f.exp.ord)).length,'1º período ou prorrogação'],
@@ -7164,7 +7590,20 @@ async function renderColab(){
     ['Aniversariantes de '+MESES[+mes-1].toLowerCase(),ativos.filter(f=>f.nascimento?.slice(5,7)===mes).length,'veja no filtro “Aniversariantes do mês”']]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
 }
-$('cbTab').addEventListener('click',ev=>{const tr=ev.target.closest('[data-cb]');if(tr)abrirColab(COLAB.find(f=>f.id===tr.dataset.cb))});
+$('cbTab').addEventListener('click',ev=>{if(CB_ED)return;const tr=ev.target.closest('[data-cb]');if(tr)abrirColab(COLAB.find(f=>f.id===tr.dataset.cb))});
+$('cbEditar').onclick=()=>{CB_ED=!CB_ED;renderColab()};
+// preencher na lista (Carol, 18/11): grava cada campo ao sair dele, com Desfazer
+$('cbTab').addEventListener('change',async ev=>{const i=ev.target.closest('[data-ce]');if(!i)return;const tr=i.closest('[data-cb]'),f=COLAB.find(x=>x.id===tr.dataset.cb);if(!f)return;
+  const k=i.dataset.ce,v=i.value.trim()||null,ant=f[k]??null;if(v===ant)return;
+  const nv={...f,[k]:v};
+  if(nv.fim_experiencia1&&nv.fim_experiencia2&&nv.fim_experiencia2<nv.fim_experiencia1){toast('A prorrogação não pode terminar antes do 1º período.');i.value=ant||'';return}
+  if(nv.admissao&&nv.fim_experiencia2&&diasAte(nv.fim_experiencia2)-diasAte(nv.admissao)>89){toast('O contrato de experiência não pode passar de 90 dias.');i.value=ant||'';return}
+  i.disabled=true;const {error}=await sb.from('funcionarios').update({[k]:v}).eq('id',f.id);i.disabled=false;
+  if(error){fail(error);i.value=ant||'';return}
+  f[k]=v;f.exp=expSit(f);const fl=cbFaltam(f);tr.querySelectorAll('[data-ce]').forEach(x=>x.style.background=fl.includes(CB_ROT[x.dataset.ce])?'var(--warn-soft)':'');
+  const nota=tr.cells[0].querySelector('.note');if(nota)nota.remove();if(fl.length)tr.cells[0].insertAdjacentHTML('beforeend',`<div class="note neg" style="margin:2px 0 0;white-space:normal">Falta: ${esc(fl.join(', '))}</div>`);
+  toastDesfazer(`${f.nome}: salvo`,async()=>{const {error:e2}=await sb.from('funcionarios').update({[k]:ant}).eq('id',f.id);if(e2){fail(e2);return}f[k]=ant;f.exp=expSit(f);renderColab();toast('Voltou como estava')});
+});
 $('cbNovo').onclick=()=>abrirColab(null);
 function abrirColab(f){
   const e=ehEsc(),dis=e?'':' disabled',v=f||{situacao:'Ativo',folha_va:true};COLABDLG=f;$('cbDel').hidden=!e||!f;
@@ -7221,6 +7660,9 @@ $('cbSave').onclick=async()=>{
   if(ehViva(cliAtual()))o.folha_vt=tr==='vt';
   if(o.situacao==='Desligado'&&!f?.desligado_em)o.desligado_em=o.ultimo_dia_aviso||TODAY;if(o.situacao!=='Desligado')o.desligado_em=null;
   if(o.situacao==='Afastado'&&!f?.afastado_desde)o.afastado_desde=TODAY;
+  // cadastro novo sem algum dado: avisa o que falta (Carol, 18/11); dá para salvar assim mesmo e completar depois
+  const falta=cbFaltam(o);
+  if(!f&&falta.length&&!confirm(`Falta preencher: ${falta.join(', ')}.\n\nSalvar assim mesmo e completar depois?`))return;
   $('cbSave').disabled=true;
   const {error}=f?await sb.from('funcionarios').update(o).eq('id',f.id):await sb.from('funcionarios').insert({...o,cliente_id:escCli.value,folha_va:true});
   $('cbSave').disabled=false;
@@ -8202,7 +8644,9 @@ function gtTabela(rows,vazio){
   $('gtHead').innerHTML=`<tr><th style="width:34px"><input type="checkbox" id="gtTodos" title="Selecionar todas as ${rows.length} contas do filtro"${todosSel?' checked':''}></th><th>Parcela</th>${TE?'<th class="l">Empresa</th>':''}<th>Tipo</th><th>${DPNOME[dp]}</th><th class="l">${MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente'}</th><th class="l">Categoria</th><th class="l">Conta</th><th>Valor</th><th>${MV?'Pago ou recebido':P?'Pago':'Recebido'}</th><th>Falta</th><th class="l">Situação</th><th style="width:30px"></th></tr>`;
   const rowH=(t,sub)=>{const s=gtSit(t),sl=GT.sel.has(t.id);return `<tr class="click${sl?' sel':''}${sub?' gtsub':''}" data-id="${t.id}" tabindex="0"><td><input type="checkbox" data-gtsel="${t.id}"${sl?' checked':''} aria-label="Selecionar"></td><td><span class="chip">${t.parcelas>1?t.parcela+'/'+t.parcelas:'Única'}</span></td>${TE?`<td class="l"><span class="chip c-done">${esc(gtEmpNome(t.cliente_id))}</span></td>`:''}<td>${tpIc(t.tipo==='pagar'?'s':'e',t.tipo==='pagar'?'A pagar':'A receber')}</td><td>${(d=>d?dBR(d):mu('—'))(dtT(t))}</td><td class="l"><b>${esc(t.pessoa_nome||'')||mu('—')}</b><div class="d2">${esc(t.descricao||'')||'—'}${t.documento?' · '+esc(t.documento):''}${faClip(t.id)}${t.origem==='boleto_cliente'?' · enviado pelo cliente':''}</div>${gtJuntos(t)?`<br><span class="chip c-done" title="Clique para abrir e detalhar">🔗 ${gtJuntos(t)} lançamentos juntos · detalhar</span>`:''}${(k=>k&&GT.somaN?.[k]>1?`<br><span class="chip c-done" data-gtsoma="${k}" style="cursor:pointer" title="Pago junto com outras contas numa linha só do banco (ex.: remessa). Clique para ver todas">🔗 ${GT.somaN[k]} pagos juntos · detalhar</span>`:'')(gtSomaDe(t))}</td><td class="l">${t.categoria?esc(t.categoria):mu('—')}</td><td class="l">${esc(ctT(t))||mu('—')}</td><td class="${t.tipo==='pagar'?'neg':'pos'}"><b>${fm(t.valor)}</b></td><td>${GT.pago[t.id]?fm(GT.pago[t.id]):mu('—')}</td><td>${fm(gtFalta(t))}</td><td class="l">${stIc(s[2]==='baixada',gtConc(t),t.tipo==='pagar')}<span class="chip ${s[0]}">${s[1]}</span>${t.previsto&&s[2]!=='baixada'?`<br><span class="chip c-warn" title="${esc(t.obs||'Conta prevista pelo histórico')}">${prevTxt(t)}</span>`:''}${(it=>it&&s[2]!=='baixada'&&it.status!=='excluido'?`<br><span class="chip ${RMSTATUS[it.status][0]}" title="${esc(it.ocorrencia?'Banco: '+ocorTxt(it.ocorrencia.split(' ')):'')}">${RMSTATUS[it.status][1]}</span>`:'')(GT.rem?.[t.id])}</td><td><span class="gtolho" title="Ver ou corrigir">👁</span></td></tr>`};
   if(!GT3())$('gtPag').hidden=true;
-  $('gtBody').innerHTML=gtGrupoHTML(GT3()?gtPagina(rows):rows,rowH,MV,P,mu,{TE,dtT,cn})
+  // ordenar pelo cabeçalho: a lista inteira, antes de dividir em páginas (Carol, 18/11)
+  const rso=SO.dados('gtHead',rows,[['Parcela',t=>t.parcelas>1?t.parcela:0],['Empresa',t=>gtEmpNome(t.cliente_id)],['Tipo',t=>t.tipo==='pagar'?'A pagar':'A receber'],[DPNOME[dp],t=>dtT(t)],[MV?'Fornecedor ou cliente':P?'Fornecedor':'Cliente',t=>t.pessoa_nome||''],['Categoria',t=>t.categoria||''],['Conta',t=>ctT(t)],['Valor',t=>+t.valor],[MV?'Pago ou recebido':P?'Pago':'Recebido',t=>GT.pago[t.id]||null],['Falta',t=>gtFalta(t)],['Situação',t=>gtSit(t)[1]]]);
+  $('gtBody').innerHTML=gtGrupoHTML(GT3()?gtPagina(rso):rso,rowH,MV,P,mu,{TE,dtT,cn})
     ||`<tr><td class="l muted" colspan="${12+TE}">${vazio}</td></tr>`;
   const sv=k=>r2(rows.reduce((x,t)=>x+k(t),0));
   $('gtFoot').innerHTML=rows.length&&!MV?`<tr><td></td><td class="l" colspan="${6+TE}">${rows.length} ${rows.length===1?'conta':'contas'}</td><td>${fm(sv(t=>+t.valor))}</td><td>${fm(sv(t=>GT.pago[t.id]||0))}</td><td>${fm(sv(gtFalta))}</td><td colspan="2"></td></tr>`
@@ -8403,8 +8847,10 @@ const mvNat=x=>x.nat==='transf'?'Transferência':x.nat==='aporte'?'Aporte':x.tip
 function mvDesenha(){
   const L=mvLinhas();GT.mvL=L;mvOpcoes(L);gtOpcoesExtra();tlMapaSe();
   // datas no formato AAAA-MM-DD: comparar o texto direto dá a mesma ordem e é bem mais rápido que localeCompare
-  const rows=mvFiltra(L).sort((a,b)=>{const da=a.dd||a.data,db=b.dd||b.data;return (MV.asc?1:-1)*((da<db?-1:da>db?1:0)||(a.k==='t')-(b.k==='t'))});
+  let rows=mvFiltra(L).sort((a,b)=>{const da=a.dd||a.data,db=b.dd||b.data;return (MV.asc?1:-1)*((da<db?-1:da>db?1:0)||(a.k==='t')-(b.k==='t'))});
   const cnm=new Map((GT.contas||[]).map(c=>[c.id,c.nome])),cn=id=>cnm.get(id)||contaNome(id)||'',mu=t=>`<span class="muted">${t}</span>`;
+  // ordenar pelo cabeçalho as outras colunas, na lista inteira antes das páginas (Carol, 18/11); a data continua no ▲▼ dela
+  rows=SO.dados('gtHead',rows,[['Parcela',x=>x.parc||''],['Empresa',x=>gtEmpNome(x.cli)],['Tipo',x=>mvNat(x)],['Cliente / Fornecedor',x=>x.pessoa||''],['Categoria',x=>x.categoria||''],['Conta',x=>cn(x.conta_id)],['Valor (R$)',x=>x.tipo==='saida'?-x.valor:+x.valor],['Situação',x=>mvSt(x)[1]]]);
   const vis=new Set(L.map(x=>x.k+':'+x.id));MV.sel.forEach(k=>{if(!vis.has(k))MV.sel.delete(k)});
   const todosSel=rows.length&&rows.every(x=>MV.sel.has(x.k+':'+x.id)),TE=GT.todasE?1:0,NC=10+TE;
   // colunas no modelo do Bom Controle (Carol, 15/11): parcela, empresa, tipo, data, cliente/fornecedor com a descrição embaixo, categoria, conta, valor e situação
@@ -8552,7 +8998,8 @@ function mvAbre(tr){
 }
 ['mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvDataPor'].forEach(id=>$(id).onchange=()=>{MV.lim=300;gtDesenha()});
 ['mvPessoa','mvVmin','mvVmax'].forEach(id=>$(id).oninput=()=>{MV.lim=300;clearTimeout(gtDesenha.t);gtDesenha.t=setTimeout(gtDesenha,250)});
-$('gtHead').addEventListener('click',e=>{if(e.target.id==='mvOrd'){MV.asc=!MV.asc;gtDesenha()}});
+$('gtHead').addEventListener('click',e=>{if(e.target.id==='mvOrd'){MV.asc=!MV.asc;SO.limpa('gtHead');gtDesenha()}});
+SO.reg('gtHead',()=>gtDesenha());
 $('mvLimpa').onclick=()=>{['mvConta','mvTipo','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvPessoa','mvVmin','mvVmax','gtIni','gtFim','gtBusca'].forEach(id=>$(id).value='');MV.lim=300;gtDesenha()};
 // inadimplência: contas a receber vencidas, agrupadas por cliente
 function gtInad(){
@@ -13865,6 +14312,12 @@ function nsAbreCfg(id){
     <div class="card" style="padding:10px 12px;margin-top:12px;display:grid;gap:6px"><b>Certificado digital A1</b><span class="muted" style="font-size:13px">Fica guardado criptografado no cofre do Supabase, nunca no navegador nem no GitHub. A senha fica em Edge Functions › Secrets com o nome NFSE_SENHA_${esc(nsSo(e?.cnpj)||'CNPJ')}.</span><div id="nc_teste"></div><div>${e?ctBtn('nstesta','Testar certificado e conexão'):''}</div></div>`,
     ctBtn('fechar','Fechar','ghost')+'<span class="spacer"></span>'+ctBtn('nssalvacfg','Salvar','primary'));
   $('nc_qual').onchange=()=>nsAbreCfg($('nc_qual').value);
+  // empresa do portal com a ficha preenchida (Configurações › Cadastro de empresas): completa os campos vazios (Carol 18/11)
+  $('nc_cli').onchange=()=>{const c=(typeof CLIENTES!=='undefined'?CLIENTES:[]).find(x=>x.id===$('nc_cli').value);if(!c||typeof fcDados!=='function')return;
+    const d=fcDados(c),en=d.end,poe=(id,v)=>{const el=$(id);if(el&&v&&!el.value.trim()&&!el.readOnly)el.value=v};
+    poe('nc_nome',c.nome);poe('nc_cnpj',nsDoc(fcDig(d.cnpj)));poe('nc_razao',d.razao);poe('nc_im',d.im);poe('nc_mun',en.cidade);poe('nc_cmun',en.ibge);
+    if(en.uf&&!e)$('nc_uf').value=en.uf;poe('nc_cep',en.cep);poe('nc_lgr',en.logradouro);poe('nc_nro',en.numero);poe('nc_bairro',en.bairro);poe('nc_fone',d.contato.telefone);poe('nc_email',d.contato.email);
+    if(d.simples!=null&&!e)$('nc_sn').value=d.simples?'3':'1';};
 }
 async function nsSalvaCfg(bt){
   const e=CTL.dlg.obj,cnpj=nsSo(ctV('nc_cnpj')),trib=nsSo(ctV('nc_trib')),amb=Number($('nc_amb').value);
@@ -14075,6 +14528,7 @@ const MANUAL=[
 <li><b>Empresa:</b> escolha a empresa no alto. Ela vale para todos os módulos e continua escolhida quando você troca de tela ou atualiza a página. Quem vê mais de uma empresa tem também a opção <b>Todas as empresas</b>, que soma os quadros de todas. Se houver <b>grupos de empresas</b> (Configurações › Cadastro de empresas), aparecem também as opções <b>Grupo: …</b>, que somam só as empresas do grupo; a matriz com filiais vira um grupo sozinha.</li>
 <li><b>Módulos:</b> na faixa de módulos ficam Dashboard, Rotina diária, Gestão financeira e RH. No <b>canto direito do topo</b>, ao lado do seu nome, ficam os ícones <b>Contabilidade</b>, <b>Comunicação</b>, <b>Controlacs</b> (só a Master), <b>Configurações</b> (engrenagem) e <b>Ajuda</b> (?, com este manual). Passe o mouse (ou clique) num módulo ou num ícone para abrir o painel com as telas, separadas em Dia a dia, Cadastros e Relatórios. Só aparecem os módulos e as telas que você tem liberados.</li>
 <li><b>Exportar e Imprimir:</b> nas telas com lista de lançamentos, o botão <b>Exportar</b> gera o arquivo em <b>Excel</b> ou <b>PDF</b> e o botão <b>Imprimir</b> abre a impressão. Sai só o que está na tela: filtre primeiro (situação, empresa, período, busca) e depois exporte. Os filtros usados aparecem no alto do relatório.</li>
+<li><b>Ordenar a lista:</b> em toda tabela, clique no nome da coluna (a setinha <b>↕</b> ao lado mostra que dá para ordenar). O 1º clique ordena em ordem crescente (<b>▲</b>: A a Z, data mais antiga, menor valor) e o 2º, decrescente (<b>▼</b>). Ex.: em RH › Colaboradores, clique em <b>Colaborador</b> para a ordem alfabética ou em <b>Cargo</b> para juntar por cargo. Linhas vazias ficam sempre no fim. Ao trocar de tela, a lista volta à ordem normal.</li>
 <li><b>Esconder o resumo:</b> nas telas com quadros de resumo no alto (totais, pendentes, conciliadas…), clique em <b>▲ Esconder resumo</b> para recolher os quadros e ver mais da lista. Para ver de novo, clique em <b>▼ Mostrar resumo</b>. O portal lembra a escolha de cada tela neste aparelho.</li>
 <li><b>Números vermelhos</b> ao lado de um módulo ou de uma tela mostram pendências, por exemplo conferências atrasadas ou novidades para ver.</li>
 <li>No canto direito aparece onde você está, por exemplo <i>Rotina diária › Caixa</i>.</li>
@@ -14923,6 +15377,19 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18ficha',data:'2026-11-18',t:'Ficha completa da empresa',itens:[
+    {x:'Configurações › Cadastro de empresas: cada empresa tem agora a 📋 Ficha, com CNPJ obrigatório (digitou, o sistema busca na Receita a razão social, o nome fantasia e o endereço), contato, serviços contratados, contrato com a Controlacs e regras. A lista mostra se a ficha está completa ou o que falta, com busca em todas as colunas e filtro.',para:'esc'},
+    {x:'Empresa nova só entra com a ficha completa. O que gera arquivo ou documento (remessa CNAB, NFS-e, recibos, documentos do RH, pedido de benefícios) é obrigatório. Empresa antiga com a ficha incompleta não é bloqueada: aparece o aviso e a tarefa para completar. Salvou errado? Use Desfazer.',para:'esc'},
+    {x:'RH e benefícios na ficha: benefícios que a empresa usa, a empresa de cada benefício (e o código do cliente), o dia do pedido e onde chegam os cartões (no endereço da empresa ou em outro, com quem recebe e o telefone). São as mesmas Regras de benefícios do Pedido de benefícios: mudar num lugar muda no outro.',para:'esc'}]},
+  {k:'2026-11-18colab',data:'2026-11-18',t:'RH: preencher os colaboradores na lista e pedido de benefícios',itens:[
+    {x:'RH › Colaboradores e prazos: botão “✎ Preencher na lista” para preencher cargo, nascimento, admissão e os prazos da experiência direto na lista, sem abrir cada cadastro. Cada campo grava ao sair dele, com Desfazer. O que falta preencher aparece em amarelo e embaixo do nome.',para:'esc'},
+    {x:'Cadastro novo de colaborador: ao salvar, o sistema avisa o que falta preencher (cargo, CPF, nascimento, WhatsApp, admissão e prazos da experiência).',para:'esc'},
+    {x:'Pedido de benefícios: usa o Transporte, VT por dia, Empresa do VT e VA por mês da ficha de cada colaborador. Novo campo na ficha: “Prêmio no VA se não faltar”. Cada empresa tem as suas Regras de benefícios, no fim do pedido.',para:'esc'},
+    {x:'Pedido de benefícios: “+ Dia fechado” para marcar os dias em que a clínica não abre (ex.: 24/12 e 31/12). O dia sai dos dias úteis e da escala de sábados, e o VT e o VA por dia são recalculados.',para:'esc'},
+    {x:'RH › Colaboradores e prazos: Exportar (Excel, PDF) e Imprimir, só com o que está filtrado na tela. A lista ganhou a coluna CPF.',para:'esc'},
+    {x:'Pedido de benefícios: botão “Planilha Pluxee” gera a planilha de importação do pedido de vale alimentação na Pluxee (Viva e BJ). Os dados de entrega dos cartões vêm do cadastro da empresa e o CPF e o nascimento, da ficha de cada colaborador; o que faltar é avisado antes.',para:'esc'}]},
+  {k:'2026-11-18ordenar',data:'2026-11-18',t:'Ordenar a lista clicando no nome da coluna, em todas as telas',itens:[
+    {x:'Em todas as telas com tabela (ex.: RH › Colaboradores e Controle de experiência, Contas a pagar e a receber, Movimentação, Notas fiscais, Conferências, Cadastros), clique no nome da coluna para ordenar a lista: o 1º clique põe em ordem crescente (▲: A a Z, data mais antiga, menor valor) e o 2º inverte (▼). Ex.: clique em “Colaborador” para ordem alfabética ou em “Cargo” para juntar por cargo. A setinha ↕ ao lado do nome mostra que a coluna pode ser ordenada. Ao trocar de tela, a lista volta à ordem normal.'}]},
   {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
     {x:'Nova tela Gestão financeira › Relatórios › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações), ou só até uma data (tudo até aquele dia fica travado). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
     {x:'Se tentar lançar, alterar ou excluir com data de um mês já encerrado, aparece o aviso: "Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."',mods:['caixa','tesouraria']},
