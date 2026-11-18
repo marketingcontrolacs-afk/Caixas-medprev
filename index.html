@@ -12172,7 +12172,8 @@ async function bcMonta(){
   const ids=[...new Set(L.map(l=>BCI.mapa[l.contaBC]))],ds=L.map(l=>l.data).filter(Boolean).sort(),vs=L.map(l=>l.venc).filter(Boolean).sort();
   const key=BCI.dbKey=ids.join(',')+'|'+ds[0]+'|'+ds.at(-1);
   if(BCI.dbKeyOk!==key){
-    const [movs,tits]=await Promise.all([ids.length&&ds.length?todas(()=>sb.from('fin_movimentos').select('id,cliente_id,conta_id,data,tipo,valor,transf_id,descricao,documento,validar').in('conta_id',ids).gte('data',ds[0]).lte('data',ds.at(-1))):[],
+    const s3=(d,n)=>isoLocal(new Date(dObj(d).getTime()+n*864e5));
+    const [movs,tits]=await Promise.all([ids.length&&ds.length?todas(()=>sb.from('fin_movimentos').select('id,cliente_id,conta_id,data,tipo,valor,transf_id,descricao,documento,validar,titulo_id,pessoa_nome').in('conta_id',ids).gte('data',s3(ds[0],-3)).lte('data',s3(ds.at(-1),3))):[],
       vs.length?todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor').eq('cliente_id',cli.id).gte('vencimento',vs[0]).lte('vencimento',vs.at(-1))):[]]);
     BCI.movs=movs;BCI.tits=tits;BCI.dbKeyOk=key;BCI.cand={};
     // quantas pontas tem cada transferência já gravada (a de uma ponta só aparece para escolher a outra conta)
@@ -12182,9 +12183,9 @@ async function bcMonta(){
     // o pagamento importado baixa a conta, em vez de ficar duplicado (Carol, 04/11)
     BCI.abertos=[];
     if(ds.length){const sd=(d,n)=>isoLocal(new Date(dObj(d).getTime()+n*864e5));
-      const ab=await todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor,pessoa_id,pessoa_nome,previsto,categoria').eq('cliente_id',cli.id).gte('vencimento',sd(ds[0],-BCJAN)).lte('vencimento',sd(ds.at(-1),BCJAN)));
+      const ab=await todas(()=>sb.from('fin_titulos').select('id,tipo,vencimento,valor,pessoa_id,pessoa_nome,previsto,categoria,origem,obs').eq('cliente_id',cli.id).gte('vencimento',sd(ds[0],-BCJAN)).lte('vencimento',sd(ds.at(-1),BCJAN)));
       const pg=new Set();for(let i=0;i<ab.length;i+=150){const {data,error}=await sb.from('fin_movimentos').select('titulo_id').in('titulo_id',ab.slice(i,i+150).map(t=>t.id));if(error)throw error;(data||[]).forEach(x=>pg.add(x.titulo_id))}
-      BCI.abertos=ab.filter(t=>!pg.has(t.id))}
+      BCI.abertos=ab.filter(t=>!pg.has(t.id));await bcDocs(BCI.abertos)}
   }
   const ja={},jt={};BCI.movs.forEach(m=>(ja[m.conta_id+'|'+m.data+'|'+m.tipo+'|'+Math.round(m.valor*100)]||=[]).push(m));
   BCI.tits.forEach(t=>(jt[t.tipo+'|'+t.vencimento+'|'+Math.round(t.valor*100)]||=[]).push(t));
@@ -12192,6 +12193,11 @@ async function bcMonta(){
   // clientes e fornecedores: mesmo nome (regra da v58) ou mesmo CNPJ/CPF
   const pes=BCI.pesLista,dig=t=>String(t||'').replace(/\D/g,''),novosP={};
   const achaP=(n,d)=>pes.find(p=>d&&dig(p.documento)===d)||pes.find(p=>pessoaChave(p.nome)===pessoaChave(n)||p.fantasia&&pessoaChave(p.fantasia)===pessoaChave(n));
+  // pagamento já registrado no portal (ex.: repasse marcado como pago) com data até 3 dias diferente: não duplica (Carol, 18/11)
+  const jaPg=BCI.movs.filter(m=>m.titulo_id&&!m.transf_id),jaPgU=new Set();
+  const bcJaPago=(conta,tipo,l)=>{const m=jaPg.find(x=>!jaPgU.has(x.id)&&x.conta_id===conta&&x.tipo===tipo&&Math.round(x.valor*100)===Math.round(l.vreal*100)&&Math.abs(dObj(x.data)-dObj(l.data))/864e5<=3
+      &&bcMesmoParc({pessoa_nome:x.pessoa_nome,_doc:dig(achaP(x.pessoa_nome,'')?.documento)},{pessoa_nome:l.pessoa,descricao:l.descricao,doc:l.doc}));
+    if(m)jaPgU.add(m.id);return m};
   const catDe=l=>l.catOk||(BCI.cats[l.cat]?.escolha&&pk[chave(BCI.cats[l.cat].escolha)])||null;
   const R={movs:[],tits:[],ja:0,jaT:0,pulo:BCI.linhas.length-L.length,trPar:0,trSem:0,ordem:0,pend:0,semCat:0,porConta:{},soltas:[]};
   const pc=n=>R.porConta[n]||={linhas:0,novos:0,ja:0,ent:0,sai:0};
@@ -12231,7 +12237,7 @@ async function bcMonta(){
           cx.novos++;cx[x.tipo==='entrada'?'ent':'sai']=r2(cx[x.tipo==='entrada'?'ent':'sai']+x.valor)});
         if(legs.length>1)R.trPar++;else R.trSem++;return;
       }
-      if(usa(ja,mk({data:l.data,tipo,valor:l.vreal}))){c.ja++;R.ja++;return}
+      if(usa(ja,mk({data:l.data,tipo,valor:l.vreal}))||bcJaPago(conta,tipo,l)){c.ja++;R.ja++;return}
       R.movs.push({...base,tipo,data:l.data,valor:l.vreal,conciliado:l.conc,validar,_l:l,_p:pessoa.novo});
       c.novos++;c[tipo==='entrada'?'ent':'sai']=r2(c[tipo==='entrada'?'ent':'sai']+l.vreal);return;
     }
@@ -12244,6 +12250,7 @@ async function bcMonta(){
     c.novos++;
   });
   R.baixas=BCI.baixar===false?[]:bcBaixas(R.movs);
+  R.dups=bcDuplas(R.movs,R.baixas);
   R.novosP=novosP;return R;
 }
 // pagamento do arquivo × conta em aberto: mesmo tipo, mesmo fornecedor ou cliente e data até BCJAN dias do vencimento.
@@ -12252,9 +12259,9 @@ async function bcMonta(){
 const BCJAN=10;
 function bcBaixas(movs){
   const ab=[...(BCI.abertos||[])],out=new Map(),dd=(a,b)=>Math.abs(dObj(a)-dObj(b))/864e5;
-  movs.filter(m=>!m.transf_id&&!m.titulo_id&&m.pessoa_nome).sort((a,b)=>a.data.localeCompare(b.data)).forEach(m=>{
-    const tp=m.tipo==='saida'?'pagar':'receber',pk=pessoaChave(m.pessoa_nome);
-    const cs=ab.filter(t=>t.tipo===tp&&pessoaChave(t.pessoa_nome)===pk&&dd(t.vencimento,m.data)<=BCJAN&&(t.previsto||Math.round(t.valor*100)===Math.round(m.valor*100)))
+  movs.filter(m=>!m.transf_id&&!m.titulo_id&&(m.pessoa_nome||m._l?.doc)).sort((a,b)=>a.data.localeCompare(b.data)).forEach(m=>{
+    const tp=m.tipo==='saida'?'pagar':'receber',mp={pessoa_nome:m.pessoa_nome,descricao:m.descricao,doc:m._l?.doc};
+    const cs=ab.filter(t=>t.tipo===tp&&bcMesmoParc(t,mp)&&dd(t.vencimento,m.data)<=BCJAN&&(t.previsto||Math.round(t.valor*100)===Math.round(m.valor*100)))
       .sort((a,b)=>(Math.round(b.valor*100)===Math.round(m.valor*100))-(Math.round(a.valor*100)===Math.round(m.valor*100))||dd(a.vencimento,m.data)-dd(b.vencimento,m.data));
     const t=cs[0];if(!t)return;
     m.titulo_id=t.id;if(!m.categoria&&t.categoria)m.categoria=t.categoria;
@@ -12262,6 +12269,37 @@ function bcBaixas(movs){
     if(!t.previsto)ab.splice(ab.indexOf(t),1);
   });
   return [...out.values()];
+}
+// Mesmo parceiro, cliente ou fornecedor (Carol, 18/11: restituições de 05/11/2026 duplicadas em Chopinzinho e Coronel).
+// O relatório de repasse e o Bom Controle escrevem o nome diferente ("Caroline Balvedi Gaiewski - Mpa*" × "Caroline Balvedi
+// Gaiewski"; "e R Imagens..." × "Centro Imagem Chopinzinho..."). Vale: o mesmo CNPJ/CPF (no cadastro, na coluna do BC ou
+// no texto do Pix) ou o mesmo nome sem "Dr.", "- Mpa" e asteriscos, inclusive o nome do relatório guardado na conta a pagar.
+// Nunca por nome só "parecido" (regra de 05/11).
+function bcNomeBase(n){return pessoaChave(String(n||'').replace(/\*/g,' ').replace(/\s*-\s*mpa\b.*$/i,' ').replace(/^\s*(dr|dra|drª)\.?\s+/i,' '))}
+function bcMesmoParc(t,m){
+  const d=String(t._doc||'').replace(/\D/g,'');
+  if(d.length>=11){const md=String(m.doc||'').replace(/\D/g,'');if(md===d||String(m.descricao||'').replace(/[.\/-]/g,'').includes(d))return true}
+  const mn=bcNomeBase(m.pessoa_nome);if(mn.length<4)return false;
+  return [t.pessoa_nome,String(t.obs||'').split(' · ')[0]].some(n=>bcNomeBase(n)===mn);
+}
+// CNPJ/CPF do cadastro de cada conta em aberto
+async function bcDocs(ts){
+  const ids=[...new Set(ts.map(t=>t.pessoa_id).filter(Boolean))],doc={};
+  for(let i=0;i<ids.length;i+=150){const {data,error}=await sb.from('fin_pessoas').select('id,documento').in('id',ids.slice(i,i+150));if(error)throw error;(data||[]).forEach(p=>doc[p.id]=p.documento)}
+  ts.forEach(t=>t._doc=doc[t.pessoa_id]||null);return ts;
+}
+// pagamento novo do arquivo com o mesmo valor de uma conta em aberto (até 3 dias) de outro nome: pode ser o mesmo
+// pagamento escrito diferente. Não liga sozinho (dois parceiros podem ter o mesmo valor); entra "a validar" e aparece na prévia.
+function bcDuplas(movs,baixas){
+  const usados=new Set(baixas.map(b=>b.t.id)),out=[],dd=(a,b)=>Math.abs(dObj(a)-dObj(b))/864e5;
+  movs.filter(m=>!m.transf_id&&!m.titulo_id&&!m.validar).forEach(m=>{
+    const tp=m.tipo==='saida'?'pagar':'receber';
+    const t=(BCI.abertos||[]).find(t=>!usados.has(t.id)&&!t.previsto&&t.tipo===tp&&Math.round(t.valor*100)===Math.round(m.valor*100)&&dd(t.vencimento,m.data)<=3);
+    if(!t)return;usados.add(t.id);
+    m.validar=`Possível duplicidade: já existe a conta a ${tp} de ${t.pessoa_nome||'—'} (vencimento ${dBR(t.vencimento)}, mesmo valor) em aberto. Se for o mesmo pagamento, abra a conta e use Conciliar/ligar; se não, valide.`;
+    out.push({m,t});
+  });
+  return out;
 }
 // ---- transferência com uma ponta só (Carol, 05/11) ----
 // O Bom Controle não diz a outra conta da transferência. Na importação (e na edição do lançamento) escolhe-se a outra
@@ -12368,7 +12406,7 @@ async function bcPrevia(){
   const cats=Object.values(BCI.cats).sort((a,b)=>b.n-a.n),nP=Object.keys(R.novosP).length;
   const totE=R.movs.filter(m=>m.tipo==='entrada'&&!m.transf_id).reduce((s,m)=>s+m.valor,0),totS=R.movs.filter(m=>m.tipo==='saida'&&!m.transf_id).reduce((s,m)=>s+m.valor,0);
   $('bciTitle').textContent='Importar do Bom Controle · '+cli.nome;
-  $('bciBody').innerHTML=`<p class="note" style="margin:0">${esc(BCI.arqs.join(', '))}: ${BCI.linhas.length} linhas. Os lançamentos entram em <b>${esc(cli.nome)}</b> (a empresa escolhida no topo). O que já existe na mesma conta, com a mesma data, tipo e valor, fica de fora: pode importar o mesmo arquivo de novo sem duplicar.</p>
+  $('bciBody').innerHTML=`<p class="note" style="margin:0">${esc(BCI.arqs.join(', '))}: ${BCI.linhas.length} linhas. Os lançamentos entram em <b>${esc(cli.nome)}</b> (a empresa escolhida no topo). O que já existe na mesma conta, com a mesma data, tipo e valor, fica de fora, assim como o pagamento já registrado no portal (ex.: repasse marcado como pago) com até 3 dias de diferença: pode importar o mesmo arquivo de novo sem duplicar.</p>
     ${falta.length?`<div class="alerta"><div><b>⚠ Escolha a conta de ${falta.length===1?'1 conta do arquivo':falta.length+' contas do arquivo'}</b><br><span class="note">Não achei uma conta de ${esc(cli.nome)} com este nome no Bom Controle. Escolha a conta (o nome fica guardado nela) ou “Não importar”.</span></div></div>`:''}
     <h3 style="margin:4px 0 0">Contas</h3>
     <div class="tablebox" style="margin:0"><table class="cfg"><thead><tr><th class="l">Conta no Bom Controle</th><th class="l">Conta no portal</th><th>Linhas</th><th>Novos</th><th>Já existem</th><th>Entradas novas</th><th>Saídas novas</th></tr></thead><tbody>${
@@ -12381,6 +12419,7 @@ async function bcPrevia(){
     <ul class="note" style="margin:0;padding-left:18px">
       <li><b>${R.movs.length}</b> ${R.movs.length===1?'lançamento novo':'lançamentos novos'} na Movimentação (entradas ${fm(totE)}, saídas ${fm(totS)}, fora as transferências)${R.ja?` · ${R.ja} já ${R.ja===1?'existia':'existiam'} e ${R.ja===1?'fica':'ficam'} de fora`:''}.</li>
       ${R.baixas.length?`<li><b>${R.baixas.length}</b> ${R.baixas.length===1?'conta a pagar ou a receber que já estava lançada é baixada':'contas a pagar ou a receber que já estavam lançadas são baixadas'} pelo pagamento do arquivo, sem duplicar${R.baixas.some(b=>b.t.previsto)?` (${R.baixas.filter(b=>b.t.previsto).length} ${R.baixas.filter(b=>b.t.previsto).length===1?'prevista fica':'previstas ficam'} com o valor pago)`:''}. <a href="#" id="bciVerBx">Ver</a></li>`:''}
+      ${R.dups.length?`<li><b>⚠ ${R.dups.length}</b> ${R.dups.length===1?'pagamento tem':'pagamentos têm'} o mesmo valor de uma conta em aberto de outro nome (até 3 dias): ${R.dups.slice(0,5).map(d=>`${dBR(d.m.data)} ${esc(d.m.pessoa_nome||'')} ${fm(d.m.valor)} × ${esc(d.t.pessoa_nome||'')} (venc. ${dBR(d.t.vencimento)})`).join('; ')}${R.dups.length>5?'…':''}. ${R.dups.length===1?'Entra':'Entram'} “a validar” para conferir se não é o mesmo pagamento.</li>`:''}
       ${R.tits.length||R.jaT?`<li><b>${R.tits.length}</b> ${R.tits.length===1?'conta em aberto vai':'contas em aberto vão'} para as contas a pagar e a receber${R.jaT?` · ${R.jaT} já ${R.jaT===1?'existia':'existiam'}`:''}.</li>`:''}
       ${R.trPar||R.trSem?`<li>Transferências: ${R.trPar} com as duas contas no arquivo${R.trSem?`; ${R.trSem} só com uma ponta (o Bom Controle não diz a outra conta): escolha a outra conta na tabela de transferências${R.soltas.filter(x=>!x.outra).length?` (<b>${R.soltas.filter(x=>!x.outra).length}</b> sem a outra conta ${R.soltas.filter(x=>!x.outra).length===1?'fica':'ficam'} “a validar”)`:''}.`:'.'}</li>`:''}
       ${R.soltas.some(x=>x.outra?.espelho_tes&&!x.cand)?`<li><b>⚠ ${R.soltas.filter(x=>x.outra?.espelho_tes&&!x.cand).length}</b> ${R.soltas.filter(x=>x.outra?.espelho_tes&&!x.cand).length===1?'transferência não está lançada':'transferências não estão lançadas'} na tesouraria: ${R.soltas.filter(x=>x.outra?.espelho_tes&&!x.cand).length===1?'o lançamento será criado':'os lançamentos serão criados'} também na tesouraria (Rotina diária).</li>`:''}
@@ -15429,6 +15468,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18dupbc',data:'2026-11-18',t:'Repasse e Bom Controle sem pagamento em dobro',itens:[
+    {x:'Importar do Bom Controle: o pagamento de um repasse que já está nas Contas a pagar dá baixa nele mesmo quando o nome vem escrito diferente (ex.: “Caroline Balvedi Gaiewski - Mpa*” e “Caroline Balvedi Gaiewski”), pelo CNPJ/CPF ou pelo nome do relatório. O repasse já marcado como pago no portal com até 3 dias de diferença fica de fora, e um pagamento de mesmo valor de uma conta em aberto de outro nome entra “a validar”, para conferir.',para:'esc'},
+    {x:'Repasse de parceiros › Marcar como pago: se o pagamento já entrou pelo Bom Controle ou pelo extrato (mesma conta e valor, até 3 dias, mesmo parceiro), o sistema liga a conta a pagar a ele em vez de lançar de novo.',para:'esc'}]},
   {k:'2026-11-18ocultar',data:'2026-11-18',t:'Ocultar avisos em todas as telas',itens:[
     {x:'Todo aviso ou faixa do sistema (ficha incompleta, tarefas pendentes, avisos novos, conferências, lançamentos alterados, contabilidade, notas, recebíveis e os que vierem) agora tem o botão ✕ Ocultar no canto. Ele some por 7 dias nesta tela e empresa, neste computador, e fica só uma linha “Aviso oculto até…” com o botão Mostrar aviso para trazer de volta.'}]},
   {k:'2026-11-18ficha',data:'2026-11-18',t:'Ficha completa da empresa',itens:[
@@ -16958,11 +17000,27 @@ async function rnSalvaPago(b){
     const movs=ls.flatMap(it=>{const t=RN.tits[it.titulo_id],falta=r2(t.valor-(t.pago||0));if(falta<=0.004)return [];
       return dvDivide(conta[it.empresa_id],falta,dvs[it.id]||{partes:[],soma:0},t.forma).map(pt=>({cliente_id:it.empresa_id,conta_id:pt.conta,data,tipo:'saida',valor:pt.valor,juros:0,desconto:0,titulo_id:t.id,
         descricao:t.descricao||'Pagamento',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria,forma:pt.forma||t.forma||null}))});
-    for(let i=0;i<movs.length;i+=200){const {error}=await sb.from('fin_movimentos').insert(movs.slice(i,i+200));if(error)throw error}
+    // o pagamento já veio do Bom Controle ou do extrato (mesma conta e valor, até 3 dias, mesmo parceiro): liga, não duplica (Carol, 18/11)
+    const lig=await rnJaNoExtrato(movs,data);
+    const novos=movs.filter(m=>!lig.has(m));
+    for(let i=0;i<novos.length;i+=200){const {error}=await sb.from('fin_movimentos').insert(novos.slice(i,i+200));if(error)throw error}
+    for(const [m,x] of lig){const {error}=await sb.from('fin_movimentos').update({titulo_id:m.titulo_id}).eq('id',x.id).is('titulo_id',null);if(error)throw error;m.data=x.data}
     movs.forEach(m=>{const t=RN.tits[m.titulo_id];t.pago=r2((t.pago||0)+m.valor);t.conta_id=m.conta_id;t.contas=[...new Set([...(t.contas||[]),m.conta_id])];t.data=m.data});n=new Set(movs.map(m=>m.titulo_id)).size;
-    toast(`${n} ${n===1?'repasse marcado':'repasses marcados'} como pago${n===1?'':'s'}`);dlgRN.close();RN.sel.clear();
+    toast(`${n} ${n===1?'repasse marcado':'repasses marcados'} como pago${n===1?'':'s'}`+(lig.size?` (${lig.size} já ${lig.size===1?'estava':'estavam'} no extrato e só ${lig.size===1?'foi ligado':'foram ligados'})`:''));dlgRN.close();RN.sel.clear();
   }catch(e){console.error(e);err((v45(e)?v45Msg:'Não foi possível registrar: '+(e.message||e))+(cont.n?` (${cont.n} contas a pagar já foram geradas)`:''))}
   b.disabled=false;GT.key='';rnDesenha();
+}
+// pagamentos do extrato ainda sem conta a pagar, na mesma conta e valor, até 3 dias da data, do mesmo parceiro
+async function rnJaNoExtrato(movs,data){
+  const out=new Map();if(!movs.length)return out;
+  const sd=n=>isoLocal(new Date(dObj(data).getTime()+n*864e5)),contas=[...new Set(movs.map(m=>m.conta_id))];
+  const {data:ex,error}=await sb.from('fin_movimentos').select('id,conta_id,data,valor,pessoa_nome,descricao').in('conta_id',contas).eq('tipo','saida').is('titulo_id',null).is('transf_id',null).gte('data',sd(-3)).lte('data',sd(3));
+  if(error)throw error;
+  const ts=await bcDocs(movs.map(m=>({...RN.tits[m.titulo_id]}))),usados=new Set();
+  movs.forEach((m,i)=>{const x=(ex||[]).filter(x=>!usados.has(x.id)&&x.conta_id===m.conta_id&&Math.round(x.valor*100)===Math.round(m.valor*100)&&bcMesmoParc(ts[i],{pessoa_nome:x.pessoa_nome,descricao:x.descricao}))
+      .sort((a,b)=>Math.abs(dObj(a.data)-dObj(data))-Math.abs(dObj(b.data)-dObj(data)))[0];
+    if(x){usados.add(x.id);out.set(m,x)}});
+  return out;
 }
 async function rnDesfaz(it){
   const t=RN.tits[it.titulo_id];
