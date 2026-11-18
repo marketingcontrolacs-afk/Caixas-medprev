@@ -659,6 +659,7 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 .apr-ana textarea{width:100%;min-height:110px;font:inherit}.apr-ana h4{margin:12px 0 4px;font-size:13px}
 .apr-obs{white-space:normal!important;max-width:320px;font-size:12px}
 #viewApr .chip.ok{background:var(--ok-soft);color:var(--ok)}#viewApr .chip.warn{background:var(--warn-soft);color:var(--warn)}#viewApr .chip.bad{background:var(--bad-soft);color:var(--bad)}#viewApr .chip:not(.ok):not(.warn):not(.bad){background:var(--sunk);color:var(--muted)}
+#viewEncRel .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}#viewEncRel .chip.ok{background:var(--ok-soft);color:var(--ok)}#viewEncRel .chip.warn{background:var(--warn-soft);color:var(--warn)}#viewEncRel .enc-f input{padding:4px 6px;font-size:12px;min-width:70px}
 #viewEnc .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}#viewEnc .chip.ok{background:var(--ok-soft);color:var(--ok)}#viewEnc .chip.warn{background:var(--warn-soft);color:var(--warn)}
 #viewEnc .enc-f input{padding:4px 6px;font-size:12px;min-width:70px}#viewEnc tr.enc-sep td{border-top:2px solid var(--line)}#viewEnc .enc-pend{color:var(--warn)}#viewEnc .neg{color:var(--bad)}.enc-t td,.enc-t th{white-space:nowrap}
 #viewApr .note.warn{color:var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:8px}
@@ -1131,6 +1132,24 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     </div>
     <div class="tabs" id="aprTabs" role="tablist"></div>
     <div id="aprBody" class="apr-body"></div>
+  </section>
+  <section id="viewEncRel" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
+      <div><h1>Meses encerrados</h1><p class="sub">Todos os meses e períodos encerrados de cada conta, quem encerrou, quem desbloqueou e o motivo. Para encerrar, use Cadastros › Encerramento de mês.</p></div>
+      <div class="row" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
+        <label class="f">Empresa<select id="enrCli"></select></label>
+        <label class="f">Situação<select id="enrSit"><option value="ativo">Encerrados</option><option value="des">Desbloqueados</option><option value="">Todos</option></select></label>
+        <label class="f">Do mês<input type="month" id="enrDe"></label>
+        <label class="f">Até o mês<input type="month" id="enrAte"></label>
+        <label class="f">Buscar<input id="enrBusca" placeholder="Empresa, conta, pessoa..." style="max-width:200px"></label>
+      </div>
+    </div>
+    <div class="toolbar"><button type="button" class="btn" id="enrXls">Baixar Excel</button><button type="button" class="btn" id="enrPrint">Imprimir / PDF</button><button type="button" class="btn" id="enrIr">Abrir Encerramento de mês</button></div>
+    <h2>Situação de cada conta</h2>
+    <div class="card tablebox"><table id="enrTabConta"><thead><tr><th class="l">Empresa</th><th class="l">Conta</th><th class="l">Tipo</th><th class="l">Encerrada até</th><th class="l">Meses encerrados</th></tr></thead><tbody id="enrConta"></tbody></table></div>
+    <h2 style="margin-top:18px">Encerramentos</h2>
+    <div class="card tablebox"><table id="enrTab"><thead id="enrHead"></thead><tbody id="enrBody"></tbody></table></div>
+    <p class="note" id="enrNote"></p>
   </section>
   <section id="viewEnc" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px">
@@ -1629,6 +1648,11 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <div class="db" id="ctdBody"></div>
   <div class="df" id="ctdFoot"></div>
 </dialog>
+<dialog id="encMesDlg" style="width:min(520px,calc(100vw - 32px))">
+  <div class="dh"><h2>🔒 Encerrar o mês</h2></div>
+  <div class="db"><p id="encMesTxt"></p><label class="f">Qual mês encerrar?<input type="month" id="encMesData"></label><p class="muted">Só esse mês fica travado nessas contas (do dia 1 ao último dia). Os outros meses continuam como estão.</p><p class="neg" id="encMesErr"></p></div>
+  <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" onclick="this.closest('dialog').close()">Cancelar</button><button type="button" class="btn primary" id="encMesOk">🔒 Encerrar</button></div>
+</dialog>
 <dialog id="encAteDlg" style="width:min(520px,calc(100vw - 32px))">
   <div class="dh"><h2>🔒 Encerrar até uma data</h2></div>
   <div class="db"><p id="encAteTxt"></p><label class="f">Encerrado até (inclusive)<input type="date" id="encAteData"></label><p class="muted">Tudo com data até esse dia fica travado nessas contas, inclusive os meses anteriores. Depois dele continua aberto.</p><p class="neg" id="encAteErr"></p></div>
@@ -1903,7 +1927,7 @@ const escR=()=>ehEsc()&&!rotCli();
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual','gfencerra'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
+const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual','gfencerra','gfencrel'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcrm','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
@@ -1967,6 +1991,7 @@ const ICO={
   gffluxo:'<path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/>',
   gforc:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
   gfdre:'<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  gfencrel:'<path d="M5 4h14v16H5z"/><path d="M8 9h8M8 13h5"/><rect x="13" y="14" width="6" height="5" rx="1"/><path d="M14.5 14v-1.5a1.5 1.5 0 0 1 3 0V14"/>',
   gfencerra:'<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2"/>',
   gfapres:'<path d="M3 4h18v12H3z"/><path d="M12 16v4M8 20h8"/><path d="M7 12l3-3 2 2 4-4"/>',
   gfdcat:'<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
@@ -2022,7 +2047,9 @@ const NAV=[
   // NFs emitidas pelos parceiros, mês a mês, no mesmo controle de NF do repasse (Carol, 30/10; v77)
   {k:'gfnf',t:'Parceiros › Notas fiscais',g:'Gestão financeira',s:'Caixa e tesouraria',ok:okGestao,aba:'repasse'},
   // encerrar o mês de cada conta depois de conferir (Carol, 18/11; v151): toda a equipe Controlacs encerra, só o Master desbloqueia
-  {k:'gfencerra',t:'Encerramento de mês',g:'Gestão financeira',s:'Relatórios',ok:()=>ehEsc()},
+  {k:'gfencerra',t:'Encerramento de mês',g:'Gestão financeira',s:'Cadastros',ok:()=>ehEsc()},
+  // relatório dos meses e períodos encerrados, com filtros e Excel (Carol, 18/11)
+  {k:'gfencrel',t:'Meses encerrados',g:'Gestão financeira',s:'Relatórios',ok:()=>ehEsc()},
   {k:'gfresumo',t:'Resumo da empresa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gfext',t:'Extrato da conta',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
   {k:'gffluxo',t:'Fluxo de caixa',g:'Gestão financeira',s:'Relatórios',ok:okGestao},
@@ -2090,7 +2117,7 @@ const SECOES=['Dia a dia','Caixa e tesouraria','Bancos','Recebíveis','Mensagens
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k==='gfapres'||k==='gfencerra'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
+const telaSemEmp=k=>k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -2370,7 +2397,7 @@ const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
 function openView(){
   viewDaEmp();renderNav();
-  ['viewApr','viewEnc','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2410,6 +2437,7 @@ function openView(){
   else if(VIEW==='gfplano'){$('viewPC').hidden=false;renderPC()}
   else if(VIEW==='gfapres'){$('viewApr').hidden=false;renderApr()}
   else if(VIEW==='gfencerra'){$('viewEnc').hidden=false;renderEnc()}
+  else if(VIEW==='gfencrel'){$('viewEncRel').hidden=false;renderEncRel()}
   else if(VIEW.startsWith('ctb')){$('viewCtb').hidden=false;renderCtb()}
   else if(VIEW.startsWith('ctl')){$('viewCtl').hidden=false;renderCtl()}
   avBanner();tpBanner();soVerBanner();rotBanner();
@@ -3527,7 +3555,7 @@ const dadosAcesso=(email,senha)=>`Portal do Cliente Controlacs\n${location.origi
 // cada ferramenta do operador cliente pertence a um módulo do banco (acessos): Executar em alguma ferramenta = Lançamento, só Visualizar = Consulta
 const TOOLMOD={caixa:'caixa',pagar:'pagar',tesouraria:'tesouraria',cartao:'cartao',rh:'ferias',folha:'folha',adto:'folha',ponto:'ponto',premio:'premio',ben:'beneficios',colab:'colab',docs:'colab',tarefas:'tarefas',repasse:'repasse',ctbexp:'contabil',ctbdepara:'contabil',ctbplano:'contabil',ctblayout:'contabil',
   // Gestão financeira inteira para o operador cliente (Carol, 04/11; v91). O plano de contas continua só do master
-  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
+  gfmov:'gestao',gfpagar:'gestao',gfrec:'gestao',gfinad:'gestao',gfagenda:'gestao',gfconc:'gestao',gfcartoes:'gestao',gfreceb:'gestao',gfremessa:'gestao',gfretorno:'gestao',gffatura:'gestao',gfrepasse:'gestao',gfnf:'gestao',gfresumo:'gestao',gfext:'gestao',gffluxo:'gestao',gforc:'gestao',gfdre:'gestao',gfapres:'gestao',gfencerra:'gestao',gfencrel:'gestao',gfdcat:'gestao',gfdforn:'gestao',gfdforma:'gestao',gfpes:'gestao',gfcontas:'gestao'};
 const MODS_CLIENTE=[...new Set(Object.values(TOOLMOD))];
 const ehTipoEquipe=t=>t==='equipe';
 // ferramentas que aparecem na tela de permissões de cada tipo (Tarefas, Avisos, Projetos e Dashboard são de toda a equipe; Configurações e planos, só do master)
@@ -14726,9 +14754,10 @@ const MANUAL=[
     {k:'gfencerra',t:'Encerramento de mês',
       txt:`<p>Depois de conferir o mês, a equipe Controlacs encerra cada conta. Mês encerrado fica travado: ninguém inclui, altera ou exclui lançamentos daquela conta com data naquele mês (Movimentação, Extrato, Conciliação, Tesouraria e Caixa diário). Quem tentar vê o aviso <b>"Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."</b></p>
 <ol>
-<li>Em <b>Gestão financeira › Relatórios › Encerramento de mês</b>, escolha o <b>Mês</b> e a <b>Empresa</b> (ou Todas as empresas).</li>
+<li>Em <b>Gestão financeira › Cadastros › Encerramento de mês</b>, escolha o <b>Mês</b> e a <b>Empresa</b> (ou Todas as empresas).</li>
 <li>A lista mostra todas as contas (caixa diário, tesouraria, bancos, aplicações e cartão) com lançamentos, entradas, saídas, saldo no fim do mês e as <b>pendências</b> (a validar, sem categoria, sem conciliar, dias de caixa sem conferir).</li>
-<li>Clique em <b>🔒 Encerrar o mês</b> na conta já conferida, ou marque várias e clique em <b>Encerrar as marcadas</b>. Se tiver pendência, o sistema avisa antes.</li>
+<li>Clique em <b>🔒 Encerrar o mês</b> na conta já conferida, ou marque várias e clique em <b>Encerrar as marcadas</b>. O sistema pergunta <b>qual mês</b> encerrar (vem sugerido o mês da tela). Se tiver pendência, avisa antes.</li>
+<li>Para ver todos os meses e períodos encerrados, use <b>Gestão financeira › Relatórios › Meses encerrados</b>, com filtros e Baixar Excel.</li>
 <li>Para travar só até um dia (por exemplo, conferiu até o dia 15), clique em <b>Até uma data…</b> (ou <b>Encerrar as marcadas até uma data…</b>) e escolha a data: tudo com data até esse dia fica travado, inclusive os meses anteriores; depois dele continua aberto.</li>
 <li>Errou o clique? O botão <b>Desfazer</b> aparece logo depois (e fica na linha por 15 minutos para quem encerrou).</li>
 <li>Só o <b>Master</b> desbloqueia: botão <b>🔓 Desbloquear</b>, com o motivo. Depois de corrigir, encerre de novo.</li>
@@ -15444,8 +15473,11 @@ const NOVIDADES=[
     {x:'Pedido de benefícios: botão “Planilha Pluxee” gera a planilha de importação do pedido de vale alimentação na Pluxee (Viva e BJ). Os dados de entrega dos cartões vêm do cadastro da empresa e o CPF e o nascimento, da ficha de cada colaborador; o que faltar é avisado antes.',para:'esc'}]},
   {k:'2026-11-18ordenar',data:'2026-11-18',t:'Ordenar a lista clicando no nome da coluna, em todas as telas',itens:[
     {x:'Em todas as telas com tabela (ex.: RH › Colaboradores e Controle de experiência, Contas a pagar e a receber, Movimentação, Notas fiscais, Conferências, Cadastros), clique no nome da coluna para ordenar a lista: o 1º clique põe em ordem crescente (▲: A a Z, data mais antiga, menor valor) e o 2º inverte (▼). Ex.: clique em “Colaborador” para ordem alfabética ou em “Cargo” para juntar por cargo. A setinha ↕ ao lado do nome mostra que a coluna pode ser ordenada. Ao trocar de tela, a lista volta à ordem normal.'}]},
+  {k:'2026-11-18encerra2',data:'2026-11-18',t:'Encerramento de mês: escolha do mês e relatório',itens:[
+    {x:'Encerramento de mês agora fica em Gestão financeira › Cadastros. O botão Encerrar o mês pergunta qual mês encerrar (não encerra mais direto o mês da tela).',para:'esc'},
+    {x:'Novo relatório Gestão financeira › Relatórios › Meses encerrados: até quando cada conta está encerrada e a lista de todos os encerramentos e desbloqueios, com filtros e Baixar Excel.',para:'esc'}]},
   {k:'2026-11-18encerra',data:'2026-11-18',t:'Encerramento de mês',itens:[
-    {x:'Nova tela Gestão financeira › Relatórios › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações), ou só até uma data (tudo até aquele dia fica travado). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
+    {x:'Nova tela Gestão financeira › Cadastros › Encerramento de mês: depois de conferir, encerre o mês de cada conta (caixa diário, tesouraria, bancos e aplicações), ou só até uma data (tudo até aquele dia fica travado). Mês encerrado não aceita incluir, alterar nem excluir lançamentos daquela conta. Só o Master desbloqueia, com o motivo, e tudo fica no histórico.',para:'esc'},
     {x:'Se tentar lançar, alterar ou excluir com data de um mês já encerrado, aparece o aviso: "Esse mês já foi encerrado. Para prosseguir com o lançamento, solicite ao usuário Master o desbloqueio desse período."',mods:['caixa','tesouraria']},
     {x:'Apresentação (DRE financeira): meses encerrados aparecem com 🔒 e há aviso dos que ainda têm conta aberta. A antecipação de recebíveis que entra no banco não abate mais as despesas (fica numa linha à parte, fora da DRE).',para:'esc'}]},
   {k:'2026-11-17bancos',data:'2026-11-17',t:'Lista de bancos da empresa',itens:[
@@ -17801,14 +17833,14 @@ function encDesenha(){
     <td class="l">${esc(l.fechado_por_nome||'')} · ${encQuando(l.fechado_em)}</td><td class="l">${l.ativo?'<span class="muted">Continua encerrado</span>':`${esc(l.reaberto_por_nome||'')} · ${encQuando(l.reaberto_em)}`}</td><td class="l">${esc(l.motivo||'')}</td></tr>`).join('')
     ||'<tr><td class="l muted" colspan="6">Nenhum encerramento neste mês ainda.</td></tr>';
 }
-async function encEncerra(ks,ate){const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&!r.lock);if(!rs.length)return;
-  const comPend=rs.filter(r=>encPend(r).length);const mesTxt=ate?'até '+dBR(ate):MESES[+ENC.mes.slice(5)-1].toLowerCase()+'/'+ENC.mes.slice(0,4);
+async function encEncerra(ks,ate,mes){mes=mes||ENC.mes;const outro=!ate&&mes!==ENC.mes;const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&(outro||!r.lock));if(!rs.length)return;
+  const comPend=outro?[]:rs.filter(r=>encPend(r).length);const mesTxt=ate?'até '+dBR(ate):MESES[+mes.slice(5)-1].toLowerCase()+'/'+mes.slice(0,4);
   let msg=`Encerrar ${mesTxt} em ${rs.length===1?'1 conta':rs.length+' contas'}? Depois disso ninguém inclui, altera ou exclui lançamentos ${rs.length===1?'dela':'delas'} ${ate?'com data até esse dia':'nesse mês'}; só o Master desbloqueia.`;
   if(comPend.length)msg+=`\n\nAtenção: ${comPend.length===1?'1 conta tem':comPend.length+' contas têm'} pendência:\n`+comPend.slice(0,12).map(r=>`• ${r.emp} · ${r.conta}: ${encPend(r).join(', ')}`).join('\n')+(comPend.length>12?'\n• ...':'')+'\n\nEncerrar mesmo assim?';
-  if(!ate&&!confirm(msg)||ate&&comPend.length&&!confirm(msg))return;
-  const {data,error}=await sb.from('fin_meses_encerrados').insert(rs.map(r=>({cliente_id:r.cliente_id,conta_id:r.conta_id||null,competencia:(ate||ENC.mes).slice(0,7)+'-01',...(ate?{de:null,ate}:{}),fechado_por_nome:ME?.nome||ME?.email||null}))).select();
+  if(comPend.length&&!confirm(msg))return;
+  const {data,error}=await sb.from('fin_meses_encerrados').insert(rs.map(r=>({cliente_id:r.cliente_id,conta_id:r.conta_id||null,competencia:(ate||mes).slice(0,7)+'-01',...(ate?{de:null,ate}:{}),fechado_por_nome:ME?.nome||ME?.email||null}))).select();
   if(error){console.error(error);return alert(encV151(error)?encMsg:/duplicate|unique/i.test(error.message||'')?'Uma dessas contas já foi encerrada por outra pessoa. A tela vai atualizar.':'Erro ao encerrar: '+error.message),renderEnc()}
-  ks.forEach(k=>ENC.sel.delete(k));MESENC=null;
+  ks.forEach(k=>ENC.sel.delete(k));MESENC=null;if(outro)ENC.mes=mes;
   toastDesfazer(`${rs.length===1?'Conta encerrada':rs.length+' contas encerradas'} ${ate?'':'em '}${mesTxt}.`,async()=>{
     const {error:e2}=await sb.from('fin_meses_encerrados').update({ativo:false,motivo:'Desfeito logo depois de encerrar'}).in('id',(data||[]).map(x=>x.id));
     if(e2)alert('Não deu para desfazer: '+e2.message);else toast('Encerramento desfeito.');MESENC=null;renderEnc()});
@@ -17834,13 +17866,18 @@ $('viewEnc').addEventListener('change',e=>{const t=e.target;
   if(t.dataset.encsel){t.checked?ENC.sel.add(t.dataset.encsel):ENC.sel.delete(t.dataset.encsel);return encDesenha()}
   if(t.id==='encTodas'){const bq=document.querySelectorAll('[data-encsel]');bq.forEach(c=>t.checked?ENC.sel.add(c.dataset.encsel):ENC.sel.delete(c.dataset.encsel));encDesenha()}});
 $('viewEnc').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.encone)return encEncerra([b.dataset.encone]);
+  if(b.dataset.encone)return encMesAbre([b.dataset.encone]);
   if(b.dataset.encate)return encAteAbre([b.dataset.encate]);
   if(b.id==='encAteSel')return encAteAbre([...ENC.sel]);
   if(b.dataset.encdes)return encDesbloqueia(b.dataset.encdes);
-  if(b.id==='encSel')return encEncerra([...ENC.sel]);
+  if(b.id==='encSel')return encMesAbre([...ENC.sel]);
   if(b.id==='encTodasBtn'){document.querySelectorAll('[data-encsel]').forEach(c=>ENC.sel.add(c.dataset.encsel));return encDesenha()}
   if(b.id==='encXls'){const t=document.querySelector('.enc-t');const ws=XLSX.utils.table_to_sheet(t,{raw:false});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Encerramento');XLSX.writeFile(wb,`Encerramento de mês ${ENC.mes}.xlsx`)}});
+// "Encerrar o mês" sempre pergunta qual mês (Carol, 18/11: às vezes o mês anterior está atrasado)
+function encMesAbre(ks){const rs=ENC.rows.filter(r=>ks.includes(encK(r)));if(!rs.length)return;ENC.mesKs=ks;
+  $('encMesTxt').textContent=rs.length===1?`${rs[0].emp} · ${rs[0].conta}`:`${rs.length} contas marcadas`;$('encMesData').value=ENC.mes;$('encMesErr').textContent='';$('encMesDlg').showModal()}
+$('encMesOk').addEventListener('click',async()=>{const m=$('encMesData').value;if(!m)return $('encMesErr').textContent='Escolha o mês.';if(m>TODAY.slice(0,7))return $('encMesErr').textContent='O mês não pode ser depois do mês atual.';
+  $('encMesDlg').close();await encEncerra(ENC.mesKs||[],null,m)});
 // "Encerrar até uma data" (Carol, 18/11; v152): só a data final; tudo até ela fica travado
 function encAteAbre(ks){const rs=ENC.rows.filter(r=>ks.includes(encK(r))&&!r.lock);if(!rs.length)return;ENC.ateKs=ks;
   $('encAteTxt').textContent=rs.length===1?`${rs[0].emp} · ${rs[0].conta}`:`${rs.length} contas marcadas`;$('encAteData').value=fimMes(ENC.mes+'-01')>TODAY?TODAY:fimMes(ENC.mes+'-01');$('encAteErr').textContent='';$('encAteDlg').showModal()}
@@ -17853,6 +17890,56 @@ async function mesEncLista(){if(MESENC)return MESENC;try{MESENC=(await todas(()=
 // a conta está encerrada no mês inteiro? (um encerramento do mês ou um "até" no último dia ou depois)
 const encCobre=(ls,conta,m)=>{const ini=m+'-01',fim=fimMes(ini);return ls.some(l=>l.conta_id===conta&&l.ate>=fim&&(!l.de||l.de<=ini))};
 // ---------- fim do Encerramento de mês ----------
+// ---------- Gestão financeira › Relatórios › Meses encerrados ----------
+// Pedido da Carol (18/11/2026): relatório para procurar os meses e períodos encerrados, com filtros em todas as colunas e Excel.
+const ENR={cli:'*',sit:'ativo',de:'',ate:'',busca:'',f:{},rows:[],contas:{}};
+const ENR_COLS=['Empresa','Conta','Tipo','Período','Situação','Encerrado por','Desbloqueado por','Motivo'];
+async function renderEncRel(){
+  const emps=encEmps();if(ENR.cli!=='*'&&!emps.some(c=>c.id===ENR.cli))ENR.cli='*';
+  $('enrCli').innerHTML='<option value="*">Todas as empresas</option>'+emps.map(c=>`<option value="${c.id}"${c.id===ENR.cli?' selected':''}>${esc(c.nome)}</option>`).join('');
+  $('enrSit').value=ENR.sit;$('enrDe').value=ENR.de;$('enrAte').value=ENR.ate;
+  $('enrBody').innerHTML='<tr><td class="l muted" colspan="8">Carregando…</td></tr>';$('enrConta').innerHTML='';
+  const clis=ENR.cli==='*'?emps.map(c=>c.id):[ENR.cli];if(!clis.length)return;
+  let ls,cs;try{[ls,cs]=await Promise.all([todas(()=>sb.from('fin_meses_encerrados').select('*').in('cliente_id',clis).order('fechado_em',{ascending:false})),
+    todas(()=>sb.from('fin_contas').select('id,cliente_id,nome,tipo,ativo').in('cliente_id',clis))])}
+  catch(e){console.error(e);$('enrBody').innerHTML=`<tr><td class="l neg" colspan="8">${encV151(e)?encMsg:'Erro ao carregar: '+esc(e.message||e)}</td></tr>`;return}
+  if(VIEW!=='gfencrel')return;
+  ENR.contas=Object.fromEntries(cs.map(c=>[c.id,c]));const nomeCli=id=>CLIENTES.find(c=>c.id===id)?.nome||'?';
+  ENR.rows=ls.map(encNorm).map(l=>{const c=l.conta_id?ENR.contas[l.conta_id]:null;return {...l,emp:nomeCli(l.cliente_id),conta:c?c.nome:'Caixa diário',tipo:c?c.tipo:'Caixa diário'}});
+  enrDesenha()}
+function enrCols(r){return [r.emp,r.conta,r.tipo,encPer(r),r.ativo?'Encerrado':'Desbloqueado',[r.fechado_por_nome,encQuando(r.fechado_em)].filter(Boolean).join(' · '),r.ativo?'':[r.reaberto_por_nome,encQuando(r.reaberto_em)].filter(Boolean).join(' · '),r.motivo||r.obs||'']}
+function enrDesenha(){const bq=chave(ENR.busca||''),de=ENR.de?ENR.de+'-01':'',ate=ENR.ate?fimMes(ENR.ate+'-01'):'';
+  const vis=ENR.rows.filter(r=>{if(ENR.sit==='ativo'&&!r.ativo||ENR.sit==='des'&&r.ativo)return false;
+    if(de&&r.ate<de||ate&&r.de&&r.de>ate)return false;const cs=enrCols(r);
+    if(bq&&!chave(cs.join(' ')).includes(bq))return false;return ENR_COLS.every((_,i)=>!ENR.f[i]||chave(cs[i]).includes(chave(ENR.f[i])))})
+    .sort((a,b)=>a.emp.localeCompare(b.emp)||a.conta.localeCompare(b.conta)||String(b.ate).localeCompare(String(a.ate)));
+  $('enrHead').innerHTML=`<tr>${ENR_COLS.map(c=>`<th class="l">${c}</th>`).join('')}</tr><tr class="enc-f">${ENR_COLS.map((c,i)=>`<th><input data-enrf="${i}" value="${esc(ENR.f[i]||'')}" placeholder="Filtrar" aria-label="Filtrar ${esc(c)}"></th>`).join('')}</tr>`;
+  $('enrBody').innerHTML=vis.map(r=>{const cs=enrCols(r);return `<tr>${cs.map((v,i)=>`<td class="l">${i===4?`<span class="chip ${r.ativo?'ok':'warn'}">${r.ativo?'🔒 ':''}${esc(v)}</span>`:esc(v)||'<span class="muted">—</span>'}</td>`).join('')}</tr>`}).join('')
+    ||'<tr><td class="l muted" colspan="8">Nenhum encerramento com esses filtros.</td></tr>';
+  // situação atual de cada conta: até quando está encerrada (meses inteiros seguidos ou "até" uma data)
+  const at=ENR.rows.filter(r=>r.ativo),porConta={};
+  at.forEach(r=>{const k=r.cliente_id+'|'+(r.conta_id||'caixa');(porConta[k]=porConta[k]||{emp:r.emp,conta:r.conta,tipo:r.tipo,ls:[]}).ls.push(r)});
+  const contasAtivas=Object.values(ENR.contas).filter(c=>c.ativo!==false);contasAtivas.forEach(c=>{const k=c.cliente_id+'|'+c.id;porConta[k]=porConta[k]||{emp:CLIENTES.find(x=>x.id===c.cliente_id)?.nome||'?',conta:c.nome,tipo:c.tipo,ls:[]}});
+  const lin=Object.values(porConta).map(x=>{const ate=x.ls.filter(l=>!l.de).map(l=>l.ate).sort().pop()||'';
+    const meses=x.ls.filter(l=>l.de).map(l=>l.de.slice(0,7)).sort();
+    // até quando está fechado sem buraco: parte do "até" e soma os meses inteiros seguidos depois dele
+    let fim=ate;const set=new Set(meses);let m=fim?somaMes(fim.slice(0,8)+'01',fim===fimMes(fim.slice(0,8)+'01')?1:0).slice(0,7):(meses[0]||'');
+    if(!fim&&meses.length){fim=''}while(m&&set.has(m)){fim=fimMes(m+'-01');m=somaMes(m+'-01',1).slice(0,7)}
+    return {...x,fim,meses}}).filter(x=>(ENR.cli==='*'||true)&&(!bq||chave(x.emp+' '+x.conta).includes(bq))).sort((a,b)=>a.emp.localeCompare(b.emp)||a.conta.localeCompare(b.conta));
+  $('enrConta').innerHTML=lin.map(x=>`<tr><td class="l">${esc(x.emp)}</td><td class="l">${esc(x.conta)}</td><td class="l">${esc(x.tipo)}</td>
+    <td class="l">${x.fim?`<span class="chip ok">🔒 Encerrada até ${dBR(x.fim)}</span>`:'<span class="chip warn">Nada encerrado em sequência</span>'}</td>
+    <td class="l">${x.meses.length?esc(x.meses.map(m=>aprMLabel(m)).join(', ')):'<span class="muted">—</span>'}</td></tr>`).join('')||'<tr><td class="l muted" colspan="5">Nenhuma conta.</td></tr>';
+  $('enrNote').textContent=`${vis.length} encerramento(s) na lista.`}
+$('enrCli').addEventListener('change',e=>{ENR.cli=e.target.value;renderEncRel()});
+['enrSit','enrDe','enrAte'].forEach(id=>$(id).addEventListener('change',e=>{ENR[{enrSit:'sit',enrDe:'de',enrAte:'ate'}[id]]=e.target.value;enrDesenha()}));
+$('enrBusca').addEventListener('input',e=>{ENR.busca=e.target.value;clearTimeout(ENR.t);ENR.t=setTimeout(enrDesenha,250)});
+$('viewEncRel').addEventListener('input',e=>{const t=e.target;if(t.dataset.enrf==null)return;ENR.f[t.dataset.enrf]=t.value;clearTimeout(ENR.t);
+  ENR.t=setTimeout(()=>{enrDesenha();const i=document.querySelector(`[data-enrf="${t.dataset.enrf}"]`);i?.focus();i?.setSelectionRange(99,99)},300)});
+$('enrXls').addEventListener('click',()=>{const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet($('enrTabConta'),{raw:false}),'Situação por conta');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet($('enrTab'),{raw:false}),'Encerramentos');XLSX.writeFile(wb,`Meses encerrados ${TODAY}.xlsx`)});
+$('enrPrint').addEventListener('click',()=>window.print());
+$('enrIr').addEventListener('click',()=>go('gfencerra'));
+// ---------- fim de Meses encerrados ----------
 boot();
 })();
 
