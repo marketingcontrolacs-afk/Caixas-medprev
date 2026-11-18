@@ -13401,7 +13401,11 @@ async function tVersoes(){
   if(window.V74===undefined){const {error:e74}=await sb.from('tarefas').select('executor').limit(1);window.V74=!e74}
   if(window.V31===undefined){const {error:e31}=await sb.from('tarefa_usuarios').select('tarefa_id').limit(1);window.V31=!e31}
   if(window.V85T===undefined){const {error:e85}=await sb.from('tarefa_participantes').select('tarefa_id').limit(1);window.V85T=!e85}
+  if(window.V159===undefined){const {error:e159}=await sb.from('tarefas').select('recorrencia').limit(1);window.V159=!e159}
 }
+// v159: tarefas que repetem (Carol, 18/11: ex. extrato da XP todo mês). Ao concluir, o banco cria a próxima com o prazo do próximo período.
+const TREC=[['','Não repete'],['semanal','Toda semana'],['quinzenal','A cada 15 dias'],['mensal','Todo mês'],['bimestral','A cada 2 meses'],['trimestral','A cada 3 meses'],['semestral','A cada 6 meses'],['anual','Todo ano']];
+const tRecNome=r=>(TREC.find(x=>x[0]===r)||['',''])[1];
 // v85: mais executores e validadores; na conclusão, todos os envolvidos dão ciente (Carol, 30/10 e 03/11)
 // envolvidos = executor principal, responsável, executores a mais e validadores. Vale para as tarefas concluídas a partir de 03/11/2026.
 const CIENTE_DESDE='2026-11-03';
@@ -13497,6 +13501,7 @@ function tCard(t,todas){
   const n=t.tarefa_comentarios?.[0]?.count||0;
   const chips=[pr[0]?`<span class="chip ${pr[0]}">${pr[1]}</span>`:'',todas&&t.cliente_id?`<span class="chip c-done">${esc(nome)}</span>`:'',
     t.interna&&ehEsc()?'<span class="chip c-none" title="O cliente não vê">🔒 Interna</span>':'',
+    t.recorrencia?`<span class="chip c-none" title="Ao concluir, o sistema cria a próxima">🔁 ${tRecNome(t.recorrencia)}</span>`:'',
     ehEsc()&&t.tarefa_usuarios?.length?`<span class="chip c-warn" title="Só os usuários marcados veem">👥 ${t.tarefa_usuarios.length} ${t.tarefa_usuarios.length===1?'pessoa':'pessoas'}</span>`:'',
     tPedeCiente(t)?(()=>{const ev=tEnvolvidos(t),n=ev.filter(x=>tCienteDe(t,x.id)).length;return `<span class="chip ${n===ev.length?'c-done':'c-warn'}" title="Ciente da conclusão">✔ Ciente ${n}/${ev.length}</span>`})():''].join('');
   const meta=[t.prazo?`<span class="${late||hoje?'late':''}">📅 ${late?'Atrasada · ':hoje?'Hoje · ':''}${dBR(t.prazo).slice(0,5)}</span>`:'',
@@ -13561,6 +13566,9 @@ async function abrirTarefa(t){
     <label class="f">Status${sel('td_status',TCOLS,t?.status||'afazer')}</label>
     <label class="f">Prioridade${sel('td_pri',Object.entries(TPRI).map(([k,v])=>[k,v[1]]),t?.prioridade||'normal')}</label>
     <label class="f">Prazo<input type="date" id="td_prazo" value="${t?.prazo||''}"${d}></label>
+    ${window.V159&&e?`<label class="f">Repetir${sel('td_rec',TREC,t?.recorrencia||'')}</label><label class="f" id="td_recAteBox"${t?.recorrencia?'':' hidden'}>Repetir até (opcional)<input type="date" id="td_recAte" value="${t?.recorrencia_ate||''}"${d}></label>
+      <p class="note wide" id="td_recNote" style="margin:0"${t?.recorrencia?'':' hidden'}>🔁 Quando esta tarefa for concluída, o sistema cria sozinho a próxima, com o mesmo título, descrição, executor e quem vê, e o prazo do próximo período (nos meses, o mesmo dia do prazo). Reabrir a tarefa concluída desfaz a próxima, se ninguém mexeu nela. Para parar, escolha “Não repete”.</p>`
+      :window.V159&&t?.recorrencia?`<p class="note wide" style="margin:0">🔁 Esta tarefa repete: <b>${tRecNome(t.recorrencia).toLowerCase()}</b>. Ao concluir, a próxima aparece sozinha.</p>`:''}
     ${e?'<label class="f">Responsável (acompanha)<span id="td_respBox"></span></label><label class="f">Executor (quem faz)<span id="td_execBox"></span></label>'+(window.V85T?'<div class="wide" id="td_partBox"></div>':'')
       :t&&(t.responsavel||t.executor)?`<p class="note wide" style="margin:0">${t.executor?'Executor: <b>'+esc(t.executor_nome||'')+'</b>':''}${t.responsavel&&t.executor?' · ':''}${t.responsavel?'Responsável: <b>'+esc(t.responsavel_nome||'')+'</b>':''}</p>`:''}
     ${!e&&t?.tarefa_participantes?.length?`<p class="note wide" style="margin:0">${['executor','validador'].map(pp=>{const l=t.tarefa_participantes.filter(x=>x.papel===pp);return l.length?(pp==='executor'?'Mais executores: ':'Validadores: ')+'<b>'+l.map(x=>esc(x.nome||'')).join(', ')+'</b>':''}).filter(Boolean).join(' · ')}</p>`:''}
@@ -13583,6 +13591,7 @@ async function abrirTarefa(t){
   const b=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-act="${act}">${txt}</button>`;
   $('tdFoot').innerHTML=(e&&t?b('excluir','Excluir','ghost')+b('arquivar','Arquivar','ghost'):'')+'<span class="spacer"></span>'+b('fechar','Fechar','ghost')+(pode?b('salvar',t?'Salvar':'Criar tarefa','primary'):'');
   const ic=$('td_cli'),ib=$('td_intBox');if(ic&&ib){const f=()=>ib.hidden=!ic.value;ic.onchange=f;f()}
+  if($('td_rec'))$('td_rec').onchange=()=>{const on=!!$('td_rec').value;$('td_recAteBox').hidden=!on;$('td_recNote').hidden=!on};
   if(t&&!t.cliente_id&&ib)ib.hidden=true;
   // responsável e executor: escolhidos pelo nome entre a equipe e os usuários da empresa da tarefa
   if($('td_respBox')){
@@ -13641,6 +13650,11 @@ async function tAcao(act,btn){
       const titulo=$('td_titulo').value.trim();if(!titulo)return tdErr('Informe o título da tarefa.');
       const r={titulo,descricao:$('td_desc').value.trim()||null,status:$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
       if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked;if(window.V74)r.executor=$('td_exec').value||null}
+      if(e&&$('td_rec')){r.recorrencia=$('td_rec').value||null;r.recorrencia_ate=r.recorrencia&&$('td_recAte').value||null;
+        if(r.recorrencia&&!r.prazo)return tdErr('Para a tarefa repetir, informe o prazo da primeira vez.');
+        if(r.recorrencia&&r.recorrencia_ate&&r.recorrencia_ate<r.prazo)return tdErr('“Repetir até” precisa ser depois do prazo.');
+        // trocou o prazo: o dia do mês passa a ser o do prazo novo
+        if(r.recorrencia&&(!t||t.prazo!==r.prazo||t.recorrencia!==r.recorrencia))r.recorrencia_dia=+r.prazo.slice(8,10)}
       const restrito=e&&$('td_visBox')?.querySelector('input[name="td_vis"]:checked')?.value==='marcados',quem=restrito?pickLer('td_pick'):[];
       if(restrito&&!quem.length)return tdErr('Marque pelo menos um usuário que pode ver a tarefa, ou escolha a opção de todos.');
       if(!t){const c=$('td_cli').value||null;if(!c&&!e)return tdErr('Escolha a empresa.');r.cliente_id=c;
@@ -15797,6 +15811,9 @@ const NOVIDADES=[
   {k:'2026-11-18dupbc',data:'2026-11-18',t:'Repasse e Bom Controle sem pagamento em dobro',itens:[
     {x:'Importar do Bom Controle: o pagamento de um repasse que já está nas Contas a pagar dá baixa nele mesmo quando o nome vem escrito diferente (ex.: “Caroline Balvedi Gaiewski - Mpa*” e “Caroline Balvedi Gaiewski”), pelo CNPJ/CPF ou pelo nome do relatório. O repasse já marcado como pago no portal com até 3 dias de diferença fica de fora, e um pagamento de mesmo valor de uma conta em aberto de outro nome entra “a validar”, para conferir.',para:'esc'},
     {x:'Repasse de parceiros › Marcar como pago: se o pagamento já entrou pelo Bom Controle ou pelo extrato (mesma conta e valor, até 3 dias, mesmo parceiro), o sistema liga a conta a pagar a ele em vez de lançar de novo.',para:'esc'}]},
+  {k:'2026-11-18tarefasrec',data:'2026-11-18',t:'Tarefas que repetem',itens:[
+    {x:'Tarefas e recados: ao criar ou abrir uma tarefa, o escritório escolhe “Repetir” (toda semana, a cada 15 dias, todo mês, a cada 2, 3 ou 6 meses, todo ano) e, se quiser, “Repetir até”. Quando a tarefa é concluída, o sistema cria sozinho a próxima, com o mesmo título, descrição, executor e quem vê, e o prazo do próximo período. Ex.: enviar o extrato da XP todo mês.',para:'esc'},
+    {x:'O cartão mostra 🔁 com a frequência. Reabrir a tarefa concluída desfaz a próxima, se ninguém mexeu nela. Para parar de repetir, escolha “Não repete” na tarefa em aberto.',para:'esc'}]},
   {k:'2026-11-18parceirosmp',data:'2026-11-18',t:'Módulo Parceiros MP e notas fiscais dos parceiros',itens:[
     {x:'Novo módulo Parceiros MP no alto, com Repasse da semana, Notas fiscais dos parceiros, Restituições efetuadas e o cadastro de Parceiros. Ele aparece só nas empresas com o serviço “Parceiros MP” marcado na ficha da empresa (ou na coluna Parceiros MP de Configurações › Cadastro de empresas). Os parceiros saíram da Gestão financeira: as outras empresas usam o cadastro de fornecedores.',mods:['gfrepasse','gfnf','gfrestit','repasse'],para:'esc'},
     {x:'Repasse da semana: “Importar relatório de repasses” aceita o relatório novo (Data, Parceiro, Identificador, Bruto, Repasse, Descontos…). Só entram as linhas com situação Pendente. O valor a pagar é a coluna Repasse, e o valor da nota fiscal é Bruto − (Repasse + Descontos), que aparece embaixo do valor de cada parceiro. O relatório antigo continua funcionando.',mods:['gfrepasse']},
