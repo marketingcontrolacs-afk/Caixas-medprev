@@ -2216,14 +2216,12 @@ function fillClientes(){
   // "Todas as empresas" em todos os módulos para quem vê mais de uma empresa (Carol, 30/10)
   const todas=!telaSemEmp(m)&&(doMod.length>1||lista.length>1&&ehEsc()||m==='tarefas'&&ehEsc())?'<option value="*">Todas as empresas</option>':'';
   const internas=m==='tarefas'&&ehEsc()?'<option value="int">Internas da Controlacs</option>':'';
-  // grupos de empresas logo abaixo de "Todas as empresas" (Carol, 12/11)
-  const grs=todas?gruposTodos().filter(g=>g.empresas.filter(id=>doMod.some(c=>c.id===id)).length>=(ehEsc()?1:2)):[];
-  const grOpt=grs.length?`<optgroup label="Grupos de empresas">${grs.map(g=>`<option value="*" data-grupo="${esc(g.id)}">Grupo: ${esc(g.nome)}</option>`).join('')}</optgroup>`:'';
+  // os grupos ("Grupo: X") saíram da lista do alto (Carol, 18/11): agora são atalhos dentro de "Escolher várias empresas"
   // várias empresas (Carol, 18/11): a seleção marcada fica logo abaixo de "Todas as empresas", e a opção para marcar outras
   const vsN=todas?VSEL.filter(id=>doMod.some(c=>c.id===id)).length:0;
   const vsOpt=todas?(vsN?`<option value="*" data-grupo="sel">Várias: ${esc(vsGrupo().nome)}</option>`:'')+'<option value="__varias">☑ Escolher várias empresas…</option>':'';
   $('vsBtn').hidden=!todas;
-  escCli.innerHTML=todas+vsOpt+grOpt+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
+  escCli.innerHTML=todas+vsOpt+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
   if(escCli.value==='*'&&GSEL){const i=[...escCli.options].findIndex(o=>o.dataset.grupo===GSEL);if(i>=0)escCli.selectedIndex=i;else GSEL=''}
   $('ctxbar').hidden=m.startsWith('cfg')||m.startsWith('ctl')||m==='avisos'||m==='projetos'||m==='agenda'||m==='manual';
