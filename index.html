@@ -5945,11 +5945,23 @@ function benUteis(ini,fim,comp,fer){
 }
 // sábados da escala pelo cadastro: todos, alternados (começando no 1º) ou nenhum; a partir de 16/02/2027 é 5x2
 const benSabPadrao=f=>{const e=ff(f,'sab_escala'),s=BEN.cal.sabs.filter(d=>d<='2027-02-15');return e==='todos'?s:e==='alt'?s.filter((_,i)=>i%2===0):[]};
-// linha do pedido a partir do cadastro (ff.vt_* e ff.va_*) e das faltas
+// Benefícios do pedido: cadastro do pedido (ff.*) e, quando vazio, a ficha do colaborador (RH › Colaboradores e prazos:
+// Transporte, VT por dia ida e volta, Empresa do VT, VA por mês). Carol 18/11: os dois cadastros não conversavam.
+// 'nenhum' no cadastro do pedido = escolheu "Não tem" mesmo com a ficha preenchida.
+function benFb(f,k){
+  if(k==='vt_tipo'){const t=f.folha_vt!=null||f.folha_ajuda_custo!=null?(+f.folha_ajuda_custo>0?'ajuda':f.folha_vt?'vt':''):'';return t==='vt'?'vt':null}
+  if(k==='vt_empresa')return f.vt_empresa||null;
+  if(k==='vt_unit')return +f.vt_valor_dia>0?r2(f.vt_valor_dia/2):null;
+  if(k==='va_tipo')return +f.va_valor>0?'fixo':null;
+  if(k==='va_valor')return +f.va_valor>0?+f.va_valor:null;
+  return null;
+}
+const bff=(f,k)=>{const v=ff(f,k)??benFb(f,k);return v==='nenhum'?null:v},bffNum=(f,k)=>{const v=bff(f,k);if(v==null)return null;const n=typeof v==='number'?v:parseMoney(String(v));return Number.isFinite(n)?n:null};
+// linha do pedido a partir do cadastro (ff.vt_* e ff.va_*, ou a ficha do colaborador) e das faltas
 function benLinha(f,tipo,fa){
   const sd=benSabPadrao(f),r={funcionario_id:f.id,tipo,faltas:fa.n,faltas_injust:fa.inj,obs:fa.t||null,dias_uteis:BEN.cal.uteis,sab_datas:sd,sab_trab:sd.length};
-  if(tipo==='va')Object.assign(r,{empresa:ff(f,'va_empresa')||'',va_tipo:ff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:ffNum(f,'va_valor')||0,assid:ff(f,'va_tipo')==='fixo'?ffNum(f,'va_assid'):null});
-  else Object.assign(r,{empresa:ff(f,'vt_empresa')||'',unitario:ffNum(f,'vt_unit')||0});
+  if(tipo==='va')Object.assign(r,{empresa:ff(f,'va_empresa')||'',va_tipo:bff(f,'va_tipo')==='fixo'?'fixo':'dia',unitario:bffNum(f,'va_valor')||0,assid:bff(f,'va_tipo')==='fixo'?ffNum(f,'va_assid'):null});
+  else Object.assign(r,{empresa:bff(f,'vt_empresa')||'',unitario:bffNum(f,'vt_unit')||0});
   return benCalc(r);
 }
 const benDias=r=>Math.max(0,(+r.dias_uteis||0)+(+r.sab_trab||0)-(+r.faltas||0));
@@ -5969,7 +5981,7 @@ async function renderBen(){
   if(!cli){vazio('<span class="muted">Nenhuma empresa liberada.</span>');return}
   const comp=BEN.comp=$('bnMes').value+'-01',ant=addMes(comp,-1),fim=fimMes(comp);
   const [rf,rp,rm,rpe,rl,rh,rv]=await Promise.all([
-    sb.from('funcionarios').select('id,nome,matricula,situacao,admissao,desligado_em,folha_fixos').eq('cliente_id',cli.id).order('nome'),
+    sb.from('funcionarios').select('id,nome,matricula,situacao,admissao,desligado_em,folha_fixos,folha_vt,vt_valor_dia,vt_empresa,va_valor,folha_ajuda_custo').eq('cliente_id',cli.id).order('nome'),
     sb.from('beneficios_pedidos').select('*').eq('cliente_id',cli.id).eq('competencia',comp),
     sb.from('beneficios_meses').select('*').eq('cliente_id',cli.id).eq('competencia',comp).maybeSingle(),
     sb.from('beneficios_pendencias').select('*').eq('cliente_id',cli.id).order('criado_em'),
@@ -5994,8 +6006,8 @@ async function renderBen(){
     return {n,inj,t:t.join('; ')}};
   BEN.salvo=(rp.data||[]).length>0;
   BEN.rows=BEN.salvo?(rp.data||[]).map(r=>({...r,sab_datas:r.sab_datas||[],quantFixa:r.tipo!=='va'&&r.quant!=null&&+r.quant!==benDias(r)*2}))
-    :BEN.func.filter(f=>f.situacao!=='Desligado').flatMap(f=>{const fa=falta(f),o=[],vt=ff(f,'vt_tipo');
-      if(vt==='vt'||vt==='comb'&&R.combustivel)o.push(benLinha(f,vt,fa));if(ff(f,'va_tipo'))o.push(benLinha(f,'va',fa));return o});
+    :BEN.func.filter(f=>f.situacao!=='Desligado').flatMap(f=>{const fa=falta(f),o=[],vt=bff(f,'vt_tipo');
+      if(vt==='vt'||vt==='comb'&&R.combustivel)o.push(benLinha(f,vt,fa));if(['dia','fixo'].includes(bff(f,'va_tipo')))o.push(benLinha(f,'va',fa));return o});
   const C=BEN.cal,st=BEN.mes?.status||'Rascunho',[y,m]=comp.split('-');
   // ponto importado (ou falta lançada) depois de salvar o pedido: o rascunho pega as faltas novas sozinho; o pedido feito só avisa
   const ultLanc=(rl.data||[]).reduce((x,l)=>l.criado_em>x?l.criado_em:x,''),salvoEm=(rp.data||[]).reduce((x,r)=>!x||r.criado_em<x?r.criado_em:x,''),
@@ -6043,7 +6055,7 @@ function benTabelas(lanca){
     <tfoot><tr><td class="l" colspan="${comb?10:9}"><b>Total</b></td><td><b id="bnVtTot">${tot(vt)}</b></td><td colspan="2"></td></tr></tfoot>`
     :'<tbody><tr><td class="l muted">Ninguém com vale transporte ou combustível. Cadastre em “Benefícios de cada colaborador”.</td></tr></tbody>';
   const temFixo=va.some(x=>x.r.va_tipo==='fixo');
-  $('bnVa').innerHTML=va.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Empresa</th><th class="l">Tipo</th><th>R$ Valor (dia ou fixo)</th>${temFixo?'<th>R$ Assiduidade</th>':''}<th>Dias úteis</th><th>Sábados</th><th>Faltas/ Atestados/ Férias</th><th>Dias a receber</th><th>Taxa 2ª via cartão</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
+  $('bnVa').innerHTML=va.length?`<thead><tr><th class="l">Funcionário</th><th class="l">Empresa</th><th class="l">Tipo</th><th>R$ Valor (dia ou fixo)</th>${temFixo?'<th>R$ Prêmio se não faltar</th>':''}<th>Dias úteis</th><th>Sábados</th><th>Faltas/ Atestados/ Férias</th><th>Dias a receber</th><th>Taxa 2ª via cartão</th><th>R$ Total</th><th class="l">Observação</th><th></th></tr></thead><tbody>${
     va.map(({r,i})=>{const fx=r.va_tipo==='fixo',perde=fx&&(+r.faltas_injust||0)>0&&+r.assid>0;
       return `<tr><td class="l"><b>${esc(benNome(r.funcionario_id))}</b></td><td class="l">${txt(i,'empresa',r.empresa,120)}</td><td class="l"><select data-bi="${i}" data-bk="va_tipo"${dis}><option value="dia"${!fx?' selected':''}>Dia trabalhado</option><option value="fixo"${fx?' selected':''}>Fixo</option></select></td><td>${num(i,'unitario',showMoney(r.unitario),75)}</td>${temFixo?`<td>${fx?num(i,'assid',showMoney(r.assid),75)+(perde?' <span class="chip c-bad" title="Faltou sem atestado">perde</span>':''):''}</td>`:''}<td>${fx?'':num(i,'dias_uteis',r.dias_uteis,50)}</td><td data-bsab="${i}">${fx?'':r.sab_trab||0}</td><td>${num(i,'faltas',r.faltas,50)}${fx?`<div class="note" style="margin:0">${+r.faltas_injust||0} sem atestado ${num(i,'faltas_injust',r.faltas_injust,40)}</div>`:''}</td><td data-bq="${i}">${r.quant??''}</td><td>${taxa(i,r)}</td><td data-bt="${i}"><b>${fm(r.total)}</b></td><td class="l">${txt(i,'obs',r.obs,220)}</td><td>${del(i)}</td></tr>`}).join('')}</tbody>
     <tfoot><tr><td class="l" colspan="${temFixo?10:9}"><b>Total</b></td><td><b id="bnVaTot">${tot(va)}</b></td><td colspan="2"></td></tr></tfoot>`
@@ -6216,14 +6228,14 @@ FOLACAO.benPend=async b=>{const t=$('bpT').value.trim();if(!t)return foErro('Esc
   b.disabled=false;if(error)return foErro('Não foi possível salvar. Verifique a internet e tente de novo.');dlgFol.close();toast('Pendência salva');renderBen()};
 // cadastro dos benefícios de cada colaborador (escritório)
 function renderBenCad(){
-  const R=benRegra(BEN.cli),fs=BEN.func.filter(f=>f.situacao!=='Desligado'),sel=(f,k,ops)=>`<select data-k="${k}">${ops.map(([v,t])=>`<option value="${v}"${(ff(f,k)||'')===v?' selected':''}>${t}</option>`).join('')}</select>`;
-  $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th class="l">Sábados</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th><th>R$ Assiduidade (no VA fixo)</th></tr></thead><tbody>${
+  const R=benRegra(BEN.cli),fs=BEN.func.filter(f=>f.situacao!=='Desligado'),sel=(f,k,ops)=>`<select data-k="${k}">${ops.map(([v,t])=>`<option value="${v}"${(bff(f,k)||'')===v?' selected':''}>${t}</option>`).join('')}</select>`;
+  $('bnCad').innerHTML=fs.length?`<thead><tr><th class="l">Colaborador</th><th class="l">Transporte</th><th class="l">Empresa</th><th>R$ por passagem</th><th class="l">Sábados</th><th class="l">Alimentação</th><th class="l">Empresa</th><th>R$ (dia ou fixo)</th><th>R$ Prêmio se não faltar (VA fixo)</th></tr></thead><tbody>${
     fs.map(f=>`<tr data-bc="${f.id}"><td class="l"><b>${esc(f.nome)}</b></td>
       <td class="l">${sel(f,'vt_tipo',[['','Não tem'],['vt','Vale transporte'],['ajuda','Ajuda de custo (sem VT)'],...(R.combustivel||ff(f,'vt_tipo')==='comb'?[['comb','Combustível']]:[])])}</td>
-      <td class="l"><input data-k="vt_empresa" value="${esc(ff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" class="money" value="${showMoney(ffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
+      <td class="l"><input data-k="vt_empresa" value="${esc(bff(f,'vt_empresa')||'')}" style="width:150px;min-width:150px"></td><td><input data-k="vt_unit" class="money" value="${showMoney(bffNum(f,'vt_unit'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
       <td class="l">${sel(f,'sab_escala',[['','Não trabalha'],['todos','Todos'],['alt','Alternados']])}</td>
       <td class="l">${sel(f,'va_tipo',[['','Não tem'],['dia','Por dia trabalhado'],['fixo','Fixo no mês']])}</td>
-      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" class="money" value="${showMoney(ffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
+      <td class="l"><input data-k="va_empresa" value="${esc(ff(f,'va_empresa')||'')}" style="width:140px;min-width:140px"></td><td><input data-k="va_valor" class="money" value="${showMoney(bffNum(f,'va_valor'))}" style="width:80px;min-width:80px" inputmode="decimal"></td>
       <td><input data-k="va_assid" class="money" value="${showMoney(ffNum(f,'va_assid'))}" style="width:80px;min-width:80px" inputmode="decimal"></td></tr>`).join('')}</tbody>`
     :'<tbody><tr><td class="l muted">Nenhum colaborador ativo.</td></tr></tbody>';
 }
@@ -6231,8 +6243,9 @@ $('bnCadSalvar').onclick=async ev=>{
   const b=ev.target,muda=[];
   for(const tr of document.querySelectorAll('#bnCad [data-bc]')){const f=BEN.func.find(x=>x.id===tr.dataset.bc),fx={...(f.folha_fixos||{})},g=k=>tr.querySelector(`[data-k="${k}"]`).value.trim();
     delete fx.vt_sab_nao;
-    for(const k of ['vt_tipo','vt_empresa','va_tipo','va_empresa','sab_escala'])if(g(k))fx[k]=g(k);else delete fx[k];
-    for(const k of ['vt_unit','va_valor','va_assid']){const n=parseMoney(g(k));if(Number.isNaN(n)){toast(`Confira o valor de ${f.nome}`);return}if(n)fx[k]=n;else delete fx[k]}
+    // o que é igual à ficha do colaborador não é gravado de novo (a ficha continua valendo); "Não tem" com a ficha preenchida grava 'nenhum'
+    for(const k of ['vt_tipo','vt_empresa','va_tipo','va_empresa','sab_escala']){const fb=benFb(f,k);if(g(k)&&g(k)!==fb)fx[k]=g(k);else if(!g(k)&&fb&&(k==='vt_tipo'||k==='va_tipo'))fx[k]='nenhum';else delete fx[k]}
+    for(const k of ['vt_unit','va_valor','va_assid']){const n=parseMoney(g(k));if(Number.isNaN(n)){toast(`Confira o valor de ${f.nome}`);return}if(n&&n!==benFb(f,k))fx[k]=n;else delete fx[k]}
     if(JSON.stringify(fx)!==JSON.stringify(f.folha_fixos||{}))muda.push([f,fx])}
   if(!muda.length){toast('Nada alterado');return}
   b.disabled=true;
@@ -7147,7 +7160,8 @@ function abrirColab(f){
     <h3>Benefícios</h3>
     <div class="fields"><label class="f">Transporte<select id="cbTr"${dis}>${[['','Não recebe'],['vt','Vale transporte'],['ajuda','Ajuda de custo'],['comb','Vale combustível']].map(([k,t])=>`<option value="${k}"${trAtual(v)===k?' selected':''}>${t}</option>`).join('')}</select></label>
       <label class="f" id="cbAjL"${trAtual(v)==='ajuda'?'':' hidden'}>Ajuda de custo por mês (R$)<input id="cbAj" class="money" value="${showMoney(v.folha_ajuda_custo)}"${dis}></label>
-      ${I('vt_valor_dia','VT por dia, ida e volta (R$)','text',' class="money"')}${I('vt_empresa','Empresa do VT')}${I('va_valor','VA por mês (R$)','text',' class="money"')}</div>
+      ${I('vt_valor_dia','VT por dia, ida e volta (R$)','text',' class="money"')}${I('vt_empresa','Empresa do VT')}${I('va_valor','VA por mês (R$)','text',' class="money"')}
+      <label class="f" title="Pago junto com o vale alimentação. A pessoa perde se faltar sem atestado (atestado não tira).">Prêmio no VA se não faltar (R$)<input id="cbAssid" class="money" value="${showMoney(f?ffNum(f,'va_assid'):null)}"${dis}></label></div>
     ${ehViva(cliAtual())?'<p class="note" style="margin:0">Viva: vale transporte marca “Sim” no desconto de VT da folha; ajuda de custo vai com o valor para a folha, sem desconto de VT.</p>':''}
     ${v.situacao==='Afastado'||!f?I('motivo_afastamento','Motivo do afastamento'):''}
     <p class="note" style="margin:0">Ajuda de custo, percentuais e VA/VT da folha ficam em Folha de pagamento › Colaboradores e valores fixos.</p>
@@ -7179,6 +7193,9 @@ $('cbSave').onclick=async()=>{
   const tr=$('cbTr').value,aj=tr==='ajuda'?parseMoney($('cbAj').value):null;
   if(tr==='ajuda'&&!(aj>0)){err.textContent='Informe o valor da ajuda de custo.';err.hidden=false;return}
   const fxT={...(f?.folha_fixos||{})};if(tr)fxT.vt_tipo=tr;else delete fxT.vt_tipo;o.folha_fixos=fxT;
+  // prêmio no VA se não faltar (Carol, 18/11): é a assiduidade do pedido de benefícios (folha_fixos.va_assid)
+  const pa=parseMoney($('cbAssid').value);if(Number.isNaN(pa)){err.textContent='Valor do prêmio no VA inválido.';err.hidden=false;return}
+  if(pa>0)fxT.va_assid=pa;else delete fxT.va_assid;
   if(tr==='ajuda')o.folha_ajuda_custo=aj;else if(f&&trAtual(f)==='ajuda')o.folha_ajuda_custo=null;
   if(ehViva(cliAtual()))o.folha_vt=tr==='vt';
   if(o.situacao==='Desligado'&&!f?.desligado_em)o.desligado_em=o.ultimo_dia_aviso||TODAY;if(o.situacao!=='Desligado')o.desligado_em=null;
