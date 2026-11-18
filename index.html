@@ -203,6 +203,9 @@ dialog[open]#dlgBCI{display:flex;flex-direction:column}#dlgBCI .db{flex:1;min-he
 .ccgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}.ccgrid>*{min-width:0}
 @media (max-width:900px){.ccgrid{grid-template-columns:minmax(0,1fr)}}
 #ccDoc img{max-width:100%;border:1px solid var(--line);border-radius:8px}#ccDoc iframe{width:100%;height:68vh;border:1px solid var(--line);border-radius:8px;background:#fff} #dlgRep .db>*{min-width:0}
+/* várias empresas no alto (Carol, 18/11) */
+.ctxbar .vsBtn{flex:0 0 auto;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:10px;padding:6px 10px;font:600 13px var(--body);cursor:pointer;white-space:nowrap}.ctxbar .vsBtn:hover{background:rgba(255,255,255,.18)}.ctxbar .vsBtn.on{background:#fff;color:#13232B}
+#vsLista{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 12px;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px 10px}#vsLista label{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;padding:4px 2px;margin:0;cursor:pointer;font-size:14px;font-weight:500;color:var(--ink)}#vsLista label[hidden]{display:none!important}#vsLista input{width:auto!important;margin:0;flex:0 0 auto}#vsAtalhos{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 #dlgFicha .fcSec{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px}#dlgFicha .fcSec h3{margin:0 0 6px;font-size:15px}#dlgFicha .fields{margin:0}#dlgFicha .err{margin:0 0 10px}
 .alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
 .alerta b{color:var(--warn)}
@@ -674,7 +677,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
 <header class="top">
   <div class="wrap topin">
     <div class="logo" id="logo"><span class="chip-logo"><img src="logo.png" alt="Controlacs Gestão Empresarial"></span><small>Portal do Cliente</small></div>
-    <div class="ctxbar" id="ctxbar" hidden><span>Empresa</span><select id="escCli" aria-label="Empresa"></select></div>
+    <div class="ctxbar" id="ctxbar" hidden><span>Empresa</span><select id="escCli" aria-label="Empresa"></select><button type="button" class="vsBtn" id="vsBtn" title="Marcar várias empresas e abrir os dados delas juntos">☑ Várias</button></div>
     <span class="spacer"></span>
     <nav class="topmods" id="topmods" aria-label="Controlacs, Configurações e Ajuda" hidden></nav>
     <div class="who" id="who" hidden></div>
@@ -874,7 +877,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
 
   <!-- TODAS AS EMPRESAS numa tela que é de uma empresa só: lista das empresas para abrir -->
   <section id="viewTodas" hidden>
-    <div><h1 id="tdTitle"></h1><p class="sub">Todas as empresas: esta tela mostra uma empresa por vez. Escolha a empresa para abrir.</p></div>
+    <div><h1 id="tdTitle"></h1><p class="sub"><span id="tdQuais">Todas as empresas</span>: esta tela mostra uma empresa por vez. Escolha a empresa para abrir.</p></div>
     <div class="card" style="margin-top:16px;padding:18px 20px"><div class="dlinks" id="tdLista"></div></div>
   </section>
 
@@ -1541,6 +1544,14 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
   <div class="db" id="fcBody"></div>
   <div class="df"><button type="button" class="btn ghost" id="fcDesf" hidden title="Volta a ficha para como estava antes da última alteração salva">Desfazer última alteração</button><span class="spacer"></span><button type="button" class="btn ghost" id="fcClose">Fechar</button><button type="button" class="btn primary" id="fcSave">Salvar ficha</button></div>
 </dialog>
+<dialog id="dlgVarias" style="max-width:720px;width:calc(100% - 32px)">
+  <div class="dh"><h2>Escolher várias empresas</h2><span class="spacer"></span><span class="chip" id="vsConta"></span></div>
+  <div class="db"><p class="note" style="margin:0 0 10px">Marque quantas empresas quiser: todas as telas e quadros passam a mostrar e somar só as empresas marcadas, como em "Todas as empresas". É só visualização: cada lançamento continua na própria empresa.</p>
+    <div id="vsAtalhos"></div>
+    <label class="f" style="margin:0 0 8px">Buscar empresa<input id="vsBusca" placeholder="Digite parte do nome"></label>
+    <div id="vsLista"></div><p class="err" id="vsErr" hidden></p></div>
+  <div class="df"><button type="button" class="btn ghost" id="vsTodas">Marcar todas</button><button type="button" class="btn ghost" id="vsLimpa">Limpar</button><span class="spacer"></span><button type="button" class="btn ghost" id="vsClose">Fechar</button><button type="button" class="btn primary" id="vsOk">Abrir juntas</button></div>
+</dialog>
 <dialog id="dlgOpCx" style="max-width:520px;width:calc(100% - 32px)">
   <div class="dh"><h2 id="ocTitle">Operadores do caixa</h2></div>
   <div class="db"><p class="note" style="margin:0 0 10px">Cadastre o nome das pessoas que operam o caixa nesta empresa. Na tela Caixa, quem fecha escolhe o próprio nome; o nome aparece na Conferência de caixa e na planilha do mês.</p>
@@ -2187,14 +2198,18 @@ function gruposTodos(){
   CLIENTES.filter(m=>m.ativo!==false&&!m.matriz_id&&CLIENTES.some(f=>f.matriz_id===m.id&&f.ativo!==false))
     .forEach(m=>l.push({id:'m:'+m.id,nome:m.nome+' + filiais',auto:true,empresas:[m.id,...CLIENTES.filter(f=>f.matriz_id===m.id&&f.ativo!==false).map(f=>f.id)]}));
   return l}
-const grupoSel=()=>{if(escCli.value!=='*')return null;const gid=escCli.selectedOptions[0]?.dataset.grupo;return gid?gruposTodos().find(g=>g.id===gid)||null:null};
+// várias empresas marcadas no alto (Carol, 18/11): funciona como um grupo, com o data-grupo 'sel'
+const VSK='portal_varias';
+let VSEL=(()=>{try{const a=JSON.parse(localStorage.getItem(VSK)||'[]');return Array.isArray(a)?a:[]}catch(e){return []}})();
+function vsGrupo(){const ns=VSEL.map(id=>CLIENTES.find(c=>c.id===id)?.nome).filter(Boolean);return {id:'sel',varias:true,empresas:VSEL.slice(),nome:ns.length<=3?ns.join(' + '):ns.length+' empresas'}}
+const grupoSel=()=>{if(escCli.value!=='*')return null;const gid=escCli.selectedOptions[0]?.dataset.grupo;if(gid==='sel')return VSEL.length?vsGrupo():null;return gid?gruposTodos().find(g=>g.id===gid)||null:null};
 // com um grupo escolhido, só as empresas dele; sem grupo, todas
 const noGrupo=id=>{const g=grupoSel();return !g||g.empresas.includes(id)};
 $('tdLista').addEventListener('click',e=>{const b=e.target.closest('[data-emp]');if(!b)return;escCli.value=b.dataset.emp;guardaEmp();openView()});
 // a empresa é escolhida uma vez no topo e vale para todos os módulos, inclusive depois de atualizar a página
 const EMPK='portal_empresa';
 let EMP=(()=>{try{return localStorage.getItem(EMPK)||''}catch(e){return ''}})();
-function guardaEmp(){const v=escCli.value;GSEL=v==='*'?escCli.selectedOptions[0]?.dataset.grupo||'':'';if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
+function guardaEmp(){const v=escCli.value;escCli.dataset.prev=escCli.selectedIndex;GSEL=v==='*'?escCli.selectedOptions[0]?.dataset.grupo||'':'';if(v&&v!=='*'&&v!=='int'){EMP=v;try{localStorage.setItem(EMPK,v)}catch(e){}}}
 function fillClientes(){
   // "Todas as empresas" continua escolhida ao trocar de módulo
   const m=VIEW,lista=empresasTopo(),doMod=empresasDe(m,true),cur=escCli.value,ant=escCli.dataset.mod,v=cur==='*'||cur==='int'&&ant===m?cur:EMP||cur;escCli.dataset.mod=m;
@@ -2204,13 +2219,41 @@ function fillClientes(){
   // grupos de empresas logo abaixo de "Todas as empresas" (Carol, 12/11)
   const grs=todas?gruposTodos().filter(g=>g.empresas.filter(id=>doMod.some(c=>c.id===id)).length>=(ehEsc()?1:2)):[];
   const grOpt=grs.length?`<optgroup label="Grupos de empresas">${grs.map(g=>`<option value="*" data-grupo="${esc(g.id)}">Grupo: ${esc(g.nome)}</option>`).join('')}</optgroup>`:'';
-  escCli.innerHTML=todas+grOpt+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
+  // várias empresas (Carol, 18/11): a seleção marcada fica logo abaixo de "Todas as empresas", e a opção para marcar outras
+  const vsN=todas?VSEL.filter(id=>doMod.some(c=>c.id===id)).length:0;
+  const vsOpt=todas?(vsN?`<option value="*" data-grupo="sel">Várias: ${esc(vsGrupo().nome)}</option>`:'')+'<option value="__varias">☑ Escolher várias empresas…</option>':'';
+  $('vsBtn').hidden=!todas;
+  escCli.innerHTML=todas+vsOpt+grOpt+internas+lista.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')||'<option value="">Nenhuma empresa</option>';
   if(lista.some(c=>c.id===v)||(todas&&v==='*')||(internas&&v==='int'))escCli.value=v;
   if(escCli.value==='*'&&GSEL){const i=[...escCli.options].findIndex(o=>o.dataset.grupo===GSEL);if(i>=0)escCli.selectedIndex=i;else GSEL=''}
   $('ctxbar').hidden=m.startsWith('cfg')||m.startsWith('ctl')||m==='avisos'||m==='projetos'||m==='agenda'||m==='manual';
   escCli.disabled=escCli.options.length<2;
 }
-escCli.onchange=()=>{guardaEmp();openView()};
+escCli.onchange=()=>{if(escCli.value==='__varias'){escCli.selectedIndex=+escCli.dataset.prev||0;vsAbre();return}guardaEmp();openView()};
+// ===== Escolher várias empresas (Carol, 18/11) =====
+function vsMarc(){return [...document.querySelectorAll('#vsLista input:checked')].map(x=>x.value)}
+function vsConta(){$('vsConta').textContent=vsMarc().length+' marcada(s)'}
+function vsDesenha(marc){const q=$('vsBusca').value,set=new Set(marc);
+  $('vsLista').innerHTML=empresasTopo().map(c=>`<label${buscaCasa(q,[c.nome])?'':' hidden'}><input type="checkbox" value="${c.id}"${set.has(c.id)?' checked':''}> ${esc(c.nome)}</label>`).join('')||'<p class="note">Nenhuma empresa.</p>';vsConta()}
+function vsAbre(){const lista=empresasTopo(),g=grupoSel(),ini=g?g.empresas:escCli.value&&escCli.value!=='*'&&escCli.value!=='int'?[escCli.value]:VSEL;
+  $('vsBusca').value='';$('vsErr').hidden=true;
+  // atalhos: os grupos cadastrados marcam as empresas deles de uma vez (dá para juntar grupos e empresas soltas)
+  $('vsAtalhos').innerHTML=gruposTodos().filter(x=>x.empresas.some(id=>lista.some(c=>c.id===id))).map(x=>`<button type="button" class="btn small ghost" data-vsg="${esc(x.id)}">+ ${esc(x.nome)}</button>`).join('');
+  vsDesenha(ini.filter(id=>lista.some(c=>c.id===id)));$('dlgVarias').showModal()}
+['focus','pointerdown'].forEach(ev=>escCli.addEventListener(ev,()=>{if(escCli.value!=='__varias')escCli.dataset.prev=escCli.selectedIndex}));
+$('vsBtn').addEventListener('click',vsAbre);
+$('vsBusca').addEventListener('input',()=>vsDesenha(vsMarc()));
+$('vsLista').addEventListener('change',vsConta);
+$('vsAtalhos').addEventListener('click',e=>{const b=e.target.closest('[data-vsg]');if(!b)return;const x=gruposTodos().find(g=>g.id===b.dataset.vsg);if(x)vsDesenha([...vsMarc(),...x.empresas])});
+$('vsTodas').addEventListener('click',()=>{const q=$('vsBusca').value;vsDesenha([...vsMarc(),...empresasTopo().filter(c=>buscaCasa(q,[c.nome])).map(c=>c.id)])});
+$('vsLimpa').addEventListener('click',()=>vsDesenha([]));
+$('vsClose').addEventListener('click',()=>$('dlgVarias').close());
+$('vsOk').addEventListener('click',()=>{const m=vsMarc();
+  if(!m.length){$('vsErr').textContent='Marque pelo menos uma empresa.';$('vsErr').hidden=false;return}
+  $('dlgVarias').close();
+  if(m.length===1){escCli.value=m[0];guardaEmp();fillClientes();openView();return}
+  VSEL=m;try{localStorage.setItem(VSK,JSON.stringify(m))}catch(e){}
+  GSEL='sel';escCli.value='*';fillClientes();guardaEmp();openView()});
 // a seção aberta fica guardada: ao atualizar a página, o portal volta para ela (Carol, 27/10)
 const SECK='portal_secao';
 // filtros e buscas das telas voltam ao padrão ao trocar de tela: o nome de fornecedor digitado não fica lá esquecido (Carol, 04/11)
@@ -2357,12 +2400,12 @@ function viewDaEmp(){
 let CLIDLG=null;
 const cliAtual=()=>CLIDLG||CLIENTES.find(c=>c.id===escCli.value);
 function renderTodas(){
-  const n=NAV.find(x=>x.k===VIEW);$('tdTitle').textContent=n?n.t:'';
+  const n=NAV.find(x=>x.k===VIEW);$('tdTitle').textContent=n?n.t:'';$('tdQuais').textContent=TODAS.nome;
   $('tdLista').innerHTML=empresasDe(VIEW).map(c=>`<button type="button" class="dlink" data-emp="${c.id}">${svgI(ICO[VIEW]?VIEW:'m_esc')}<span>${esc(c.nome)}</span></button>`).join('')||'<p class="muted" style="margin:0">Nenhuma empresa.</p>';
 }
 // telas da Gestão financeira que somam todas as empresas, para o pagamento do dia não esquecer nenhuma (Carol, 30/10)
 const GTTODAS=['gfpagar','gfrec','gfagenda','gfinad','gfmov'];
-const TODAS={id:'*',get nome(){const g=grupoSel();return g?'Grupo: '+g.nome:'Todas as empresas'},bpo_financeiro:true};
+const TODAS={id:'*',get nome(){const g=grupoSel();return g?(g.varias?'Várias: ':'Grupo: ')+g.nome:'Todas as empresas'},bpo_financeiro:true};
 const cliOuTodas=()=>escCli.value==='*'?TODAS:cliAtual();
 // telas que somam todas as empresas; nas outras, "Todas as empresas" mostra a lista das empresas para abrir a tela de cada uma
 const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
@@ -10183,7 +10226,7 @@ async function renderDash(){
   const cli=cliOuTodas(),g=$('dsGrid');$('dsTiles').innerHTML='';$('dsNote').textContent='';
   const hr=new Date().getHours(),nome=(ME?.nome||'').split(' ')[0];
   $('dsHello').textContent=(hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+(nome?', '+nome:'');
-  $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?(cli.id==='*'?(grupoSel()?'Resumo das empresas do grupo em ':'Resumo de todas as empresas em '):'Resumo da empresa em ')+dBR(TODAY)+'.':'';
+  $('dsTitle').textContent=cli?cli.nome:'Dashboard';$('dsSub').textContent=cli?(cli.id==='*'?(grupoSel()?(grupoSel().varias?'Resumo das empresas marcadas em ':'Resumo das empresas do grupo em '):'Resumo de todas as empresas em '):'Resumo da empresa em ')+dBR(TODAY)+'.':'';
   if(!cli){g.innerHTML='<p class="muted">Escolha uma empresa.</p>';return}
   g.innerHTML='<p class="muted">Carregando…</p>';
   if(!dsFin(cli))return dsModulos(cli);
