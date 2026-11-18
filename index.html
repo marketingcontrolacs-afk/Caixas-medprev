@@ -4655,7 +4655,13 @@ const diasDe=(base,n)=>isoLocal(new Date(dObj(base).getTime()+n*864e5));
 function bolConfere(bol,ref){if(!bol)return '';const ms=[];
   if(bol.venc&&dObj(bol.venc)<dObj(TODAY)-90*864e5)ms.push(`o vencimento do código de barras (${dBR(bol.venc)}) é antigo`);
   if(ref>0&&bol.valor>0&&(bol.valor/ref>5||ref/bol.valor>5))ms.push(`o valor do código de barras (${fm(bol.valor)}) é muito diferente de ${fm(ref)}`);
+  // emissor que não aplicou a regra de 2025 do fator de vencimento (passou de 9999 e escreveu 5 números, empurrando o valor):
+  // ex.: Royalties DIMAK venc. 20/11/2026 "1 10636000927875" = fator 10636 + valor 9.278,75 (Carol, 18/11)
+  const f5=ms.length?bolFora(bol):null;
+  if(f5)return `o boleto foi emitido fora do padrão dos bancos (fator de vencimento com 5 números): o certo seria vencimento ${dBR(f5.venc)} e valor ${fm(f5.valor)}, mas o banco vai ler ${fm(bol.valor)} e ${dBR(bol.venc)}. Peça um boleto novo ao fornecedor ou pague por Pix/TED`;
   return ms.join(' e ')}
+function bolFora(bol){const d=soDig(bol?.linha||'');if(bol?.tipo!=='banco'||d.length!==47||+d.slice(33,38)<10000)return null;
+  const venc=diasDe('1997-10-07',+d.slice(33,38)),valor=+d.slice(38)/100;return Math.abs(dObj(venc)-dObj(TODAY))<2*365*864e5&&valor>0?{venc,valor}:null}
 // conta do mês anterior do mesmo fornecedor (para comparar o valor do boleto novo com o último, nunca com um antigo) (Carol, 18/11)
 function mesAnterior(t,lista){if(!t?.vencimento)return null;const k=pessoaChave(t.pessoa_nome||''),lim=somaMes(t.vencimento,-2);
   return (lista||GT.lista||[]).filter(y=>y.id!==t.id&&y.cliente_id===t.cliente_id&&y.tipo===t.tipo&&y.vencimento<t.vencimento&&y.vencimento>=lim&&!y.previsto
@@ -9413,7 +9419,7 @@ async function leArquivoDoc(f){
   else return {erro:'Envie o boleto, a nota ou o cupom em PDF, foto ou XML.'};
   const r=lerTextoDoc(t),n=textoNota(t);
   // guia de imposto (DARF, DCTFWeb, GPS, DAS, FGTS) e recibo (ex.: de aluguel): os campos próprios valem mais que a leitura genérica (Carol, 18/11)
-  await guiasCarrega();const g=guiaDe(t),cli=typeof cliAtual==='function'?cliAtual():null,rc=g?null:reciboDe(pdfTexto.lay||t,cli?.cnpj);
+  await guiasCarrega();const g=guiaDe(t),cli=typeof cliAtual==='function'?cliAtual():null,rc=g||r.bol||/recibo\s+do\s+(?:sacado|pagador)|ficha\s+de\s+compensa/i.test(t)?null:reciboDe(pdfTexto.lay||t,cli?.cnpj);
   const out={...n,...nfseDe(t),bol:r.bol,nfe:r.nfe,cnpjs:cnpjsDoTexto(t),origem,texto:t};
   if(g){Object.assign(out,{guia:g,valor:g.valor||out.valor,venc:g.venc||out.venc,numero:g.numero||'',nfseNum:'',servico:'',origem:GUIA_NOME[g.guia]+(origem==='PDF'?'':' ('+origem+')')});
     if(r.bol&&r.bol.tipo==='conc'&&!r.bol.venc&&g.venc)out.bol={...r.bol,venc:g.venc}}
@@ -9433,7 +9439,7 @@ async function gtLeArquivo(f,mais,cat){
   // conta já lançada com valor diferente do boleto: pergunta antes de trocar e oferece atualizar as próximas previstas (Carol, 13/11)
   const t0=GTR,dup0=(r.dups||[]).find(d=>d.venc>=TODAY)||(r.dups||[])[0],vb=r2(+(r.bol?.valor||dup0?.valor||r.valor||0)),va=parseMoney($('gt_valor')?.value);
   const ant=t0?mesAnterior(t0):null,susp=r.bol?bolConfere(r.bol,va||t0?.valor||ant?.valor):'';
-  if(susp){avisos.push(`a linha digitável lida não confere: ${susp}. Não preenchi o valor, o vencimento nem a linha; confira o boleto (a linha digitável impressa pode estar errada)`);r.bol=null}
+  if(susp){const f5=bolFora(r.bol);if(f5){r.valor=r.valor||f5.valor;r.venc=r.venc||f5.venc}avisos.push(`a linha digitável lida não confere: ${susp}. Não preenchi o valor, o vencimento nem a linha; confira o boleto (a linha digitável impressa pode estar errada)`);r.bol=null}
   const difP=!!(t0&&t0.tipo==='pagar'&&cat!=='Nota fiscal'&&vb>0&&va>0&&Math.abs(va-vb)>0.004)&&!susp;
   const poe=(id,v,txt,fmt,money)=>{const el=$(id);if(!el||el.disabled||v==null||v==='')return;if(id==='gt_valor'&&difP)return;
     const atual=money?parseMoney(el.value):el.value.trim();
@@ -9754,7 +9760,7 @@ async function ltSug(x){x.sugFeita=true;
   // linha digitável que não confere com a conta lançada ou com o mês anterior do fornecedor: não cria sem conferir (Carol, 18/11)
   if(x.bol){const td=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null,an=mesAnterior({id:null,cliente_id:LT.cli.id,tipo:'pagar',pessoa_nome:x.forn,vencimento:somaMes(TODAY,1)});
     x.susp=bolConfere(x.bol,td?.valor||an?.valor);x.ant=an;
-    if(x.susp){const n=textoNota(x.texto||'');x.ok=false;x.valor=n.valor||null;x.venc=n.venc||'';x.linha='';x.bol=null}}}
+    if(x.susp){const n=textoNota(x.texto||''),f5=bolFora(x.bol);x.ok=false;x.valor=f5?.valor||n.valor||null;x.venc=f5?.venc||n.venc||'';x.linha='';x.bol=null}}}
 function ltConta(){const n=LT.it.filter(x=>x.ok&&!x.erro).length;$('ltCriar').disabled=!n||LT.lendo>0;$('ltCriar').textContent=n?`Criar os ${n} lançamentos marcados`:'Criar os lançamentos marcados';
   $('ltNote').textContent=LT.lendo?`Lendo ${LT.lendo} arquivo${LT.lendo>1?'s':''}…`:`${LT.it.length} lançamento${LT.it.length===1?'':'s'} na lista`}
 function ltDesenha(){
