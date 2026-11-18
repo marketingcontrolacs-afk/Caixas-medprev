@@ -1428,14 +1428,14 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
       <div><h1>Pedido de benefícios</h1><p class="sub">Vale transporte, combustível e alimentação. O pedido é feito no fim do mês para o mês seguinte e já desconta as faltas, atestados e férias.</p></div>
       <div class="row" style="align-items:flex-end"><label class="f">Mês de uso<select id="bnMes"></select></label><button class="btn" id="bnBaixar">Baixar planilha</button><button class="btn primary" id="bnSalvar">Salvar pedido</button></div>
     </div>
-    <div class="card block" style="margin-top:16px"><div class="row" id="bnBar"></div></div>
+    <div class="card block" style="margin-top:16px"><div class="row" id="bnBar"></div><p class="note" id="bnRegTxt" hidden style="margin:10px 0 0"></p></div>
     <h2 style="margin-top:18px">Escala de sábados</h2>
     <div class="card tablebox"><table id="bnSab"></table></div>
     <h2 style="margin-top:18px" id="bnVtTit">Vale transporte e combustível</h2>
     <div class="card tablebox"><table id="bnVt"></table></div>
     <h2 style="margin-top:18px">Alimentação</h2>
     <div class="card tablebox"><table id="bnVa"></table></div>
-    <p class="note">Dias = dias úteis do mês de uso + sábados da escala − faltas, atestados e férias. Passagens = dias × 2. Alimentação por dia = dias × valor do dia; alimentação fixa (Viva) = valor fixo, que atestado não desconta, mais o prêmio se não faltar (do cadastro de cada um), que a pessoa perde com qualquer falta ou atestado, compensada ou não (folga de aniversário e folga do banco de horas não tiram). Perdeu o cartão do vale alimentação ou do combustível: marque “2ª via” e a taxa de R$ 9,00 sai do valor do benefício. As faltas e atestados vêm do Espelho de ponto do mês do pedido (importado na seção Espelho de ponto); se o ponto for importado depois de salvar, o rascunho atualiza as faltas sozinho. Dá para mudar qualquer número antes de salvar.</p>
+    <p class="note">Dias = dias úteis do mês de uso + sábados da escala − faltas, atestados e férias. Passagens = dias × 2. Alimentação por dia = dias × valor do dia; alimentação fixa (Viva) = valor fixo, que atestado não desconta, mais o prêmio se não faltar (do cadastro de cada um), que a pessoa perde com falta do ponto, compensada ou não, e com atestado se as Regras de benefícios da empresa mandarem. Perdeu o cartão do vale alimentação ou do combustível: marque “2ª via” e a taxa de R$ 9,00 sai do valor do benefício. As faltas e atestados vêm do Espelho de ponto do mês do pedido (importado na seção Espelho de ponto); se o ponto for importado depois de salvar, o rascunho atualiza as faltas sozinho. Dá para mudar qualquer número antes de salvar.</p>
     <h2 style="margin-top:22px">Contas a pagar do pedido</h2>
     <div class="card tablebox"><table id="bnCp"></table></div>
     <p class="note" id="bnCpNote">Ao marcar o pedido como feito, o sistema cria uma conta a pagar por fornecedor nesta empresa: valor do pedido + taxa do boleto do fornecedor. Anexe aqui o boleto de cada fornecedor: o sistema lê o boleto e avisa se o valor não bate, se o boleto é de outra empresa (CNPJ do pagador) ou se o mesmo boleto já está em outra conta.</p>
@@ -1445,6 +1445,8 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
       <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Benefícios de cada colaborador</h2><button class="btn" id="bnCadSalvar">Salvar cadastro</button></div>
       <div class="card tablebox"><table id="bnCad"></table></div>
       <p class="note">Esses valores montam o pedido de cada mês. "Sábados" preenche a escala de sábados do mês (todos, alternados ou nenhum); depois dá para marcar sábado a sábado na escala. A partir de 16/02/2027 (escala 5x2) ninguém entra trabalhando no sábado.</p>
+      <div class="row" style="justify-content:space-between;margin-top:22px"><h2>Regras de benefícios desta empresa</h2><button class="btn" id="bnRegSalvar">Salvar regras</button></div>
+      <div class="card block" id="bnReg"></div>
     </div>
   </section>
   <!-- RH · COLABORADORES E PRAZOS -->
@@ -5923,7 +5925,9 @@ $('prSalvar').onclick=async ev=>{
 // Viva: VA fixo (atestado não desconta) com a assiduidade paga junto, que a pessoa perde se faltar.
 // Combustível só onde a empresa tem (Oliveira e BJ). Desconto na folha: Oliveira não desconta; as demais, 6% VT e R$ 1,00 VA.
 const BEN_PADRAO={desconta:true,combustivel:false};
-const benRegra=cli=>({...BEN_PADRAO,...(cli?.folha_modelo?.beneficios||{})});
+// regras de benefícios de cada empresa (clientes.folha_modelo.beneficios). premio_atestado: atestado tira o prêmio no VA
+// (Carol 18/11: na Viva tira; cada empresa tem a sua regra). Padrão: só a Viva.
+const benRegra=cli=>{const r={...BEN_PADRAO,...(cli?.folha_modelo?.beneficios||{})};if(r.premio_atestado==null)r.premio_atestado=ehViva(cli);return r};
 let BEN={cli:null,comp:null,rows:[],salvo:false,mes:null,pend:[],func:[],cal:null};
 function initBen(){
   if(!$('bnMes').options.length){$('bnMes').innerHTML=mesesOpts(addMes(TODAY,2).slice(0,7));$('bnMes').value=addMes(TODAY,1).slice(0,7)}
@@ -6001,8 +6005,8 @@ async function renderBen(){
     ls.filter(l=>l.coluna==='faltas_dias'||l.coluna==='faltas_data').forEach(l=>{const k=+l.quantidade||1;n+=k;inj+=k;t.push(`falta ${l.data?dBR(l.data).slice(0,5):''}`.trim())});
     // banco de horas (Viva): os dias de falta vêm do ponto como observação "Faltas: N dias (dd/mm, ...)"
     ls.filter(l=>l.coluna==='observacoes'&&/^\W*faltas:/i.test(l.texto||'')).forEach(l=>{const k=+((l.texto.match(/(\d+)\s*dia/)||[])[1]||1);n+=k;inj+=k;t.push('falta '+(l.texto.match(/\d{2}\/\d{2}/g)||[]).join(', '))});
-    // atestado também tira o prêmio no VA (Carol, 18/11); férias não
-    ls.filter(l=>l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')).forEach(l=>{const ds=(l.texto.match(/\d{2}\/\d{2}/g)||[]),k=ds.length||1;n+=k;inj+=k;t.push('atestado '+ds.join(', '))});
+    // atestado tira o prêmio no VA quando a regra da empresa manda (Viva: tira, Carol 18/11); férias nunca tiram
+    ls.filter(l=>l.coluna==='observacoes'&&/^\W*atestado/i.test(l.texto||'')).forEach(l=>{const ds=(l.texto.match(/\d{2}\/\d{2}/g)||[]),k=ds.length||1;n+=k;if(R.premio_atestado)inj+=k;t.push('atestado '+ds.join(', '))});
     (rv.data||[]).filter(x=>x.status!=='Devolvida'&&(x.matricula&&f.matricula?String(x.matricula)===String(f.matricula):nomeIg(x.nome)===nomeIg(f.nome))).forEach(x=>{const k=benUteis(x.inicio,x.fim_real,comp,fer);if(k){n+=k;t.push(`férias ${dBR(x.inicio).slice(0,5)} a ${dBR(x.fim_real).slice(0,5)} (${k} ${k===1?'dia':'dias'})`)}});
     return {n,inj,t:t.join('; ')}};
   BEN.salvo=(rp.data||[]).length>0;
@@ -6028,8 +6032,24 @@ async function renderBen(){
   $('bnSalvar').hidden=!lanca;$('bnBaixar').hidden=!BEN.rows.length;
   $('bnVtTit').textContent=R.combustivel?'Vale transporte e combustível':'Vale transporte';
   benEscala(lanca);benTabelas(lanca);renderBenPend(lanca);renderBenCp(lanca);
-  $('bnCadBox').hidden=!e;if(e)renderBenCad();
+  $('bnCadBox').hidden=!e;if(e){renderBenCad();renderBenReg()}
+  $('bnRegTxt').hidden=!R.texto;$('bnRegTxt').innerHTML=R.texto?`<b>Regras de benefícios desta empresa:</b> ${esc(R.texto).replace(/\n/g,'<br>')}`:'';
 }
+// Regras de benefícios de cada empresa (Carol 18/11): cada empresa tem as suas; ficam em clientes.folha_modelo.beneficios
+function renderBenReg(){
+  const R=benRegra(BEN.cli),sn=(k,v,t)=>`<label class="f">${t}<select data-rg="${k}"><option value="1"${v?' selected':''}>Sim</option><option value="0"${v?'':' selected'}>Não</option></select></label>`;
+  $('bnReg').innerHTML=`<div class="fields">${sn('desconta',R.desconta,'Desconta na folha (6% de VT e R$ 1,00 de VA)')}${sn('combustivel',R.combustivel,'Tem vale combustível')}${sn('premio_atestado',R.premio_atestado,'Atestado tira o prêmio no VA')}</div>
+    <p class="note" style="margin:6px 0">Prêmio no VA se não faltar: o valor é de cada colaborador (na ficha dele). Falta do ponto sempre tira, compensada ou não; férias não tiram. Folga de aniversário e folga do banco de horas não aparecem como falta no ponto.</p>
+    <label class="f">Regras escritas (aparecem no alto do pedido)<textarea id="bnRegT" rows="3" placeholder="Ex.: perde o prêmio com qualquer falta ou atestado; não perde com folga de aniversário ou de banco de horas.">${esc(R.texto||'')}</textarea></label>`;
+}
+$('bnRegSalvar').onclick=async ev=>{
+  const b=ev.target,cli=BEN.cli,ant=cli.folha_modelo||{},R=benRegra(cli),nv={...R,confirmado:true,texto:$('bnRegT').value.trim()||null};
+  document.querySelectorAll('#bnReg [data-rg]').forEach(x=>nv[x.dataset.rg]=x.value==='1');
+  if(!nv.texto)delete nv.texto;const fm2={...ant,beneficios:nv};
+  b.disabled=true;const {error}=await sb.from('clientes').update({folha_modelo:fm2}).eq('id',cli.id);b.disabled=false;
+  if(error){fail(error);return}cli.folha_modelo=fm2;renderBen();
+  toastDesfazer('Regras de benefícios salvas',async()=>{const {error:e2}=await sb.from('clientes').update({folha_modelo:ant}).eq('id',cli.id);if(e2){fail(e2);return}cli.folha_modelo=ant;renderBen();toast('Regras voltaram como estavam')});
+};
 const benNome=id=>BEN.func.find(f=>f.id===id)?.nome||'?';
 const benIds=()=>[...new Set(BEN.rows.filter(r=>!(r.tipo==='va'&&r.va_tipo==='fixo')).map(r=>r.funcionario_id))].sort((a,b)=>benNome(a).localeCompare(benNome(b)));
 // escala de sábados do mês de uso: quem trabalha em cada sábado (soma nos dias do VT e do VA por dia)
@@ -7162,7 +7182,7 @@ function abrirColab(f){
     <div class="fields"><label class="f">Transporte<select id="cbTr"${dis}>${[['','Não recebe'],['vt','Vale transporte'],['ajuda','Ajuda de custo'],['comb','Vale combustível']].map(([k,t])=>`<option value="${k}"${trAtual(v)===k?' selected':''}>${t}</option>`).join('')}</select></label>
       <label class="f" id="cbAjL"${trAtual(v)==='ajuda'?'':' hidden'}>Ajuda de custo por mês (R$)<input id="cbAj" class="money" value="${showMoney(v.folha_ajuda_custo)}"${dis}></label>
       ${I('vt_valor_dia','VT por dia, ida e volta (R$)','text',' class="money"')}${I('vt_empresa','Empresa do VT')}${I('va_valor','VA por mês (R$)','text',' class="money"')}
-      <label class="f" title="Pago junto com o vale alimentação. A pessoa perde com qualquer falta ou atestado, compensada ou não. Folga de aniversário e folga do banco de horas não tiram.">Prêmio no VA se não faltar (R$)<input id="cbAssid" class="money" value="${showMoney(f?ffNum(f,'va_assid'):null)}"${dis}></label></div>
+      <label class="f" title="Pago junto com o vale alimentação. A pessoa perde com falta do ponto; com atestado, conforme as Regras de benefícios da empresa (no Pedido de benefícios).">Prêmio no VA se não faltar (R$)<input id="cbAssid" class="money" value="${showMoney(f?ffNum(f,'va_assid'):null)}"${dis}></label></div>
     ${ehViva(cliAtual())?'<p class="note" style="margin:0">Viva: vale transporte marca “Sim” no desconto de VT da folha; ajuda de custo vai com o valor para a folha, sem desconto de VT.</p>':''}
     ${v.situacao==='Afastado'||!f?I('motivo_afastamento','Motivo do afastamento'):''}
     <p class="note" style="margin:0">Ajuda de custo, percentuais e VA/VT da folha ficam em Folha de pagamento › Colaboradores e valores fixos.</p>
