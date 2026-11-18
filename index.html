@@ -207,6 +207,11 @@ dialog[open]#dlgBCI{display:flex;flex-direction:column}#dlgBCI .db{flex:1;min-he
 .alerta{margin-top:16px;padding:14px 18px;border:1px solid var(--warn);background:var(--warn-soft);border-radius:12px;display:grid;gap:4px}
 .alerta b{color:var(--warn)}
 .alerta.bad{border-color:var(--bad);background:var(--bad-soft)}.alerta.bad b{color:var(--bad)}
+/* Ocultar avisos (OC): botão ✕ Ocultar em todo aviso; oculto vira uma linha com Mostrar aviso */
+.oc-ok{padding-right:104px!important}.oc-x{position:absolute;top:8px;right:8px;z-index:1}
+.oc-off{padding:8px 12px!important;background:transparent!important;border-style:dashed!important;min-height:0!important}.oc-off>*:not(.oc-l){display:none!important}
+.oc-l{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.oc-l i{font-style:normal;color:var(--ink,inherit)}
+@media (max-width:640px){.oc-ok:not(.oc-off){padding-right:14px!important;padding-top:44px!important}}
 .gcfil th{padding-top:0}.gcfil input{font-size:13px;padding:4px 8px;min-width:0;width:100%;box-sizing:border-box}
 .tcres{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:8px}.tcres ul{margin:0;padding-left:20px;display:grid;gap:6px}
 .rat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:10px}
@@ -704,8 +709,8 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
 
   <div class="shell" id="app" hidden>
     <div style="min-width:0">
-      <div class="alerta" id="tpBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
-      <div class="alerta" id="avBanner" hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
+      <div class="alerta" id="tpBanner" data-oc-global hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
+      <div class="alerta" id="avBanner" data-oc-global hidden style="margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div class="alerta" id="rotVisBanner" hidden style="margin:0 0 14px"></div>
       <div class="alerta" id="soVerBanner" hidden style="margin:0 0 14px"><b>Somente visualização</b><span>Você pode ver e baixar o que está nesta tela, mas não lançar, alterar ou excluir. Para isso, peça ao master para marcar “Executar” nesta ferramenta.</span></div>
   <!-- OPERADOR -->
@@ -1078,7 +1083,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
       <div><h1>Portal da contabilidade</h1><p class="sub" id="ctbSub"></p></div>
       <div class="row" style="align-items:flex-end" id="ctbAcoes"></div>
     </div>
-    <div id="ctbAlerta"></div>
+    <div id="ctbAlerta" data-oc-global="emp"></div>
     <div class="tabs" role="tablist" id="tabsCtb">
       <button role="tab" data-tab="ctbexp">Fechamento e exportação</button>
       <button role="tab" data-tab="ctbdepara">De-para de contas</button>
@@ -2296,6 +2301,32 @@ document.addEventListener('click',e=>{const th=e.target.closest('th.so-ok');if(!
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('th.so-ok')){e.preventDefault();e.target.click()}});
 new MutationObserver(SO.agenda).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',SO.agenda);
+// ---- OCULTAR AVISOS (Carol, 18/11): todo aviso/faixa (.alerta, .note.warn, [data-oc]) ganha sozinho o botão ✕ Ocultar.
+// Some por 7 dias, por tela e empresa, neste computador; fica uma linha "Aviso oculto até ... · Mostrar" para trazer de volta.
+// data-oc-global: vale em todas as telas (="emp": todas as telas, por empresa). Aviso novo já nasce com o botão. Fora: avisos dentro de janelas (dialog) e formulários, barras de seleção (…Bulk) e classe .nooc.
+const OCU={K:'ctl_oc',DIAS:7,raf:0,ocupado:false};
+OCU.le=()=>{try{const o=JSON.parse(localStorage.getItem(OCU.K)||'{}'),t=Date.now();let mud=false;for(const k in o)if(!(o[k]>t)){delete o[k];mud=true}if(mud)OCU.grava(o);return o}catch(e){return {}}};
+OCU.grava=o=>{try{localStorage.setItem(OCU.K,JSON.stringify(o))}catch(e){}};
+OCU.titulo=el=>{const b=[...el.querySelectorAll('b,strong')].find(x=>!x.closest('.oc-x'));
+  let t=String((b||el).textContent||'').replace(/✕ Ocultar|Mostrar/g,'');t=t.replace(/\s+/g,' ').trim();return t.length>90?t.slice(0,88)+'…':t};
+OCU.chave=el=>{const ge=el.closest('[data-oc-global]'),ga=ge?ge.getAttribute('data-oc-global'):null,g=ga!=null&&ga!=='emp',v=ga!=null?'*':typeof VIEW==='string'?VIEW:'';let emp='';try{emp=g||ga==null&&v&&telaSemEmp(v)?'':(escCli?.value||'')}catch(e){}
+  const t=OCU.titulo(el).replace(/\d+([.,]\d+)*/g,'#').toLowerCase();return [v,emp,el.id||'',t].join('|')};
+OCU.pode=el=>!(el.classList.contains('nooc')||el.closest('dialog,form,.nooc')||/Bulk$/.test(el.id||'')||el.id==='novaVersao'
+  ||el.querySelector('#tcOculta,#tcMostra,input,select,textarea')||!OCU.titulo(el));
+OCU.marca=el=>{const k=OCU.chave(el),ate=OCU.le()[k]||0,x=el.querySelector(':scope>.oc-x');
+  if(x&&x.dataset.k===k&&(!!ate)===el.classList.contains('oc-off'))return;
+  OCU.ocupado=true;try{x?.remove();el.querySelector(':scope>.oc-l')?.remove();el.classList.add('oc-ok');el.classList.toggle('oc-off',!!ate);
+    if(getComputedStyle(el).position==='static')el.style.position='relative';
+    el.insertAdjacentHTML('afterbegin',`<button type="button" class="btn small ghost oc-x" data-k="${esc(k)}" title="Ocultar este aviso por ${OCU.DIAS} dias nesta tela${k.split('|')[1]?' e empresa':''}, neste computador">✕ Ocultar</button>`);
+    if(ate)el.insertAdjacentHTML('beforeend',`<span class="oc-l">⚠ Aviso oculto até ${dBR(isoLocal(new Date(ate)))}: <i>${esc(OCU.titulo(el))}</i> <button type="button" class="btn small ghost oc-m" data-k="${esc(k)}">Mostrar aviso</button></span>`)}
+  finally{OCU.ocupado=false}};
+OCU.passo=()=>{OCU.raf=0;document.querySelectorAll('.alerta,.note.warn,[data-oc]').forEach(el=>{if(OCU.pode(el))OCU.marca(el);else if(el.classList.contains('oc-ok')){el.classList.remove('oc-ok','oc-off');el.querySelectorAll(':scope>.oc-x,:scope>.oc-l').forEach(n=>n.remove())}})};
+OCU.agenda=()=>{if(!OCU.ocupado&&!OCU.raf)OCU.raf=requestAnimationFrame(OCU.passo)};
+document.addEventListener('click',e=>{const b=e.target.closest('.oc-x,.oc-m');if(!b)return;e.stopPropagation();const o=OCU.le(),k=b.dataset.k;
+  if(b.classList.contains('oc-x')){o[k]=Date.now()+OCU.DIAS*864e5;OCU.grava(o);OCU.passo();toast?.('Aviso oculto por '+OCU.DIAS+' dias. Para ver de novo, use “Mostrar aviso”.')}
+  else{delete o[k];OCU.grava(o);OCU.passo()}},true);
+new MutationObserver(OCU.agenda).observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',OCU.agenda);
 const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
@@ -15398,6 +15429,8 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18ocultar',data:'2026-11-18',t:'Ocultar avisos em todas as telas',itens:[
+    {x:'Todo aviso ou faixa do sistema (ficha incompleta, tarefas pendentes, avisos novos, conferências, lançamentos alterados, contabilidade, notas, recebíveis e os que vierem) agora tem o botão ✕ Ocultar no canto. Ele some por 7 dias nesta tela e empresa, neste computador, e fica só uma linha “Aviso oculto até…” com o botão Mostrar aviso para trazer de volta.'}]},
   {k:'2026-11-18ficha',data:'2026-11-18',t:'Ficha completa da empresa',itens:[
     {x:'Configurações › Cadastro de empresas: cada empresa tem agora a 📋 Ficha, com CNPJ obrigatório (digitou, o sistema busca na Receita a razão social, o nome fantasia e o endereço), contato, serviços contratados, contrato com a Controlacs e regras. A lista mostra se a ficha está completa ou o que falta, com busca em todas as colunas e filtro.',para:'esc'},
     {x:'Empresa nova só entra com a ficha completa. O que gera arquivo ou documento (remessa CNAB, NFS-e, recibos, documentos do RH, pedido de benefícios) é obrigatório. Empresa antiga com a ficha incompleta não é bloqueada: aparece o aviso e a tarefa para completar. Salvou errado? Use Desfazer.',para:'esc'},
