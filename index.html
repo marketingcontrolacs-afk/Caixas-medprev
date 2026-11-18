@@ -990,6 +990,8 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
         <div><h2 style="margin:0">Repasses pagos: notas a emitir</h2><p class="sub" id="nfPgSub" style="margin:4px 0 0"></p></div>
         <div class="row" style="align-items:flex-end;flex-wrap:wrap">
           <label class="f">Empresa que pagou<select id="nfPgEmp"></select></label>
+          <label class="f">Pago de<input type="date" id="nfPgDe"></label>
+          <label class="f">até<input type="date" id="nfPgAte"></label>
           <label class="f">Mês do pagamento<select id="nfPgMes"></select></label>
           <label class="f">Mostrar<select id="nfPgF"><option value="pend">Falta emitir a NF</option><option value="feita">NF emitida</option><option value="nao">Não emitir NF</option><option value="todos">Todos os pagos</option></select></label>
           <input id="nfPgBusca" placeholder="Buscar clínica, CNPJ ou protocolo" style="max-width:240px" aria-label="Buscar nos repasses pagos">
@@ -2488,7 +2490,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('.oc-x,.oc-m');if
   else{delete o[k];OCU.grava(o);OCU.passo()}},true);
 new MutationObserver(OCU.agenda).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',OCU.agenda);
-const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgF','nfPgBusca','prEmp','prConta','prForma','prNF','prBusca','nrEmp','nrSit','nrBusca','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
+const FILTROS=['pFiltro','pBusca','gtFiltro','gtIni','gtFim','mvConta','mvTipo','mvPessoa','mvCat','mvSit','mvEmp','mvAnexo','mvForma','mvConc','mvVmin','mvVmax','gtBusca','gteFiltro','gcFiltro','gcBusca','gcfData','gcfHist','gcfValor','gcfLanc','nfFiltro','nfEmp','nfBusca','rnFiltro','rnSitF','rnPixF','rnEmpF','rnBusca','rnLote','rnDe','rnAte','ftBusca','pcBusca','pcFiltro','gfBusca','gfPapel','gfFiltro','avFiltro','pjBusca','pjSit','pjTipo','pjQuem','tBusca','tResp','tConc','usBusca','fbcBusca','fFiltro','cbFiltro','nfPgMes','nfPgDe','nfPgAte','nfPgF','nfPgBusca','prEmp','prConta','prForma','prNF','prBusca','nrEmp','nrSit','nrBusca','ctBusca','ctTipo','cvDe','cvAte','cvVisao','cvCanal','cvBand','cvBusca','rcDe','rcAte','rcVisao','rcAdq','rcSit','rcBusca']
   .map(id=>{const el=$(id);if(!el)return null;const o=el.tagName==='SELECT'?[...el.options]:null;return [el,o?((o.find(x=>x.defaultSelected)||o[0])?.value||''):el.defaultValue||'']}).filter(Boolean);
 function limpaFiltros(){
   FILTROS.forEach(([el,v])=>{if(el.value===v)return;el.value=v;if(el.tagName==='SELECT'&&el.selectedIndex<0&&el.options.length)el.selectedIndex=0});
@@ -15815,6 +15817,7 @@ const NOVIDADES=[
     {x:'Tarefas e recados: ao criar ou abrir uma tarefa, o escritório escolhe “Repetir” (toda semana, a cada 15 dias, todo mês, a cada 2, 3 ou 6 meses, todo ano) e, se quiser, “Repetir até”. Quando a tarefa é concluída, o sistema cria sozinho a próxima, com o mesmo título, descrição, executor e quem vê, e o prazo do próximo período. Ex.: enviar o extrato da XP todo mês.',para:'esc'},
     {x:'O cartão mostra 🔁 com a frequência. Reabrir a tarefa concluída desfaz a próxima, se ninguém mexeu nela. Para parar de repetir, escolha “Não repete” na tarefa em aberto.',para:'esc'}]},
   {k:'2026-11-18parceirosmp',data:'2026-11-18',t:'Módulo Parceiros MP e notas fiscais dos parceiros',itens:[
+    {x:'Notas fiscais dos parceiros: filtro de período pela data do pagamento (Pago de / até).'},
     {x:'Novo módulo Parceiros MP no alto, com Repasse da semana, Notas fiscais dos parceiros, Restituições efetuadas e o cadastro de Parceiros. Ele aparece só nas empresas com o serviço “Parceiros MP” marcado na ficha da empresa (ou na coluna Parceiros MP de Configurações › Cadastro de empresas). Os parceiros saíram da Gestão financeira: as outras empresas usam o cadastro de fornecedores.',mods:['gfrepasse','gfnf','gfrestit','repasse'],para:'esc'},
     {x:'Repasse da semana: “Importar relatório de repasses” aceita o relatório novo (Data, Parceiro, Identificador, Bruto, Repasse, Descontos…). Só entram as linhas com situação Pendente. O valor a pagar é a coluna Repasse, e o valor da nota fiscal é Bruto − (Repasse + Descontos), que aparece embaixo do valor de cada parceiro. O relatório antigo continua funcionando.',mods:['gfrepasse']},
     {x:'Notas fiscais dos parceiros: em “Repasses pagos: notas a emitir” aparecem todas as clínicas pagas, separadas pela empresa que pagou, com o valor da NF. Marque as que serão emitidas e use “NF emitida”, ou “Não emite”. A escolha fica guardada no parceiro (Emite NF ou Não emitir NF) e já vem preenchida nos próximos repasses. “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.',mods:['gfnf']},
@@ -17827,8 +17830,8 @@ async function nfPgCarrega(recarrega){
   }
   nfPgDesenha();
 }
-function nfPgFiltrados(){const emp=$('nfPgEmp').value,mes=$('nfPgMes').value,qd=($('nfPgBusca')?.value||'').trim(),q=chave(qd);
-  return NFP.itens.filter(i=>(!emp||i.empresa_id===emp)&&(!mes||+i.pago_em.slice(5,7)===+mes)&&(!qd||(()=>{const p=nfPgParc(i);return chave(i.nome).includes(q)||chave(p?.nome_global||'').includes(q)||String(p?.cpf_cnpj||'').replace(/\D/g,'').includes(qd.replace(/\D/g,'')||'#')||String(i.protocolo||'').includes(qd)||fm(nfPgV(i)).includes(qd)})()))}
+function nfPgFiltrados(){const emp=$('nfPgEmp').value,mes=$('nfPgMes').value,de=$('nfPgDe').value,ate=$('nfPgAte').value,qd=($('nfPgBusca')?.value||'').trim(),q=chave(qd);
+  return NFP.itens.filter(i=>(!emp||i.empresa_id===emp)&&(!mes||+i.pago_em.slice(5,7)===+mes)&&(!de||i.pago_em>=de)&&(!ate||i.pago_em<=ate)&&(!qd||(()=>{const p=nfPgParc(i);return chave(i.nome).includes(q)||chave(p?.nome_global||'').includes(q)||String(p?.cpf_cnpj||'').replace(/\D/g,'').includes(qd.replace(/\D/g,'')||'#')||String(i.protocolo||'').includes(qd)||fm(nfPgV(i)).includes(qd)})()))}
 function nfPgDesenha(){
   if(!NFP.key)return;
   const base=nfPgFiltrados(),f=$('nfPgF').value,emp=$('nfPgEmp').value,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+nfPgV(i),0));
@@ -17853,7 +17856,7 @@ function nfPgDesenha(){
   $('nfPgMarca').className=ehAdm()?'btn':'btn primary';$('nfPgMarca').title='Para nota emitida fora do portal (site da prefeitura ou emissor nacional)';
   $('nfPgNote').textContent=`${rows.length} de ${base.length} repasses pagos. O valor da NF é o Bruto menos o Repasse e os Descontos do relatório. Ao marcar “NF emitida”, a nota entra sozinha no mês da emissão na tabela de baixo e o parceiro fica guardado como “Emite NF”; “Não emite” guarda o parceiro como “Não emitir NF”. Nos próximos repasses isso já vem preenchido, e “Selecionar quem emite NF” marca de uma vez quem já emitiu antes. Tudo tem Desfazer.`;
 }
-['nfPgEmp','nfPgMes','nfPgF'].forEach(id=>$(id).addEventListener('change',()=>{NFP.sel.clear();nfPgDesenha()}));
+['nfPgEmp','nfPgMes','nfPgDe','nfPgAte','nfPgF'].forEach(id=>$(id).addEventListener('change',()=>{NFP.sel.clear();nfPgDesenha()}));
 $('nfPgBusca').addEventListener('input',()=>nfPgDesenha());
 // marca de uma vez as clínicas guardadas como “Emite NF” que ainda estão sem nota (Carol, 18/11)
 $('nfPgQuem').onclick=()=>{const l=nfPgFiltrados().filter(i=>!i.nf_emitida_em&&i.nf_escolha!=='nao_emite'&&nfPgSit(i)==='emite');
