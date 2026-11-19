@@ -3125,7 +3125,16 @@ $('saidas').addEventListener('input',e=>{
 $('saidas').addEventListener('change',async e=>{
   if(e.target.type!=='file'||!e.target.files[0])return;const i=+e.target.closest('.saida').dataset.i;
   toast('Enviando arquivo…');
-  try{draftSaidas[i].anexo={...await uploadAnexo(e.target.files[0],OPCLI.id,$('opData').value),categoria:'Comprovante da saída'};renderSaidas();toast('Arquivo anexado')}catch(err){toast(err.message)}
+  const f=e.target.files[0];
+  try{draftSaidas[i].anexo={...await uploadAnexo(f,OPCLI.id,$('opData').value),categoria:'Comprovante da saída'};renderSaidas();toast('Arquivo anexado')}catch(err){toast(err.message);return}
+  // lê o comprovante e preenche o que estiver em branco: valor, nº da nota e, em Outras despesas, o fornecedor (Carol, 19/11)
+  if(!(/pdf|image|xml/i.test(f.type||'')||/\.(pdf|jpe?g|png|webp|xml)$/i.test(f.name||'')))return;
+  try{const r=await leArquivoDoc(f),s=draftSaidas[i];if(!s||r.erro)return;const lidos=[];
+    const v=r2(+(r.bol?.valor||r.valor||0));if(!(s.valor>0)&&v>0){s.valor=v;lidos.push('valor '+fm(v))}
+    const nf=r.nfseNum||r.numero||r.nfe?.numero||'';if(s.tipo!==DEV&&s.tipo!=='Repasse'&&!(s.guia||'').trim()&&nf){s.guia=String(nf);lidos.push('nº '+nf)}
+    if(s.tipo===OUTRAS&&!(s.descricao||'').trim()&&(r.nome||r.servico)){s.descricao=[r.nome,r.servico].filter(Boolean).join(' - ').slice(0,120);lidos.push('descrição')}
+    if(lidos.length){renderSaidas();updateOp();toast('Lido do comprovante: '+lidos.join(', ')+'. Confira.')}}
+  catch(err){console.error(err)}
 });
 $('saidas').addEventListener('click',e=>{
   const row=e.target.closest('.saida');if(!row)return;
@@ -4805,7 +4814,9 @@ async function openReg(r,pre){
     if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
     if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="${MOD==='cartao'?'Ex.: material de escritório na papelaria; almoço com a equipe; peça para a impressora':'Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção'}"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
       :`<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
-    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${dis}></label>`;
+    // escritório: cadastrar o fornecedor na hora, dentro do próprio lançamento (Carol, 19/11)
+    const pn=ed&&escR()&&(k==='fornecedor'||MOD==='tesouraria'&&k==='descricao');
+    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${pn?' data-pesnova':''}${dis}>${pn?PESNOVA:''}</label>`;
   };
   // cliente nos boletos e notas a pagar: só anexa e diz do que se trata; o resto é opcional e a Controlacs completa (Carol, 04/11)
   $('rFields').innerHTML=simp?(MOD==='cartao'?`<p class="note wide" style="margin:0">Anexe a <b>nota fiscal</b> ou o <b>cupom</b> da compra logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere com a fatura do cartão e completa o resto.</p>`
@@ -4813,6 +4824,7 @@ async function openReg(r,pre){
     +campo(cfg.campos.find(c=>c[0]==='sobre'))
     +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">${MOD==='cartao'?'Outros dados da compra (opcional): data, fornecedor, nº da nota, valor, parcelas':'Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor'}</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
     :cfg.campos.map(campo).join('');
+  if(!simp&&!$('rLeitura'))$('rFields').insertAdjacentHTML('beforeend','<div class="note wide" id="rLeitura"></div>');   // cartão e tesouraria: mensagem da leitura do anexo (Carol, 19/11)
   // fornecedor: sugere os nomes do cadastro único de clientes e fornecedores (vale para todas as empresas; v101)
   pesListaLiga($('rFields'));
   // quem lança em mais de uma empresa escolhe a empresa aqui mesmo; o escritório também usa para corrigir a empresa errada
@@ -5129,7 +5141,7 @@ function pdfLinhas(items){
 function ocrLimpa(t){return String(t||'').replace(/(\d)[Oo](?=[\d\s.,\-\/]|$)/gm,'$10').replace(/(^|[\s.])[Oo](\d)/gm,'$10$2').replace(/(\d),\s(\d{2})(?!\d)/g,'$1,$2').replace(/[—–]/g,'-')}
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
-async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem,mais){
+async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico,nome:nomeLido},origem,mais){
   const avisos=[],lidos=[];
   const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
@@ -5150,9 +5162,21 @@ async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem,mai
   if(servico){const so=rCampo('sobre'),ob=rCampo('obs');
     if(so&&!so.disabled&&(!so.value.trim()||/^previsto:/i.test(so.value.trim()))){so.value=servico;lidos.push('descrição do serviço')}
     else if(ob&&!ob.disabled&&!ob.value.trim()&&chave(so?.value||'')!==chave(servico)){ob.value=servico;lidos.push('descrição do serviço (em Observação)')}}
-  if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº');
-    const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:nfe.cnpj}).then(r=>r,()=>({data:null}));
-    if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
+  if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº')}
+  // fornecedor pelo CNPJ do documento: o da chave da NF-e ou o primeiro CNPJ do arquivo que não seja o da empresa.
+  // Se não estiver no cadastro, fica o nome lido e o “+ Cadastrar” já abre com o CNPJ (Carol, 19/11)
+  {const fk=MOD==='tesouraria'?'descricao':'fornecedor',fe=rCampo(fk),meu=soDig(regCli()?.cnpj),
+      docs=[...new Set([nfe?.cnpj,...(cnpjs||[])].filter(d=>d&&d!==meu))];
+    if(fe&&!fe.disabled&&!fe.value.trim()&&docs.length){
+      const ls=await pesLista().catch(()=>[]);let pe=null;
+      for(const d of docs){pe=ls.find(x=>soDig(x.documento)===d);if(pe)break}
+      if(!pe)for(const d of docs){pe=cnpjRaiz(ls,d);if(pe)break}
+      let nome=pe?pesNome(pe):null;
+      if(!nome){const {data}=await sb.rpc('fornecedor_por_documento',{doc:docs[0]}).then(r=>r,()=>({data:null}));if(typeof data==='string')nome=data}
+      if(nome)poe(fk,nome,'fornecedor');
+      else{const cf=pnFmt(docs[0]);fe.dataset.pesdoc=docs[0];if(nomeLido)poe(fk,nomeLido,'fornecedor');
+        avisos.push(`fornecedor do CNPJ ${cf} ainda não está cadastrado`+(fe.hasAttribute('data-pesnova')?': use “+ Cadastrar” embaixo do campo':''))}
+      if(fe.hasAttribute('data-pesnova'))pnBtn(fe)}}
   const box=$('rLeitura');if(!box)return;
   const de=origem==='linha'?'da linha digitável':origem==='foto'?'da foto':'do '+origem;
   const html=!bol&&!nfe&&!prevDif&&!(vt>0)&&!numero&&!servico?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
@@ -5167,7 +5191,7 @@ $('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()
 // leitura do boleto anexado. Roda ANTES do envio do arquivo (capture), porque o envio limpa o campo do arquivo e a leitura
 // ficava sem o arquivo. Também lê PDF escaneado e foto (OCR), como em Contas a pagar (Carol, 13/11)
 $('rDocs').addEventListener('change',async e=>{const fs=[...(e.target.files||[])].filter(f=>/pdf|image/i.test(f.type||'')||/\.(pdf|jpe?g|png|webp)$/i.test(f.name||''));
-  if(MOD!=='pagar'||!fs.length||!regEditavel())return;
+  if(!['pagar','cartao','tesouraria'].includes(MOD)||!fs.length||!regEditavel())return;   // cartão e tesouraria também (Carol, 19/11)
   const box=$('rLeitura'),cats=MODCFG[MOD].cats,pad=e.target.dataset.cat;
   // vários arquivos de uma vez (ex.: boleto e nota): o boleto é lido primeiro e cada leitura vai somando na mensagem
   const it=fs.map(f=>({f,cat:catPeloNome(f.name,cats,pad)})).sort((a,b)=>(a.cat==='Nota fiscal')-(b.cat==='Nota fiscal'));
@@ -5179,12 +5203,12 @@ $('rDocs').addEventListener('change',async e=>{const fs=[...(e.target.files||[])
       // na nota fiscal o valor não dispara o aviso do previsto (o valor da nota pode ter retenções); só preenche se estiver vazio
       const vt=r.bol?null:nota?(REGPRE?null:r.valor):r.valor,numero=r.nfseNum||(nota||!r.bol?r.numero:'')||'',servico=r.servico||'';
       if(box&&!mais)box.innerHTML='';
-      if(r.bol||r.nfe||vt>0||numero||servico){if(nm&&box)box.insertAdjacentHTML('beforeend',`<div class="note" style="margin:4px 0 0">${nm}</div>`);await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:vt,numero,servico},r.origem,true)}
-      else if(box)box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}${nota?'Não achei o nº nem a descrição nesta nota.':'Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.'}</div>`)}
+      if(r.bol||r.nfe||vt>0||numero||servico||(r.cnpjs||[]).length){if(nm&&box)box.insertAdjacentHTML('beforeend',`<div class="note" style="margin:4px 0 0">${nm}</div>`);await aplicarLeitura({bol:MOD==='pagar'?r.bol:null,nfe:r.nfe,cnpjs:r.cnpjs,valor:MOD==='pagar'?vt:r.bol?.valor||r.valor,numero,servico,nome:r.nome},r.origem,true)}
+      else if(box)box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}${nota?'Não achei o nº nem a descrição nesta nota.':MOD!=='pagar'?'Não achei o valor nem o nº neste arquivo.':'Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.'}</div>`)}
     catch(err){console.error(err);if(box){if(!mais)box.innerHTML='';box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}Não consegui ler este arquivo.</div>`)}}
     n++}},true);
 // leitura mais rápida (Carol, 13/11): o leitor de PDF já carrega ao clicar para anexar, enquanto a pessoa escolhe o arquivo
-$('rDocs').addEventListener('pointerdown',e=>{if(MOD!=='pagar'||!e.target.closest('.fotobtn'))return;
+$('rDocs').addEventListener('pointerdown',e=>{if(!['pagar','cartao','tesouraria'].includes(MOD)||!e.target.closest('.fotobtn'))return;
   if(!window.pdfjsLib)carregaJs(PDFJS+'pdf.min.js').then(()=>{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}).catch(()=>{})},true);
 $('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitavel')return;const d=soDig(e.target.value),box=$('rLeitura');
   if(d.length<44){if(box)box.innerHTML='';return}
@@ -12515,7 +12539,7 @@ document.addEventListener('focusout',e=>{const i=e.target.closest?.('input[data-
 document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-pesnova-btn]');if(!b)return;e.preventDefault();
   const inp=b.parentElement.querySelector('input[data-pesnova]');if(!inp)return;
   const v=inp.value.trim(),soNum=/^[\d.\-\/\s]+$/.test(v);
-  const p=await pesNova(cliAtual(),pnPapelDe(inp),v&&!pnTem(inp)&&!soNum?v:'',soNum?v:inp.dataset.pesdoc||'');if(!p)return;
+  const p=await pesNova(dlgReg.open&&dlgReg.contains(inp)&&regCli()||cliAtual(),pnPapelDe(inp),v&&!pnTem(inp)&&!soNum?v:'',soNum?v:inp.dataset.pesdoc||'');if(!p)return;
   const nome=pesNome(p);
   const dl=lstDe(inp);if(dl&&![...dl.options].some(o=>o.value===nome)){const o=document.createElement('option');o.value=nome;dl.appendChild(o)}
   inp.value=nome;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));pnBtn(inp)});
