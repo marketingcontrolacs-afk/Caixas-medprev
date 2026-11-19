@@ -2,6 +2,11 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 09:45 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
+  - O boleto do repasse (publicado às 09:30, portal #119) agora aceita **vários arquivos de uma vez** (boleto e NF, também XML). O arquivo com a linha digitável vira o boleto; os outros vão para os anexos como "Nota fiscal" (ou "Outros"). O XML só é lido.
+  - O botão aparece também no repasse **sem empresa**: abre "Qual empresa vai pagar?", cria a conta a pagar (o mesmo que "Pagar em", `rnPagarEm`) e anexa. No Envio de remessa também vale para vários arquivos.
+  - Sem SQL. **Pendente:** OK da Carol para publicar.
+
 - **19/11/2026 09:40 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - **Boleto no pagamento, opcional** (Carol: "só tem 2 casos", ex.: Laboratório Médico Santa Luzia SC). Nada ficou obrigatório; quem não anexa continua por Pix ou conta.
     - Parceiros MP › Repasse da semana: na coluna Situação de cada repasse com conta a pagar em aberto, "📎 Anexar boleto" ou "Colar linha". Com boleto, aparece "📎 Vai por boleto" e o botão "Tirar boleto".
