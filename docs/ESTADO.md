@@ -2,6 +2,9 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 20:55 · conta 2 · branch `feat/conciliacao-total-selecao`**
+  - Conciliação bancária: a barra "N linhas selecionadas" agora mostra o **total** das linhas marcadas. Se forem só saídas ou só entradas, mostra o total delas; se forem as duas, mostra o saldo, com entradas e saídas separadas.
+
 - **19/11/2026 20:35 · conta 2 · branch `fix/remessa-regra-sequencial`**
   - **Regra da numeração da remessa (Sicredi):** o banco espera o número seguinte ao último arquivo que ele **aceitou**; arquivo recusado não conta.
     - Quando a recusa é por **"Sequencial fora de ordem"**, NÃO se libera o número (responder "Cancelar" na 2ª pergunta) e se acerta o "Nº da última remessa" da conta.
