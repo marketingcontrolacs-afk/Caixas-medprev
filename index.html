@@ -720,6 +720,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .sol-anx{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
 .sol-anx span{display:grid;gap:1px;min-width:0}.sol-anx small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.sol-svtab{width:100%;border-collapse:collapse}.sol-svtab th{text-align:left;font-size:12px;color:var(--muted);padding:4px 6px}.sol-svtab td{padding:4px 6px;vertical-align:middle}.sol-svtab input,.sol-svtab select{width:100%}.sol-inativo{opacity:.55}
 .sol-ev{display:grid;gap:1px;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}.sol-ev small{color:var(--muted);font-size:11px}
 </style>
 </head>
@@ -1396,7 +1397,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <!-- SOLICITAÇÕES (Carol, 18/11): pedidos dos clientes, conversa, documentos e admissão -->
   <section id="viewSol" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Solicitações</h1><p class="sub" id="solSub"></p></div>
+      <div><h1 id="solH1">Solicitações</h1><p class="sub" id="solSub"></p></div>
       <button class="btn primary" id="solNovaBtn" type="button">+ Nova solicitação</button>
     </div>
     <div id="solBody"></div>
@@ -2256,6 +2257,8 @@ const NAV=[
   {k:'cfgusr',t:'Cadastro de usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  // catálogo de serviços que os clientes pedem em Solicitações, por área do contrato (Carol, 18/11)
+  {k:'solserv',t:'Serviços das solicitações',g:'Configurações',s:'Cadastros',ok:ehAdm},
   // Gestão da Controlacs: clientes, serviços, contratos, reajustes e documentos da própria Controlacs; só a Master (Carol, 05/11; v104)
   {k:'ctlpainel',t:'Painel e avisos de reajuste',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
   // CRM: leads de clientes de BPO, funil, follow-ups e propostas (Carol, 15/11; v133)
@@ -2282,7 +2285,7 @@ const SECOES=['Dia a dia','Caixa e tesouraria','Bancos','Recebíveis','Mensagens
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k==='solic'||k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
+const telaSemEmp=k=>k==='solic'||k==='solserv'||k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -2625,7 +2628,7 @@ async function solBadge(){if(!ME)return;try{
   const n=count||0;if((NAVBADGE.solic||0)!==n){NAVBADGE.solic=n;renderNav()}}catch(e){}}
 function solSair(){if(SOL.ch){try{sb.removeChannel(SOL.ch)}catch(e){}SOL.ch=null}}
 async function renderSol(){
-  solSair();await solBase();
+  solSair();await solBase();$('solH1').textContent='Solicitações';
   if(SOL.tela==='nova')return solNova();
   if(SOL.tela==='det'&&SOL.sel)return solDet(SOL.sel);
   return solLista();
@@ -2654,13 +2657,21 @@ async function solLista(){
      ||'<div class="card sol-vazio">Nenhuma solicitação nesta situação.</div>'}</div>`;
 }
 // ---------- nova ----------
+// lista de serviços conforme o contrato da empresa (ficha: BPO financeiro / BPO RH); "Outros" sempre (Carol, 18/11)
+const SOL_CAT={rh:'Departamento pessoal (RH)',financeiro:'Financeiro',fiscal:'Fiscal',outro:'Outros'};
+const solContrata=(c,cat)=>!c||cat==='outro'||(cat==='rh'?!!c.bpo_rh:!!c.bpo_financeiro)||!c.bpo_rh&&!c.bpo_financeiro;
 function solNova(){
-  SOL.tela='nova';$('solNovaBtn').hidden=true;$('solSub').textContent='Escolha o serviço. O prazo e os documentos aparecem conforme o tipo.';
-  const n=SOL.novo,t=solTipo(n.tipo),adm=solEhAdm(t),cl=CLIENTES.filter(c=>c.ativo!==false),ca=cliAtual();
-  const cliSel=ehEsc()||cl.length>1?`<label class="f">Empresa<select id="solNCli">${cl.map(c=>`<option value="${c.id}" ${(n.cli||ca?.id)===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`:'';
-  $('solBody').innerHTML=`<div class="sol-tipos">${SOL.tipos.map(x=>`<button type="button" class="sol-tipo card" data-soltipo="${x.id}" aria-pressed="${x.id===n.tipo}">
-      <small>${esc({financeiro:'Financeiro',rh:'RH',fiscal:'Fiscal',outro:'Outro'}[x.categoria]||'')}</small><b>${esc(x.nome)}</b><small>${x.sla_horas?'Prazo: '+Math.ceil(x.sla_horas/24)+(x.sla_horas<=24?' dia útil':' dias úteis'):'Prazo combinado'}</small></button>`).join('')}</div>
-   ${t?`<div class="card sol-form">${cliSel}<h2>${esc(t.nome)}</h2>
+  SOL.tela='nova';$('solNovaBtn').hidden=true;$('solSub').textContent='Escolha o serviço que você precisa. O prazo e os documentos aparecem conforme o tipo.';
+  const n=SOL.novo,cl=CLIENTES.filter(c=>c.ativo!==false),ca=cliAtual();if(!n.cli)n.cli=(ca&&cl.some(c=>c.id===ca.id)?ca.id:cl[0]?.id)||'';
+  const emp=solCli(n.cli),tipos=SOL.tipos.filter(t=>solContrata(emp,t.categoria));if(n.tipo&&!tipos.some(t=>t.id===n.tipo))n.tipo=null;
+  const t=solTipo(n.tipo),adm=solEhAdm(t),desc=t&&/desconto/i.test(t.nome),dia=new Date().getDate();
+  const cats=['rh','financeiro','fiscal','outro'].filter(k=>tipos.some(x=>x.categoria===k));
+  $('solBody').innerHTML=`<div class="card sol-form">
+    ${cl.length>1?`<label class="f">Empresa<select id="solNCli">${cl.map(c=>`<option value="${c.id}" ${n.cli===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`:''}
+    <label class="f">Qual serviço você precisa?<select id="solNTipo"><option value="">Selecione o serviço</option>${cats.map(k=>`<optgroup label="${SOL_CAT[k]}">${tipos.filter(x=>x.categoria===k).map(x=>`<option value="${x.id}" ${x.id===n.tipo?'selected':''}>${esc(x.nome)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    ${t?`<p class="note" style="margin:0">${t.sla_horas?'Prazo de atendimento: '+Math.ceil(t.sla_horas/24)+(t.sla_horas<=24?' dia útil':' dias úteis'):'Prazo combinado com a equipe'}</p>
+     ${t.descricao?`<div class="alerta" style="margin:0">${esc(t.descricao)}</div>`:''}
+     ${desc&&dia>20?`<div class="alerta" style="margin:0;border-color:var(--bad);background:var(--bad-soft)">Hoje já passou do dia 20: estes descontos entram na folha do mês que vem.</div>`:''}
      ${adm?`<div class="sol-g3">
        <label class="f">Nome do colaborador<input id="solNNome" placeholder="Ex.: Joana Lima"></label>
        <label class="f">WhatsApp do colaborador<input id="solNWhats" type="tel" placeholder="(48) 99999-0000"></label>
@@ -2671,14 +2682,15 @@ function solNova(){
        <p class="note" id="solNVenc"></p>
        <label class="f">Observação (opcional)<input id="solNObs" placeholder="Ex.: vaga da UTI, substitui a Maria"></label>
        <p class="note">O RH envia um link para o colaborador preencher os dados e mandar os documentos pelo celular. Você acompanha cada etapa por aqui.</p>`
-     :`${(t.documentos||[]).length?`<div class="alerta">Documentos que vamos pedir: ${esc(t.documentos.join(', '))}. Anexe aqui ou depois, na conversa.</div>`:''}
-       <label class="f">Título<input id="solNTit" placeholder="Resumo do pedido"></label>
-       <label class="f">Detalhes<textarea id="solNDesc" rows="4" placeholder="Explique o que precisa"></textarea></label>
+     :`${(t.documentos||[]).length?`<p class="note" style="margin:0">Documentos que vamos pedir: <b>${esc(t.documentos.join(', '))}</b>. Anexe aqui ou depois, na conversa.</p>`:''}
+       <label class="f">Título (opcional)<input id="solNTit" placeholder="${esc(t.nome)}"></label>
+       <label class="f">Detalhes<textarea id="solNDesc" rows="4" placeholder="Explique o que precisa: colaborador, datas, valores…"></textarea></label>
        <label class="f">Anexos (opcional)<input id="solNArq" type="file" multiple></label>`}
-     <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn" data-solvolta="1">Cancelar</button><button type="button" class="btn primary" id="solNCriar">Abrir solicitação</button></div></div>`:''}`;
+     <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn" data-solvolta="1">Cancelar</button><button type="button" class="btn primary" id="solNCriar">Abrir solicitação</button></div>`
+    :`<div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-solvolta="1">Cancelar</button></div>`}</div>`;
 }
 async function solCriar(){
-  const t=solTipo(SOL.novo.tipo);if(!t)return;const cli=$('solNCli')?.value||cliAtual()?.id||ME.cliente_id||CLIENTES[0]?.id;
+  const t=solTipo(SOL.novo.tipo);if(!t)return;const cli=SOL.novo.cli||cliAtual()?.id||ME.cliente_id||CLIENTES[0]?.id;
   if(!cli){toast('Escolha a empresa.');return}
   let reg={cliente_id:cli,tipo_id:t.id};
   if(solEhAdm(t)){const v=k=>($(k)?.value||'').trim();
@@ -2878,7 +2890,40 @@ $('viewSol').addEventListener('click',async e=>{const b=e.target.closest('button
 });
 $('viewSol').addEventListener('change',async e=>{const t=e.target;
   if(t.id==='solPri'){const {error}=await sb.from('sol_solicitacoes').update({prioridade:t.value}).eq('id',SOL.sel);if(error)alert(error.message);else solDet(SOL.sel);return}
+  if(t.id==='solNCli'){SOL.novo={cli:t.value,tipo:SOL.novo.tipo};solNova();return}
+  if(t.id==='solNTipo'){SOL.novo={cli:SOL.novo.cli,tipo:t.value||null};solNova();return}
   if(t.id==='solNIni'||t.id==='solNExp'){const v=solVenc($('solNIni').value,$('solNExp').value);$('solNVenc').textContent=v}
+});
+
+// ---------- cadastro dos serviços (Configurações › Serviços das solicitações; só a Master) ----------
+async function renderSolServ(){
+  solSair();$('solH1').textContent='Serviços das solicitações';$('solNovaBtn').hidden=true;
+  $('solSub').textContent='O que os clientes podem pedir em Solicitações. Cada empresa vê só as áreas do contrato (ficha da empresa: BPO financeiro / BPO RH); "Outros" aparece para todas.';
+  const {data,error}=await sb.from('sol_tipos').select('*').order('categoria').order('ordem');
+  if(error){$('solBody').innerHTML=`<div class="alerta">${esc(error.message)}</div>`;return}
+  const cats=['rh','financeiro','fiscal','outro'];
+  const linha=t=>`<tr data-solsv="${t?t.id:'novo'}"${t&&!t.ativo?' class="sol-inativo"':''}>
+    <td><input data-c="nome" value="${esc(t?t.nome:'')}" placeholder="Nome do serviço"></td>
+    <td><select data-c="categoria">${cats.map(k=>`<option value="${k}" ${(t?t.categoria:'rh')===k?'selected':''}>${SOL_CAT[k]}</option>`).join('')}</select></td>
+    <td><input data-c="prazo" type="number" min="0" step="1" style="width:70px" value="${t&&t.sla_horas?Math.ceil(t.sla_horas/24):''}" placeholder="dias"></td>
+    <td><input data-c="documentos" value="${esc(t?(t.documentos||[]).join('; '):'')}" placeholder="Separe por ;"></td>
+    <td><input data-c="descricao" value="${esc(t?t.descricao||'':'')}" placeholder="Orientação para o cliente"></td>
+    <td><input data-c="ordem" type="number" style="width:60px" value="${t?t.ordem:50}"></td>
+    <td style="text-align:center"><input data-c="ativo" type="checkbox" ${!t||t.ativo?'checked':''} style="width:auto;min-height:0"></td>
+    <td><button type="button" class="btn small ${t?'':'primary'}" data-solsvsalva="1">${t?'Salvar':'Incluir'}</button></td></tr>`;
+  $('solBody').innerHTML=`<div class="card sol-form"><h2>Incluir serviço</h2><div class="tablebox"><table class="sol-svtab"><thead><tr><th>Serviço</th><th>Área</th><th>Prazo (dias)</th><th>Documentos pedidos</th><th>Orientação</th><th>Ordem</th><th>Ativo</th><th></th></tr></thead><tbody>${linha(null)}</tbody></table></div></div>
+   ${cats.map(k=>{const ts=(data||[]).filter(x=>x.categoria===k);return ts.length?`<div class="card sol-form"><h2>${SOL_CAT[k]} (${ts.filter(x=>x.ativo).length} ativos)</h2><div class="tablebox"><table class="sol-svtab"><thead><tr><th>Serviço</th><th>Área</th><th>Prazo (dias)</th><th>Documentos pedidos</th><th>Orientação</th><th>Ordem</th><th>Ativo</th><th></th></tr></thead><tbody>${ts.map(linha).join('')}</tbody></table></div></div>`:''}).join('')}
+   <p class="note">Desativar esconde o serviço da lista dos clientes. As solicitações antigas continuam com o nome. A admissão usa o serviço com "Admissão" no nome.</p>`;
+}
+$('viewSol').addEventListener('click',async e=>{const b=e.target.closest('[data-solsvsalva]');if(!b)return;
+  const tr=b.closest('tr'),v=c=>tr.querySelector(`[data-c="${c}"]`),id=tr.dataset.solsv,nome=v('nome').value.trim();
+  if(!nome){toast('Informe o nome do serviço.');return}
+  const dias=parseInt(v('prazo').value,10);
+  const reg={nome,categoria:v('categoria').value,sla_horas:dias>0?dias*24:null,documentos:v('documentos').value.split(';').map(x=>x.trim()).filter(Boolean),
+    descricao:v('descricao').value.trim()||null,ordem:parseInt(v('ordem').value,10)||50,ativo:v('ativo').checked};
+  b.disabled=true;const r=id==='novo'?await sb.from('sol_tipos').insert(reg):await sb.from('sol_tipos').update(reg).eq('id',id);b.disabled=false;
+  if(r.error){alert('Não foi possível salvar: '+r.error.message);return}
+  SOL.tipos=[];toast(id==='novo'?'Serviço incluído.':'Serviço salvo.');renderSolServ();
 });
 // ================= fim SOLICITAÇÕES =================
 
@@ -2907,6 +2952,7 @@ function openView(){
   else if(VIEW==='repasse'){$('viewRep').hidden=false;parcAbas();renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
   else if(VIEW==='solic'){$('viewSol').hidden=false;renderSol()}
+  else if(VIEW==='solserv'){$('viewSol').hidden=false;renderSolServ()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='agenda'){$('viewAgenda').hidden=false;renderAgenda()}

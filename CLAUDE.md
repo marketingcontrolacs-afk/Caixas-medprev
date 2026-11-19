@@ -3,7 +3,7 @@
 Este arquivo é lido pelo Claude em **qualquer conta** que abrir este repositório. Conversas e memória não passam de uma conta para a outra, por isso **tudo o que for decidido precisa ficar escrito aqui ou em `docs/`**.
 
 ## O que é
-- Portal do Cliente / ERP da **Controlacs** (BPO financeiro e RH). No ar em `erpfinanceiro.controlacs.com.br` (Netlify; também há uma cópia em GitHub Pages).
+- Portal do Cliente / ERP da **Controlacs** (BPO financeiro e RH). No ar em `erpfinanceiro.controlacs.com.br`, publicado pela **Cloudflare Pages** (projeto `portal-controlacs`, endereço `portal-controlacs.pages.dev`, publica a `main` do repositório `portal-controlacs`; build command `echo "$CF_PAGES_COMMIT_SHA" > versao.txt`, saída `/`). O DNS tem um CNAME `erpfinanceiro → portal-controlacs.pages.dev`. O Netlify foi desativado em 18/11/2026 (builds parados; não reativar). Também há uma cópia em GitHub Pages (`caixas-medprev`).
 - Site estático: **um único `index.html`** (HTML, CSS e JS puro, tudo dentro de um IIFE), com `supabase-js` via CDN. Não há etapa de build.
 - Banco: Supabase, projeto **Caixas MedPrev** (`qlopcclhswtbgrupfhyy`). O front usa só a chave **publishable**. Nunca coloque a `service_role` ou outros segredos no código.
 - Os repositórios `caixas-medprev` e `portal-controlacs` publicam o **mesmo** `index.html`.
