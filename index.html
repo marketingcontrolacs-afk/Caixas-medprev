@@ -10829,29 +10829,38 @@ function rmForma(t,pes,pref){
 // BOLETO NO PAGAMENTO (Carol, 19/11): parceiro (ou fornecedor) que recebe por boleto. Anexar o boleto é opcional (só alguns casos):
 // lê a linha digitável do arquivo (com a correção da linha fora do padrão, portal #111), guarda o arquivo nos anexos da conta a pagar
 // e a conta passa a ir na remessa como boleto. Quem não anexa continua por Pix ou conta, como antes. Devolve a função de desfazer.
-async function bolNoTitulo(t,{file,linha}){
-  let bol=null;
-  if(file){const r=await leArquivoDoc(file);if(r.erro)throw new Error(r.erro);bol=r.bol;
-    if(!bol)throw new Error('Não achei a linha digitável neste arquivo. Use “Colar linha” e digite a linha digitável do boleto.')}
-  else{bol=boletoDe(linha);if(!bol)throw new Error('Linha digitável inválida. Confira os números.')}
+// vários arquivos de uma vez (Carol, 19/11): boleto e nota fiscal juntos; o arquivo em que a linha digitável é achada é o boleto,
+// os outros ficam nos anexos como Nota fiscal (ou Outros). O XML da nota só é lido, não fica guardado (igual às Contas a pagar).
+async function bolNoTitulo(t,{file,files,linha}){
+  let bol=null;const fs=files||(file?[file]:[]),outros=[];let bolF=null;
+  for(const f of fs){const xml=/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||'');let r={};
+    try{r=await leArquivoDoc(f)}catch(e){console.error(e);r={erro:'não consegui ler'}}
+    if(!bol&&r.bol&&!xml){bol=r.bol;bolF=f;continue}
+    if(!xml)outros.push({f,cat:r.nfe||r.nfseNum||r.numero||/\b(nf|nota)/i.test(f.name||'')?'Nota fiscal':'Outros'})}
+  if(fs.length&&!bol){if(linha)bol=boletoDe(linha);
+    if(!bol)throw new Error(fs.length>1?'Não achei a linha digitável em nenhum dos arquivos. Use “Colar linha” e digite a linha digitável do boleto.':'Não achei a linha digitável neste arquivo. Use “Colar linha” e digite a linha digitável do boleto.')}
+  if(!fs.length){bol=boletoDe(linha);if(!bol)throw new Error('Linha digitável inválida. Confira os números.')}
   const susp=bolConfere(bol,+t.valor);
   if(susp)throw new Error(`A linha digitável lida não confere: ${susp}. Não anexei; confira o boleto.`);
   const avisos=[];
   if(bol.corrigida)avisos.push(`O boleto veio com a linha digitável fora do padrão dos bancos; usei a linha corrigida, a mesma do DDA (${fm(bol.valor)}, venc. ${dBR(bol.venc)}). Confira com o DDA antes de pagar.`);
-  if(bol.valor>0&&Math.abs(bol.valor-(+t.valor))>0.004)avisos.push(`O valor do boleto (${fm(bol.valor)}) é diferente do valor a pagar (${fm(t.valor)}). A remessa paga ${fm(t.valor)}; se o certo é o valor do boleto, corrija a conta a pagar antes de gerar a remessa.`);
+  // vale o valor do boleto (Carol, 19/11): o parceiro desconta a retenção de impostos no boleto e às vezes não bate 100% com o repasse;
+  // a conta a pagar passa a ter o valor do boleto e a diferença fica anotada na observação (o Desfazer volta o valor antigo)
+  const pagoJa=+(GT.pago?.[t.id]||t.pago||0),difV=bol.valor>0?r2(+t.valor-bol.valor):0,trocaV=Math.abs(difV)>0.004&&!(pagoJa>0);
+  if(Math.abs(difV)>0.004&&pagoJa>0)avisos.push(`O valor do boleto (${fm(bol.valor)}) é diferente do valor da conta a pagar (${fm(t.valor)}), mas ela já tem pagamento: o valor não foi trocado.`);
   const rp=await boletoRepetido(bol,t.id);if(rp.length)avisos.push('ESTE BOLETO JÁ ESTÁ LANÇADO EM OUTRA CONTA: '+repetidoTxt(rp));
   if(avisos.length&&!confirm(avisos.join('\n\n')+'\n\nAnexar o boleto mesmo assim?'))return null;
-  let doc=null;
-  if(file){const up=await uploadAnexo(file,t.cliente_id,'financeiro');
-    const {data,error}=await sb.from('documentos').insert({cliente_id:t.cliente_id,modulo:'financeiro',registro_id:t.id,categoria:'Boleto ou fatura',nome_arquivo:up.nome_arquivo,caminho:up.caminho}).select('*').single();
-    if(error){await sb.storage.from('anexos').remove([up.caminho]).catch(()=>{});throw v94(error)?new Error(v94Msg):error}doc=data}
-  const ant={forma:t.forma??null,linha_digitavel:t.linha_digitavel??null},novo={forma:'Boleto',linha_digitavel:soDig(bol.linha||bol.barra)};
+  const docs=[],tiraDocs=async()=>{for(const d of docs){await sb.from('documentos').delete().eq('id',d.id);const {data:o}=await sb.from('documentos').select('id').eq('caminho',d.caminho).limit(1);if(!(o||[]).length)await sb.storage.from('anexos').remove([d.caminho]).catch(()=>{})}};
+  try{for(const [f,cat] of [...(bolF?[[bolF,'Boleto ou fatura']]:[]),...outros.map(o=>[o.f,o.cat])]){const up=await uploadAnexo(f,t.cliente_id,'financeiro');
+      const {data,error}=await sb.from('documentos').insert({cliente_id:t.cliente_id,modulo:'financeiro',registro_id:t.id,categoria:cat,nome_arquivo:up.nome_arquivo,caminho:up.caminho}).select('*').single();
+      if(error){await sb.storage.from('anexos').remove([up.caminho]).catch(()=>{});throw v94(error)?new Error(v94Msg):error}docs.push(data)}}
+  catch(e){await tiraDocs();throw e}
+  const ant={forma:t.forma??null,linha_digitavel:t.linha_digitavel??null,valor:t.valor,obs:t.obs??null},novo={forma:'Boleto',linha_digitavel:soDig(bol.linha||bol.barra)};
+  if(trocaV){novo.valor=r2(bol.valor);novo.obs=[t.obs,`Valor do boleto ${fm(bol.valor)} (era ${fm(t.valor)}; ${difV>0?'retenção/diferença de '+fm(difV):'diferença de '+fm(-difV)+' a mais'})`].filter(Boolean).join(' · ')}
   const {error}=await sb.from('fin_titulos').update(novo).eq('id',t.id);
-  if(error){if(doc){await sb.from('documentos').delete().eq('id',doc.id);await sb.storage.from('anexos').remove([doc.caminho]).catch(()=>{})}throw error}
+  if(error){await tiraDocs();throw error}
   Object.assign(t,novo);GT.key='';GT.anx?.add?.(t.id);
-  return {bol,doc,desfaz:async()=>{const {error:e1}=await sb.from('fin_titulos').update(ant).eq('id',t.id);if(e1)throw e1;Object.assign(t,ant);
-    if(doc){await sb.from('documentos').delete().eq('id',doc.id);const {data:o}=await sb.from('documentos').select('id').eq('caminho',doc.caminho).limit(1);if(!(o||[]).length)await sb.storage.from('anexos').remove([doc.caminho]).catch(()=>{})}
-    GT.key=''}};
+  return {bol,docs,trocaV:trocaV?{de:ant.valor,para:novo.valor}:null,desfaz:async()=>{const {error:e1}=await sb.from('fin_titulos').update(ant).eq('id',t.id);if(e1)throw e1;Object.assign(t,ant);await tiraDocs();GT.key=''}};
 }
 // tira o boleto da conta a pagar (o anexo de boleto também sai): volta a ir por Pix ou conta, pelo cadastro
 async function bolTiraTitulo(t,formaVolta){
@@ -11129,7 +11138,7 @@ async function renderGR(retHtml){
       $('grFoot').innerHTML='<span class="spacer"></span><button type="button" class="btn primary" data-act="rm_gerar">Gerar arquivo</button>';
       ['rm_conta','rm_data','rm_ate'].forEach(id=>$(id).onchange=()=>{if(id==='rm_data'&&$('rm_ate').value<$('rm_data').value)$('rm_ate').value=$('rm_data').value;rmDesenha()});
       $('rm_todas').onchange=()=>{$('rmBody').querySelectorAll('input[data-id]:not(:disabled)').forEach(x=>x.checked=$('rm_todas').checked);rmTotal()};
-      $('rmBody').onchange=e=>{if(e.target.matches('[data-rmbol]')){const f=e.target.files?.[0];e.target.value='';if(f)rmBol(RM.lista[+e.target.dataset.rmbol],{file:f},e.target.closest('.rmbol'));return}rmTotal()};
+      $('rmBody').onchange=e=>{if(e.target.matches('[data-rmbol]')){const fs=[...(e.target.files||[])];e.target.value='';if(fs.length)rmBol(RM.lista[+e.target.dataset.rmbol],{files:fs},e.target.closest('.rmbol'));return}rmTotal()};
       $('rm_tirados').onchange=e=>{RM.tirados=e.target.checked;rmDesenha()};
       rmDesenha();
     }
@@ -11163,12 +11172,12 @@ function rmDesenha(){
 // boleto na remessa (Carol, 19/11): qualquer conta a pagar que ainda iria por Pix/TED (ou que está sem forma) pode receber o boleto aqui; opcional
 // CPF/CNPJ do favorecido do boleto: o do cadastro do fornecedor; no parceiro sem documento no fornecedor, o CPF/CNPJ do parceiro (Carol, 19/11)
 const rmDoc=p=>p?.documento||(p?.parceiro_id&&RM.parc?.[p.parceiro_id]?.cpf_cnpj)||'';
-const rmBolHtml=i=>`<div class="rmbol" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><span class="btn small ghost fotobtn" title="Opcional: quem recebe por boleto. A linha digitável é lida do arquivo e o pagamento vai como boleto">📎 Anexar boleto<input type="file" accept="${ACCEPT}" data-rmbol="${i}" aria-label="Anexar o boleto"></span><button type="button" class="btn small ghost" data-act="rm_bollinha" data-i="${i}" title="Digitar a linha digitável do boleto">Colar linha</button></div>`;
+const rmBolHtml=i=>`<div class="rmbol" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><span class="btn small ghost fotobtn" title="Opcional: quem recebe por boleto. Pode escolher o boleto e a nota fiscal juntos: a linha digitável é lida do boleto e o pagamento vai como boleto">📎 Anexar boleto<input type="file" multiple accept="${ACCEPT},.xml,text/xml" data-rmbol="${i}" aria-label="Anexar o boleto (e a nota fiscal)"></span><button type="button" class="btn small ghost" data-act="rm_bollinha" data-i="${i}" title="Digitar a linha digitável do boleto">Colar linha</button></div>`;
 async function rmBol(x,arg,box){if(!x)return;if(box)box.innerHTML='<span class="muted">Lendo o boleto…</span>';
   const marc=new Set([...$('rmBody').querySelectorAll('input[data-id]:checked')].map(c=>RM.lista[+c.dataset.id].t.id));marc.add(x.t.id);
   const refaz=()=>{rmDesenha();$('rmBody').querySelectorAll('input[data-id]').forEach(c=>{if(!c.disabled)c.checked=marc.has(RM.lista[+c.dataset.id].t.id)});rmTotal()};
   try{const r=await bolNoTitulo(x.t,arg);refaz();if(!r)return;
-    toastDesfazer(`Boleto anexado: ${x.t.pessoa_nome||''} vai como boleto`,async()=>{try{await r.desfaz();toast('Boleto tirado: voltou como estava')}catch(e){fail(e)}refaz()})}
+    toastDesfazer(`Boleto anexado: ${x.t.pessoa_nome||''} vai como boleto${r.trocaV?`, valor do boleto ${fm(r.trocaV.para)} (era ${fm(r.trocaV.de)})`:''}`,async()=>{try{await r.desfaz();toast('Boleto tirado: voltou como estava')}catch(e){fail(e)}refaz()})}
   catch(e){console.error(e);refaz();alert(e.message||'Não foi possível anexar o boleto.')}}
 function rmTotal(){const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
   const semDoc=sel.filter(x=>x.f.forma==='boleto'&&!soDig(rmDoc(x.p))).length,venc=sel.filter(x=>x.t.vencimento<$('rm_data').value).length;
@@ -17994,21 +18003,33 @@ function rnFiltrados(){
     return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)});
 }
 // boleto no repasse (Carol, 19/11): opcional, para o parceiro que recebe por boleto; vai na remessa como boleto
-function rnBolHtml(t){if(!t)return '';
-  if(soDig(t.linha_digitavel))return `<div class="rnbol" style="margin-top:4px"><span class="chip c-ok" title="Linha digitável: ${esc(soDig(t.linha_digitavel))}">📎 Vai por boleto</span> <button type="button" class="btn small ghost" data-rn="bolTira" title="Tirar o boleto: volta a ir por Pix ou conta, pelo cadastro do parceiro">Tirar boleto</button></div>`;
-  return `<div class="rnbol" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><span class="btn small ghost fotobtn" title="Opcional: para o parceiro que recebe por boleto. A linha digitável é lida do arquivo e a remessa paga como boleto">📎 Anexar boleto<input type="file" accept="${ACCEPT}" data-rnbol aria-label="Anexar o boleto deste repasse"></span><button type="button" class="btn small ghost" data-rn="bolLinha" title="Digitar a linha digitável do boleto">Colar linha</button></div>`}
+function rnBolHtml(t,it){if(!t&&(!it||it.titulo_id))return '';
+  if(t&&soDig(t.linha_digitavel))return `<div class="rnbol" style="margin-top:4px"><span class="chip c-ok" title="Linha digitável: ${esc(soDig(t.linha_digitavel))}">📎 Vai por boleto</span> <button type="button" class="btn small ghost" data-rn="bolTira" title="Tirar o boleto: volta a ir por Pix ou conta, pelo cadastro do parceiro">Tirar boleto</button></div>`;
+  return `<div class="rnbol" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><span class="btn small ghost fotobtn" title="Opcional: para o parceiro que recebe por boleto. Pode escolher o boleto e a nota fiscal juntos: a linha digitável é lida do boleto e a remessa paga como boleto">📎 Anexar boleto<input type="file" multiple accept="${ACCEPT},.xml,text/xml" data-rnbol aria-label="Anexar o boleto (e a nota fiscal) deste repasse"></span><button type="button" class="btn small ghost" data-rn="bolLinha" title="Digitar a linha digitável do boleto">Colar linha</button></div>`}
 const rnFormaCad=t=>{const pe=RN.pes.find(x=>x.id===t.pessoa_id),p=pe&&RN.parc.find(x=>x.id===pe.parceiro_id);return p?.pix_chave?'Pix':p?.conta?'Transferência':null};
-async function rnBol(it,{file,linha}){const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t)return;
-  try{const r=await bolNoTitulo(t,{file,linha});if(!r)return;rnDesenha();
-    toastDesfazer(`Boleto anexado: ${(it.nome||'').trim()} vai na remessa como boleto${r.bol.venc?' (venc. '+dBR(r.bol.venc)+')':''}`,async()=>{try{await r.desfaz();toast('Boleto tirado: voltou como estava')}catch(e){fail(e)}rnDesenha()})}
-  catch(e){console.error(e);alert(e.message||'Não foi possível anexar o boleto.')}}
+// repasse ainda sem conta a pagar: pergunta a empresa que paga e cria a conta a pagar (o mesmo que “Pagar em”), depois anexa
+function rnEscolheEmp(it){return new Promise(res=>{let d=$('dlgRnBolEmp');
+  if(!d){d=document.createElement('dialog');d.id='dlgRnBolEmp';document.body.appendChild(d)}
+  const emps=RN.grupo.empresas;
+  d.innerHTML=`<form method="dialog" style="min-width:min(420px,90vw);padding:18px"><h3 style="margin:0 0 6px">Qual empresa vai pagar?</h3>
+    <p class="note" style="margin:0 0 8px">${esc((it.nome||'').trim())} · ${fm(it.valor)}. A conta a pagar é criada nesta empresa (igual ao “Pagar em”) e o boleto fica nela.</p>
+    <label class="f">Empresa que vai pagar<select id="rbeEmp">${emps.map(id=>`<option value="${id}"${id===it.empresa_id?' selected':''}>${esc(rnEmpNome(id))}</option>`).join('')}</select></label>
+    <div class="row" style="justify-content:flex-end;gap:8px;margin-top:10px"><button type="button" class="btn ghost" id="rbeCanc">Cancelar</button><button type="button" class="btn primary" id="rbeOk">Continuar</button></div></form>`;
+  $('rbeCanc').onclick=()=>{d.close();res(null)};$('rbeOk').onclick=()=>{const v=$('rbeEmp').value;d.close();res(v)};d.oncancel=()=>res(null);d.showModal()})}
+async function rnBol(it,arg,box){
+  if(!it.titulo_id){const emp=await rnEscolheEmp(it);if(!emp)return rnDesenha();await rnPagarEm([it],emp);if(!it.titulo_id)return rnDesenha()}
+  const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t)return;
+  const bx=box&&document.body.contains(box)?box:document.querySelector(`#rnBody tr[data-id="${it.id}"] .rnbol`);if(bx)bx.innerHTML='<span class="muted">Lendo o boleto…</span>';
+  try{const r=await bolNoTitulo(t,arg);if(!r)return rnDesenha();rnDesenha();
+    toastDesfazer(`Boleto anexado: ${(it.nome||'').trim()} vai na remessa como boleto${r.bol.venc?' (venc. '+dBR(r.bol.venc)+')':''}${r.trocaV?`, valor do boleto ${fm(r.trocaV.para)} (era ${fm(r.trocaV.de)})`:''}`,async()=>{try{await r.desfaz();toast('Boleto tirado: voltou como estava')}catch(e){fail(e)}rnDesenha()})}
+  catch(e){console.error(e);rnDesenha();alert(e.message||'Não foi possível anexar o boleto.')}}
 function rnDesenha(){
   const rows=rnFiltrados(),G=RN.grupo,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+(rnLiq(i)||0),0));
   // “Pagar em” só mostra a empresa: ela é escolhida nos botões “Pagar em …” do alto, que já criam a conta a pagar na empresa (Carol, 03/11)
   const opEmp=it=>it.empresa_id?`<b style="white-space:nowrap">${esc(rnEmpNome(it.empresa_id))}</b>`:mu('—');
   const opSit=it=>{const s=rnSitDe(it);return `<select class="rnsit ${RNSIT[s][1]}" style="min-width:150px;padding:6px 8px;font-weight:600" title="Situação no controle de NF. Ao trocar, o controle guarda para os próximos relatórios.">${(s==='sem'?['sem']:[]).concat(['emite','nao_emitido','nao_emitir']).map(k=>`<option value="${k}"${k===s?' selected':''}>${RNSIT[k][0]}</option>`).join('')}</select>`};
   const linha=it=>{const s=rnSitDe(it),nf=rnNf(it),p=rnParc(it,it.empresa_id),t=it.titulo_id&&RN.tits[it.titulo_id],ds=rnDescPend(p);
-    const st=rnStatus(it),ct=it.titulo_id?(t?(st==='pago'||st==='conciliado'?`<span class="chip ${RNST[st][1]}">✓ ${RNST[st][0]}</span>${t.data?`<br><span class="muted">${dBR(t.data)}${t.contas?.length>1?' · '+esc(t.contas.map(id=>RN.contas.find(c=>c.id===id)?.nome||'').filter(Boolean).join(' + ')):t.conta_id?' · '+esc(RN.contas.find(c=>c.id===t.conta_id)?.nome||''):''}</span>`:''}`:`<span class="chip ${RNST[st][1]}">${RNST[st][0]}</span> <span class="muted">venc. ${dBR(t.vencimento)}</span><br><button type="button" class="btn small ghost" data-rn="desfaz">Desfazer</button>${rnBolHtml(t)}`):'<span class="chip c-none">conta excluída</span>'):`<span class="chip c-none">${it.empresa_id?'Sem conta a pagar':'Falta escolher a empresa'}</span>`;
+    const st=rnStatus(it),ct=it.titulo_id?(t?(st==='pago'||st==='conciliado'?`<span class="chip ${RNST[st][1]}">✓ ${RNST[st][0]}</span>${t.data?`<br><span class="muted">${dBR(t.data)}${t.contas?.length>1?' · '+esc(t.contas.map(id=>RN.contas.find(c=>c.id===id)?.nome||'').filter(Boolean).join(' + ')):t.conta_id?' · '+esc(RN.contas.find(c=>c.id===t.conta_id)?.nome||''):''}</span>`:''}`:`<span class="chip ${RNST[st][1]}">${RNST[st][0]}</span> <span class="muted">venc. ${dBR(t.vencimento)}</span><br><button type="button" class="btn small ghost" data-rn="desfaz">Desfazer</button>${rnBolHtml(t)}`):'<span class="chip c-none">conta excluída</span>'):`<span class="chip c-none">${it.empresa_id?'Sem conta a pagar':'Falta escolher a empresa'}</span>${rnBolHtml(null,it)}`;
     const alt=!rnPago(it)&&rnAlt(it),dsx=!rnPago(it)&&ds.length;
     // já pago (verde) ou já com empresa e conta a pagar (verde-azulado): a linha fica colorida e mostra a empresa ao lado do nome
     const jaPg=rnPago(it),jaSep=!jaPg&&!!it.empresa_id&&!!it.titulo_id;
@@ -18016,7 +18037,7 @@ function rnDesenha(){
     const jaTag=jaPg?`<br><span class="rnjatag pg" title="Este repasse já foi pago: não pague de novo">✓ Já pago${it.empresa_id?' · '+esc(rnEmpNome(it.empresa_id)):''}</span>`:jaSep?`<br><span class="rnjatag" title="Este repasse já está separado nesta empresa, com a conta a pagar criada">➜ Já separado em ${esc(rnEmpNome(it.empresa_id))}</span>`:'';
     return `<tr data-id="${it.id}"${cls?` class="${cls}"`:''}><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
       <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${jaTag}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}${dsx?`<div class="rndescbox">⚠ <b>Desconto a fazer neste repasse</b>${ds.map(d=>`<br>${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''} <button type="button" class="btn small ghost" data-rn="descFeito" data-desc="${d.id}">Desconto feito</button>`).join('')}<br><b>Pagar ${fm(r2(rnLiq(it)-ds.reduce((x,d)=>x+(+d.valor),0)))}</b>${t?'<br><span class="muted">Clique em Desconto feito para tirar da conta a pagar agora. Ao gerar a remessa por aqui, ele sai sozinho.</span>':'<br><span class="muted">O desconto sai sozinho do valor ao criar a conta a pagar e ao gerar a remessa (a remessa vai com o valor líquido).</span>'}</div>`:''}</td>
-      <td>${it.guias??''}</td><td>${t&&Math.abs(+t.valor-(+it.valor))>0.004?`<span class="muted" style="text-decoration:line-through" title="Valor do relatório">${fm(it.valor)}</span><br><b title="Valor a pagar, já com o desconto">${fm(t.valor)}</b><br><span class="chip c-warn" title="Desconto já tirado da conta a pagar">− ${fm(r2(+it.valor-(+t.valor)))} desconto</span>`:`<b>${fm(it.valor)}</b>`}${rnVNF(it)!=null?`<br><span class="muted" style="white-space:nowrap" title="Valor da nota fiscal: bruto ${fm(it.bruto)} − repasse ${fm(it.valor)} − descontos ${fm(+it.desconto_rel||0)}">NF ${fm(rnVNF(it))}</span>`:''}</td><td class="l">${opSit(it)}</td>
+      <td>${it.guias??''}</td><td>${t&&Math.abs(+t.valor-(+it.valor))>0.004?`<span class="muted" style="text-decoration:line-through" title="Valor do relatório">${fm(it.valor)}</span><br><b title="Valor a pagar, já com o desconto">${fm(t.valor)}</b><br><span class="chip c-warn" title="${soDig(t.linha_digitavel)?'Diferença entre o repasse e o valor do boleto (retenção de impostos)':'Desconto já tirado da conta a pagar'}">${+it.valor>=+t.valor?'−':'+'} ${fm(Math.abs(r2(+it.valor-(+t.valor))))} ${soDig(t.linha_digitavel)?'pelo boleto':'desconto'}</span>`:`<b>${fm(it.valor)}</b>`}${rnVNF(it)!=null?`<br><span class="muted" style="white-space:nowrap" title="Valor da nota fiscal: bruto ${fm(it.bruto)} − repasse ${fm(it.valor)} − descontos ${fm(+it.desconto_rel||0)}">NF ${fm(rnVNF(it))}</span>`:''}</td><td class="l">${opSit(it)}</td>
       <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${alt?rnAltBox(alt,it):''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
       <td>${opEmp(it)}</td><td class="l">${ct}</td><td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td></tr>`};
   const O=rnOrd(),th=(k,t,c)=>`<th${c?` class="${c}"`:''} data-ord="${k}" style="cursor:pointer;user-select:none;white-space:nowrap" title="Clique para ordenar por ${t.toLowerCase()} (clique de novo para inverter)">${t}${O.k===k?(O.d>0?' ▲':' ▼'):' <span class="muted" style="opacity:.5">↕</span>'}</th>`;
@@ -18083,7 +18104,7 @@ $('rnBusca').oninput=()=>{clearTimeout(rnDesenha.t);rnDesenha.t=setTimeout(rnDes
 $('rnVenc').onchange=async()=>{const v=$('rnVenc').value||null;const {error}=await sb.from('repasse_lotes').update({vencimento:v}).eq('id',RN.lote.id);if(error)return fail(error);RN.lote.vencimento=v;toast('Data de pagamento salva')};
 $('rnHead').addEventListener('change',e=>{if(e.target.id!=='rnTodas')return;rnFiltrados().filter(i=>!rnPago(i)).forEach(i=>e.target.checked?RN.sel.add(i.id):RN.sel.delete(i.id));rnDesenha()});
 $('rnBody').addEventListener('change',async e=>{const tr=e.target.closest('tr[data-id]');if(!tr)return;const it=RN.itens.find(x=>x.id===tr.dataset.id);
-  if(e.target.matches('[data-rnbol]')){const f=e.target.files?.[0];e.target.value='';if(!f)return;e.target.closest('.rnbol').innerHTML='<span class="muted">Lendo o boleto…</span>';return rnBol(it,{file:f})}
+  if(e.target.matches('[data-rnbol]')){const fs=[...(e.target.files||[])];e.target.value='';if(!fs.length)return;return rnBol(it,{files:fs},e.target.closest('.rnbol'))}
   if(e.target.classList.contains('rnck')){e.target.checked?RN.sel.add(it.id):RN.sel.delete(it.id);return rnDesenha()}
   if(e.target.classList.contains('rnemp'))return rnEmpresa([it],e.target.value||null);
   if(e.target.classList.contains('rnsit'))return rnSituacao(it,e.target.value);
