@@ -2,6 +2,14 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 09:00 · conta 2 · branch `feat/cadastrar-fornecedor-rotina`**
+  - **Rotina diária, modo escritório:** em Boletos e notas a pagar, Cartão de crédito e Tesouraria, o campo do fornecedor ganhou o botão **+ Cadastrar** (o mesmo `data-pesnova`/`PESNOVA` da Gestão financeira). O cadastro usa a empresa do lançamento (`regCli()`).
+  - **Leitura do documento anexado:** antes era só em Boletos e notas a pagar. Agora também vale no Cartão de crédito, na Tesouraria e nas saídas do fechamento de caixa.
+    - Preenche o que estiver em branco: valor, nº da nota e fornecedor.
+    - O fornecedor sai de qualquer CNPJ do documento que não seja o da empresa: primeiro procura no cadastro (inclusive pela raiz do CNPJ), depois em `fornecedor_por_documento`.
+    - Se o fornecedor não estiver cadastrado, fica o nome lido do documento e o "+ Cadastrar" já abre com o CNPJ.
+  - Sem SQL. **Teste:** só a checagem de sintaxe; o simulador de testes não tem os módulos da Rotina diária. Conferir com um documento real.
+
 - **19/11/2026 08:40 · conta 2 · branch `fix/salvar-sem-fornecedor`**
   - **Feito:** dá para salvar sem fornecedor cadastrado.
     - Em Boletos e notas a pagar e em Cartão de crédito, o campo Fornecedor ficou opcional.
