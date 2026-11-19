@@ -2,6 +2,15 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **18/11/2026 22:15 · conta 2 · branch `feat/solicitacoes-servicos` (ainda não publicado)**
+  - **No banco (já aplicado):**
+    - 22 serviços de RH em `sol_tipos`, incluindo advertência, suspensão, atestado, INSS/CAT e "Descontos em folha" (até o dia 20).
+    - "Alteração na folha" virou "Lançamentos na folha".
+  - **No branch:**
+    - A "Nova solicitação" virou uma lista para escolher (agrupada por área) e mostra só os serviços do contrato da empresa: `clientes.bpo_rh` / `bpo_financeiro`; "Outros" sempre aparece.
+    - Mostra a descrição do serviço e avisa quando passou do dia 20 nos descontos.
+  - **Pendente:** publicar junto com a migração para a Cloudflare, para não gastar build do Netlify.
+
 - **18/11/2026 21:45 · conta 2 (chat Solicitações) · branch `feat/solicitacoes-modulo`**
   - **Feito:** módulo **Solicitações** dentro do `index.html`. Menu: Comunicação › Solicitações (`VIEW 'solic'`, em `SEMPRE`). Código num bloco só (`// ===== SOLICITAÇÕES + ADMISSÃO`), antes do `openView`; HTML na `section#viewSol`; CSS com prefixo `.sol-`. Também entra a página `admissao.html`.
     - Lista com filtros e selo de novidade; contador no menu, pelas `sol_notificacoes`.

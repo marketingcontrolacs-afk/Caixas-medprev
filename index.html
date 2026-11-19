@@ -2654,13 +2654,21 @@ async function solLista(){
      ||'<div class="card sol-vazio">Nenhuma solicitação nesta situação.</div>'}</div>`;
 }
 // ---------- nova ----------
+// lista de serviços conforme o contrato da empresa (ficha: BPO financeiro / BPO RH); "Outros" sempre (Carol, 18/11)
+const SOL_CAT={rh:'Departamento pessoal (RH)',financeiro:'Financeiro',fiscal:'Fiscal',outro:'Outros'};
+const solContrata=(c,cat)=>!c||cat==='outro'||(cat==='rh'?!!c.bpo_rh:!!c.bpo_financeiro)||!c.bpo_rh&&!c.bpo_financeiro;
 function solNova(){
-  SOL.tela='nova';$('solNovaBtn').hidden=true;$('solSub').textContent='Escolha o serviço. O prazo e os documentos aparecem conforme o tipo.';
-  const n=SOL.novo,t=solTipo(n.tipo),adm=solEhAdm(t),cl=CLIENTES.filter(c=>c.ativo!==false),ca=cliAtual();
-  const cliSel=ehEsc()||cl.length>1?`<label class="f">Empresa<select id="solNCli">${cl.map(c=>`<option value="${c.id}" ${(n.cli||ca?.id)===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`:'';
-  $('solBody').innerHTML=`<div class="sol-tipos">${SOL.tipos.map(x=>`<button type="button" class="sol-tipo card" data-soltipo="${x.id}" aria-pressed="${x.id===n.tipo}">
-      <small>${esc({financeiro:'Financeiro',rh:'RH',fiscal:'Fiscal',outro:'Outro'}[x.categoria]||'')}</small><b>${esc(x.nome)}</b><small>${x.sla_horas?'Prazo: '+Math.ceil(x.sla_horas/24)+(x.sla_horas<=24?' dia útil':' dias úteis'):'Prazo combinado'}</small></button>`).join('')}</div>
-   ${t?`<div class="card sol-form">${cliSel}<h2>${esc(t.nome)}</h2>
+  SOL.tela='nova';$('solNovaBtn').hidden=true;$('solSub').textContent='Escolha o serviço que você precisa. O prazo e os documentos aparecem conforme o tipo.';
+  const n=SOL.novo,cl=CLIENTES.filter(c=>c.ativo!==false),ca=cliAtual();if(!n.cli)n.cli=(ca&&cl.some(c=>c.id===ca.id)?ca.id:cl[0]?.id)||'';
+  const emp=solCli(n.cli),tipos=SOL.tipos.filter(t=>solContrata(emp,t.categoria));if(n.tipo&&!tipos.some(t=>t.id===n.tipo))n.tipo=null;
+  const t=solTipo(n.tipo),adm=solEhAdm(t),desc=t&&/desconto/i.test(t.nome),dia=new Date().getDate();
+  const cats=['rh','financeiro','fiscal','outro'].filter(k=>tipos.some(x=>x.categoria===k));
+  $('solBody').innerHTML=`<div class="card sol-form">
+    ${cl.length>1?`<label class="f">Empresa<select id="solNCli">${cl.map(c=>`<option value="${c.id}" ${n.cli===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`:''}
+    <label class="f">Qual serviço você precisa?<select id="solNTipo"><option value="">Selecione o serviço</option>${cats.map(k=>`<optgroup label="${SOL_CAT[k]}">${tipos.filter(x=>x.categoria===k).map(x=>`<option value="${x.id}" ${x.id===n.tipo?'selected':''}>${esc(x.nome)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    ${t?`<p class="note" style="margin:0">${t.sla_horas?'Prazo de atendimento: '+Math.ceil(t.sla_horas/24)+(t.sla_horas<=24?' dia útil':' dias úteis'):'Prazo combinado com a equipe'}</p>
+     ${t.descricao?`<div class="alerta" style="margin:0">${esc(t.descricao)}</div>`:''}
+     ${desc&&dia>20?`<div class="alerta" style="margin:0;border-color:var(--bad);background:var(--bad-soft)">Hoje já passou do dia 20: estes descontos entram na folha do mês que vem.</div>`:''}
      ${adm?`<div class="sol-g3">
        <label class="f">Nome do colaborador<input id="solNNome" placeholder="Ex.: Joana Lima"></label>
        <label class="f">WhatsApp do colaborador<input id="solNWhats" type="tel" placeholder="(48) 99999-0000"></label>
@@ -2671,14 +2679,15 @@ function solNova(){
        <p class="note" id="solNVenc"></p>
        <label class="f">Observação (opcional)<input id="solNObs" placeholder="Ex.: vaga da UTI, substitui a Maria"></label>
        <p class="note">O RH envia um link para o colaborador preencher os dados e mandar os documentos pelo celular. Você acompanha cada etapa por aqui.</p>`
-     :`${(t.documentos||[]).length?`<div class="alerta">Documentos que vamos pedir: ${esc(t.documentos.join(', '))}. Anexe aqui ou depois, na conversa.</div>`:''}
-       <label class="f">Título<input id="solNTit" placeholder="Resumo do pedido"></label>
-       <label class="f">Detalhes<textarea id="solNDesc" rows="4" placeholder="Explique o que precisa"></textarea></label>
+     :`${(t.documentos||[]).length?`<p class="note" style="margin:0">Documentos que vamos pedir: <b>${esc(t.documentos.join(', '))}</b>. Anexe aqui ou depois, na conversa.</p>`:''}
+       <label class="f">Título (opcional)<input id="solNTit" placeholder="${esc(t.nome)}"></label>
+       <label class="f">Detalhes<textarea id="solNDesc" rows="4" placeholder="Explique o que precisa: colaborador, datas, valores…"></textarea></label>
        <label class="f">Anexos (opcional)<input id="solNArq" type="file" multiple></label>`}
-     <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn" data-solvolta="1">Cancelar</button><button type="button" class="btn primary" id="solNCriar">Abrir solicitação</button></div></div>`:''}`;
+     <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn" data-solvolta="1">Cancelar</button><button type="button" class="btn primary" id="solNCriar">Abrir solicitação</button></div>`
+    :`<div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-solvolta="1">Cancelar</button></div>`}</div>`;
 }
 async function solCriar(){
-  const t=solTipo(SOL.novo.tipo);if(!t)return;const cli=$('solNCli')?.value||cliAtual()?.id||ME.cliente_id||CLIENTES[0]?.id;
+  const t=solTipo(SOL.novo.tipo);if(!t)return;const cli=SOL.novo.cli||cliAtual()?.id||ME.cliente_id||CLIENTES[0]?.id;
   if(!cli){toast('Escolha a empresa.');return}
   let reg={cliente_id:cli,tipo_id:t.id};
   if(solEhAdm(t)){const v=k=>($(k)?.value||'').trim();
@@ -2878,6 +2887,8 @@ $('viewSol').addEventListener('click',async e=>{const b=e.target.closest('button
 });
 $('viewSol').addEventListener('change',async e=>{const t=e.target;
   if(t.id==='solPri'){const {error}=await sb.from('sol_solicitacoes').update({prioridade:t.value}).eq('id',SOL.sel);if(error)alert(error.message);else solDet(SOL.sel);return}
+  if(t.id==='solNCli'){SOL.novo={cli:t.value,tipo:SOL.novo.tipo};solNova();return}
+  if(t.id==='solNTipo'){SOL.novo={cli:SOL.novo.cli,tipo:t.value||null};solNova();return}
   if(t.id==='solNIni'||t.id==='solNExp'){const v=solVenc($('solNIni').value,$('solNExp').value);$('solNVenc').textContent=v}
 });
 // ================= fim SOLICITAÇÕES =================
