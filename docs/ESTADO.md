@@ -2,6 +2,14 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 09:40 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
+  - **Boleto no pagamento, opcional** (Carol: "só tem 2 casos", ex.: Laboratório Médico Santa Luzia SC). Nada ficou obrigatório; quem não anexa continua por Pix ou conta.
+    - Parceiros MP › Repasse da semana: na coluna Situação de cada repasse com conta a pagar em aberto, "📎 Anexar boleto" ou "Colar linha". Com boleto, aparece "📎 Vai por boleto" e o botão "Tirar boleto".
+    - Gestão financeira › Envio de remessa (qualquer conta a pagar, de qualquer empresa, que iria por Pix/TED ou que estava sem forma): os mesmos dois botões. A linha do boleto mostra vencimento e valor.
+    - Funções novas: `bolNoTitulo` (lê o arquivo com `leArquivoDoc`, usa a linha corrigida do portal #111, recusa linha que não confere com `bolConfere`, avisa valor diferente e boleto repetido, guarda o arquivo em `documentos` como "Boleto ou fatura" e grava `fin_titulos.linha_digitavel` + `forma='Boleto'`) e `bolTiraTitulo`. Tudo com ↶ Desfazer.
+    - Santander: o boleto de parceiro sem CPF/CNPJ no fornecedor usa o CPF/CNPJ do cadastro do parceiro (`rmDoc`).
+  - Sem SQL. Testado no simulador (prints em `sistema-caixa/boleto-parceiros/`). **Pendente:** OK da Carol para publicar; testar com um boleto real.
+
 - **19/11/2026 09:00 · conta 2 · branch `feat/cadastrar-fornecedor-rotina`**
   - **Rotina diária, modo escritório:** em Boletos e notas a pagar, Cartão de crédito e Tesouraria, o campo do fornecedor ganhou o botão **+ Cadastrar** (o mesmo `data-pesnova`/`PESNOVA` da Gestão financeira). O cadastro usa a empresa do lançamento (`regCli()`).
   - **Leitura do documento anexado:** antes era só em Boletos e notas a pagar. Agora também vale no Cartão de crédito, na Tesouraria e nas saídas do fechamento de caixa.
