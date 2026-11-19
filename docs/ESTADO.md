@@ -2,6 +2,14 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 14:30 · conta 1 (thread "Descontar guias da Top Imagem no repasse") · branch `claude/project-thread-h0h07i` (ainda não publicado)**
+  - **Arquivo de desconto do parceiro** (Carol, 19/11; ex.: Top Image, relatório de atendimentos por representante = guias recebidas na clínica). Marca nova no cadastro do parceiro (só escritório): "Exige arquivo de desconto no repasse" (`parceiros.desc_arq`) + "Nome do desconto" (`desc_arq_nome`, ex.: Representante).
+  - Repasse da semana: o repasse do parceiro marcado mostra "Falta o arquivo de desconto" com "📎 Anexar arquivo de desconto" (Excel/CSV/PDF) ou "Não tem desconto" (`repasse_itens.desc_arq`). Leitura `daLeArquivo`/`daLeLinhas` (aguenta colunas desalinhadas do Crystal), conferência `rnDAAnexa` (guias já descontadas antes ficam desmarcadas, empresa obrigatória), lançamento `rnDALanca` (um `repasse_descontos` com motivo "<nome> do período X a Y (N guias)"; se já há conta a pagar em aberto, sai na hora por `descNaConta`; o arquivo vai para os anexos da conta a pagar). Desfazer `rnDADesfaz`. Quadro e filtro "Falta arquivo de desconto". Trava em "Gerar remessa" e "Marcar como pago" (`rnDATrava`).
+  - **Contas a pagar:** todo desconto de parceiro (manual ou por arquivo) agora também entra na **descrição** da conta a pagar: " · Descontado R$ X ref. <motivo>" (`descDescr`, em `rnCriaTitulos` e `descNaConta`). A observação continua como antes.
+  - Não mexe no boleto do repasse (regra do Santa Luzia): são coisas separadas.
+  - Banco: **v164** RODADA pelo MCP (colunas acima; cadastro do parceiro Top Image com a marca, ligado ao fornecedor de mesmo CNPJ; desconto de R$ 1.560,00 em Oliveira SJ, período 01/11 a 15/11/2026, 6 guias, para o repasse de 19/11). SQL e DESFAZER em `sistema-caixa/sql-versoes`. **Próximo SQL livre: v165.**
+  - Testado no simulador (prints em `sistema-caixa/desconto-arquivo/`). **Pendente:** OK da Carol para publicar.
+
 - **19/11/2026 12:55 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - **Só aceita TED (nunca Pix)** (Carol, 19/11): o Inter mandou como Pix a TED da Clínica Viva Simon (o arquivo estava certo, lote TED; o Inter faz transferência para outro banco pelo Pix por agência e conta). Marca nova no cadastro do fornecedor (Gestão financeira › Cadastros, `gf_so_ted`) e do parceiro (`pc_so_ted`, só escritório). `rmForma` nunca usa Pix para quem tem a marca (`soTedDe`: fornecedor ou parceiro ligado); no Envio de remessa do Inter a linha fica de fora com o aviso para pagar à mão; Sicredi e Santander vão por TED no arquivo.
   - Banco: **v163** RODADA (colunas `so_ted` em `fin_pessoas` e `parceiros`, padrão false); Clínica Viva Simon Fpolis e Kobrasol já marcadas (parceiros e fornecedores ligados). SQL em `sistema-caixa/sql-versoes`. **Pendente:** OK da Carol para publicar.

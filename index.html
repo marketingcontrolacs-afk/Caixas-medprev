@@ -1108,7 +1108,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
       <label class="f" data-rnf>Pagamento em<input type="date" id="rnVenc"></label>
       <button type="button" class="btn" id="rnAdd" data-rnf title="Inclui neste relatório um repasse que não veio no arquivo">+ Incluir repasse</button>
       <button type="button" class="btn" id="rnExcl" data-rnf style="color:var(--bad);border-color:var(--bad)" title="Exclui este relatório importado e as contas a pagar ainda não pagas que ele gerou">Excluir relatório</button>
-      <label class="f" data-rnf>Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="semPix">Sem chave Pix</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option><option value="rem">Enviados por remessa</option><option value="semRem">Não enviados por remessa</option></select></label>
+      <label class="f" data-rnf>Mostrar<select id="rnFiltro"><option value="todos">Todos</option><option value="emite">Emite NF</option><option value="nao">Não emite NF</option><option value="sem">Não encontrados no controle</option><option value="semEmp">Sem empresa escolhida</option><option value="semConta">Sem conta bancária</option><option value="semPix">Sem chave Pix</option><option value="alt">Com alteração de conta</option><option value="desc">Com desconto a fazer</option><option value="darq">Falta arquivo de desconto</option><option value="rem">Enviados por remessa</option><option value="semRem">Não enviados por remessa</option></select></label>
       <label class="f" data-rnf>Situação<select id="rnSitF"><option value="">Todas</option><option value="falta">Falta pagar</option><option value="sem">Sem empresa (sem conta a pagar)</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="pago">Pagos</option><option value="conciliado">Conciliados</option></select></label>
       <label class="f" data-rnf>Chave Pix<select id="rnPixF" title="Filtra pelo cadastro do parceiro na empresa escolhida"><option value="">Todos</option><option value="com">Com chave Pix cadastrada</option><option value="sem">Sem chave Pix cadastrada</option></select></label>
       <label class="f" data-rnf>Empresa<select id="rnEmpF"></select></label>
@@ -14350,7 +14350,9 @@ async function abrirParceiro(p,modo){
     h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
       ${p&&!editaCad?'<p class="note" style="margin:6px 0 0">Os dados já foram conferidos pelo escritório. Para trocar a conta, use “Informar alteração de conta”.</p>':''}
       ${e&&p?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px"><input type="checkbox" id="pc_ativo" style="width:auto"${p.ativo?' checked':''}> Parceiro ativo</label>`:''}
-      ${e?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px" title="Nunca vai por Pix. Na remessa do Inter fica de fora para pagar à mão (o Inter manda transferência como Pix). Vale em todas as empresas."><input type="checkbox" id="pc_so_ted" style="width:auto"${p?.so_ted?' checked':''}> Só aceita TED (nunca Pix)</label>`:''}</div>`;
+      ${e?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px" title="Nunca vai por Pix. Na remessa do Inter fica de fora para pagar à mão (o Inter manda transferência como Pix). Vale em todas as empresas."><input type="checkbox" id="pc_so_ted" style="width:auto"${p?.so_ted?' checked':''}> Só aceita TED (nunca Pix)</label>`:''}
+      ${e?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px" title="No Repasse da semana, o repasse deste parceiro pede o arquivo de desconto (ex.: relatório das guias recebidas na clínica) ou a marca “Não tem desconto”. Sem um dos dois, não gera remessa nem marca como pago."><input type="checkbox" id="pc_desc_arq" style="width:auto"${p?.desc_arq?' checked':''}> Exige arquivo de desconto no repasse</label>
+        <label class="f" style="margin-top:6px;max-width:420px">Nome do desconto <span class="muted">(aparece em Contas a pagar)</span><input id="pc_desc_arq_nome" value="${esc(p?.desc_arq_nome||'')}" placeholder="Ex.: Representante"></label>`:''}</div>`;
     if(hist.length)h+=`<div><h3 style="margin-bottom:6px">Histórico</h3>${hist.map(x=>`<p class="note" style="margin:0 0 4px">${dBR(String(x[0]).slice(0,10))} · ${esc(x[1])}</p>`).join('')}</div>`;
   }
   h+='<p class="err" id="rpErr" hidden></p>';
@@ -14409,6 +14411,8 @@ async function rpAcao(act,el){
       if((o.banco||o.agencia||o.conta)&&!temConta(o))return rpErr('Complete banco, agência e conta, ou deixe em branco e preencha depois.');
       if(o.pix_chave&&(!p||o.pix_chave!==p.pix_chave)&&!(await parcPixOk(o.pix_chave,p?[p.id]:[]))){el.disabled=false;return}
       if(e&&$('pc_so_ted')&&($('pc_so_ted').checked||p?.so_ted))o.so_ted=$('pc_so_ted').checked;   // só TED (Carol, 19/11; v163)
+      // exige arquivo de desconto no repasse (Carol, 19/11; v164): ex.: Top Image, relatório das guias recebidas na clínica
+      if(e&&$('pc_desc_arq')&&($('pc_desc_arq').checked||p?.desc_arq||$('pc_desc_arq_nome').value.trim()!==(p?.desc_arq_nome||''))){o.desc_arq=$('pc_desc_arq').checked;o.desc_arq_nome=$('pc_desc_arq_nome').value.trim()||null}
       if(p){if(e&&$('pc_ativo'))o.ativo=$('pc_ativo').checked;o.atualizado_em=new Date().toISOString();
         const {error}=await sb.from('parceiros').update(o).eq('id',p.id);if(error){if(v120(error))return rpErr(v120Msg);throw error}return recarregar('Parceiro salvo')}
       o.cliente_id=$('pc_cliente').value;o.conferido=e;
@@ -16231,6 +16235,7 @@ const MANUAL=[
 <li><b>Filtros com quadradinhos (todas as telas):</b> nos filtros de lista (Contas a pagar e a receber, Movimentação financeira, Conciliação bancária, Parceiros, Controle de notas fiscais, Projetos e melhorias, Tarefas, Férias, Colaboradores, Conciliação de cartões e Repasse da semana), clique no filtro e marque uma ou mais opções. Dentro do mesmo filtro aparece o que tiver qualquer uma das opções marcadas; filtros diferentes valem juntos. <b>Limpar</b> volta para Todos e <b>OK</b> fecha a lista.</li>
 <li><b>Buscar em tudo:</b> em Contas a pagar, Contas a receber e Movimentação financeira, o campo <b>Buscar</b> acha por qualquer coluna: fornecedor, descrição, documento, categoria, parcela, situação, data (ex.: 12/11) e valor (ex.: 388 ou 388,00). Para filtrar por coluna, use também <b>Cliente ou fornecedor</b> e <b>Valor de / até</b>.</li>
 <li><b>Filtros com mais de uma opção:</b> no Repasse da semana, clique em Mostrar, Situação, Chave Pix ou Empresa e marque os quadradinhos que quiser (ex.: Emite NF + Sem empresa escolhida, ou duas empresas). Dentro do mesmo filtro aparece quem tem qualquer uma das opções marcadas; filtros diferentes valem juntos. Em Mostrar, as opções de nota fiscal valem uma ou outra, e as demais (sem empresa, sem conta, sem Pix, alteração, desconto) valem juntas. <b>Limpar</b> volta para Todos.</li>
+<li><b>Arquivo de desconto do parceiro:</b> no cadastro do parceiro (só o escritório), marque <b>Exige arquivo de desconto no repasse</b> e dê um nome ao desconto (ex.: Representante). Em todo repasse desse parceiro aparece a caixa “Falta o arquivo de desconto”: use <b>📎 Anexar arquivo de desconto</b> (Excel, CSV ou PDF) ou <b>Não tem desconto</b>. O sistema lê as guias, deixa desmarcadas as que já foram descontadas antes, e o total marcado vira um desconto do parceiro, que sai da conta a pagar. Em Contas a pagar, a descrição mostra “Descontado R$ X ref. Representante do período …”. Enquanto faltar o arquivo, o repasse não vai para a remessa nem pode ser marcado como pago. Use o quadro <b>Falta arquivo de desconto</b> para achar. O <b>Desfazer</b> tira o desconto e volta o valor da conta a pagar. Não tem relação com o boleto do parceiro.</li>
 <li><b>Filtrar pelos quadros do repasse:</b> no Repasse da semana, clique num quadro de valores para ver só os repasses que formam aquele valor: uma empresa (ex.: MP Chopinzinho), Emitem NF, Não emitem NF, Não encontrados, Sem empresa, Alteração de conta, Desconto a fazer ou Falta pagar. O quadro escolhido fica contornado e os outros filtros voltam para “Todos”. Clique de novo no mesmo quadro, ou em <b>Repasses</b>, para ver todos.</li>
 <li><b>Titular da conta e Pix repetido:</b> o <b>CPF/CNPJ do parceiro</b> é do cadastro e não repete. O <b>CPF/CNPJ do titular da conta</b> é só do pagamento e pode ser o mesmo de outro parceiro (ex.: duas unidades de uma clínica pagas numa conta só). Se a chave Pix já for de outro parceiro, o sistema avisa e pergunta se deseja continuar.</li>
 <li><b>Incluir um repasse à mão:</b> escolha o relatório e clique em <b>+ Incluir repasse</b>. Informe o parceiro (a lista mostra os cadastrados), o valor e, se tiver, as guias e o protocolo. Depois ele aparece na lista como os outros.</li>
@@ -17020,6 +17025,10 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-19desc-arquivo',data:'2026-11-19',t:'Repasse: arquivo de desconto do parceiro (ex.: Top Image)',itens:[
+    {x:'No cadastro do parceiro há a marca “Exige arquivo de desconto no repasse”, com o nome do desconto (ex.: Representante). Vale para qualquer parceiro que mande um relatório de guias para descontar.',mods:['gfrepasse','repasse'],para:'esc'},
+    {x:'No Repasse da semana, o repasse desse parceiro pede o arquivo (“📎 Anexar arquivo de desconto”) ou “Não tem desconto”. O sistema lê as guias, mostra a conferência (as guias já descontadas antes ficam desmarcadas) e lança o desconto, que sai da conta a pagar. Sem o arquivo ou a marca, não gera remessa nem marca como pago. Tem Desfazer.',mods:['gfrepasse'],para:'esc'},
+    {x:'Em Contas a pagar, a descrição do repasse mostra o desconto: “Descontado R$ X ref. …”. Vale para todos os descontos de parceiros.',mods:['gfrepasse','gfpagar'],para:'esc'}]},
   {k:'2026-11-19so-ted',data:'2026-11-19',t:'Cadastro: “Só aceita TED (nunca Pix)”',itens:[
     {x:'No cadastro do fornecedor (Gestão financeira › Cadastros) e do parceiro (Parceiros) há a marca “Só aceita TED (nunca Pix)”. Vale em todas as empresas.',mods:['gfremessa','gfrepasse','repasse'],para:'esc'},
     {x:'No Envio de remessa, quem tem a marca nunca vai por Pix. Na remessa do Inter fica de fora, com o aviso para pagar à mão por TED, porque o Inter manda as transferências para outros bancos como Pix. Nos outros bancos vai por TED no arquivo. A Clínica Viva Simon (Fpolis e Kobrasol) já está marcada.',para:'esc'}]},
@@ -18074,6 +18083,7 @@ function rnFiltrados(){
     if(fRm.length&&!fRm.some(k=>(k==='rem')===!!(it.titulo_id&&RN.rem?.[it.titulo_id])))return false;
     for(const k of fE){
       if(k==='desc'&&(rnPago(it)||!rnDescPend(p()).length))return false;
+      if(k==='darq'&&!rnDAFalta(it))return false;
       if(k==='semEmp'&&it.empresa_id||k==='semConta'&&rnTemConta(p())||k==='semPix'&&p()?.pix_chave||k==='alt'&&!rnAlt(it))return false}
     if(P.length===1&&(P[0]==='com')!==!!p()?.pix_chave)return false;
     if(E.length&&!E.some(k=>k==='-'?!it.empresa_id:it.empresa_id===k))return false;
@@ -18100,6 +18110,144 @@ async function rnBol(it,arg,box){
   try{const r=await bolNoTitulo(t,arg);if(!r)return rnDesenha();rnDesenha();
     toastDesfazer(`Boleto anexado: ${(it.nome||'').trim()} vai na remessa como boleto${r.bol.venc?' (venc. '+dBR(r.bol.venc)+')':''}${r.trocaV?`, valor do boleto ${fm(r.trocaV.para)} (era ${fm(r.trocaV.de)})`:''}`,async()=>{try{await r.desfaz();toast('Boleto tirado: voltou como estava')}catch(e){fail(e)}rnDesenha()})}
   catch(e){console.error(e);rnDesenha();alert(e.message||'Não foi possível anexar o boleto.')}}
+// DESCONTO POR ARQUIVO NO REPASSE (Carol, 19/11; v164): parceiro marcado “Exige arquivo de desconto” (ex.: Top Image, relatório
+// das guias que ele recebeu na clínica) precisa, em cada repasse, do arquivo ou da marca “Não tem desconto”. O sistema lê o arquivo
+// (Excel, CSV ou PDF), tira as guias que já foram descontadas antes e lança o desconto (repasse_descontos), que sai da conta a pagar.
+const rnDAP=it=>{const p=rnParc(it,it.empresa_id);return p?.desc_arq?p:null};
+const rnDAFalta=it=>!rnPago(it)&&!it.desc_arq&&!!rnDAP(it);
+const daDtRe=/(\d{2}\/\d{2}\/\d{4})/;
+function daCel(v){if(v==null)return '';if(v instanceof Date)return dBR(v.toISOString().slice(0,10));return String(v).trim()}
+function daNum(v){if(typeof v==='number')return v;const t=String(v??'').trim();if(!t||!/\d/.test(t)||/[a-z]/i.test(t.replace(/r\$/i,'')))return NaN;return /,\d{1,2}$/.test(t)?parseMoney(t):+t.replace(/[^\d.-]/g,'')}
+// lê as linhas de uma planilha: cabeçalho com “Valor” e a coluna da guia (Atendimento, Guia, Protocolo); datas soltas acima de cada bloco
+function daLeLinhas(rows){
+  const R={linhas:[],periodo:null,totalArq:null};let H=null,dataAtual=null;
+  for(const r of rows){const c=r.map(daCel),txt=c.filter(Boolean).join(' ');if(!txt)continue;
+    const per=txt.match(/(\d{2}\/\d{2}\/\d{4})\s*(?:~|a|até|ate|-|–)\s*(\d{2}\/\d{2}\/\d{4})/i);if(per&&!R.periodo&&/per[ií]odo/i.test(txt))R.periodo=[per[1],per[2]];
+    const ix=re=>c.findIndex(x=>re.test(x));
+    const iv=ix(/^valor/i),ig=ix(/^(atendimento|guia|n[ºo°.]*\s*(da\s*)?guia|protocolo|n[ºo°]\s*atend)/i);
+    if(iv>=0&&ig>=0){H={v:iv,g:ig,n:ix(/usu[aá]rio|paciente|nome|cliente|benefici/i),d:ix(/^data/i)};continue}
+    if(/^total/i.test(c.find(Boolean)||'')){const ns=r.map(daNum).filter(x=>!isNaN(x));if(ns.length)R.totalArq=ns[ns.length-1];continue}
+    const so=c.filter(Boolean);if(so.length===1&&daDtRe.test(so[0])&&so[0].length<=12){dataAtual=so[0].match(daDtRe)[1];continue}
+    if(!H)continue;
+    // relatórios tipo Crystal (ex.: Top Image) não alinham as colunas da linha com o cabeçalho: pega a célula mais perto de cada coluna
+    const perto=(alvo,ok)=>{let m=-1;c.forEach((x,k)=>{if(x!==''&&ok(x,k)&&(m<0||Math.abs(k-alvo)<Math.abs(m-alvo)))m=k});return m};
+    const kg=perto(H.g,x=>/^\d{4,}(\.0+)?$/.test(x.trim())),g=kg>=0?c[kg].replace(/\.0+$/,'').replace(/\D/g,''):'';
+    const kv=perto(H.v,(x,k)=>k!==kg&&daNum(r[k])>0&&!daDtRe.test(x)),v=kv>=0?daNum(r[kv]):NaN;
+    const kn=H.n>=0?perto(H.n,(x,k)=>k!==kg&&k!==kv&&/[a-zà-ú]{2}/i.test(x)):-1,kd=H.d>=0?perto(H.d,x=>daDtRe.test(x)):-1;
+    if(g.length>=4&&v>0)R.linhas.push({guia:g,valor:r2(v),nome:kn>=0?c[kn]:'',data:(kd>=0&&c[kd].match(daDtRe)[1])||dataAtual||''})}
+  return R}
+async function daLeArquivo(f){
+  const nome=f.name||'';
+  if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(nome)){const t=await pdfTexto(f),R={linhas:[],periodo:null,totalArq:null};let dataAtual=null;
+    for(const l of t.split(/\n/)){const s=l.trim();if(!s)continue;
+      const per=s.match(/per[ií]odo\D*(\d{2}\/\d{2}\/\d{4})\s*(?:~|a|até|-|–)\s*(\d{2}\/\d{2}\/\d{4})/i);if(per){R.periodo=[per[1],per[2]];continue}
+      if(/^total/i.test(s)){const m=s.match(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/);if(m)R.totalArq=parseMoney(m[1]);continue}
+      if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){dataAtual=s;continue}
+      const m=s.match(/^(\d{5,})\s+(.*?)\s*(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})\b/);if(m)R.linhas.push({guia:m[1],nome:m[2].trim(),valor:parseMoney(m[3]),data:dataAtual||''})}
+    return R}
+  const wb=XLSX.read(await f.arrayBuffer(),{cellDates:true});const R={linhas:[],periodo:null,totalArq:null};
+  for(const n of wb.SheetNames){const x=daLeLinhas(XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}));R.linhas.push(...x.linhas);R.periodo=R.periodo||x.periodo;if(x.totalArq!=null)R.totalArq=r2((R.totalArq||0)+x.totalArq)}
+  return R}
+const daBR2ISO=d=>d?d.split('/').reverse().join('-'):'';
+function daPeriodo(R){if(R.periodo)return R.periodo;const ds=R.linhas.map(l=>daBR2ISO(l.data)).filter(Boolean).sort();return ds.length?[dBR(ds[0]),dBR(ds[ds.length-1])]:null}
+// conferência antes de lançar: as guias lidas, as já descontadas antes (ficam desmarcadas), a empresa e o total
+async function rnDAAnexa(it,f){
+  const p=rnDAP(it);if(!p)return;let R;
+  try{R=await daLeArquivo(f)}catch(e){console.error(e);R={linhas:[],periodo:null,totalArq:null,erro:true}}
+  // guias já descontadas deste parceiro (em qualquer repasse): não descontar duas vezes
+  const ja={};{const {data}=await sb.from('repasse_descontos').select('id,referencia,status,criado_em').eq('parceiro_id',p.id).neq('status','Cancelado');
+    for(const d of data||[])for(const g of String(d.referencia||'').match(/\d{4,}/g)||[])ja[g]=d}
+  const emps=RN.grupo.empresas,nomeD=p.desc_arq_nome||'Desconto',per=daPeriodo(R);
+  let d=$('dlgRnDA');if(!d){d=document.createElement('dialog');d.id='dlgRnDA';d.className='cheia';document.body.appendChild(d)}
+  const ls=R.linhas.map((l,i)=>({...l,i,ja:ja[l.guia]||null}));
+  d.innerHTML=`<div class="dh"><h2>Arquivo de desconto · ${esc((it.nome||'').trim())}</h2></div><div class="db" style="display:grid;gap:12px;align-content:start">
+    <p class="note" style="margin:0">${esc(f.name||'arquivo')} · repasse de ${fm(it.valor)}. Confira as guias: as marcadas viram um desconto só, que sai do valor deste repasse.</p>
+    ${R.erro||!ls.length?`<div class="alerta" style="margin:0">Não consegui ler as guias deste arquivo. Informe o total a descontar e o número das guias.</div>
+      <div class="fields"><label class="f">Valor do desconto *<input class="money" id="daValor" inputmode="decimal" placeholder="0,00"></label><label class="f wide">Nº das guias *<input id="daGuias" placeholder="Ex.: 29970488, 30003824"></label></div>`
+    :`<div class="tablebox" style="margin:0;max-height:46vh;overflow:auto"><table><thead><tr><th style="width:28px"></th><th>Data</th><th class="l">Guia</th><th class="l">Nome</th><th>Valor</th><th class="l">Situação</th></tr></thead><tbody>${ls.map(l=>`<tr><td><input type="checkbox" data-dai="${l.i}" style="width:auto"${l.ja?'':' checked'}></td><td>${esc(l.data)}</td><td class="l">${esc(l.guia)}</td><td class="l">${esc(l.nome||'')}</td><td>${fm(l.valor)}</td><td class="l">${l.ja?`<span class="chip c-warn" title="${esc(l.ja.referencia||'')}">já descontada (${esc(l.ja.status)} em ${dBR(String(l.ja.criado_em).slice(0,10))})</span>`:'<span class="chip c-ok">descontar</span>'}</td></tr>`).join('')}</tbody></table></div>`}
+    <div class="fields"><label class="f">Período${per?'':' *'}<input id="daPer" value="${per?esc(per[0]+' a '+per[1]):''}" placeholder="01/11/2026 a 15/11/2026"></label>
+      <label class="f">Empresa em que sai o desconto *<select id="daEmp">${it.empresa_id?'':'<option value="">Escolha</option>'}${emps.map(id=>`<option value="${id}"${id===it.empresa_id?' selected':''}>${esc(rnEmpNome(id))}</option>`).join('')}</select></label></div>
+    <div id="daRes" class="note" style="margin:0"></div><p class="err" id="daErr" hidden></p></div>
+    <div class="df"><button type="button" class="btn ghost" id="daCanc">Cancelar</button><span class="spacer"></span><button type="button" class="btn primary" id="daOk">Lançar desconto</button></div>`;
+  const marc=()=>ls.filter(l=>d.querySelector(`[data-dai="${l.i}"]`)?.checked);
+  const tot=()=>ls.length?r2(marc().reduce((x,l)=>x+l.valor,0)):(parseMoney($('daValor').value)||0);
+  const res=()=>{const t=tot(),n=ls.length?marc().length:null;
+    $('daRes').innerHTML=`${ls.length?`${n} de ${ls.length} guias marcadas · `:''}<b>Desconto ${fm(t)}</b> · o repasse fica <b>${fm(r2(+it.valor-t))}</b>`
+      +(R.totalArq!=null&&ls.length&&Math.abs(R.totalArq-r2(ls.reduce((x,l)=>x+l.valor,0)))>0.004?`<br><span class="neg">O total do arquivo (${fm(R.totalArq)}) não bate com a soma das guias lidas (${fm(r2(ls.reduce((x,l)=>x+l.valor,0)))}). Confira o arquivo.</span>`:'')
+      +(ls.some(l=>l.ja)?'<br>As guias já descontadas antes ficam desmarcadas.':'')};
+  d.onchange=res;d.oninput=res;res();d.showModal();
+  return new Promise(ok=>{
+    $('daCanc').onclick=()=>{d.close();ok(null)};d.oncancel=()=>ok(null);
+    $('daOk').onclick=async()=>{const err=t=>{$('daErr').textContent=t;$('daErr').hidden=false};
+      const emp=$('daEmp').value,t=tot(),pr=$('daPer').value.trim(),gs=ls.length?marc().map(l=>l.guia):($('daGuias').value.match(/\d{4,}/g)||[]);
+      if(!emp)return err('Escolha a empresa em que sai o desconto.');if(!(t>0))return err(ls.length?'Marque ao menos uma guia.':'Informe o valor do desconto.');
+      if(!gs.length)return err('Informe o número das guias.');if(!pr)return err('Informe o período do arquivo.');
+      if(t>+it.valor-0.004)return err(`O desconto (${fm(t)}) é maior que o repasse (${fm(it.valor)}).`);
+      const rep=gs.filter(g=>ja[g]);if(rep.length&&!confirm(`${rep.length===1?'A guia':'As guias'} ${rep.join(', ')} já ${rep.length===1?'foi descontada':'foram descontadas'} antes. Descontar de novo?`))return;
+      $('daOk').disabled=true;d.close();ok({emp,total:t,periodo:pr,guias:gs,n:gs.length,nome:nomeD,p})}})
+}
+// lança: guarda o arquivo, cria o desconto e, se o repasse já tem conta a pagar em aberto, tira dela agora
+async function rnDALanca(it,f){
+  const r=await rnDAAnexa(it,f);if(!r)return rnDesenha();
+  let caminho=null,doc=null,desc=null,aplicado=false;const t=it.titulo_id&&RN.tits[it.titulo_id];
+  try{
+    try{const safe=(f.name||'arquivo').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.-]+/g,'_');caminho=`${r.emp}/financeiro/${crypto.randomUUID()}-${safe}`;
+      const {error}=await sb.storage.from('anexos').upload(caminho,f,{contentType:f.type||'application/octet-stream'});if(error)throw error}
+    catch(e){console.error(e);caminho=null}
+    const motivo=`${r.nome} do período ${r.periodo} (${r.n} ${r.n===1?'guia':'guias'})`;
+    const {data,error}=await sb.from('repasse_descontos').insert({parceiro_id:r.p.id,cliente_id:r.emp,valor:r.total,motivo,referencia:`Guias nº ${r.guias.join(', ')} · arquivo ${f.name||''}`.trim(),status:'Pendente'}).select('*').single();
+    if(error)throw error;desc=data;
+    const da={sit:'anexado',desc_ids:[desc.id],arquivo:f.name||'',caminho,total:r.total,n:r.n,periodo:r.periodo,por:ME.user_id,em:new Date().toISOString()};
+    {const {error:e2}=await sb.from('repasse_itens').update({desc_arq:da}).eq('id',it.id);if(e2)throw e2}
+    it.desc_arq=da;RN.desc.push(desc);
+    if(t&&!((+t.pago||0)>0)){await descNaConta(desc,t,+it.valor,it.id);RN.desc=RN.desc.filter(x=>x.id!==desc.id);aplicado=true}
+    if(t&&caminho){const {data:dd}=await sb.from('documentos').insert({cliente_id:t.cliente_id,modulo:'financeiro',registro_id:t.id,categoria:'Outros',nome_arquivo:f.name||'Arquivo de desconto',caminho}).select('id').single();doc=dd?.id||null}
+    if(doc){it.desc_arq.doc_id=doc;await sb.from('repasse_itens').update({desc_arq:it.desc_arq}).eq('id',it.id)}
+  }catch(e){console.error(e);if(desc&&!aplicado){await sb.from('repasse_descontos').delete().eq('id',desc.id);RN.desc=RN.desc.filter(x=>x.id!==desc.id)}
+    if(!aplicado&&it.desc_arq?.desc_ids?.[0]===desc?.id){it.desc_arq=null;await sb.from('repasse_itens').update({desc_arq:null}).eq('id',it.id)}
+    rnDesenha();return alert('Não foi possível lançar o desconto: '+(e.message||e))}
+  GT.key='';parcPendentes();rnDesenha();
+  toastDesfazer(`Desconto de ${fm(r.total)} lançado em ${(it.nome||'').trim()}${aplicado?`: a conta a pagar ficou ${fm(t.valor)}`:': sai da conta a pagar quando ela for criada'}`,()=>rnDADesfaz(it,true))}
+// desfaz o arquivo (ou a marca “Não tem desconto”): o desconto sai e a conta a pagar volta ao valor de antes
+async function rnDADesfaz(it,semPerg){
+  const da=it.desc_arq;if(!da)return;
+  try{
+    if(da.sit==='anexado'){
+      const {data:ds}=await sb.from('repasse_descontos').select('*').in('id',da.desc_ids||[]);
+      for(const d of ds||[])if(d.status==='Descontado'&&d.titulo_id){const t=RN.tits[d.titulo_id]||(await sb.from('fin_titulos').select('*').eq('id',d.titulo_id).single()).data;
+        if(t&&(+t.pago||0)>0)return alert('A conta a pagar deste repasse já tem pagamento. Desfaça o pagamento em Contas a pagar antes.');
+        const {data:rem}=await sb.from('fin_remessa_itens').select('status').eq('titulo_id',d.titulo_id).in('status',['enviado','agendado']).limit(1);
+        if(rem?.length)return alert('A conta a pagar já está numa remessa enviada ao banco. Cancele o pagamento no banco e leia o retorno antes de desfazer.')}
+      if(!semPerg&&!confirm(`Desfazer o desconto do arquivo (${fm(da.total)})?\n\nO desconto sai e a conta a pagar volta ao valor sem ele. Depois é preciso anexar o arquivo de novo ou marcar “Não tem desconto”.`))return;
+      for(const d of ds||[]){
+        if(d.status==='Descontado'&&d.titulo_id){const t=RN.tits[d.titulo_id]||(await sb.from('fin_titulos').select('*').eq('id',d.titulo_id).single()).data;
+          // a descrição perde o “Descontado …”; a observação guarda o histórico e ganha a linha do desfazer
+          if(t){const novo=r2(+t.valor+(+d.valor));
+            const up={valor:novo,descricao:(t.descricao||'').split(descDescr(d)).join('')||null,obs:[t.obs,`Desconto ${fm(d.valor)} desfeito em ${dBR(TODAY)}: ${fm(t.valor)} + ${fm(d.valor)} = ${fm(novo)}`].filter(Boolean).join(' · ')};
+            const {error}=await sb.from('fin_titulos').update(up).eq('id',t.id);if(error)throw error;if(RN.tits[t.id])Object.assign(RN.tits[t.id],up)}}
+        const {error}=await sb.from('repasse_descontos').delete().eq('id',d.id);if(error)throw error;RN.desc=RN.desc.filter(x=>x.id!==d.id)}
+      if(da.doc_id)await sb.from('documentos').delete().eq('id',da.doc_id);
+      if(da.caminho)await sb.storage.from('anexos').remove([da.caminho]).catch(()=>{})}
+    else if(!semPerg&&!confirm('Tirar a marca “Não tem desconto” deste repasse?'))return;
+    const {error}=await sb.from('repasse_itens').update({desc_arq:null}).eq('id',it.id);if(error)throw error;it.desc_arq=null;
+    toast(da.sit==='anexado'?'Desconto do arquivo desfeito':'Marca “Não tem desconto” retirada');GT.key='';parcPendentes();
+  }catch(e){fail(e)}
+  rnDesenha()}
+async function rnDASem(it){
+  const da={sit:'sem',por:ME.user_id,em:new Date().toISOString()};
+  const {error}=await sb.from('repasse_itens').update({desc_arq:da}).eq('id',it.id);if(error)return v164(error)?alert(v164Msg):fail(error);
+  it.desc_arq=da;rnDesenha();toastDesfazer(`${(it.nome||'').trim()}: não tem desconto neste repasse`,()=>rnDADesfaz(it,true))}
+const v164=e=>/desc_arq/i.test(e?.message||'');const v164Msg='Para esta função, rode a atualização v164 do banco no Supabase.';
+function rnDAHtml(it,p){
+  if(!p?.desc_arq)return '';const da=it.desc_arq,nm=esc(p.desc_arq_nome||'desconto');
+  if(da?.sit==='anexado')return `<div style="margin-top:4px"><span class="chip c-ok" style="white-space:normal;line-height:1.35" title="${esc(da.arquivo||'')}">📄 ${nm}: ${fm(da.total)} · ${esc(da.periodo||'')} · ${da.n} ${da.n===1?'guia':'guias'}</span>${da.caminho?` <button type="button" class="btn small ghost" data-rn="daVer">Ver arquivo</button>`:''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="daDesfaz">Desfazer</button>`}</div>`;
+  if(da?.sit==='sem')return `<div style="margin-top:4px"><span class="chip c-none">Não tem desconto neste repasse</span>${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="daDesfaz">Desfazer</button>`}</div>`;
+  if(rnPago(it))return '';
+  return `<div class="rndescbox">📄 <b>Falta o arquivo de desconto${p.desc_arq_nome?' ('+nm+')':''}</b><br><span class="muted">Este parceiro sempre manda o arquivo de desconto. Anexe o arquivo da semana ou marque que não tem desconto. Sem um dos dois, não gera remessa nem marca como pago.</span>
+    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span class="btn small primary fotobtn">📎 Anexar arquivo de desconto<input type="file" accept=".xls,.xlsx,.csv,.pdf" data-rnda aria-label="Anexar o arquivo de desconto deste repasse"></span><button type="button" class="btn small ghost" data-rn="daSem">Não tem desconto</button></div></div>`}
+// trava: remessa e “Marcar como pago” só com o arquivo ou a marca “Não tem desconto”
+function rnDATrava(ls){const f=ls.filter(rnDAFalta);if(!f.length)return false;
+  alert(`Falta o arquivo de desconto de:\n\n${f.map(i=>'• '+i.nome.trim()+' · '+fm(i.valor)).join('\n')}\n\nAnexe o arquivo na linha do repasse ou clique em “Não tem desconto”. Use o quadro “Falta arquivo de desconto” para achar.`);return true}
 function rnDesenha(){
   const rows=rnFiltrados(),G=RN.grupo,mu=t=>`<span class="muted">${t}</span>`,soma=l=>r2(l.reduce((x,i)=>x+(rnLiq(i)||0),0));
   // “Pagar em” só mostra a empresa: ela é escolhida nos botões “Pagar em …” do alto, que já criam a conta a pagar na empresa (Carol, 03/11)
@@ -18113,7 +18261,7 @@ function rnDesenha(){
     const cls=alt?'rnalt':dsx?'rndesc':jaPg?'rnpg':jaSep?'rnsep':'';
     const jaTag=jaPg?`<br><span class="rnjatag pg" title="Este repasse já foi pago: não pague de novo">✓ Já pago${it.empresa_id?' · '+esc(rnEmpNome(it.empresa_id)):''}</span>`:jaSep?`<br><span class="rnjatag" title="Este repasse já está separado nesta empresa, com a conta a pagar criada">➜ Já separado em ${esc(rnEmpNome(it.empresa_id))}</span>`:'';
     return `<tr data-id="${it.id}"${cls?` class="${cls}"`:''}><td><input type="checkbox" class="rnck" style="width:auto"${RN.sel.has(it.id)?' checked':''}${rnPago(it)?' disabled':''}></td>
-      <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${jaTag}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}${dsx?`<div class="rndescbox">⚠ <b>Desconto a fazer neste repasse</b>${ds.map(d=>`<br>${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''} <button type="button" class="btn small ghost" data-rn="descFeito" data-desc="${d.id}">Desconto feito</button>`).join('')}<br><b>Pagar ${fm(r2(rnLiq(it)-ds.reduce((x,d)=>x+(+d.valor),0)))}</b>${t?'<br><span class="muted">Clique em Desconto feito para tirar da conta a pagar agora. Ao gerar a remessa por aqui, ele sai sozinho.</span>':'<br><span class="muted">O desconto sai sozinho do valor ao criar a conta a pagar e ao gerar a remessa (a remessa vai com o valor líquido).</span>'}</div>`:''}</td>
+      <td class="l" style="white-space:normal;min-width:220px;max-width:330px"><b>${esc(it.nome)}</b>${nf&&nf.cpf_cnpj?'<br>'+mu(esc(nf.cpf_cnpj)):''}${jaTag}${it.nf_via==='parecido'?' <span class="chip c-warn" title="Ligado ao controle de NF por nome parecido">conferir nome</span>':''}${ds.length?`<br><span class="chip c-warn" title="${esc(ds.map(d=>fm(d.valor)+' · '+d.motivo).join(' | '))}">desconto pendente ${fm(ds.reduce((x,d)=>x+(+d.valor),0))}</span>`:''}${dsx?`<div class="rndescbox">⚠ <b>Desconto a fazer neste repasse</b>${ds.map(d=>`<br>${fm(d.valor)} · ${esc(d.motivo||'')}${d.referencia?' · '+esc(d.referencia):''} <button type="button" class="btn small ghost" data-rn="descFeito" data-desc="${d.id}">Desconto feito</button>`).join('')}<br><b>Pagar ${fm(r2(rnLiq(it)-ds.reduce((x,d)=>x+(+d.valor),0)))}</b>${t?'<br><span class="muted">Clique em Desconto feito para tirar da conta a pagar agora. Ao gerar a remessa por aqui, ele sai sozinho.</span>':'<br><span class="muted">O desconto sai sozinho do valor ao criar a conta a pagar e ao gerar a remessa (a remessa vai com o valor líquido).</span>'}</div>`:''}${rnDAHtml(it,p)}</td>
       <td>${it.guias??''}</td><td>${t&&Math.abs(+t.valor-(+it.valor))>0.004?`<span class="muted" style="text-decoration:line-through" title="Valor do relatório">${fm(it.valor)}</span><br><b title="Valor a pagar, já com o desconto">${fm(t.valor)}</b><br><span class="chip c-warn" title="${soDig(t.linha_digitavel)?'Diferença entre o repasse e o valor do boleto (retenção de impostos)':'Desconto já tirado da conta a pagar'}">${+it.valor>=+t.valor?'−':'+'} ${fm(Math.abs(r2(+it.valor-(+t.valor))))} ${soDig(t.linha_digitavel)?'pelo boleto':'desconto'}</span>`:`<b>${fm(it.valor)}</b>`}${rnVNF(it)!=null?`<br><span class="muted" style="white-space:nowrap" title="Valor da nota fiscal: bruto ${fm(it.bruto)} − repasse ${fm(it.valor)} − descontos ${fm(+it.desconto_rel||0)}">NF ${fm(rnVNF(it))}</span>`:''}</td><td class="l">${opSit(it)}</td>
       <td class="l" style="white-space:normal;min-width:200px;max-width:300px">${p?(rnTemConta(p)?rnConta(p):'<span class="neg">Parceiro sem conta nem Pix</span>'):'<span class="neg">Parceiro não cadastrado</span>'}${alt?rnAltBox(alt,it):''}${rnPago(it)?'':` <button type="button" class="btn small ghost" data-rn="conta" title="${p?'Editar a conta e o Pix no cadastro do parceiro':'Cadastrar o parceiro com a conta e o Pix'}">${p?'Editar':'Cadastrar'}</button>`}</td>
       <td>${opEmp(it)}</td><td class="l">${ct}</td><td class="l muted" style="white-space:nowrap">${esc(it.protocolo||'')}</td></tr>`};
@@ -18132,8 +18280,9 @@ function rnDesenha(){
     ['Sem empresa',fm(soma(semE)),semE.length?`${semE.length} para escolher`:'todos escolhidos','e:-'],
     ...(()=>{const l=it.filter(i=>!rnPago(i)&&rnAlt(i));return l.length?[['Alteração de conta',String(l.length),'conferir antes de pagar','f:alt']]:[]})(),
     ...(()=>{const l=it.filter(i=>!rnPago(i)&&rnDescPend(rnParc(i,i.empresa_id)).length);return l.length?[['Desconto a fazer',String(l.length),'descontar antes de pagar','f:desc']]:[]})(),
+    ...(()=>{const l=it.filter(rnDAFalta);return l.length?[['Falta arquivo de desconto',String(l.length),'anexar ou marcar “Não tem desconto”','f:darq']]:[]})(),
     (()=>{const l=it.filter(i=>!rnPago(i));return ['Falta pagar',fm(soma(l)),l.length?`${l.length} ${l.length===1?'repasse':'repasses'}`:'todos pagos','s:falta']})()]
-    .map((t,i)=>`<div class="card tile" data-tf="${t[3]}" style="cursor:pointer${rnTileAtivo()===t[3]?';box-shadow:inset 0 0 0 2px var(--brand)':''}" title="${t[3]==='f:todos'?'Clique para mostrar todos os repasses do relatório':rnTileAtivo()===t[3]?'Filtrando por este quadro. Clique de novo para mostrar todos':'Clique para mostrar só os repasses deste quadro'}"><div class="k">${t[0]}</div><div class="v${t[0]==='Sem empresa'&&semE.length||t[0]==='Não encontrados'||t[0]==='Alteração de conta'||t[0]==='Desconto a fazer'?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
+    .map((t,i)=>`<div class="card tile" data-tf="${t[3]}" style="cursor:pointer${rnTileAtivo()===t[3]?';box-shadow:inset 0 0 0 2px var(--brand)':''}" title="${t[3]==='f:todos'?'Clique para mostrar todos os repasses do relatório':rnTileAtivo()===t[3]?'Filtrando por este quadro. Clique de novo para mostrar todos':'Clique para mostrar só os repasses deste quadro'}"><div class="k">${t[0]}</div><div class="v${t[0]==='Sem empresa'&&semE.length||t[0]==='Não encontrados'||t[0]==='Alteração de conta'||t[0]==='Desconto a fazer'||t[0]==='Falta arquivo de desconto'?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   rnTilesMin();
   const ns=RN.sel.size;$('rnBulk').hidden=!ns;
   $('rnBulkTxt').textContent=`${ns} ${ns===1?'repasse selecionado':'repasses selecionados'} · ${fm(soma(it.filter(i=>RN.sel.has(i.id))))}`;
@@ -18181,6 +18330,7 @@ $('rnBusca').oninput=()=>{clearTimeout(rnDesenha.t);rnDesenha.t=setTimeout(rnDes
 $('rnVenc').onchange=async()=>{const v=$('rnVenc').value||null;const {error}=await sb.from('repasse_lotes').update({vencimento:v}).eq('id',RN.lote.id);if(error)return fail(error);RN.lote.vencimento=v;toast('Data de pagamento salva')};
 $('rnHead').addEventListener('change',e=>{if(e.target.id!=='rnTodas')return;rnFiltrados().filter(i=>!rnPago(i)).forEach(i=>e.target.checked?RN.sel.add(i.id):RN.sel.delete(i.id));rnDesenha()});
 $('rnBody').addEventListener('change',async e=>{const tr=e.target.closest('tr[data-id]');if(!tr)return;const it=RN.itens.find(x=>x.id===tr.dataset.id);
+  if(e.target.matches('[data-rnda]')){const f=e.target.files?.[0];e.target.value='';if(f)return rnDALanca(it,f);return}
   if(e.target.matches('[data-rnbol]')){const fs=[...(e.target.files||[])];e.target.value='';if(!fs.length)return;return rnBol(it,{files:fs},e.target.closest('.rnbol'))}
   if(e.target.classList.contains('rnck')){e.target.checked?RN.sel.add(it.id):RN.sel.delete(it.id);return rnDesenha()}
   if(e.target.classList.contains('rnemp'))return rnEmpresa([it],e.target.value||null);
@@ -18189,6 +18339,9 @@ $('rnBody').addEventListener('change',async e=>{const tr=e.target.closest('tr[da
 $('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-rn]');if(!b)return;const it=RN.itens.find(x=>x.id===b.closest('tr').dataset.id);
   if(b.dataset.rn==='desfaz'){b.disabled=true;await rnDesfaz(it);b.disabled=false}
   if(b.dataset.rn==='conta')rnAbreConta(it);
+  if(b.dataset.rn==='daSem'){b.disabled=true;await rnDASem(it)}
+  if(b.dataset.rn==='daDesfaz'){b.disabled=true;await rnDADesfaz(it);b.disabled=false}
+  if(b.dataset.rn==='daVer'&&it.desc_arq?.caminho){const {data,error}=await sb.storage.from('anexos').createSignedUrl(it.desc_arq.caminho,300);if(error)return fail(error);window.open(data.signedUrl,'_blank')}
   if(b.dataset.rn==='bolLinha'){const l=prompt('Linha digitável do boleto (só os números, pode colar com pontos e espaços):');if(l&&soDig(l)){b.disabled=true;await rnBol(it,{linha:l});b.disabled=false}}
   if(b.dataset.rn==='bolTira'){const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t||!confirm(`Tirar o boleto de ${(it.nome||'').trim()}?\n\nA conta a pagar volta a ir por Pix ou conta, pelo cadastro do parceiro.`))return;b.disabled=true;
     try{const r=await bolTiraTitulo(t,rnFormaCad(t));rnDesenha();toastDesfazer('Boleto tirado do repasse',async()=>{try{await r.desfaz();toast('O boleto voltou')}catch(e){fail(e)}rnDesenha()})}catch(e){b.disabled=false;fail(e)}}
@@ -18448,15 +18601,17 @@ async function descMarca(d,extra){
   if(error&&v110(error))({error}=await sb.from('repasse_descontos').update(base).eq('id',d.id));
   if(error)throw error}
 const descTxtCurto=d=>`${fm(d.valor)} (${d.motivo||'desconto'}${d.referencia?' · '+d.referencia:''})`;
+// o desconto aparece também na descrição da conta a pagar (Carol, 19/11: “no contas a pagar, aparecer que foi descontado o valor x ref. ao representante do período y”)
+const descDescr=d=>` · Descontado ${fm(d.valor)} ref. ${d.motivo||'desconto'}`;
 // tira o desconto de uma conta a pagar já criada e ainda não paga
 async function descNaConta(d,t,bruto,itemId){
   const pago=+t.pago||0,falta=r2(+t.valor-pago);
   if(+d.valor>falta-0.004)throw new Error(`O desconto (${fm(d.valor)}) é maior que o que falta pagar (${fm(falta)}).`);
   const {data:rem}=await sb.from('fin_remessa_itens').select('status').eq('titulo_id',t.id).in('status',['enviado','agendado']).limit(1);
   if(rem?.length)throw new Error('Esta conta a pagar já está numa remessa enviada ao banco. Cancele o pagamento no banco e leia o retorno antes de descontar.');
-  const novo=r2(+t.valor-(+d.valor)),obs=[t.obs,`Desconto ${descTxtCurto(d)}: ${fm(t.valor)} − ${fm(d.valor)} = ${fm(novo)}`].filter(Boolean).join(' · ');
-  const {error}=await sb.from('fin_titulos').update({valor:novo,obs}).eq('id',t.id);if(error)throw error;
-  t.valor=novo;t.obs=obs;
+  const novo=r2(+t.valor-(+d.valor)),obs=[t.obs,`Desconto ${descTxtCurto(d)}: ${fm(t.valor)} − ${fm(d.valor)} = ${fm(novo)}`].filter(Boolean).join(' · '),descricao=(t.descricao||'')+descDescr(d);
+  const {error}=await sb.from('fin_titulos').update({valor:novo,obs,descricao}).eq('id',t.id);if(error)throw error;
+  t.valor=novo;t.obs=obs;t.descricao=descricao;
   await descMarca(d,{titulo_id:t.id,valor_repasse:bruto??null,...(itemId?{repasse_item_id:itemId}:{})});
   return novo}
 // a conta a pagar do repasse foi excluída (desfazer ou troca de empresa): o desconto volta para pendente e é aplicado de novo
@@ -18537,10 +18692,13 @@ async function rnCriaTitulos(ls,venc,cont){
       let liq=r2(+it.valor);const usa=[];
       for(const d of rnDescPend(p)){if(+d.valor<liq-0.004){liq=r2(liq-(+d.valor));usa.push(d)}else cont.semCaber=(cont.semCaber||0)+1}
       row.valor=liq;
-      if(usa.length)row.obs+=` · Relatório ${fm(it.valor)} − desconto ${usa.map(descTxtCurto).join(' − ')} = a pagar ${fm(liq)}`;
+      if(usa.length){row.obs+=` · Relatório ${fm(it.valor)} − desconto ${usa.map(descTxtCurto).join(' − ')} = a pagar ${fm(liq)}`;row.descricao+=usa.map(descDescr).join('')}
       const {data,error}=await sb.from('fin_titulos').insert(row).select('*').single();if(error)throw error;
       const {error:e2}=await sb.from('repasse_itens').update({titulo_id:data.id}).eq('id',it.id);if(e2)throw e2;
       for(const d of usa){await descMarca(d,{titulo_id:data.id,repasse_item_id:it.id,valor_repasse:+it.valor});RN.desc=RN.desc.filter(x=>x.id!==d.id);cont.desc=(cont.desc||0)+1}
+      // arquivo de desconto do repasse (v164) vai junto para os anexos da conta a pagar
+      if(it.desc_arq?.caminho){const {data:dd}=await sb.from('documentos').insert({cliente_id:id,modulo:'financeiro',registro_id:data.id,categoria:'Outros',nome_arquivo:it.desc_arq.arquivo||'Arquivo de desconto',caminho:it.desc_arq.caminho}).select('id').single();
+        if(dd){it.desc_arq.doc_id=dd.id;await sb.from('repasse_itens').update({desc_arq:it.desc_arq}).eq('id',it.id)}}
       it.titulo_id=data.id;RN.tits[data.id]={...data,pago:0};cont.n++}}
   if(cont.desc){toast(`${cont.desc} ${cont.desc===1?'desconto aplicado':'descontos aplicados'}: a conta a pagar já sai com o valor líquido`);parcPendentes()}
   if(cont.semCaber)alert(`${cont.semCaber} ${cont.semCaber===1?'desconto é maior':'descontos são maiores'} que o repasse e ${cont.semCaber===1?'continua pendente':'continuam pendentes'} para o próximo repasse.`);
@@ -18566,6 +18724,7 @@ function rnStatus(it){const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t)return '
 // remessa de pagamento só dos repasses selecionados, numa empresa escolhida na hora (Carol, 05/11)
 function rnAbreRem(ls){
   if(!ls.length)return alert('Os repasses marcados já estão pagos. Nada para enviar na remessa.');
+  if(rnDATrava(ls))return;
   const emps=RN.grupo.empresas,conta=id=>ls.filter(i=>i.empresa_id===id).length;
   const pad=emps.reduce((a,id)=>conta(id)>conta(a)?id:a,emps[0]);
   RN.dlg={modo:'rem',ls};$('rnDFoot').querySelector('[data-act="salvar"]').textContent='Abrir a remessa';
@@ -18601,6 +18760,7 @@ async function rnSalvaRem(b){
   escCli.value=emp;guardaEmp();go('gfremessa');
 }
 function rnAbrePago(ls){
+  if(rnDATrava(ls))return;
   const sem=ls.filter(i=>!i.empresa_id);
   if(sem.length)return alert(`Escolha antes em qual empresa ${sem.length===1?'foi pago':'foram pagos'} ${sem.length===1?'1 repasse':sem.length+' repasses'} (coluna “Pagar em”).`);
   const emps=RN.grupo.empresas.filter(id=>ls.some(i=>i.empresa_id===id));RN.dlg={modo:'pago',ls};
