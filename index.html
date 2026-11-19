@@ -1059,7 +1059,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Notas fiscais emitidas</h1><p class="sub" id="nrSub">As notas fiscais emitidas pelas empresas do grupo: as NFS-e emitidas pelo portal e as marcadas como emitidas fora dele. Para conferir e mandar à contabilidade.</p></div>
-      <div class="row" style="align-items:flex-end"><span class="expgrp" id="nrExp" data-exp="nr"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="nrXml" title="Baixa um .zip com o XML de cada nota filtrada (e do cancelamento) e a planilha da lista">Baixar XMLs (.zip)</button></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="nrExp" data-exp="nr"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button type="button" class="btn" data-nslbtn="nr" disabled title="Marque as notas na lista: cada uma vai para o e-mail do seu tomador">✉ Enviar por e-mail</button><button class="btn primary" id="nrXml" title="Baixa um .zip com o XML de cada nota filtrada (e do cancelamento) e a planilha da lista">Baixar XMLs (.zip)</button></div>
     </div>
     <div class="toolbar">
       <label class="f">De<input type="date" id="nrDe"></label>
@@ -14968,7 +14968,7 @@ async function ctCarrega(){
   // assinaturas pela Autentique (v105); sem a v105 o resto do módulo continua funcionando
   const a=await sb.from('ctl_assinaturas').select('*').order('criado_em',{ascending:false});CTL.assOk=!a.error;CTL.ass=a.data||[];
   // NFS-e (v131); sem a v131 o resto continua funcionando
-  const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em').order('criado_em',{ascending:false})]);
+  const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em,extra').order('criado_em',{ascending:false})]);
   CTL.nsOk=!ne.error&&!nn.error;CTL.nsEmit=ne.data||[];CTL.ns=nn.data||[];
   // CRM (v133); sem a v133 o resto continua funcionando
   await crmCarrega().catch(()=>{CRM.ok=false});
@@ -15094,7 +15094,7 @@ document.addEventListener('click',e=>{
   const bx=e.target.closest('[data-ctbaixa]');if(bx){e.preventDefault();e.stopPropagation();return ctBaixa(bx.dataset.ctbaixa)}
   if(e.target.closest('[data-ctassat]')){e.stopPropagation();return ctAssAtualiza(e.target.closest('[data-ctassat]'))}
   const nse=e.target.closest('[data-nsemit]');if(nse){e.stopPropagation();return nsAbreEmit(CTL.lanc.find(x=>x.id===nse.dataset.nsemit))}
-  const nsv=e.target.closest('[data-nsver]');if(nsv&&!e.target.closest('button:not([data-nsver]),input,select')){e.preventDefault();e.stopPropagation();return nsAbreNota(CTL.ns.find(x=>x.id===nsv.dataset.nsver))}
+  const nsv=e.target.closest('[data-nsver]');if(nsv&&!e.target.closest('button:not([data-nsver]),input,select,.nslc')){e.preventDefault();e.stopPropagation();return nsAbreNota(CTL.ns.find(x=>x.id===nsv.dataset.nsver))}
   const nsc=e.target.closest('[data-nscanc]');if(nsc){e.stopPropagation();return nsAbreCanc(CTL.ns.find(x=>x.id===nsc.dataset.nscanc))}
   const bxl=e.target.closest('[data-ctbx]');if(bxl){e.stopPropagation();return ctBaixaHoje(bxl)}
   const rj=e.target.closest('[data-ctreaj]');if(rj){e.stopPropagation();return ctAbreCont(CTL.cont.find(c=>c.id===rj.dataset.ctreaj),true)}
@@ -15284,11 +15284,13 @@ function nsDesenha(b,sit,tem){
       <div class="card tile"><div class="k">Canceladas no mês</div><div class="v">${doMes.filter(n=>n.situacao==='cancelada').length}</div><div class="n">${fm(doMes.filter(n=>n.situacao==='cancelada').reduce((s,n)=>s+(Number(n.valor)||0),0))}</div></div>
       <div class="card tile"><div class="k">Recusadas para conferir</div><div class="v ${rej.length?'neg':''}">${rej.length}</div><div class="n">todos os meses</div></div></div>
     ${!CTL.nsEmit.length?'<div class="alerta"><b>Comece pelos “Dados fiscais”.</b><span>Cadastre a empresa que emite (CNPJ, cidade, regime e o serviço padrão).</span></div>':''}
-    ${tab('<th>Emissão</th><th>Nº NFS-e</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th>Situação</th><th></th>',
-      l.map(n=>`<tr data-nsver="${n.id}"><td>${dBR(nsData(n))}</td><td><b>${esc(n.numero_nfse||'—')}</b>${n.ambiente==2?' '+nsAmbChip(2):''}</td><td>${dBR(n.competencia)}</td><td class="l">${esc(n.tomador_nome||'')}</td><td class="l">${esc(nsDoc(n.tomador_doc))}</td><td class="l">${esc((n.descricao||'').slice(0,90))}</td><td>${fm(n.valor)}</td><td>${nsChip(n)}</td>
+    <div class="row" style="justify-content:flex-end;margin:10px 0 6px">${nslBotao('ns')}</div>
+    ${tab(nslTh('ns')+'<th>Emissão</th><th>Nº NFS-e</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th>Situação</th><th></th>',
+      l.map(n=>`<tr data-nsver="${n.id}">${nslTd('ns',n.id,!!n.chave&&['emitida','cancelada'].includes(n.situacao))}<td>${dBR(nsData(n))}</td><td><b>${esc(n.numero_nfse||'—')}</b>${n.ambiente==2?' '+nsAmbChip(2):''}</td><td>${dBR(n.competencia)}</td><td class="l">${esc(n.tomador_nome||'')}</td><td class="l">${esc(nsDoc(n.tomador_doc))}</td><td class="l">${esc((n.descricao||'').slice(0,90))}</td><td>${fm(n.valor)}</td><td>${nsChip(n)}${nslJa(n.extra?.emails)}</td>
         <td style="white-space:nowrap">${n.situacao==='emitida'?`<button type="button" class="btn small ghost" data-nscanc="${n.id}">Cancelar</button>`:''}${DUPIC}</td></tr>`).join(''),
       doMes.length?'Nenhuma nota com estes filtros.':'Nenhuma nota emitida neste mês.')}`;
-  $('ctNote').textContent='Clique na nota para ver, imprimir, baixar o XML ou cancelar. A busca acha por qualquer coluna (número, tomador, CNPJ, descrição, valor ou data). As notas emitidas no site nacional não aparecem aqui.';
+  nslPoda('ns',l.filter(n=>n.chave&&['emitida','cancelada'].includes(n.situacao)).map(n=>n.id));
+  $('ctNote').textContent='Clique na nota para ver, imprimir, baixar o XML ou cancelar. Para mandar várias por e-mail, marque as caixinhas e clique em “✉ Enviar por e-mail”. A busca acha por qualquer coluna (número, tomador, CNPJ, descrição, valor ou data). As notas emitidas no site nacional não aparecem aqui.';
 }
 // ---- emitir ----
 // tomador da NFS-e pela ficha da empresa ligada ao cliente (Carol 18/11)
@@ -15567,6 +15569,121 @@ async function nsEnviaEmail(bt){
   }catch(e){ctErr('Não foi possível enviar: '+(e.message||e))}
   bt.disabled=false;bt.textContent=txt;
 }
+// ---- Enviar várias NFS-e por e-mail de uma vez (Carol, 18/11) ----
+// Peça única para TODA lista de NFS-e do portal (Controlacs › Notas fiscais, Parceiros MP › Notas fiscais emitidas e o fim da
+// emissão em lote dos parceiros), para todas as empresas que emitem pelo portal, inclusive as cadastradas depois.
+// Marque as notas na lista (caixinha) e clique em “✉ Enviar por e-mail”: abre a conferência com o e-mail do tomador de cada nota
+// (dá para trocar ou desmarcar). Cada nota vai num e-mail só dela, pela mesma função do envio individual (nfse-email), que
+// registra o envio na nota (data, para quem e quem enviou). E-mail enviado não tem desfazer: por isso a conferência e a confirmação.
+// Tela nova com lista de NFS-e: use nslTh(k) no cabeçalho, nslTd(k,id,temXml) em cada linha, nslBotao(k) na barra e nslPoda(k,ids) ao desenhar.
+const NSL={sel:{},dlg:null};
+const NSL_RE=/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/,nslSep=v=>String(v||'').split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean);
+const nslSet=k=>NSL.sel[k]||(NSL.sel[k]=new Set());
+const nslTh=k=>`<th class="nosort nslc" style="width:30px"><input type="checkbox" data-nslall="${k}" title="Marcar todas as notas da lista" aria-label="Marcar todas as notas"></th>`;
+const nslTd=(k,id,ok)=>ok?`<td class="nslc"><input type="checkbox" data-nsl="${k}" value="${id}"${nslSet(k).has(id)?' checked':''} aria-label="Marcar a nota para enviar por e-mail"></td>`
+  :'<td class="nslc"><input type="checkbox" disabled title="Nota sem XML no portal: não dá para enviar por e-mail" aria-label="Nota sem XML"></td>';
+const nslBotao=k=>`<button type="button" class="btn" data-nslbtn="${k}" disabled title="Marque as notas na lista: cada uma vai para o e-mail do seu tomador">✉ Enviar por e-mail</button>`;
+// chip “✉ enviada” na lista, com a data e para quem
+const nslJa=env=>{env=env||[];if(!env.length)return '';const u=env[env.length-1];
+  return ` <span class="chip c-ok" title="${esc(env.map(x=>'Enviada em '+dtBR(x.em)+' para '+(x.para||[]).join(', ')).join('\n'))}">✉ ${dtBR(u.em).slice(0,8)}</span>`};
+// a seleção guarda só o que está na lista (quem sai do filtro sai da seleção)
+function nslPoda(k,ids){const s=nslSet(k),v=new Set(ids);[...s].forEach(id=>{if(!v.has(id))s.delete(id)});nslBtn(k)}
+function nslBtn(k){const n=nslSet(k).size;
+  document.querySelectorAll(`[data-nslbtn="${k}"]`).forEach(b=>{b.disabled=!n;b.classList.toggle('primary',!!n);b.textContent=n?`✉ Enviar ${n} por e-mail`:'✉ Enviar por e-mail'});
+  document.querySelectorAll(`[data-nslall="${k}"]`).forEach(a=>{const cx=[...(a.closest('table')||document).querySelectorAll(`input[data-nsl="${k}"]`)];
+    a.checked=cx.length>0&&cx.every(c=>c.checked);a.indeterminate=!a.checked&&cx.some(c=>c.checked);a.disabled=!cx.length})}
+document.addEventListener('change',e=>{const t=e.target;if(!t?.dataset)return;
+  if(t.dataset.nsl){const s=nslSet(t.dataset.nsl);t.checked?s.add(t.value):s.delete(t.value);return nslBtn(t.dataset.nsl)}
+  if(t.dataset.nslall){const k=t.dataset.nslall;(t.closest('table')||document).querySelectorAll(`input[data-nsl="${k}"]`).forEach(c=>{c.checked=t.checked;t.checked?nslSet(k).add(c.value):nslSet(k).delete(c.value)});nslBtn(k)}});
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-nslbtn]');if(b){e.stopPropagation();return nslAbre([...nslSet(b.dataset.nslbtn)],b.dataset.nslbtn)}
+  const c=e.target.closest?.('[data-nslids]');if(c){e.stopPropagation();nslAbre(c.dataset.nslids.split(',').filter(Boolean),'nfe')}});
+// e-mail de cada nota: 1) o do tomador gravado na nota; 2) o último para o qual ela já foi enviada; 3) o cliente da Controlacs com o
+// mesmo CNPJ/CPF; 4) a ficha da empresa com o mesmo CNPJ; 5) o cadastro de pessoas (parceiros e fornecedores) com o mesmo documento
+async function nslEmails(ns){
+  const docs=[...new Set(ns.map(n=>nsSo(n.tomador_doc)).filter(Boolean))];let cli=[],pes=[];
+  try{cli=await todas(()=>sb.from('ctl_clientes').select('cnpj_cpf,email').not('email','is',null))}catch(_){}
+  try{const fm_=[...new Set(docs.flatMap(d=>[d,nsDoc(d)]))];for(let i=0;i<fm_.length;i+=100){const {data}=await sb.from('fin_pessoas').select('documento,email').in('documento',fm_.slice(i,i+100)).not('email','is',null);pes=pes.concat(data||[])}}catch(_){}
+  const fic=d=>{try{const c=(typeof CLIENTES!=='undefined'?CLIENTES:[]).find(c=>'ficha' in c&&fcDig(fcDados(c).cnpj)===d);return c?fcDados(c).contato.email||'':''}catch(_){return ''}};
+  const out={};for(const n of ns){const d=nsSo(n.tomador_doc),u=(n.extra?.emails||[]).slice(-1)[0];
+    out[n.id]=n.tomador?.email||(u?.para||[]).join('; ')||(d&&(cli.find(c=>nsSo(c.cnpj_cpf)===d)?.email||fic(d)||pes.find(p=>nsSo(p.documento)===d)?.email))||''}
+  return out}
+const NSL_MSG='Olá,\n\nSegue a nota fiscal de serviço nº [número], no valor de [valor], referente a [descrição].\nO PDF (DANFSe) e o arquivo XML estão anexos.\n\nQualquer dúvida, estamos à disposição.\n\n[empresa]';
+const NSL_ASS='Nota fiscal de serviço nº [número] - [empresa]';
+const nslTroca=(t,n,e)=>String(t||'').replace(/\[número\]/gi,n.numero_nfse||'').replace(/\[valor\]/gi,fm(n.valor)).replace(/\[descrição\]/gi,n.descricao||'nossos serviços')
+  .replace(/\[tomador\]/gi,n.tomador_nome||'').replace(/\[empresa\]/gi,e.razao_social||e.nome||'Controlacs').replace(/\[competência\]/gi,n.competencia?dBR(n.competencia).slice(3):'');
+function nslDlg(){let d=$('dlgNSL');if(d)return d;
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="dlgNSL" style="width:min(1150px,calc(100vw - 32px))"><div class="dh"><h2 id="nslTit">Enviar notas por e-mail</h2></div><div class="db" id="nslBody"></div>
+    <div class="df"><span class="note" id="nslNote" style="margin:0"></span><span class="spacer"></span><button type="button" class="btn ghost" data-nsla="fechar">Fechar</button><button type="button" class="btn primary" data-nsla="enviar" id="nslEnv" hidden>Enviar</button></div></dialog>`);
+  d=$('dlgNSL');
+  d.addEventListener('click',e=>{const b=e.target.closest('[data-nsla]');if(!b)return;if(b.dataset.nsla==='fechar'){if(NSL.dlg?.enviando)return;return d.close()}if(b.dataset.nsla==='enviar')return nslEnvia(b)});
+  d.addEventListener('cancel',e=>{if(NSL.dlg?.enviando)e.preventDefault()});
+  d.addEventListener('close',()=>{const D=NSL.dlg;if(D?.mudou&&D.depois)D.depois()});
+  d.addEventListener('change',e=>{const tr=e.target.closest('tr[data-i]');if(!tr||!e.target.matches('[data-nslm]'))return;NSL.dlg.l[+tr.dataset.i].marc=e.target.checked;nslConta()});
+  d.addEventListener('input',e=>{const tr=e.target.closest('tr[data-i]');if(!tr||!e.target.matches('[data-nslp]'))return;const x=NSL.dlg.l[+tr.dataset.i];x.para=e.target.value;
+    if(nslSep(x.para).length&&!x.marc&&!x.ja.length){x.marc=true;tr.querySelector('[data-nslm]').checked=true}nslConta()});
+  return d}
+// k: lista de onde veio (para atualizar ao fechar); ids das notas
+async function nslAbre(ids,k){if(!ids?.length)return toast('Marque as notas na lista.');
+  const d=nslDlg();NSL.dlg={k,l:[],emit:[],mudou:false,depois:k==='ns'?async()=>{await ctCarrega().catch(()=>{});ctDesenha()}:k==='nr'?()=>renderNR():null};
+  $('nslTit').textContent='Enviar notas por e-mail';$('nslBody').innerHTML='<p class="muted">Carregando as notas e os e-mails dos tomadores…</p>';$('nslNote').textContent='';$('nslEnv').hidden=true;
+  if(!d.open)d.showModal();
+  try{let ns=[];for(let i=0;i<ids.length;i+=100){const {data,error}=await sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,cancelada_em,extra').in('id',ids.slice(i,i+100));if(error)throw error;ns=ns.concat(data||[])}
+    ns=ns.filter(n=>n.chave);if(!ns.length)throw new Error('Nenhuma das notas marcadas tem XML autorizado no portal.');
+    const {data:em,error:ee}=await sb.from('nfse_emitentes').select('*').in('id',[...new Set(ns.map(n=>n.emitente_id))]);if(ee)throw ee;
+    NSL.dlg.emit=em||[];(em||[]).forEach(e=>{if(!CTL.nsEmit.some(x=>x.id===e.id))CTL.nsEmit.push(e)});   // o DANFSe (PDF) usa os dados da empresa que emitiu
+    const mail=await nslEmails(ns);
+    ns.sort((a,b)=>String(a.emitida_em||'').localeCompare(String(b.emitida_em||''))||String(a.numero_nfse||'').localeCompare(String(b.numero_nfse||''),undefined,{numeric:true}));
+    NSL.dlg.l=ns.map(n=>{const ja=n.extra?.emails||[];return {n,para:mail[n.id]||'',ja,marc:!ja.length&&!!mail[n.id],st:''}});
+  }catch(e){console.error(e);$('nslBody').innerHTML=`<div class="alerta bad"><b>Não foi possível abrir as notas.</b><span>${esc(e.message||String(e))}</span></div>`;return}
+  const D=NSL.dlg,emps=[...new Set(D.l.map(x=>x.n.emitente_id))].map(id=>D.emit.find(e=>e.id===id)).filter(Boolean),cpe=emps.filter(e=>e.email);
+  $('nslTit').textContent=`Enviar ${D.l.length} ${D.l.length===1?'nota':'notas'} por e-mail`;
+  $('nslBody').innerHTML=`<p class="note" style="margin:0 0 10px">Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF (DANFSe) e o XML anexos, de <b>notas@controlacs.com.br</b> com o nome da empresa que emitiu. Confira os e-mails abaixo: dá para trocar, pôr mais de um (separe com ;) ou desmarcar a nota. As notas que já foram enviadas vêm desmarcadas.</p>
+    <div class="card tablebox" style="max-height:46vh;overflow:auto"><table><thead><tr><th class="nosort" style="width:30px"><input type="checkbox" id="nslTodas" title="Marcar todas" aria-label="Marcar todas"></th><th>Nº NFS-e</th><th class="l">Empresa que emitiu</th><th class="l">Tomador</th><th>Valor</th><th class="l">E-mail do tomador (Para)</th><th class="l">Envio</th></tr></thead><tbody id="nslLinhas"></tbody></table></div>
+    <div class="fields" style="margin-top:12px">
+      <label class="f wide">Assunto<input id="nsl_ass" value="${esc(NSL_ASS)}"></label>
+      <label class="f wide">Mensagem<textarea id="nsl_msg" rows="7">${esc(NSL_MSG)}</textarea></label>
+      <p class="muted wide" style="font-size:12px;margin:0;grid-column:1/-1">[número], [valor], [descrição], [tomador], [competência] e [empresa] são trocados pelos dados de cada nota.</p>
+      <label class="wide" style="display:flex;gap:8px;align-items:center;grid-column:1/-1;font-size:14px"><input type="checkbox" id="nsl_cpemp" ${cpe.length?'checked':'disabled'} style="width:auto"> Mandar cópia para o e-mail da empresa que emitiu${cpe.length?' ('+esc(cpe.map(e=>e.email).join(', '))+')':' (nenhuma tem e-mail em Dados fiscais)'}</label>
+      <label class="f wide">Outra cópia (opcional)<input id="nsl_cc" placeholder="financeiro@empresa.com.br"></label>
+      <label class="wide" style="display:flex;gap:8px;align-items:center;grid-column:1/-1;font-size:14px"><input type="checkbox" id="nsl_pdf" checked style="width:auto"> Anexar o PDF (DANFSe) além do XML</label></div>
+    <p class="err" id="nslErr" hidden></p>`;
+  $('nslTodas').onchange=e=>{D.l.forEach(x=>{if(x.st!=='ok')x.marc=e.target.checked});nslLinhas()};
+  $('nslEnv').hidden=false;nslLinhas()}
+function nslLinhas(){const D=NSL.dlg,tb=$('nslLinhas');if(!tb)return;
+  tb.innerHTML=D.l.map((x,i)=>{const n=x.n,e=D.emit.find(y=>y.id===n.emitente_id)||{},trava=D.enviando||x.st==='ok';
+    const av=[n.situacao==='cancelada'?'<span class="chip c-bad" title="O tomador recebe também o XML do cancelamento">Cancelada</span>':'',Number(n.ambiente)===2?nsAmbChip(2):'',
+      x.ja.length?`<span class="chip c-warn" title="${esc(x.ja.map(j=>dtBR(j.em)+' para '+(j.para||[]).join(', ')).join('\n'))}">Já enviada em ${dtBR(x.ja[x.ja.length-1].em)}</span>`:''].filter(Boolean).join(' ');
+    const st=x.st==='ok'?'<span class="chip c-ok">Enviado ✓</span>':x.st==='erro'?`<span class="chip c-bad">Não enviado</span><br><span class="muted" style="font-size:12px">${esc(x.erro||'')}</span>`:x.st?`<span class="muted">${esc(x.st)}</span>`:'';
+    return `<tr data-i="${i}"><td><input type="checkbox" data-nslm${x.marc&&x.st!=='ok'?' checked':''}${trava?' disabled':''} aria-label="Enviar a nota ${esc(n.numero_nfse||'')}"></td><td><b>${esc(n.numero_nfse||'—')}</b><br><span class="muted" style="font-size:12px">${dBR((n.emitida_em||'').slice(0,10))}</span></td>
+      <td class="l" style="white-space:nowrap">${esc(e.nome||'')}</td><td class="l" style="white-space:normal;min-width:170px">${esc(n.tomador_nome||'')}<br><span class="muted" style="font-size:12px">${esc(nsDoc(n.tomador_doc))}</span></td><td><b>${fm(n.valor)}</b></td>
+      <td class="l" style="min-width:240px"><input data-nslp value="${esc(x.para)}" placeholder="Sem e-mail no cadastro: digite aqui"${trava?' disabled':''} style="width:100%" aria-label="E-mail do tomador">${av?'<div style="margin-top:4px">'+av+'</div>':''}</td><td class="l" style="min-width:110px">${st}</td></tr>`}).join('');
+  const t=$('nslTodas'),liv=D.l.filter(x=>x.st!=='ok');if(t){t.checked=liv.length>0&&liv.every(x=>x.marc);t.indeterminate=!t.checked&&liv.some(x=>x.marc);t.disabled=!!D.enviando||!liv.length}
+  nslConta()}
+function nslConta(){const D=NSL.dlg;if(!D||D.enviando)return;const f=D.l.filter(x=>x.marc&&x.st!=='ok'),sem=f.filter(x=>!nslSep(x.para).length),ok=D.l.filter(x=>x.st==='ok').length;
+  const b=$('nslEnv');b.disabled=!f.length;b.textContent=f.length?`Enviar ${f.length} ${f.length===1?'e-mail':'e-mails'}`:'Enviar';b.hidden=!f.length&&ok>0;
+  $('nslNote').textContent=(ok?`${ok} ${ok===1?'enviada':'enviadas'}. `:'')+(f.length?`${f.length} ${f.length===1?'nota marcada':'notas marcadas'}${sem.length?`, ${sem.length} sem e-mail`:''}.`:ok?'':'Nenhuma nota marcada.')}
+async function nslEnvia(b){const D=NSL.dlg,fila=D.l.filter(x=>x.marc&&x.st!=='ok'),er=t=>{$('nslErr').textContent=t;$('nslErr').hidden=false};$('nslErr').hidden=true;
+  if(!fila.length)return er('Marque pelo menos uma nota.');
+  const sem=fila.filter(x=>!nslSep(x.para).length);if(sem.length)return er(`Falta o e-mail ${sem.length===1?'da nota':'das notas'} ${sem.map(x=>'nº '+(x.n.numero_nfse||'')).join(', ')}. Digite o e-mail ou desmarque a nota.`);
+  const ruim=fila.filter(x=>nslSep(x.para).some(m=>!NSL_RE.test(m)));if(ruim.length)return er(`Confira o e-mail ${ruim.length===1?'da nota':'das notas'} ${ruim.map(x=>'nº '+(x.n.numero_nfse||'')).join(', ')}.`);
+  const cc=nslSep($('nsl_cc').value);if(cc.some(m=>!NSL_RE.test(m)))return er('Confira o e-mail da cópia.');
+  const ass=$('nsl_ass').value,msg=$('nsl_msg').value,cpEmp=$('nsl_cpemp').checked,pdf=$('nsl_pdf').checked,dest=[...new Set(fila.flatMap(x=>nslSep(x.para).map(m=>m.toLowerCase())))];
+  if(!msg.trim())return er('Escreva a mensagem do e-mail.');
+  if(!confirm(`Enviar ${fila.length} ${fila.length===1?'nota':'notas'} por e-mail, cada uma para o e-mail do seu tomador (${dest.length} ${dest.length===1?'endereço':'endereços'} diferentes)?\n\nDepois de enviado, o e-mail não tem como ser desfeito.`))return;
+  D.enviando=true;b.disabled=true;fila.forEach(x=>{x.st='Na fila…';x.erro=''});nslLinhas();let ok=0,i=0,para=false;
+  for(const x of fila){i++;if(para){x.st='';continue}const n=x.n,e=D.emit.find(y=>y.id===n.emitente_id)||{};
+    $('nslNote').textContent=`Enviando ${i} de ${fila.length}…`;
+    try{let p='';if(pdf){x.st='Gerando o PDF…';nslLinhas();p=await nsPdfB64(n)}
+      x.st='Enviando…';nslLinhas();
+      const ccs=[...new Set([...(cpEmp&&e.email&&NSL_RE.test(e.email)?[e.email]:[]),...cc])].filter(m=>!nslSep(x.para).some(y=>y.toLowerCase()===m.toLowerCase())).slice(0,9);
+      const {data,error}=await sb.functions.invoke('nfse-email',{body:{nota_id:n.id,para:x.para,cc:ccs.join(';'),assunto:nslTroca(ass,n,e),mensagem:nslTroca(msg,n,e),pdf_b64:p}});
+      if(error){let j=null;try{j=await error.context.json()}catch(_){}const z=new Error(j?.erro||error.message);z.falta=j?.falta;throw z}
+      x.st='ok';x.ja=[...x.ja,data.envio];n.extra={...(n.extra||{}),emails:[...(n.extra?.emails||[]),data.envio]};ok++;D.mudou=true;nslSet(D.k||'').delete(n.id);
+    }catch(z){console.error(z);x.st='erro';x.erro=z.message||String(z);if(z.falta==='resend'||/Master|configurado/i.test(x.erro))para=true}   // sem chave ou sem permissão: nem tenta as outras
+    nslLinhas()}
+  D.enviando=false;b.disabled=false;nslLinhas();
+  const nok=fila.length-ok;$('nslNote').textContent=`${ok} de ${fila.length} ${ok===1?'enviada':'enviadas'}.`+(nok?` ${nok} não ${nok===1?'foi':'foram'}: veja o motivo na linha e clique em Enviar de novo.`:'');
+  toast(nok?`${ok} enviadas, ${nok} com problema`:`${ok} ${ok===1?'e-mail enviado':'e-mails enviados'}`)}
 // ---- relatório: baixar os XMLs das notas de um período (zip com os XMLs + planilha com a lista) ----
 function nsAbreLote(){
   const ini=TODAY.slice(0,8)+'01';
@@ -16115,6 +16232,7 @@ const MANUAL=[
 <ul><li>Escolha o período (pela data de emissão ou de competência), a empresa, a situação (emitida pelo portal, cancelada ou emitida fora do portal) e o ambiente. A busca acha por qualquer coluna.</li>
 <li><b>Exportar</b> gera o Excel ou o PDF só com o que está filtrado; <b>Imprimir</b> imprime a lista.</li>
 <li><b>Baixar XMLs (.zip)</b> baixa o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa, com a planilha da lista.</li>
+<li><b>✉ Enviar por e-mail</b>: marque as notas nas caixinhas (a do cabeçalho marca todas) e envie. Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF e o XML. Antes de enviar, confira e troque os e-mails; as notas já enviadas vêm desmarcadas e mostram “✉ data” na lista. E-mail enviado não tem desfazer.</li>
 <li>Os quadros do alto somam as notas válidas (sem as canceladas) e mostram o total de cada empresa.</li></ul>`},
     {k:'gfrestit',t:'Restituições efetuadas',img:'gfrestit.png',
       txt:`<p>Relatório dos repasses já pagos, pela data do pagamento: empresa que pagou, conta, forma, valor pago, bruto, descontos, valor da NF e se a nota foi emitida.</p>
@@ -16201,7 +16319,7 @@ const MANUAL=[
 <li>Para emitir: <b>+ Emitir NFS-e</b>, ou o botão <b>Emitir NF</b> na receita do Financeiro (a nota fica ligada à receita). Escolha o cliente, confira o tomador, a competência, o valor e a descrição e clique em Emitir.</li>
 <li>Se o emissor recusar, a tentativa aparece como <b>Recusada</b> com o motivo. Use <b>Corrigir e tentar de novo</b> ou <b>Descartar</b> (o descarte também tem <b>Desfazer</b>).</li>
 <li>Para desfazer uma nota emitida: abra a nota e clique em <b>Cancelar NFS-e</b>, com o motivo. O cancelamento vai para o emissor nacional e não tem volta; para corrigir, cancele e emita outra.</li>
-<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. <b>Enviar por e-mail</b> manda o PDF e o XML ao cliente (confira o e-mail, a cópia e a mensagem antes; e-mail enviado não tem como desfazer, por isso o sistema pede confirmação). A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
+<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. <b>Enviar por e-mail</b> manda o PDF e o XML ao cliente (confira o e-mail, a cópia e a mensagem antes; e-mail enviado não tem como desfazer, por isso o sistema pede confirmação). Para mandar várias de uma vez, marque as caixinhas na lista e clique em <b>✉ Enviar por e-mail</b>: cada nota vai para o e-mail do seu tomador, depois de uma tela de conferência. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
 </ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
@@ -16742,6 +16860,10 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18nfse-email-lote',data:'2026-11-18',t:'Notas fiscais: enviar várias por e-mail de uma vez',itens:[
+    {x:'Controlacs › Notas fiscais e Parceiros MP › Notas fiscais emitidas ganharam caixinhas para marcar as notas e o botão “✉ Enviar por e-mail”. Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF e o XML. Vale para todas as empresas que emitem pelo portal.',mods:['ctlnfse','gfnfrel'],para:'master'},
+    {x:'Antes de enviar abre a conferência: o e-mail de cada tomador (vem do cadastro e dá para trocar ou digitar), o assunto e a mensagem com os dados de cada nota, cópia para a empresa e o PDF. As notas que já foram enviadas vêm desmarcadas e a lista mostra “✉ data” em quem já recebeu.',para:'master'},
+    {x:'Ao terminar a emissão em lote dos parceiros, o botão “✉ Enviar as notas emitidas por e-mail” já abre a conferência com as notas que acabaram de sair.',para:'master'}]},
   {k:'2026-11-18guias',data:'2026-11-18',t:'Contas a pagar: guias, rateio na categoria, lote e recibos',itens:[
     {x:'Importar documentos em lote: arraste vários boletos, notas, guias, faturas e recibos de uma vez. O sistema separa um lançamento por documento e junta a nota e o boleto do mesmo fornecedor e mesmo valor.',para:'esc'},
     {x:'Guias de imposto (DARF, DCTFWeb, GPS, DAS e FGTS), inclusive as impressas como PDF: o sistema lê valor, vencimento, competência e os códigos, e escolhe a categoria pelo código (Configurações › Categorias › Códigos das guias).',para:'esc'},
@@ -18474,14 +18596,14 @@ async function renderNR(){
     const {data:gs,error:eg}=await sb.from('repasse_grupos').select('*');if(eg)throw eg;
     const G=(gs||[]).find(g=>(g.empresas||[]).includes(cli.id)),emps=G?G.empresas:[cli.id];NR.grupo=G;NR.emps=emps;
     const {data:em,error:ee}=await sb.from('nfse_emitentes').select('*').in('cliente_id',emps);if(ee)throw ee;NR.emit=em||[];
-    let ns=[];if(NR.emit.length){let q=sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,cancelada_em,cancel_motivo,tomador_nome,tomador_doc,descricao,ctribnac,valor,situacao').in('emitente_id',NR.emit.map(e=>e.id)).in('situacao',['emitida','cancelada']);
+    let ns=[];if(NR.emit.length){let q=sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,cancelada_em,cancel_motivo,tomador_nome,tomador_doc,descricao,ctribnac,valor,situacao,extra').in('emitente_id',NR.emit.map(e=>e.id)).in('situacao',['emitida','cancelada']);
       if(amb)q=q.eq('ambiente',Number(amb));
       q=por==='competencia'?q.gte('competencia',de).lte('competencia',ate):q.gte('emitida_em',de+'T00:00:00-03:00').lte('emitida_em',ate+'T23:59:59-03:00');
       ns=await todas(()=>q.order('emitida_em'))}
     // notas marcadas como emitidas fora do portal (sem XML): só quando o período é pela emissão, e em produção
     let fora=[];if(G&&amb!=='2'){fora=await todas(()=>sb.from('repasse_itens').select('id,nome,empresa_id,nf_emitida_em,nf_numero,liquidez,bruto,valor,parceiro_nf_id').eq('grupo_id',G.id).is('nfse_nota_id',null).gte('nf_emitida_em',de).lte('nf_emitida_em',ate));
       const pa=await todas(()=>sb.from('parceiros_nf').select('id,cpf_cnpj,nome_global').eq('grupo_id',G.id));fora.forEach(f=>f._p=pa.find(p=>p.id===f.parceiro_nf_id))}
-    NR.l=[...ns.map(n=>{const e=NR.emit.find(x=>x.id===n.emitente_id);return {id:n.id,emp:e?.cliente_id,empNome:e?.nome||'',numero:n.numero_nfse||'',emissao:(n.emitida_em||'').slice(0,10),emitida_em:n.emitida_em,competencia:n.competencia,tomador:n.tomador_nome||'',doc:n.tomador_doc||'',descricao:n.descricao||'',valor:+n.valor||0,sit:n.situacao,amb:n.ambiente,chave:n.chave||'',cancel:n.cancelada_em}}),
+    NR.l=[...ns.map(n=>{const e=NR.emit.find(x=>x.id===n.emitente_id);return {id:n.id,emp:e?.cliente_id,empNome:e?.nome||'',numero:n.numero_nfse||'',emissao:(n.emitida_em||'').slice(0,10),emitida_em:n.emitida_em,competencia:n.competencia,tomador:n.tomador_nome||'',doc:n.tomador_doc||'',descricao:n.descricao||'',valor:+n.valor||0,sit:n.situacao,amb:n.ambiente,chave:n.chave||'',cancel:n.cancelada_em,emails:n.extra?.emails||[]}}),
       ...fora.map(f=>({id:f.id,emp:f.empresa_id,empNome:rnEmpNome(f.empresa_id),numero:f.nf_numero||'',emissao:f.nf_emitida_em,competencia:null,tomador:f._p?.nome_global||f.nome.trim(),doc:f._p?.cpf_cnpj||'',descricao:'Marcada como emitida fora do portal',valor:f.bruto!=null?+f.liquidez:+f.valor,sit:'fora',amb:1,chave:''}))]
       .sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
   }catch(e){console.error(e);return vazio(/nfse_|permission|RLS/i.test(e.message||'')?'Só a Master vê as notas fiscais. Se for a Master, rode a atualização v131 do banco.':'Erro ao carregar as notas. Verifique a internet e tente de novo.')}
@@ -18496,14 +18618,14 @@ function nrDesenha(){const l=nrFiltrados(),sm=x=>r2(x.reduce((a,n)=>a+n.valor,0)
   $('nrTiles').innerHTML=[['Notas válidas',fm(sm(l.filter(n=>n.sit!=='cancelada'))),`${l.filter(n=>n.sit!=='cancelada').length} notas`],['Emitidas pelo portal',String(k('emitida').length),fm(sm(k('emitida')))],['Canceladas',String(k('cancelada').length),fm(sm(k('cancelada')))],['Emitidas fora do portal',String(k('fora').length),k('fora').length?'sem XML no portal':''],
     ...[...new Set(l.map(n=>n.emp))].map(id=>{const x=l.filter(n=>n.emp===id&&n.sit!=='cancelada');return [esc(rnEmpNome(id)),fm(sm(x)),`${x.length} notas válidas`]})]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  $('nrHead').innerHTML='<tr><th class="l">Empresa que emitiu</th><th>Nº NFS-e</th><th>Emissão</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th class="l">Situação</th><th class="l">Chave de acesso</th></tr>';
-  $('nrBody').innerHTML=l.map(n=>`<tr><td class="l" style="white-space:nowrap">${esc(n.empNome)}</td><td><b>${esc(n.numero||'—')}</b>${Number(n.amb)===2?' '+nsAmbChip(2):''}</td><td style="white-space:nowrap">${n.emissao?dBR(n.emissao):''}</td><td style="white-space:nowrap">${n.competencia?dBR(n.competencia):mu('—')}</td>
+  $('nrHead').innerHTML='<tr>'+nslTh('nr')+'<th class="l">Empresa que emitiu</th><th>Nº NFS-e</th><th>Emissão</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th class="l">Situação</th><th class="l">Chave de acesso</th></tr>';
+  $('nrBody').innerHTML=l.map(n=>`<tr>${nslTd('nr',n.id,!!n.chave&&n.sit!=='fora')}<td class="l" style="white-space:nowrap">${esc(n.empNome)}</td><td><b>${esc(n.numero||'—')}</b>${Number(n.amb)===2?' '+nsAmbChip(2):''}</td><td style="white-space:nowrap">${n.emissao?dBR(n.emissao):''}</td><td style="white-space:nowrap">${n.competencia?dBR(n.competencia):mu('—')}</td>
     <td class="l" style="white-space:normal;min-width:180px">${esc(n.tomador)}</td><td class="l" style="white-space:nowrap">${esc(nsDoc(n.doc))}</td><td class="l" style="white-space:normal;max-width:280px">${esc(n.descricao.slice(0,140))}</td><td><b>${fm(n.valor)}</b></td>
-    <td class="l"><span class="chip ${NRSIT[n.sit][0]}">${NRSIT[n.sit][1]}</span>${n.cancel?'<br>'+mu(dtBR(n.cancel)):''}</td><td class="l" style="font-size:11px;word-break:break-all;min-width:160px">${esc(n.chave)}</td></tr>`).join('')
-    ||`<tr><td class="l muted" colspan="10">Nenhuma nota neste período e filtros.</td></tr>`;
-  $('nrFoot').innerHTML=l.length?`<tr><th class="l" colspan="7">${l.length} ${l.length===1?'nota':'notas'} · válidas (sem as canceladas)</th><th>${fm(sm(l.filter(n=>n.sit!=='cancelada')))}</th><th colspan="2"></th></tr>`:'';
-  $('nrXml').disabled=!l.some(n=>n.chave);
-  $('nrNote').textContent='Exportar gera o Excel ou o PDF só com o que está filtrado; Baixar XMLs gera um .zip com o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa e a planilha da lista. As notas emitidas fora do portal não têm XML aqui: entram só na lista. O total não soma as canceladas.';
+    <td class="l"><span class="chip ${NRSIT[n.sit][0]}">${NRSIT[n.sit][1]}</span>${nslJa(n.emails)}${n.cancel?'<br>'+mu(dtBR(n.cancel)):''}</td><td class="l" style="font-size:11px;word-break:break-all;min-width:160px">${esc(n.chave)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="11">Nenhuma nota neste período e filtros.</td></tr>`;
+  $('nrFoot').innerHTML=l.length?`<tr><th></th><th class="l" colspan="7">${l.length} ${l.length===1?'nota':'notas'} · válidas (sem as canceladas)</th><th>${fm(sm(l.filter(n=>n.sit!=='cancelada')))}</th><th colspan="2"></th></tr>`:'';
+  $('nrXml').disabled=!l.some(n=>n.chave);nslPoda('nr',l.filter(n=>n.chave&&n.sit!=='fora').map(n=>n.id));
+  $('nrNote').textContent='Exportar gera o Excel ou o PDF só com o que está filtrado; Baixar XMLs gera um .zip com o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa e a planilha da lista. Para mandar várias notas por e-mail, marque as caixinhas e clique em “✉ Enviar por e-mail”: cada uma vai para o e-mail do seu tomador. As notas emitidas fora do portal não têm XML aqui: entram só na lista. O total não soma as canceladas.';
 }
 ['nrDe','nrAte','nrPor','nrAmb'].forEach(id=>$(id).addEventListener('change',()=>renderNR()));
 ['nrEmp','nrSit'].forEach(id=>$(id).addEventListener('change',()=>nrDesenha()));
@@ -18886,7 +19008,7 @@ function nfeDesenha(){const d=NF.dlg,mu=t=>`<span class="muted">${t}</span>`;
       return `<tr data-i="${i}"><td class="l" style="white-space:normal;min-width:200px"><b>${esc(x.nome)}</b>${chave(x.nome)!==chave(x.it.nome)?'<br>'+mu(esc(x.it.nome.trim())):''}${x.ps?.cep?'':'<br>'+mu('sem endereço no cadastro (a nota sai sem o endereço)')}</td>
         <td class="l">${x.res?.ok?esc(nsDoc(x.doc)):`<input class="nfedoc" value="${esc(nsDoc(x.doc))}" inputmode="numeric" style="max-width:170px" aria-label="CNPJ ou CPF de ${esc(x.nome)}">`}</td>
         <td><b>${fm(x.valor)}</b></td><td class="l" style="white-space:nowrap">${esc(rnEmpNome(x.it.empresa_id))}</td><td class="l">${st}</td></tr>`}).join('')}</tbody></table></div>
-    <p class="note" id="nfeProg" style="margin:8px 0 0">${prontas.length?`${prontas.length} ${prontas.length===1?'nota pronta':'notas prontas'} · ${fm(r2(prontas.reduce((a,x)=>a+x.valor,0)))}.`:d.linhas.some(x=>x.res?.ok)?'Notas emitidas. Elas aparecem também em Controlacs › Notas fiscais.':'Nenhuma nota pronta para emitir.'}</p><p class="err" id="nfdErr" hidden></p>`;
+    <p class="note" id="nfeProg" style="margin:8px 0 0">${prontas.length?`${prontas.length} ${prontas.length===1?'nota pronta':'notas prontas'} · ${fm(r2(prontas.reduce((a,x)=>a+x.valor,0)))}.`:d.linhas.some(x=>x.res?.ok)?'Notas emitidas. Elas aparecem também em Controlacs › Notas fiscais.':'Nenhuma nota pronta para emitir.'}</p>${!prontas.length&&d.linhas.some(x=>x.res?.ok&&x.res.nota)?`<p style="margin:8px 0 0"><button type="button" class="btn" data-nslids="${d.linhas.filter(x=>x.res?.ok&&x.res.nota).map(x=>x.res.nota).join(',')}" title="Cada nota vai para o e-mail do seu tomador, com o PDF e o XML">✉ Enviar as notas emitidas por e-mail</button></p>`:''}<p class="err" id="nfdErr" hidden></p>`;
   const sv=$('nfdFoot').querySelector('[data-act="salvar"]');sv.hidden=!prontas.length;sv.disabled=false;sv.textContent=`Emitir ${prontas.length} ${prontas.length===1?'NFS-e':'NFS-e'}`;
   $('nfeComp').onchange=()=>d.comp=$('nfeComp').value;$('nfeDesc').oninput=()=>d.desc=$('nfeDesc').value;
   $('nfdBody').querySelectorAll('.nfedoc').forEach(inp=>inp.onchange=()=>{const x=d.linhas[+inp.closest('tr').dataset.i];x.doc=nfeDig(inp.value);nfeDesenha()});
