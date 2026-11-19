@@ -2,6 +2,10 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 12:55 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
+  - **Só aceita TED (nunca Pix)** (Carol, 19/11): o Inter mandou como Pix a TED da Clínica Viva Simon (o arquivo estava certo, lote TED; o Inter faz transferência para outro banco pelo Pix por agência e conta). Marca nova no cadastro do fornecedor (Gestão financeira › Cadastros, `gf_so_ted`) e do parceiro (`pc_so_ted`, só escritório). `rmForma` nunca usa Pix para quem tem a marca (`soTedDe`: fornecedor ou parceiro ligado); no Envio de remessa do Inter a linha fica de fora com o aviso para pagar à mão; Sicredi e Santander vão por TED no arquivo.
+  - Banco: **v163** RODADA (colunas `so_ted` em `fin_pessoas` e `parceiros`, padrão false); Clínica Viva Simon Fpolis e Kobrasol já marcadas (parceiros e fornecedores ligados). SQL em `sistema-caixa/sql-versoes`. **Pendente:** OK da Carol para publicar.
+
 - **19/11/2026 11:50 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - Envio de remessa, ações em lote abaixo da lista (`rmLoteBar`): "↩ Voltar ao repasse os sem dados de pagamento", "↩ Voltar ao repasse os marcados", "Tirar da remessa os sem dados de pagamento" (contas que não são de repasse) e "Tirar da remessa os marcados". Funções `rmVoltaLote` e `rmTiraLote`, com Desfazer (o voltar recria as mesmas contas a pagar com o mesmo id, religa repasses, descontos e o status do relatório). O "Voltar ao repasse" da linha passou a usar o mesmo caminho, então também tem Desfazer. Sem SQL.
 
