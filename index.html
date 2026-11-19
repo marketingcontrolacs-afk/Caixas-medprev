@@ -14019,7 +14019,11 @@ function gcDesenha(){
     .map((t,i)=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v${i===4&&Math.abs(dif)>=0.005&&!(n('sug')+n('sem'))||i===3&&n('sem')?' neg':''}">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
   gcAvisos();
   $('gcAprovaTodas').hidden=!n('sug');$('gcAprovaTodas').textContent=`Aprovar todas as sugestões (${n('sug')})`;
-  const ns=GC.sel.size;$('gcBulk').hidden=!ns;$('gcBulkTxt').textContent=`${ns} ${ns===1?'linha selecionada':'linhas selecionadas'}`;
+  const ns=GC.sel.size;$('gcBulk').hidden=!ns;
+  // total das linhas selecionadas: entradas, saídas e o saldo (Carol, 19/11)
+  {const por=new Map([...GC.linhas,...rows].map(l=>[l.id,l])),sl=[...GC.sel].map(id=>por.get(id)).filter(Boolean),
+     en=r2(sl.filter(l=>+l.valor>0).reduce((x,l)=>x+(+l.valor),0)),sa=r2(sl.filter(l=>+l.valor<0).reduce((x,l)=>x-l.valor,0));
+   $('gcBulkTxt').innerHTML=`${ns} ${ns===1?'linha selecionada':'linhas selecionadas'}`+(!sl.length?'':en&&sa?` · <b>saldo ${fm(r2(en-sa))}</b> <span class="muted">(entradas ${fm(en)} · saídas ${fm(sa)})</span>`:` · <b>total ${fm(sa||en)}</b> <span class="muted">em ${sa?'saídas':'entradas'}</span>`)}
   $('gcNote').innerHTML=(GC.aviso?`<b>${esc(GC.aviso)}</b><br>`:'')+(rows.length>MAX?`Mostrando ${MAX} de ${rows.length}. Use a busca ou selecione todas pela caixa do cabeçalho. `:'')
     +'Linhas do mesmo dia com o mesmo histórico do banco (ex.: vendas no Pix) entram somadas numa linha só. Ao lançar uma linha, marque “Lembrar”: as próximas linhas com o mesmo texto do banco já chegam com o lançamento sugerido. A diferença “banco × sistema” compara o extrato do banco com o Extrato da conta no mesmo período.';
 }
