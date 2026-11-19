@@ -2,6 +2,12 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **18/11/2026 23:35 · conta 2 · hospedagem migrada para a Cloudflare Pages**
+  - O site agora sai da **Cloudflare Pages** (projeto `portal-controlacs`). O DNS `erpfinanceiro` aponta para `portal-controlacs.pages.dev`.
+  - No Netlify, os builds do `erpfinanceiro.controlacs.com.br` foram **parados**. Não reativar. O `controlacs.com.br` (site institucional) continua no Netlify.
+  - Merge de `feat/solicitacoes-servicos` na `main` dos dois repositórios.
+  - **Pendente:** confirmar que o domínio aparece como *Active* na Cloudflare; depois, apagar o projeto do ERP no Netlify.
+
 - **18/11/2026 22:15 · conta 2 · branch `feat/solicitacoes-servicos` (ainda não publicado)**
   - **No banco (já aplicado):**
     - 22 serviços de RH em `sol_tipos`, incluindo advertência, suspensão, atestado, INSS/CAT e "Descontos em folha" (até o dia 20).
@@ -10,7 +16,7 @@ Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o q
     - A "Nova solicitação" virou uma lista para escolher (agrupada por área) e mostra só os serviços do contrato da empresa: `clientes.bpo_rh` / `bpo_financeiro`; "Outros" sempre aparece.
     - Mostra a descrição do serviço e avisa quando passou do dia 20 nos descontos.
   - **Também no branch:** Configurações › **Serviços das solicitações** (só a Master, `VIEW 'solserv'`). Ali se incluem, editam e desativam os serviços por área, com prazo em dias, documentos pedidos, orientação e ordem.
-  - **Pendente:** publicar tudo de uma vez junto com a migração para a Cloudflare. **Não abrir PR nem fazer merge no portal-controlacs**: cada build/preview gasta crédito do Netlify.
+  - **Publicado em 18/11/2026 23:35** pela Cloudflare Pages.
 
 - **18/11/2026 21:45 · conta 2 (chat Solicitações) · branch `feat/solicitacoes-modulo`**
   - **Feito:** módulo **Solicitações** dentro do `index.html`. Menu: Comunicação › Solicitações (`VIEW 'solic'`, em `SEMPRE`). Código num bloco só (`// ===== SOLICITAÇÕES + ADMISSÃO`), antes do `openView`; HTML na `section#viewSol`; CSS com prefixo `.sol-`. Também entra a página `admissao.html`.
