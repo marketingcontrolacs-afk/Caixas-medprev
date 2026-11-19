@@ -2,6 +2,13 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 08:40 · conta 2 · branch `fix/salvar-sem-fornecedor`**
+  - **Feito:** dá para salvar sem fornecedor cadastrado.
+    - Em Boletos e notas a pagar e em Cartão de crédito, o campo Fornecedor ficou opcional.
+    - Na conferência de Exportação Bom Controle (caixa, tesouraria, boletos e notas, cartão), o "Fornecedor no Bom Controle" pode ficar em branco. O lançamento fica com `fornecedor_bc = '-'` (constante `FBC_SEM`) e vai para a exportação só com o nome digitado, sem CNPJ.
+    - Se digitar um nome que não está na lista, continua pedindo para escolher da lista ou apagar.
+  - Sem SQL. O fechamento de caixa não tem campo de fornecedor e não mudou.
+
 - **19/11/2026 00:00 · conta 1 (thread "Revisar tudo o que já foi feito") · branch `claude/project-thread-vp02g6`**
   - **Publicado** pela Cloudflare Pages, com OK da Carol (19/11): envio de NFS-e por e-mail em lote (branch `claude/project-thread-xk2hx8`, descrito abaixo). Sem SQL.
   - Revisão geral: os branches antigos `claude/project-thread-*` já estão na `main` (o conteúdo foi publicado em outras PRs); não há outra coisa aprovada esperando publicação.
