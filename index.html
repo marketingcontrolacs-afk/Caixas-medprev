@@ -11322,7 +11322,7 @@ async function rmAcao(a,b){
     // os pagamentos da remessa cancelada voltam livres, mesmo se alguém usou "Tirar da remessa" neles (Carol, 19/11)
     {const {data:its}=await sb.from('fin_remessa_itens').select('titulo_id').eq('remessa_id',x.id);const tids=[...new Set((its||[]).map(i=>i.titulo_id).filter(Boolean))];
       for(let i=0;i<tids.length;i+=200)await sb.from('fin_titulos').update({sem_remessa:false}).in('id',tids.slice(i,i+200)).eq('sem_remessa',true)}
-    if(x.nsa>0&&confirm(`O banco RECUSOU o arquivo nº ${x.nsa}?\n\nOK = sim, recusou: o próximo arquivo volta a usar o nº ${x.nsa} (o banco não conta arquivo recusado).\nCancelar = não, o banco aceitou: a numeração continua.`)&&!await rmLiberaNsa(x))return;
+    if(x.nsa>0&&confirm(`O banco RECUSOU o arquivo nº ${x.nsa} por erro nos DADOS (convênio, conta, valor, código de barras…)?\n\nOK = sim: o próximo arquivo volta a usar o nº ${x.nsa} (o banco não conta arquivo recusado).\n\nCancelar = não: o banco aceitou o arquivo OU recusou com “Sequencial fora de ordem”. A numeração continua.\n\nNo “Sequencial fora de ordem”, o banco espera o número seguinte ao último arquivo que ele ACEITOU: confira no internet banking e acerte o “Nº da última remessa” em Contas bancárias.`)&&!await rmLiberaNsa(x))return;
     toast(`Remessa nº ${x.nsa} cancelada`);GT.key='';return renderGR()}
   if(a!=='rm_gerar')return;
   const conta=GFC.lista.find(c=>c.id===$('rm_conta').value),dataPag=$('rm_data').value;
@@ -11368,6 +11368,8 @@ function lerRetorno(txt){
   return out;
 }
 // banco recusou o arquivo: o número volta a ficar livre e o próximo arquivo usa o mesmo nº (o banco espera a sequência sem pular)
+// Regra (Carol, 19/11): só libera quando a recusa é por erro nos dados. “Sequencial fora de ordem” NÃO libera: o banco espera
+// o seguinte ao último ACEITO (caso MPA Pato Branco: o Sicredi nunca tinha aceitado arquivo e esperava o nº 1).
 async function rmLiberaNsa(x){
   const neg=-Math.floor(Date.now()/1000);
   const {error:e1}=await sb.from('fin_remessas').update({nsa:neg}).eq('id',x.id);if(e1){fail(e1,'Não foi possível liberar o número');return false}
@@ -16297,6 +16299,7 @@ const MANUAL=[
 <li>No Santander, envie o arquivo até as 20h do dia do pagamento. Boleto precisa do CNPJ/CPF do fornecedor no cadastro (sem ele a conta não fica disponível para marcar). Se o convênio tiver o “teste” contratado, as remessas nº 1 a 10 são só teste.</li>
 <li>No Repasse de parceiros, o botão <b>Remessa</b> de cada empresa abre esta tela só com os repasses.</li>
 <li><b>Cancelar remessa:</b> se o banco recusou o arquivo (por exemplo, convênio inválido) ou você não vai enviar, clique em <b>Cancelar</b> na lista de Remessas geradas. Os pagamentos que ainda não foram pagos voltam a aparecer para gerar outra remessa, e a remessa fica como “Cancelada”. Se o banco já aceitou o arquivo, cancele também no banco. Se o banco <b>recusou</b> o arquivo, responda OK na pergunta seguinte: o número da remessa fica livre e o próximo arquivo usa o mesmo número, porque o banco (por exemplo, o Sicredi) espera a sequência sem pular. Numa remessa que já está cancelada, o botão <b>Liberar nº</b> faz o mesmo.</li>
+<li><b>“Sequencial fora de ordem”:</b> o banco recusou porque o nº do arquivo não é o seguinte ao último arquivo que ele <b>aceitou</b> (arquivo recusado não conta). Cancele a remessa e, na pergunta “O banco RECUSOU…”, clique em <b>Cancelar</b> (não). Depois veja no internet banking o último arquivo aceito e acerte o <b>Nº da última remessa</b> da conta em Contas bancárias (o próximo arquivo usa esse nº + 1). Se o banco nunca aceitou nenhum arquivo dessa conta, deixe 0.</li>
 <li><b>Tirar da remessa:</b> no Envio de remessa, cada lançamento tem o botão <b>Tirar da remessa</b> (embaixo do valor). Ele sai da lista e não vai em nenhum arquivo, mas a conta a pagar continua em aberto em Contas a pagar, para pagar de outro jeito. Para desfazer, marque <b>Mostrar os que foram tirados da remessa</b> e clique em <b>Voltar para a remessa</b>.</li>
 <li><b>Repasse no banco errado:</b> se mandou um repasse de parceiro para a remessa da empresa ou do banco errado, clique em <b>Voltar ao repasse</b> (embaixo do valor, na lista do Envio de remessa). A conta a pagar é excluída e o repasse volta para o Repasse de parceiros; lá, escolha a empresa certa em “Pagar em” e mande de novo para a remessa. Só funciona enquanto o pagamento não foi pago nem está numa remessa enviada (se estiver, cancele a remessa ou use Liberar antes).</li>
 <li><b>TED:</b> a conta a pagar sem boleto e sem chave Pix vai por TED, com o banco, a agência e a conta do cadastro do fornecedor (no repasse, a conta do parceiro, com o CPF/CNPJ do titular). Quem tem Pix e conta pode escolher Pix ou TED na coluna “Como paga”, ou todos de uma vez em “Quem tem Pix e conta, pagar por”. No cadastro, o banco precisa do número (ex.: 341 - Itaú) ou do nome de um banco conhecido. Na primeira TED de cada banco, faça um teste com valor pequeno.</li>

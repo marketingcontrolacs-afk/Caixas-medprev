@@ -2,19 +2,28 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 20:35 · conta 2 · branch `fix/remessa-regra-sequencial`**
+  - **Regra da numeração da remessa (Sicredi):** o banco espera o número seguinte ao último arquivo que ele **aceitou**; arquivo recusado não conta.
+    - Quando a recusa é por **"Sequencial fora de ordem"**, NÃO se libera o número (responder "Cancelar" na 2ª pergunta) e se acerta o "Nº da última remessa" da conta.
+    - A pergunta do cancelamento e o manual agora explicam isso.
+  - **Caso MPA Pato Branco (Sicredi, convênio 78D7):** nenhum arquivo tinha sido aceito.
+    - Os nº 1 a 4 foram liberados (nsa negativo e `/C` no seu número), e `cnab_seq` voltou para 0.
+    - O arquivo seguinte, nº 1, foi aceito em 19/11.
+
+- **19/11/2026 19:35 · conta 2 · banco: migration `fin_contas_ligar_tes_so_quando_muda`**
+  - **Problema:** salvar uma conta bancária (por exemplo, a Sicredi da MP Coronel) dava "canceling statement due to statement timeout".
+  - **Causa:** o trigger `fin_contas_ligar_tes` rodava `tes_ligar_banco` (a empresa inteira) em todo update que citasse nome, conta_bc, tipo ou ativo, mesmo sem mudar nada. O front sempre manda esses campos.
+  - **Correção:** o trigger foi dividido em dois:
+    - `fin_contas_ligar_tes`, só no insert;
+    - `fin_contas_ligar_tes_upd`, no update, com `WHEN` (só quando algum desses quatro campos muda de verdade).
+  - Não houve mudança no `index.html`.
+  - **Pendente:** se trocar o nome, o tipo, o "ativo" ou o nome no Bom Controle numa empresa grande, ainda pode estourar o tempo. Nesse caso, otimizar o `tes_ligar_banco`.
+
 - **19/11/2026 16:05 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · publicado (OK da Carol)**
   - **Boleto só guardado no repasse** (Carol, 19/11: anexar não pode mandar sozinho para a remessa; às vezes ela paga à mão). No repasse SEM conta a pagar, "📎 Anexar boleto"/"Colar linha" (`rnBolItem`) só lê a linha e guarda arquivos + linha em `repasse_itens.boleto` (**v165** RODADA); não cria conta a pagar. Chip "📎 Boleto guardado" com Ver e Tirar boleto (Desfazer). `rnCriaTitulos` (Pagar em / Gerar) cria a conta já como Boleto, com o valor do boleto (diferença na obs) e os anexos. Repasse que já tem conta a pagar continua anexando nela (`bolNoTitulo`).
 
 - **19/11/2026 15:20 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - Envio de remessa: aviso `#rmTir` acima da lista quando há pagamentos tirados da remessa (quantos, valor, nomes), com "↩ Trazer todos de volta para a remessa" (`rm_trazTodos`, com Desfazer) e "Ver quais são" (`rm_verTir`). Cancelar remessa (`rm_cancelar`) agora também tira o `sem_remessa` dos títulos dela. Sem SQL. **Pendente:** OK da Carol.
-
-- **19/11/2026 14:30 · conta 1 (thread "Descontar guias da Top Imagem no repasse") · branch `claude/project-thread-h0h07i` (ainda não publicado)**
-  - **Arquivo de desconto do parceiro** (Carol, 19/11; ex.: Top Image, relatório de atendimentos por representante = guias recebidas na clínica). Marca nova no cadastro do parceiro (só escritório): "Exige arquivo de desconto no repasse" (`parceiros.desc_arq`) + "Nome do desconto" (`desc_arq_nome`, ex.: Representante).
-  - Repasse da semana: o repasse do parceiro marcado mostra "Falta o arquivo de desconto" com "📎 Anexar arquivo de desconto" (Excel/CSV/PDF) ou "Não tem desconto" (`repasse_itens.desc_arq`). Leitura `daLeArquivo`/`daLeLinhas` (aguenta colunas desalinhadas do Crystal), conferência `rnDAAnexa` (guias já descontadas antes ficam desmarcadas, empresa obrigatória), lançamento `rnDALanca` (um `repasse_descontos` com motivo "<nome> do período X a Y (N guias)"; se já há conta a pagar em aberto, sai na hora por `descNaConta`; o arquivo vai para os anexos da conta a pagar). Desfazer `rnDADesfaz`. Quadro e filtro "Falta arquivo de desconto". Trava em "Gerar remessa" e "Marcar como pago" (`rnDATrava`).
-  - **Contas a pagar:** todo desconto de parceiro (manual ou por arquivo) agora também entra na **descrição** da conta a pagar: " · Descontado R$ X ref. <motivo>" (`descDescr`, em `rnCriaTitulos` e `descNaConta`). A observação continua como antes.
-  - Não mexe no boleto do repasse (regra do Santa Luzia): são coisas separadas.
-  - Banco: **v164** RODADA pelo MCP (colunas acima; cadastro do parceiro Top Image com a marca, ligado ao fornecedor de mesmo CNPJ; desconto de R$ 1.560,00 em Oliveira SJ, período 01/11 a 15/11/2026, 6 guias, para o repasse de 19/11). SQL e DESFAZER em `sistema-caixa/sql-versoes`. **Próximo SQL livre: v165.**
-  - Testado no simulador (prints em `sistema-caixa/desconto-arquivo/`). **Pendente:** OK da Carol para publicar.
 
 - **19/11/2026 14:30 · conta 1 (thread "Descontar guias da Top Imagem no repasse") · branch `claude/project-thread-h0h07i` (ainda não publicado)**
   - **Arquivo de desconto do parceiro** (Carol, 19/11; ex.: Top Image, relatório de atendimentos por representante = guias recebidas na clínica). Marca nova no cadastro do parceiro (só escritório): "Exige arquivo de desconto no repasse" (`parceiros.desc_arq`) + "Nome do desconto" (`desc_arq_nome`, ex.: Representante).
