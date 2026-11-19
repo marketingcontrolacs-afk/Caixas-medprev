@@ -9,7 +9,8 @@ Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o q
   - **No branch:**
     - A "Nova solicitação" virou uma lista para escolher (agrupada por área) e mostra só os serviços do contrato da empresa: `clientes.bpo_rh` / `bpo_financeiro`; "Outros" sempre aparece.
     - Mostra a descrição do serviço e avisa quando passou do dia 20 nos descontos.
-  - **Pendente:** publicar junto com a migração para a Cloudflare, para não gastar build do Netlify.
+  - **Também no branch:** Configurações › **Serviços das solicitações** (só a Master, `VIEW 'solserv'`). Ali se incluem, editam e desativam os serviços por área, com prazo em dias, documentos pedidos, orientação e ordem.
+  - **Pendente:** publicar tudo de uma vez junto com a migração para a Cloudflare. **Não abrir PR nem fazer merge no portal-controlacs**: cada build/preview gasta crédito do Netlify.
 
 - **18/11/2026 21:45 · conta 2 (chat Solicitações) · branch `feat/solicitacoes-modulo`**
   - **Feito:** módulo **Solicitações** dentro do `index.html`. Menu: Comunicação › Solicitações (`VIEW 'solic'`, em `SEMPRE`). Código num bloco só (`// ===== SOLICITAÇÕES + ADMISSÃO`), antes do `openView`; HTML na `section#viewSol`; CSS com prefixo `.sol-`. Também entra a página `admissao.html`.
