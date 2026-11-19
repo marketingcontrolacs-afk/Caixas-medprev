@@ -107,7 +107,7 @@ Mostrar também colaborador e WhatsApp, cargo, **setor**, horário, início, exp
 
 **c) Link do colaborador (equipe):**
 - "Gerar link": `rpc('sol_admissao_gerar_link', { p_solicitacao })` → `token`. Ele pega nome, WhatsApp e cargo do pedido do gestor.
-- URL: `https://erpfinanceiro.controlacs.com.br/admissao/{token}`.
+- URL: `https://erpfinanceiro.controlacs.com.br/admissao.html?t={token}`.
 - "Enviar por WhatsApp": `https://wa.me/55{só dígitos}?text=` + `encodeURIComponent('Olá, {nome}! Bem-vindo(a) à {empresa}. Para a sua admissão, preencha seus dados e envie os documentos por este link: {url}')`.
 - Situação do link: `status`, `expira_em`, documentos recebidos.
 - "Pedir correção": `rpc('sol_admissao_pedir_correcao', { p_solicitacao, p_msg })`. Reabre o link com o recado.
@@ -129,7 +129,7 @@ Mostrar também colaborador e WhatsApp, cargo, **setor**, horário, início, exp
 
 **e) Gerar ficha de admissão (equipe):** seção 6.
 
-## 4. Página pública do colaborador — `/admissao/:token`
+## 4. Página pública do colaborador: `admissao.html?t={token}` (pronta, arquivo `admissao.html`)
 
 Rota **sem login**, usando a chave pública (anon). Layout para celular, com o cabeçalho verde do ERP.
 
