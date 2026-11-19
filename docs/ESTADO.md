@@ -2,6 +2,8 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+> ⚠️ **18/11 21:10: a conta 2 está editando o `index.html`** (módulo Solicitações, branch `feat/solicitacoes-modulo`). **Não edite o `index.html` até este aviso sair daqui.** Outras partes do sistema podem ser mexidas, mas, se mexer no `index.html`, combine antes.
+
 - **18/11/2026 21:00 · conta 2 (chat Solicitações)**
   - **Feito:** criados `CLAUDE.md`, `docs/` e `modelos/guia_corpori.pdf`. Banco do módulo Solicitações + Admissão aplicado (ver `docs/solicitacoes/BANCO.md`).
   - **Em andamento:** telas do módulo Solicitações dentro do `index.html` e a página pública de admissão do colaborador (`admissao.html`), pela conta 2.
