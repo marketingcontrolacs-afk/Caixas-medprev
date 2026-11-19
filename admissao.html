@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Admissão · Controlacs</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<!--
+  Página pública de admissão do novo colaborador (Carol, 18/11).
+  Aberta pelo link que o RH gera na solicitação de admissão: admissao.html?t=TOKEN
+  Sem login: tudo passa pelas funções sol_admissao_* do banco, que conferem o token
+  (ver docs/solicitacoes/INSTRUCOES.md, seção 4).
+-->
+<style>
+:root{
+  --bg:#F3F6F5; --surface:#FFFFFF; --sunk:#EDF2F0; --line:#DCE4E1; --ink:#13232B; --muted:#5B6B70;
+  --brand:#025556; --brand-soft:#D9ECEA; --ok:#1D7A45; --ok-soft:#DDF1E5; --warn:#9A6200; --warn-soft:#FBEFD6;
+  --bad:#B4371B; --bad-soft:#F8E1DA; --head1:#013B3C; --head2:#025556;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif; --body:"Public Sans","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+[hidden]{display:none!important}
+header{background:linear-gradient(135deg,var(--head1),var(--head2));color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+header img{height:34px;background:#fff;border-radius:8px;padding:4px 8px}
+header small{color:#CFE3E0;font-size:12px;text-align:right}
+main{max-width:640px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:16px}
+h1{font-family:var(--display);font-size:24px;line-height:1.2;margin:0}
+h2{font-family:var(--display);font-size:18px;margin:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px}
+.muted{color:var(--muted);font-size:14px}
+label.f{display:grid;gap:6px;font-size:14px;font-weight:600;color:var(--ink)}
+label.f .obr{color:var(--bad)}
+input,select,textarea{font:inherit;font-size:16px;width:100%;border:1px solid #C7D3CF;border-radius:10px;padding:11px 12px;background:#fff;color:var(--ink);min-height:46px}
+input:focus,select:focus,textarea:focus{outline:2px solid #8FC5BE;border-color:var(--brand)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.btn{border:0;background:var(--brand);color:#fff;font:600 16px var(--body);padding:12px 18px;border-radius:10px;min-height:48px;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:default}
+.btn2{border:1px solid #C7D3CF;background:#fff;color:var(--ink);font:500 15px var(--body);padding:10px 14px;border-radius:10px;min-height:44px;cursor:pointer}
+.opc{display:flex;gap:8px}
+.opc button{flex:1;border:1px solid #C7D3CF;background:#fff;color:var(--ink);font:500 15px var(--body);padding:11px;border-radius:10px;min-height:46px;cursor:pointer;text-align:left}
+.opc button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.lista{display:grid;gap:6px}
+.lista button{display:grid;gap:2px}
+.lista small{font-size:12px;opacity:.85}
+.barra{display:flex;gap:6px}
+.barra span{flex:1;height:6px;border-radius:99px;background:#D3DDDA}
+.barra span.on{background:var(--brand)}
+.doc{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px}
+.doc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-weight:600}
+.tag{font-size:11px;font-weight:700;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.tag.obrig{background:var(--bad-soft);color:var(--bad)}
+.tag.opc{background:var(--sunk);color:var(--muted)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.arq{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.aviso{background:var(--warn-soft);color:#5C3B00;border-radius:12px;padding:12px 14px;font-size:14px}
+.erro{background:var(--bad-soft);color:#7A2016;border-radius:12px;padding:12px 14px;font-size:14px}
+.okbox{background:var(--ok-soft);color:var(--ok);border-radius:12px;padding:12px 14px;font-size:14px;font-weight:600}
+.nav{display:flex;gap:10px}
+.nav .btn{flex:2}.nav .btn2{flex:1}
+.falta{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #F0D4CC;font-size:14px}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink)}
+.chk input{width:22px;height:22px;min-height:0;flex:none;margin-top:1px}
+.centro{text-align:center;display:grid;gap:12px;justify-items:center;padding:30px 10px}
+.spin{width:28px;height:28px;border:3px solid var(--brand-soft);border-top-color:var(--brand);border-radius:50%;animation:g 1s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <img src="logo.png" alt="Controlacs">
+  <small id="hEmp">Admissão</small>
+</header>
+<main id="app"><div class="centro"><div class="spin" aria-hidden="true"></div><span class="muted">Carregando…</span></div></main>
+
+<script>
+(function(){
+const sb=supabase.createClient('https://qlopcclhswtbgrupfhyy.supabase.co','sb_publishable_7Vz9OIY5grg3eqixTtxOWQ_yGxC1XRL',{auth:{persistSession:false}});
+const TOKEN=new URLSearchParams(location.search).get('t')||'';
+const $app=document.getElementById('app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dBR=s=>s&&/^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10).split('-').reverse().join('/'):(s||'');
+
+let INFO=null, D={}, PASSO=1, ACEITE=false, ERRO='', FALTAM=null, OCUPADO=false;
+const NOMES=['','Dados pessoais','Documentos, contato e endereço','Família','Envio de documentos','Revisar e enviar'];
+const ROT={nome:'Nome completo',nome_mae:'Nome da mãe',nome_pai:'Nome do pai',nascimento:'Data de nascimento',sexo:'Sexo',local_nascimento:'Local de nascimento',
+  raca_cor:'Raça/cor',estado_civil:'Estado civil',escolaridade:'Escolaridade',cpf:'CPF',rg:'RG',rg_orgao:'Órgão emissor',rg_emissao:'Data de emissão do RG',
+  email:'E-mail',telefone:'Telefone',cep:'CEP',endereco:'Endereço e número',bairro:'Bairro',cidade:'Cidade',vale_transporte:'Vale-transporte',vt_linha:'Linha e valor do vale-transporte',
+  tamanho_calcado:'Nº do calçado',tamanho_roupa:'Tamanho da roupa',exame_unidade:'Unidade do exame',exame_data:'Quando fazer o exame',exame_turno:'Turno do exame',
+  tem_conjuge:'Se possui cônjuge',conjuge_naturalidade:'Naturalidade do cônjuge',conjuge_nascimento:'Nascimento do cônjuge',tem_dependentes:'Se possui dependentes',
+  dependentes:'Cadastre ao menos um dependente','dados do dependente':'Dados dos dependentes'};
+const PASSO_DE=k=>['nome','nome_mae','nome_pai','nascimento','sexo','local_nascimento','raca_cor','estado_civil','escolaridade'].includes(k)?1
+  :['tem_conjuge','conjuge_naturalidade','conjuge_nascimento','tem_dependentes','dependentes','dados do dependente'].includes(k)?3:ROT[k]?2:4;
+
+// ---------- carregar ----------
+async function carregar(){
+  if(!TOKEN){telaErro('invalido');return}
+  const {data,error}=await sb.rpc('sol_admissao_abrir',{p_token:TOKEN});
+  if(error||!data){telaErro('falha',error&&error.message);return}
+  if(!data.ok){telaErro(data.motivo);return}
+  INFO=data;D=Object.assign({},data.dados||{});if(!Array.isArray(D.dependentes))D.dependentes=[];
+  document.getElementById('hEmp').textContent='Admissão · '+(data.empresa||'');
+  render();
+}
+function telaErro(m,det){
+  const t={invalido:['Link inválido','Confira se o link está completo ou peça um novo ao RH.'],
+    expirado:['Este link venceu','Fale com o RH da empresa para receber um novo link.'],
+    concluida:['Admissão finalizada','Sua admissão já foi concluída. Bem-vindo(a)!'],
+    falha:['Não foi possível abrir','Verifique sua internet e tente de novo.'+(det?' ('+det+')':'')]}[m]||['Não foi possível abrir','Peça um novo link ao RH.'];
+  $app.innerHTML=`<div class="card centro"><h1>${esc(t[0])}</h1><p class="muted">${esc(t[1])}</p></div>`;
+}
+
+// ---------- regras ----------
+const temFilhos=()=>(D.dependentes||[]).some(x=>/^filh/i.test(x.parentesco||''));
+function docsVisiveis(){
+  return (INFO.documentos||[]).filter(d=>d.obrigatorio==='sempre'||d.obrigatorio==='opcional'&&d.chave!=='vacina_filhos'&&d.chave!=='escolar_filhos'
+    ||d.obrigatorio==='conjuge'&&D.tem_conjuge==='sim'||d.obrigatorio==='dependentes'&&D.tem_dependentes==='sim'
+    ||(d.obrigatorio==='filhos'||d.chave==='vacina_filhos'||d.chave==='escolar_filhos')&&temFilhos())
+    .map(d=>({...d,obrig:d.obrigatorio!=='opcional',cargo:/^cargo_/.test(d.chave)}));
+}
+const enviadosDe=nome=>(INFO.arquivos||[]).filter(a=>a.documento===nome);
+function faltasLocais(){
+  const f=[];const req=['nome','nome_mae','nome_pai','nascimento','sexo','local_nascimento','raca_cor','estado_civil','escolaridade','cpf','rg','rg_orgao','rg_emissao',
+    'email','telefone','cep','endereco','bairro','cidade','vale_transporte','exame_unidade','exame_data','exame_turno','tem_conjuge','tem_dependentes'];
+  if(D.vale_transporte==='sim')req.push('vt_linha');
+  if(INFO.pede_uniforme)req.push('tamanho_calcado','tamanho_roupa');
+  if(D.tem_conjuge==='sim')req.push('conjuge_naturalidade','conjuge_nascimento');
+  req.forEach(k=>{if(!String(D[k]||'').trim())f.push(k)});
+  if(D.tem_dependentes==='sim'){if(!D.dependentes.length)f.push('dependentes');
+    else if(D.dependentes.some(x=>!x.nome||!x.parentesco||!x.nascimento||!x.cpf))f.push('dados do dependente')}
+  docsVisiveis().forEach(d=>{if(d.obrig&&!enviadosDe(d.nome).length)f.push(d.nome)});
+  return f;
+}
+
+// ---------- telas ----------
+function render(){
+  if(INFO.modo==='acompanhamento'){renderAcomp();return}
+  const p=PASSO;
+  let h=`<div><div class="eyebrow">Bem-vindo(a) à equipe</div><h1>Dados para a sua admissão</h1>
+    <p class="muted" style="margin:6px 0 0">${esc(INFO.empresa||'')}${INFO.cargo?' · Cargo: <b>'+esc(INFO.cargo)+'</b>':''}${INFO.data_inicio?' · Início: '+esc(dBR(INFO.data_inicio)):''}${INFO.horario?' · '+esc(INFO.horario):''}</p></div>`;
+  if(INFO.status==='correcao'&&INFO.correcao)h+=`<div class="aviso"><b>O RH pediu uma correção:</b> ${esc(INFO.correcao)}</div>`;
+  h+=`<div class="barra" aria-hidden="true">${[1,2,3,4,5].map(n=>`<span class="${n<=p?'on':''}"></span>`).join('')}</div>
+    <div class="muted">Passo ${p} de 5 · <b style="color:var(--ink)">${NOMES[p]}</b></div><div class="card">`;
+  if(p===1)h+=passo1();if(p===2)h+=passo2();if(p===3)h+=passo3();if(p===4)h+=passo4();if(p===5)h+=passo5();
+  h+=`</div>`;
+  if(ERRO)h+=`<div class="erro" role="alert">${esc(ERRO)}</div>`;
+  h+=`<div class="nav">${p>1?'<button class="btn2" data-a="voltar">Voltar</button>':''}<button class="btn" data-a="avancar" ${OCUPADO?'disabled':''}>${p<5?'Continuar':'Enviar para o RH'}</button></div>
+    <p class="muted" style="text-align:center;margin:0">Suas respostas ficam salvas. Pode fechar e continuar depois por este mesmo link.</p>`;
+  $app.innerHTML=h;
+}
+const campo=(k,rot,obr,tipo='text',extra='')=>`<label class="f"><span>${esc(rot)}${obr?' <span class="obr">*</span>':''}</span><input data-k="${k}" type="${tipo}" value="${esc(D[k]||'')}" ${extra}></label>`;
+const sel=(k,rot,obr,ops)=>`<label class="f"><span>${esc(rot)}${obr?' <span class="obr">*</span>':''}</span><select data-k="${k}"><option value="">Selecione</option>${ops.map(o=>{const [v,t]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${D[k]===v?'selected':''}>${esc(t)}</option>`}).join('')}</select></label>`;
+const simnao=(k,rot)=>`<div class="f" style="display:grid;gap:6px"><span style="font-size:14px;font-weight:600">${esc(rot)} <span style="color:var(--bad)">*</span></span>
+  <div class="opc"><button type="button" data-set="${k}" data-v="sim" aria-pressed="${D[k]==='sim'}">Sim</button><button type="button" data-set="${k}" data-v="nao" aria-pressed="${D[k]==='nao'}">Não</button></div></div>`;
+
+function passo1(){return campo('nome','Nome completo',1,'text','autocomplete="name"')+campo('nome_social','Nome social, se houver',0)+campo('nome_mae','Nome da mãe',1)+campo('nome_pai','Nome do pai',1)
+  +campo('nascimento','Data de nascimento',1,'date')+sel('sexo','Sexo',1,[['F','Feminino'],['M','Masculino']])+campo('local_nascimento','Local de nascimento (cidade/UF)',1)
+  +sel('raca_cor','Raça/cor',1,['Branca','Preta','Parda','Amarela','Indígena','Não informado'])
+  +sel('estado_civil','Estado civil',1,['Solteiro(a)','Casado(a)','União estável','Divorciado(a)','Viúvo(a)'])
+  +sel('escolaridade','Escolaridade',1,['Fundamental incompleto','Fundamental completo','Médio incompleto','Médio completo','Técnico','Superior incompleto','Superior completo','Pós-graduação'])}
+function passo2(){
+  let h=campo('cpf','CPF',1,'text','inputmode="numeric" autocomplete="off"')+`<div class="g2">${campo('rg','RG',1)}${campo('rg_orgao','Órgão emissor',1)}</div>`+campo('rg_emissao','Data de emissão do RG',1,'date')
+   +campo('email','E-mail',1,'email','autocomplete="email"')+campo('telefone','Telefone de contato',1,'tel','autocomplete="tel"')
+   +campo('cep','CEP',1,'text','inputmode="numeric" placeholder="Preenche o endereço sozinho"')+campo('endereco','Endereço e número',1)+campo('complemento','Complemento',0)
+   +`<div class="g2">${campo('bairro','Bairro',1)}${campo('cidade','Cidade',1)}</div>`+simnao('vale_transporte','Vai precisar de vale-transporte?');
+  if(D.vale_transporte==='sim')h+=campo('vt_linha','Qual linha e valor por dia?',1,'text','placeholder="Ex.: Linha 6610, R$ 12,00/dia"');
+  if(INFO.pede_uniforme)h+=`<div class="g2">${campo('tamanho_calcado','Nº do calçado',1,'text','inputmode="numeric"')}${sel('tamanho_roupa','Tamanho da roupa',1,['PP','P','M','G','GG','XG'])}</div>`;
+  const antes=D.exame_data==='o quanto antes',escolher=D.exame_data&&!antes;
+  h+=`<div class="doc" style="gap:10px"><h2>Exame admissional</h2><span class="muted">Escolha a unidade mais perto de você e quando prefere ir. O RH confirma o agendamento.</span>
+    <span style="font-size:14px;font-weight:600">Unidade <span style="color:var(--bad)">*</span></span>
+    <div class="opc lista" style="display:grid">${(INFO.unidades||[]).map(u=>`<button type="button" data-set="exame_unidade" data-v="${esc(u.nome)}" aria-pressed="${D.exame_unidade===u.nome}"><span><b>${esc(u.nome)}</b></span><small>${esc(u.endereco||'')}</small></button>`).join('')}</div>
+    <span style="font-size:14px;font-weight:600">Quando? <span style="color:var(--bad)">*</span></span>
+    <div class="opc"><button type="button" data-set="exame_data" data-v="o quanto antes" aria-pressed="${antes}">O quanto antes</button><button type="button" data-a="escolherData" aria-pressed="${!!escolher}">Escolher data</button></div>
+    ${escolher?`<input type="date" data-k="exame_data" value="${esc(D.exame_data==='escolher'?'':D.exame_data)}" aria-label="Data sugerida para o exame">`:''}
+    <span style="font-size:14px;font-weight:600">Turno <span style="color:var(--bad)">*</span></span>
+    <div class="opc"><button type="button" data-set="exame_turno" data-v="manhã" aria-pressed="${D.exame_turno==='manhã'}">Manhã</button><button type="button" data-set="exame_turno" data-v="tarde" aria-pressed="${D.exame_turno==='tarde'}">Tarde</button></div></div>`;
+  return h;
+}
+function passo3(){
+  let h=simnao('tem_conjuge','Possui cônjuge?');
+  if(D.tem_conjuge==='sim')h+=`<div class="doc">${campo('conjuge_nome','Nome do cônjuge',0)}${campo('conjuge_naturalidade','Naturalidade do cônjuge',1)}${campo('conjuge_nascimento','Nascimento do cônjuge',1,'date')}</div>`;
+  h+=simnao('tem_dependentes','Possui dependentes (filhos, enteados…)?');
+  if(D.tem_dependentes==='sim'){
+    h+=D.dependentes.map((x,i)=>`<div class="doc"><div class="doc-top"><span>Dependente ${i+1}</span><button type="button" class="btn2" data-a="remDep" data-i="${i}">Remover</button></div>
+      <label class="f"><span>Nome <span class="obr">*</span></span><input data-dep="${i}" data-dk="nome" value="${esc(x.nome||'')}"></label>
+      <label class="f"><span>Parentesco <span class="obr">*</span></span><select data-dep="${i}" data-dk="parentesco"><option value="">Selecione</option>${['Filho(a)','Enteado(a)','Cônjuge','Pai/Mãe','Outro'].map(o=>`<option ${x.parentesco===o?'selected':''}>${o}</option>`).join('')}</select></label>
+      <div class="g2"><label class="f"><span>Nascimento <span class="obr">*</span></span><input type="date" data-dep="${i}" data-dk="nascimento" value="${esc(x.nascimento||'')}"></label>
+      <label class="f"><span>CPF <span class="obr">*</span></span><input inputmode="numeric" data-dep="${i}" data-dk="cpf" value="${esc(x.cpf||'')}"></label></div></div>`).join('');
+    h+=`<button type="button" class="btn2" data-a="addDep">+ Adicionar dependente</button>`;
+  }
+  return h;
+}
+function passo4(){
+  return `<p class="muted" style="margin:0">Tire uma foto legível (ou envie o PDF). A lista muda conforme o seu cargo e a sua família.</p>`+docsVisiveis().map(d=>{
+    const env=enviadosDe(d.nome),ok=env.length>0;
+    return `<div class="doc"><div class="doc-top"><span>${esc(d.nome)}</span><span class="tag ${ok?'ok':d.obrig?'obrig':'opc'}">${ok?'Enviado':d.cargo?'Obrigatório p/ o cargo':d.obrig?'Obrigatório':'Se houver'}</span></div>
+      ${env.map(a=>`<div class="arq">✓ ${esc(a.nome)}</div>`).join('')}
+      <label class="btn2" style="text-align:center">${ok?'Enviar outro arquivo':'Tirar foto ou escolher arquivo'}<input type="file" accept="image/*,application/pdf" data-up="${esc(d.nome)}" hidden></label></div>`}).join('');
+}
+function passo5(){
+  const f=faltasLocais();let h='';
+  if(f.length)h+=`<div class="erro"><b>Ainda falta:</b>${f.map(k=>`<div class="falta"><span>${esc(ROT[k]||k)}</span><button type="button" class="btn2" data-ir="${PASSO_DE(k)}">Corrigir</button></div>`).join('')}</div>`;
+  else h+=`<div class="okbox">Tudo preenchido. Confira e envie.</div>`;
+  const docs=docsVisiveis();
+  h+=`<div class="muted" style="line-height:1.6"><b style="color:var(--ink)">${esc(D.nome||'')}</b><br>CPF ${esc(D.cpf||'—')} · ${esc(D.cidade||'')}<br>
+    ${D.tem_conjuge==='sim'?'Com cônjuge':'Sem cônjuge'} · ${D.tem_dependentes==='sim'?D.dependentes.length+' dependente(s)':'sem dependentes'}<br>
+    ${docs.filter(d=>enviadosDe(d.nome).length).length} de ${docs.length} documentos enviados</div>
+    <label class="chk"><input type="checkbox" data-a="aceite" ${ACEITE?'checked':''}> Autorizo o uso dos meus dados e documentos pela ${esc(INFO.empresa||'empresa')} e pela Controlacs exclusivamente para a minha admissão e as obrigações trabalhistas (LGPD).</label>`;
+  return h;
+}
+function renderAcomp(){
+  const env=INFO.envios||[];
+  let h=`<div><div class="eyebrow">Sua admissão</div><h1>Olá${INFO.colaborador?', '+esc(String(INFO.colaborador).split(' ')[0]):''}!</h1>
+    <p class="muted" style="margin:6px 0 0">Seus dados já estão com o RH. Aqui aparecem os próximos passos.</p></div>`;
+  if(!env.length)h+=`<div class="card"><p class="muted" style="margin:0">Por enquanto não há nada para você fazer. Quando o RH enviar a guia do exame ou outro documento, ele aparece aqui e você recebe um aviso no WhatsApp.</p></div>`;
+  h+=env.map(e=>{const pend=e.retorno&&!e.retorno_enviado;
+    return `<div class="card"><div class="doc-top"><span>${esc(e.titulo)}</span><span class="tag ${e.retorno?(pend?'obrig':'ok'):'opc'}">${e.retorno?(pend?'Ação necessária':'Concluído'):'Aviso'}</span></div>
+      ${e.instrucoes?`<p style="margin:0;font-size:15px;white-space:pre-line">${esc(e.instrucoes)}</p>`:''}
+      ${e.caminho?`<button type="button" class="btn2" data-baixar="${esc(e.caminho)}">Baixar ${esc(e.arquivo||'arquivo')}</button>`:''}
+      ${pend?`<label class="btn" style="text-align:center">Enviar ${esc(e.retorno)}<input type="file" accept="image/*,application/pdf" data-ret="${esc(e.retorno)}" hidden></label>`:''}
+      ${e.retorno&&!pend?`<div class="okbox">✓ ${esc(e.retorno)} enviado ao RH</div>`:''}</div>`}).join('');
+  if(ERRO)h+=`<div class="erro" role="alert">${esc(ERRO)}</div>`;
+  $app.innerHTML=h;
+}
+
+// ---------- ações ----------
+async function salvar(enviar){
+  const {data,error}=await sb.rpc('sol_admissao_salvar',{p_token:TOKEN,p_dados:D,p_enviar:!!enviar,p_consentimento:!!ACEITE});
+  if(error)throw error;return data;
+}
+async function comprimir(file){
+  if(!/^image\/(jpeg|png|webp)$/.test(file.type))return file;
+  try{const bmp=await createImageBitmap(file);const m=2000,esc=Math.min(1,m/Math.max(bmp.width,bmp.height));
+    const c=document.createElement('canvas');c.width=Math.round(bmp.width*esc);c.height=Math.round(bmp.height*esc);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    const b=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));return b&&b.size<file.size?new File([b],file.name.replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'}):file}catch(e){return file}
+}
+async function enviarArquivo(file,documento,pasta){
+  const f=await comprimir(file);const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+  if(!['pdf','jpg','jpeg','png','heic','heif','webp'].includes(ext))throw new Error('Envie foto (JPG, PNG, HEIC) ou PDF.');
+  const caminho='admissao/'+TOKEN+'/'+(pasta?pasta+'/':'')+crypto.randomUUID()+'.'+ext;
+  const up=await sb.storage.from('solicitacoes').upload(caminho,f,{contentType:f.type||undefined,upsert:false});
+  if(up.error)throw up.error;
+  const {error}=await sb.rpc('sol_admissao_anexar',{p_token:TOKEN,p_caminho:caminho,p_nome:file.name,p_documento:documento,p_mime:f.type||null,p_tamanho:f.size});
+  if(error)throw error;
+}
+async function recarregar(){const {data}=await sb.rpc('sol_admissao_abrir',{p_token:TOKEN});if(data&&data.ok){INFO=data;if(data.modo==='formulario'){const r=data.dados||{};D=Object.assign({},r,D)}}}
+
+$app.addEventListener('input',e=>{const t=e.target;
+  if(t.dataset.k){D[t.dataset.k]=t.value;if(t.dataset.k==='cep'){const n=t.value.replace(/\D/g,'');if(n.length===8)buscaCep(n)}}
+  if(t.dataset.dep!=null){D.dependentes[+t.dataset.dep][t.dataset.dk]=t.value}});
+$app.addEventListener('change',async e=>{const t=e.target;
+  if(t.dataset.dep!=null&&t.tagName==='SELECT'){D.dependentes[+t.dataset.dep][t.dataset.dk]=t.value;render();return}
+  if(t.dataset.a==='aceite'){ACEITE=t.checked;ERRO='';return}
+  if(t.dataset.k&&t.tagName==='SELECT'){D[t.dataset.k]=t.value;return}
+  const up=t.dataset.up||t.dataset.ret;if(up&&t.files&&t.files[0]){
+    const lab=t.closest('label');const orig=lab.firstChild.textContent;lab.firstChild.textContent='Enviando…';ERRO='';
+    try{await enviarArquivo(t.files[0],up,t.dataset.ret?'retorno':'');await recarregar()}catch(x){ERRO='Não foi possível enviar: '+(x.message||x)}
+    render();if(lab.isConnected)lab.firstChild.textContent=orig}});
+$app.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.set){D[b.dataset.set]=b.dataset.v;if(b.dataset.set==='tem_dependentes'&&b.dataset.v==='sim'&&!D.dependentes.length)D.dependentes.push({});ERRO='';render();return}
+  if(b.dataset.ir){PASSO=+b.dataset.ir;ERRO='';render();scrollTo(0,0);return}
+  if(b.dataset.baixar){const {data,error}=await sb.storage.from('solicitacoes').createSignedUrl(b.dataset.baixar,300);if(error){ERRO='Não foi possível baixar.';render();return}location.href=data.signedUrl;return}
+  const a=b.dataset.a;
+  if(a==='escolherData'){if(!D.exame_data||D.exame_data==='o quanto antes')D.exame_data='escolher';render();return}
+  if(a==='addDep'){D.dependentes.push({});render();return}
+  if(a==='remDep'){D.dependentes.splice(+b.dataset.i,1);render();return}
+  if(a==='voltar'){PASSO--;ERRO='';render();scrollTo(0,0);return}
+  if(a==='avancar'){
+    if(OCUPADO)return;OCUPADO=true;ERRO='';
+    try{
+      if(D.exame_data==='escolher')D.exame_data='';
+      if(PASSO<5){await salvar(false);PASSO++;}
+      else{
+        if(faltasLocais().length){ERRO='Complete os itens acima para enviar.'}
+        else if(!ACEITE){ERRO='Marque a autorização de uso dos dados para enviar.'}
+        else{const r=await salvar(true);
+          if(r&&r.ok){OCUPADO=false;$app.innerHTML=`<div class="card centro"><div class="okbox" style="font-size:28px;width:64px;height:64px;border-radius:50%;display:grid;place-items:center" aria-hidden="true">✓</div>
+            <h1>Tudo enviado${D.nome?', '+esc(D.nome.split(' ')[0]):''}!</h1><p class="muted">O RH já recebeu seus dados e documentos. Se faltar algo, avisamos você por WhatsApp e por este mesmo link.</p>
+            <button class="btn2" onclick="location.reload()">Ver próximos passos</button></div>`;return}
+          ERRO='Ainda falta: '+((r&&r.faltam)||[]).map(k=>ROT[k]||k).join(', ')}
+      }
+    }catch(x){ERRO='Não foi possível salvar: '+(x.message||x)}
+    OCUPADO=false;render();scrollTo(0,0);
+  }
+});
+async function buscaCep(n){
+  try{const r=await fetch('https://viacep.com.br/ws/'+n+'/json/');const j=await r.json();if(j.erro)return;
+    if(!D.endereco)D.endereco=(j.logradouro||'')+(j.logradouro?', ':'');D.bairro=j.bairro||D.bairro;D.cidade=(j.localidade||'')+(j.uf?'/'+j.uf:'');
+    const foco=document.activeElement&&document.activeElement.dataset.k;render();if(foco){const el=$app.querySelector(`[data-k="${foco}"]`);if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length)}}}catch(e){}
+}
+carregar();
+})();
+</script>
+</body>
+</html>

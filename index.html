@@ -676,6 +676,51 @@ body.apr-pres .shell{display:block!important;max-width:none!important;padding:16
 body.apr-pres #viewApr{font-size:15px}body.apr-pres .apr-h{font-size:26px}body.apr-pres .tile .v{font-size:30px}
 body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
 @media print{header.top,nav.side,#modrow,#viewApr .tabs,#viewApr .apr-top .row,#viewApr .toolbar,#viewApr button{display:none!important}.shell{display:block!important}#viewApr .card{break-inside:avoid;box-shadow:none;border:1px solid #ccc}#viewApr .apr-det[hidden]{display:table-row!important}}
+/* Solicitações + Admissão (Carol, 18/11) */
+.sol-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 10px}
+.sol-tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13px var(--body);padding:7px 12px;border-radius:8px;cursor:pointer}
+.sol-tab[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.sol-lista{display:grid;gap:8px}
+.sol-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;width:100%;text-align:left;padding:13px 16px;cursor:pointer;font:inherit;color:inherit}
+.sol-row:hover{border-color:var(--brand)}
+.sol-num{font-weight:700;color:var(--muted);min-width:40px}
+.sol-tit{flex:1 1 280px;min-width:0;display:grid;gap:2px}.sol-tit small{color:var(--muted)}
+.sol-prazo{font-size:13px;color:var(--muted)}
+.sol-pri-alta{color:var(--warn);font-weight:700;font-size:13px}.sol-pri-urgente{color:var(--bad);font-weight:700;font-size:13px}
+.sol-nova{font-size:11px;font-weight:700;color:#fff;background:var(--bad);border-radius:999px;padding:2px 8px}
+.sol-st-aberta{background:var(--brand-soft);color:var(--brand)}.sol-st-em_andamento{background:#E3ECF8;color:var(--deb)}
+.sol-st-aguardando_cliente{background:var(--warn-soft);color:var(--warn)}.sol-st-concluida{background:var(--ok-soft);color:var(--ok)}.sol-st-cancelada{background:var(--sunk);color:var(--muted)}
+.sol-vazio{padding:28px;text-align:center;color:var(--muted)}
+.sol-tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:14px}
+.sol-tipo{display:grid;gap:4px;text-align:left;padding:12px 14px;cursor:pointer;font:inherit;color:inherit}
+.sol-tipo small{color:var(--muted);font-size:12px}.sol-tipo[aria-pressed="true"]{border:2px solid var(--brand);background:var(--brand-soft)}
+.sol-form,.sol-cab,.sol-acoes,.sol-adm,.sol-lado>.card,.sol-chat{padding:16px;display:grid;gap:10px;margin-top:12px}
+.sol-form h2,.sol-cab h2,.sol-adm h2,.sol-chat h2,.sol-lado h2{font-size:16px;margin:0}
+.sol-g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.sol-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.sol-cab small{color:var(--muted)}
+.sol-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sol-inl{display:flex!important;align-items:center;gap:6px;margin-left:auto}
+.sol-etapas{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
+.sol-etapas li{display:grid;gap:4px;padding:8px;border-radius:8px;background:var(--sunk);color:var(--muted);font-size:12px;line-height:1.25}
+.sol-etapas li span{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:rgba(0,0,0,.06)}
+.sol-etapas li.feita{background:var(--ok-soft);color:var(--ok)}.sol-etapas li.atual{background:var(--brand);color:var(--brand-ink)}.sol-etapas li.atual span{background:rgba(255,255,255,.2)}
+.sol-dados{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px}
+.sol-link,.sol-env,.sol-modf{display:grid;gap:8px;padding:12px;border-radius:10px;background:var(--sunk)}
+.sol-link code{font-size:12px;overflow-wrap:anywhere;color:var(--brand)}
+.sol-cols{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.sol-chat{flex:999 1 420px;min-width:0}.sol-lado{flex:1 1 280px;min-width:0;display:grid}
+.sol-msgs{display:flex;flex-direction:column;gap:8px;max-height:460px;overflow:auto;padding:4px}
+.sol-msg{max-width:80%;padding:9px 12px;border-radius:10px;font-size:14px;white-space:pre-line}
+.sol-msg small{display:block;font-size:11px;opacity:.8;margin-bottom:2px}
+.sol-msg.eu{align-self:flex-end;background:var(--brand);color:var(--brand-ink)}
+.sol-msg.outro{align-self:flex-start;background:var(--surface);border:1px solid var(--line)}
+.sol-msg.int{align-self:flex-end;background:#FFF6D6;border:1px dashed #B88A00;color:#3D3000}
+.sol-msg.sis{align-self:center;background:transparent;color:var(--muted);font-size:12px;text-align:center}
+.sol-escrever{display:grid;gap:8px}.sol-escrever textarea{width:100%}
+.sol-chk{display:flex;align-items:center;gap:6px;font-size:13px}.sol-chk input{width:auto;min-height:0;margin:0}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.sol-anx{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.sol-anx span{display:grid;gap:1px;min-width:0}.sol-anx small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.sol-ev{display:grid;gap:1px;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}.sol-ev small{color:var(--muted);font-size:11px}
 </style>
 </head>
 <body>
@@ -1346,6 +1391,15 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     </div>
     <div class="kanban" id="tBoard"></div>
     <p class="note" id="tNote"></p>
+  </section>
+
+  <!-- SOLICITAÇÕES (Carol, 18/11): pedidos dos clientes, conversa, documentos e admissão -->
+  <section id="viewSol" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1>Solicitações</h1><p class="sub" id="solSub"></p></div>
+      <button class="btn primary" id="solNovaBtn" type="button">+ Nova solicitação</button>
+    </div>
+    <div id="solBody"></div>
   </section>
 
   <!-- EXPORTAÇÃO BOM CONTROLE (escritório) -->
@@ -2023,7 +2077,7 @@ const escR=()=>ehEsc()&&!rotCli();
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual','gfencerra','gfencrel'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
+const SEMPRE=['tarefas','solic','avisos','projetos','gfdash','agenda','manual','gfencerra','gfencrel'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcrm','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
@@ -2075,6 +2129,7 @@ const ICO={
   avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   projetos:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
   agenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15.5l2 2 4-4"/>',
+  solic:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   gfpagar:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 13v4M10 15l2 2 2-2"/>',
   gfrec:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 17v-4M10 15l2-2 2 2"/>',
@@ -2187,6 +2242,8 @@ const NAV=[
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
+  // pedidos dos clientes ao escritório, com conversa e admissão de colaboradores (Carol, 18/11)
+  {k:'solic',t:'Solicitações',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0||!!ME?.cliente_id},
   // planner diário de cada usuário; ninguém vê a agenda de outra pessoa (Carol, 04/11)
   {k:'agenda',t:'Agenda',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
@@ -2225,7 +2282,7 @@ const SECOES=['Dia a dia','Caixa e tesouraria','Bancos','Recebíveis','Mensagens
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
+const telaSemEmp=k=>k==='solic'||k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -2535,9 +2592,300 @@ const cliOuTodas=()=>escCli.value==='*'?TODAS:cliAtual();
 const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
 // a conta ou o lançamento aberto com "Todas as empresas" usa a empresa dele; ao fechar a janela, volta
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
+// ================= SOLICITAÇÕES + ADMISSÃO (Carol, 18/11) =================
+// Portal de pedidos dos clientes: conversa, documentos, histórico e admissão com link para o novo colaborador.
+// Banco: tabelas sol_* e funções sol_admissao_* (docs/solicitacoes/BANCO.md); especificação: docs/solicitacoes/INSTRUCOES.md
+const SOL={tela:'lista',filtro:'todas',sel:null,tipos:[],cargos:[],unidades:[],lista:[],novas:{},ch:null,det:null,novo:{tipo:null}};
+const SOL_ST={aberta:'Aberta',em_andamento:'Em andamento',aguardando_cliente:'Aguardando cliente',concluida:'Concluída',cancelada:'Cancelada'};
+const SOL_PRI={baixa:'Baixa',normal:'Normal',alta:'Alta',urgente:'Urgente'};
+const SOL_ETAPAS=['Solicitação recebida','Link enviado ao colaborador','Colaborador preenchendo','Conferência do RH','Exame admissional','Contrato e eSocial','Admissão concluída'];
+const SOL_EXP={'45+45':'45 + 45 dias','30+60':'30 + 60 dias','15+75':'15 + 75 dias','90':'90 dias','sem':'Sem experiência'};
+// modelos do "Enviar ao colaborador" (assinatura do contrato fica no sistema de ponto: aqui só o aviso)
+const SOL_MOD=[
+  {k:'guia',t:'Guia do exame admissional',arq:'gerar',ret:'Exame admissional (ASO)',txt:'Leve esta guia e um documento com foto à unidade da Corpori que você escolheu. Depois do exame, envie a foto do ASO por este link.'},
+  {k:'carta',t:'Carta de abertura de conta salário',arq:'anexar',ret:'Comprovante da conta salário',txt:'Leve esta carta ao banco com RG, CPF e comprovante de residência. Depois envie aqui o comprovante com agência e conta.'},
+  {k:'contrato',t:'Contrato enviado para assinatura',arq:'',ret:'',txt:'Seu contrato de experiência foi enviado para assinatura no aplicativo de ponto. Abra o app e assine o quanto antes.'}];
+const solDt=s=>s?new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',''):'';
+const solD=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):'—';
+const solCli=id=>CLIENTES.find(c=>c.id===id);
+const solFone=s=>{let n=String(s||'').replace(/\D/g,'');if(n.length>=10&&n.length<=11)n='55'+n;return n};
+const solLink=t=>location.origin+location.pathname.replace(/[^/]*$/,'')+'admissao.html?t='+t;
+function solVenc(ini,exp){if(!ini||!exp||exp==='sem')return '';const d0=dObj(ini),p=String(exp).split('+').map(Number);
+  const v=n=>{const d=new Date(d0);d.setDate(d.getDate()+n-1);return dBR(isoLocal(d))};
+  return p.length>1?`1º vencimento ${v(p[0])} · 2º vencimento ${v(p[0]+p[1])}`:`Fim da experiência ${v(p[0])}`}
+async function solBase(){
+  if(SOL.tipos.length)return;
+  const [t,c,u]=await Promise.all([sb.from('sol_tipos').select('*').eq('ativo',true).order('ordem'),sb.from('sol_cargos').select('*').eq('ativo',true).order('nome'),sb.from('sol_clinica_unidades').select('*').eq('ativo',true).order('ordem')]);
+  SOL.tipos=t.data||[];SOL.cargos=c.data||[];SOL.unidades=u.data||[];
+}
+const solTipo=id=>SOL.tipos.find(t=>t.id===id);
+const solEhAdm=t=>t&&/admiss/i.test(t.nome);
+async function solBadge(){if(!ME)return;try{
+  const {count}=await sb.from('sol_notificacoes').select('id',{count:'exact',head:true}).eq('user_id',ME.user_id).is('lida_em',null);
+  const n=count||0;if((NAVBADGE.solic||0)!==n){NAVBADGE.solic=n;renderNav()}}catch(e){}}
+function solSair(){if(SOL.ch){try{sb.removeChannel(SOL.ch)}catch(e){}SOL.ch=null}}
+async function renderSol(){
+  solSair();await solBase();
+  if(SOL.tela==='nova')return solNova();
+  if(SOL.tela==='det'&&SOL.sel)return solDet(SOL.sel);
+  return solLista();
+}
+// ---------- lista ----------
+async function solLista(){
+  SOL.tela='lista';const body=$('solBody');
+  const e=escCli.value;let q=sb.from('sol_solicitacoes').select('id,numero,titulo,status,prioridade,prazo,responsavel_nome,criado_por_nome,criado_em,atualizado_em,cliente_id,tipo_id').order('atualizado_em',{ascending:false}).limit(500);
+  if(e&&e!=='*'&&e!=='int'&&CLIENTES.some(c=>c.id===e))q=q.eq('cliente_id',e);
+  const [{data,error},nt]=await Promise.all([q,sb.from('sol_notificacoes').select('solicitacao_id').eq('user_id',ME.user_id).is('lida_em',null)]);
+  if(error){body.innerHTML=`<div class="alerta">Não foi possível carregar: ${esc(error.message)}</div>`;return}
+  SOL.lista=data||[];SOL.novas={};(nt.data||[]).forEach(n=>{if(n.solicitacao_id)SOL.novas[n.solicitacao_id]=1});
+  const esc_=ehEsc(),F=esc_?[['todas','Todas',null],['novas','Novas',['aberta']],['and','Em andamento',['em_andamento']],['aguard','Aguardando cliente',['aguardando_cliente']],['fim','Concluídas',['concluida','cancelada']]]
+    :[['todas','Todas',null],['voce','Precisam de você',['aguardando_cliente']],['and','Em andamento',['aberta','em_andamento']],['fim','Concluídas',['concluida','cancelada']]];
+  const f=F.find(x=>x[0]===SOL.filtro)||F[0],passa=(x,r)=>!x[2]||x[2].includes(r.status);
+  const rows=SOL.lista.filter(r=>passa(f,r));
+  $('solSub').textContent=esc_?'Pedidos de todos os clientes. Clique para abrir a conversa.':'Peça ao escritório o que precisar e acompanhe cada pedido por aqui.';
+  $('solNovaBtn').hidden=false;
+  body.innerHTML=`<div class="sol-tabs" role="group" aria-label="Filtrar">${F.map(x=>`<button type="button" class="sol-tab" data-solf="${x[0]}" aria-pressed="${x[0]===f[0]}">${x[1]} (${SOL.lista.filter(r=>passa(x,r)).length})</button>`).join('')}</div>
+   <div class="sol-lista">${rows.map(r=>{const t=solTipo(r.tipo_id),c=solCli(r.cliente_id);
+     return `<button type="button" class="sol-row card" data-solabre="${r.id}"><span class="sol-num">#${r.numero}</span>
+      <span class="sol-tit"><b>${esc(r.titulo)}</b><small>${esc_?esc(c?c.nome:'')+' · ':''}${esc(t?t.nome:'')} · ${r.responsavel_nome?'Responsável: '+esc(r.responsavel_nome):'Sem responsável'}</small></span>
+      ${r.prioridade==='alta'||r.prioridade==='urgente'?`<span class="sol-pri-${r.prioridade}">${SOL_PRI[r.prioridade]}</span>`:''}
+      <span class="sol-prazo">${r.prazo?'Prazo '+solDt(r.prazo).slice(0,5):''}</span>
+      <span class="chip sol-st-${r.status}">${SOL_ST[r.status]}</span>${SOL.novas[r.id]?'<span class="sol-nova">novidade</span>':''}</button>`}).join('')
+     ||'<div class="card sol-vazio">Nenhuma solicitação nesta situação.</div>'}</div>`;
+}
+// ---------- nova ----------
+function solNova(){
+  SOL.tela='nova';$('solNovaBtn').hidden=true;$('solSub').textContent='Escolha o serviço. O prazo e os documentos aparecem conforme o tipo.';
+  const n=SOL.novo,t=solTipo(n.tipo),adm=solEhAdm(t),cl=CLIENTES.filter(c=>c.ativo!==false),ca=cliAtual();
+  const cliSel=ehEsc()||cl.length>1?`<label class="f">Empresa<select id="solNCli">${cl.map(c=>`<option value="${c.id}" ${(n.cli||ca?.id)===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`:'';
+  $('solBody').innerHTML=`<div class="sol-tipos">${SOL.tipos.map(x=>`<button type="button" class="sol-tipo card" data-soltipo="${x.id}" aria-pressed="${x.id===n.tipo}">
+      <small>${esc({financeiro:'Financeiro',rh:'RH',fiscal:'Fiscal',outro:'Outro'}[x.categoria]||'')}</small><b>${esc(x.nome)}</b><small>${x.sla_horas?'Prazo: '+Math.ceil(x.sla_horas/24)+(x.sla_horas<=24?' dia útil':' dias úteis'):'Prazo combinado'}</small></button>`).join('')}</div>
+   ${t?`<div class="card sol-form">${cliSel}<h2>${esc(t.nome)}</h2>
+     ${adm?`<div class="sol-g3">
+       <label class="f">Nome do colaborador<input id="solNNome" placeholder="Ex.: Joana Lima"></label>
+       <label class="f">WhatsApp do colaborador<input id="solNWhats" type="tel" placeholder="(48) 99999-0000"></label>
+       <label class="f">Cargo<select id="solNCargo"><option value="">Selecione</option>${SOL.cargos.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></label>
+       <label class="f">Horário<input id="solNHor" placeholder="Ex.: 07h às 19h (12x36)"></label>
+       <label class="f">Data de início<input id="solNIni" type="date"></label>
+       <label class="f">Período de experiência<select id="solNExp"><option value="">Selecione</option>${Object.entries(SOL_EXP).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label></div>
+       <p class="note" id="solNVenc"></p>
+       <label class="f">Observação (opcional)<input id="solNObs" placeholder="Ex.: vaga da UTI, substitui a Maria"></label>
+       <p class="note">O RH envia um link para o colaborador preencher os dados e mandar os documentos pelo celular. Você acompanha cada etapa por aqui.</p>`
+     :`${(t.documentos||[]).length?`<div class="alerta">Documentos que vamos pedir: ${esc(t.documentos.join(', '))}. Anexe aqui ou depois, na conversa.</div>`:''}
+       <label class="f">Título<input id="solNTit" placeholder="Resumo do pedido"></label>
+       <label class="f">Detalhes<textarea id="solNDesc" rows="4" placeholder="Explique o que precisa"></textarea></label>
+       <label class="f">Anexos (opcional)<input id="solNArq" type="file" multiple></label>`}
+     <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn" data-solvolta="1">Cancelar</button><button type="button" class="btn primary" id="solNCriar">Abrir solicitação</button></div></div>`:''}`;
+}
+async function solCriar(){
+  const t=solTipo(SOL.novo.tipo);if(!t)return;const cli=$('solNCli')?.value||cliAtual()?.id||ME.cliente_id||CLIENTES[0]?.id;
+  if(!cli){toast('Escolha a empresa.');return}
+  let reg={cliente_id:cli,tipo_id:t.id};
+  if(solEhAdm(t)){const v=k=>($(k)?.value||'').trim();
+    const d={colaborador_nome:v('solNNome'),colaborador_whatsapp:v('solNWhats'),cargo_id:v('solNCargo'),horario:v('solNHor'),data_inicio:v('solNIni'),experiencia:v('solNExp')};
+    if(Object.values(d).some(x=>!x)){toast('Preencha os 6 campos da admissão.');return}
+    d.cargo_nome=SOL.cargos.find(c=>c.id===d.cargo_id)?.nome||'';
+    reg={...reg,titulo:'Admissão de '+d.colaborador_nome,descricao:v('solNObs')||null,dados:d};
+  }else{const tit=($('solNTit').value||'').trim()||t.nome;reg={...reg,titulo:tit,descricao:($('solNDesc').value||'').trim()||null}}
+  $('solNCriar').disabled=true;
+  const {data,error}=await sb.from('sol_solicitacoes').insert(reg).select('id,cliente_id').single();
+  if(error){$('solNCriar').disabled=false;alert('Não foi possível abrir: '+error.message);return}
+  const fs=$('solNArq')?.files;if(fs&&fs.length)for(const f of fs)await solUpload(data,f,'');
+  toast('Solicitação aberta. A equipe foi avisada.');SOL.novo={tipo:null};SOL.sel=data.id;SOL.tela='det';renderSol();
+}
+async function solUpload(s,f,documento,interno){
+  const caminho=`${s.cliente_id}/${s.id}/${crypto.randomUUID()}-${f.name.replace(/[^\w.\-]+/g,'_').slice(-80)}`;
+  const up=await sb.storage.from('solicitacoes').upload(caminho,f,{contentType:f.type||undefined});
+  if(up.error){alert('Falha no envio de '+f.name+': '+up.error.message);return false}
+  const {error}=await sb.from('sol_anexos').insert({solicitacao_id:s.id,caminho,nome:f.name,mime:f.type||null,tamanho:f.size,documento:documento||null,interno:!!interno});
+  if(error){alert(error.message);return false}return true;
+}
+// ---------- detalhe ----------
+async function solDet(id){
+  SOL.tela='det';SOL.sel=id;$('solNovaBtn').hidden=true;const body=$('solBody');
+  const [s,m,a,e,ad]=await Promise.all([sb.from('sol_solicitacoes').select('*').eq('id',id).maybeSingle(),
+    sb.from('sol_mensagens').select('*').eq('solicitacao_id',id).order('criado_em'),
+    sb.from('sol_anexos').select('*').eq('solicitacao_id',id).order('criado_em'),
+    sb.from('sol_eventos').select('*').eq('solicitacao_id',id).order('criado_em',{ascending:false}),
+    sb.from('sol_admissoes').select('*').eq('solicitacao_id',id).maybeSingle()]);
+  if(!s.data){body.innerHTML='<div class="alerta">Solicitação não encontrada ou sem acesso.</div>';return}
+  let env=[];if(ad.data){const r=await sb.from('sol_admissao_envios').select('*').eq('admissao_id',ad.data.id).order('criado_em');env=r.data||[]}
+  SOL.det={s:s.data,msgs:m.data||[],anx:a.data||[],ev:e.data||[],adm:ad.data,env};
+  // marca como lido
+  sb.from('sol_leituras').upsert({solicitacao_id:id,user_id:ME.user_id,lido_em:new Date().toISOString()}).then(()=>{});
+  sb.from('sol_notificacoes').update({lida_em:new Date().toISOString()}).eq('user_id',ME.user_id).eq('solicitacao_id',id).is('lida_em',null).then(()=>solBadge());
+  solDesenha();
+  SOL.ch=sb.channel('sol-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'sol_mensagens',filter:'solicitacao_id=eq.'+id},()=>{if(SOL.sel===id&&SOL.tela==='det'&&VIEW==='solic')solDet(id)}).subscribe();
+}
+function solDesenha(){
+  const {s,msgs,anx,ev,adm,env}=SOL.det,t=solTipo(s.tipo_id),c=solCli(s.cliente_id),eq=ehEsc(),fech=['concluida','cancelada'].includes(s.status);
+  const dd=s.dados||{},isAdm=solEhAdm(t);
+  const acoes=eq?[...(s.responsavel!==ME.user_id&&!fech?[['assumir','Assumir']]:[]),...(!fech?[s.status!=='em_andamento'&&['st:em_andamento','Em andamento'],s.status!=='aguardando_cliente'&&['st:aguardando_cliente','Pedir algo ao cliente'],['st:concluida','Concluir']].filter(Boolean):[['st:em_andamento','Reabrir']])]:[];
+  let h=`<div><button type="button" class="btn small" data-solvolta="1">← Voltar</button></div>
+  <div class="card sol-cab"><div><small>#${s.numero} · ${esc(t?t.nome:'')} · ${esc(c?c.nome:'')}</small><h2>${esc(s.titulo)}</h2>
+    <small>Aberta por ${esc(s.criado_por_nome||'—')} em ${solDt(s.criado_em)} · Prazo ${s.prazo?solDt(s.prazo):'—'} · Responsável: ${esc(s.responsavel_nome||'ainda não definido')}</small>
+    ${s.descricao?`<p style="margin:8px 0 0;white-space:pre-line">${esc(s.descricao)}</p>`:''}</div><span class="chip sol-st-${s.status}">${SOL_ST[s.status]}</span></div>`;
+  if(eq)h+=`<div class="card sol-acoes"><b>Ações da equipe:</b>${acoes.map(([k,l])=>`<button type="button" class="btn small" data-solacao="${k}">${l}</button>`).join('')}
+    <label class="f sol-inl">Prioridade<select id="solPri">${Object.entries(SOL_PRI).map(([v,l])=>`<option value="${v}" ${s.prioridade===v?'selected':''}>${l}</option>`).join('')}</select></label></div>`;
+  else if(s.status==='aberta'&&s.criado_por===ME.user_id)h+=`<div class="card sol-acoes">Ninguém começou a tratar este pedido ainda. <button type="button" class="btn small" data-solacao="cancelar">Cancelar solicitação</button></div>`;
+  if(isAdm)h+=solAdmPainel(s,dd,adm,env,eq);
+  h+=`<div class="sol-cols"><section class="card sol-chat" aria-label="Conversa"><h2>Conversa</h2><div class="sol-msgs">${msgs.map(m=>{
+      const sis=!m.autor&&!/novo colaborador/.test(m.autor_nome||''),meu=m.autor===ME.user_id,cls=sis?'sis':m.interno?'int':meu?'eu':'outro';
+      return `<div class="sol-msg ${cls}">${sis?'':`<small>${esc(m.autor_nome||'')}${m.interno?' · nota interna':''} · ${solDt(m.criado_em)}</small>`}<div>${esc(m.texto)}</div>${sis?`<small>${solDt(m.criado_em)}</small>`:''}</div>`}).join('')||'<p class="note">Nenhuma mensagem ainda.</p>'}</div>
+    ${fech?'<p class="note">Solicitação encerrada. Para algo novo, abra outra solicitação.</p>':`<div class="sol-escrever"><textarea id="solMsg" rows="3" placeholder="${eq?'Responder ao cliente…':'Escreva para o escritório…'}"></textarea>
+      <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">${eq?'<label class="sol-chk"><input type="checkbox" id="solInt"> Nota interna (o cliente não vê)</label>':'<span class="note">A equipe recebe um aviso na hora.</span>'}
+      <span class="row" style="gap:8px"><label class="btn small">Anexar arquivo<input type="file" id="solArq" multiple hidden></label><button type="button" class="btn primary" id="solEnviar">Enviar</button></span></div></div>`}</section>
+  <aside class="sol-lado"><section class="card"><h2>Arquivos</h2>${anx.map(x=>`<div class="sol-anx"><span><b>${esc(x.documento||x.nome)}</b><small>${esc(x.nome)} · ${esc(x.enviado_por_nome||'')} · ${solDt(x.criado_em)}${x.interno?' · interno':''}</small></span><button type="button" class="btn small" data-solbaixa="${esc(x.caminho)}">Baixar</button></div>`).join('')||'<p class="note">Nenhum arquivo.</p>'}</section>
+  <section class="card"><h2>Histórico</h2>${ev.map(x=>`<div class="sol-ev"><span>${esc(solEvTxt(x))}</span><small>${solDt(x.criado_em)}</small></div>`).join('')}</section></aside></div>`;
+  $('solBody').innerHTML=h;
+  const ms=$('solBody').querySelector('.sol-msgs');if(ms)ms.scrollTop=ms.scrollHeight;
+}
+function solEvTxt(x){const quem=x.autor_nome?x.autor_nome+': ':'';
+  return quem+({criada:'abriu a solicitação',status:'status '+(SOL_ST[x.de]||x.de||'')+' → '+(SOL_ST[x.para]||x.para),responsavel:'responsável '+(x.para||'removido'),prioridade:'prioridade '+(SOL_PRI[x.para]||x.para),
+    prazo:'prazo alterado',link_admissao:'link do colaborador: '+x.para,documento_colaborador:'enviou '+x.para,envio_colaborador:'enviou ao colaborador: '+x.para,aviso_colaborador:'aviso ao colaborador: '+x.para,etapa:'etapa: '+x.para}[x.tipo]||x.tipo+' '+(x.para||''))}
+function solAdmPainel(s,dd,adm,env,eq){
+  const et=adm?adm.etapa:1,venc=solVenc(dd.data_inicio,dd.experiencia),fone=solFone(adm?.colaborador_whatsapp||dd.colaborador_whatsapp);
+  let h=`<section class="card sol-adm"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Andamento da admissão · etapa ${et} de 7</h2>
+    ${eq&&adm&&et>=3&&et<7?`<button type="button" class="btn small" data-solacao="etapa:${et+1}">Avançar para: ${SOL_ETAPAS[et]}</button>`:''}</div>
+    <ol class="sol-etapas">${SOL_ETAPAS.map((n,i)=>`<li class="${i+1<et?'feita':i+1===et?'atual':''}"><span>${i+1<et?'✓':i+1}</span>${n}</li>`).join('')}</ol>
+    <div class="sol-dados"><span><b>Colaborador:</b> ${esc(adm?.colaborador_nome||dd.colaborador_nome||'—')} · ${esc(dd.colaborador_whatsapp||'')}</span><span><b>Cargo:</b> ${esc(adm?.cargo_nome||dd.cargo_nome||'—')}</span>
+    <span><b>Setor:</b> ${esc(adm?.setor||(eq?'a preencher':'definido pelo RH'))}</span><span><b>Horário:</b> ${esc(dd.horario||'—')}</span><span><b>Início:</b> ${solD(dd.data_inicio)}</span>
+    <span><b>Experiência:</b> ${esc(SOL_EXP[dd.experiencia]||'—')}${venc?' ('+venc+')':''}</span></div>`;
+  if(eq&&adm)h+=`<div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f">Setor<input id="solSetor" value="${esc(adm.setor||'')}" placeholder="Ex.: UTI"></label>
+    <label class="f">Salário<input id="solSal" value="${esc(adm.salario||'')}" placeholder="R$ 0,00"></label><button type="button" class="btn small" data-solacao="setor">Salvar</button>
+    <span class="note">Só a equipe vê o salário.</span></div>`;
+  if(eq){
+    if(!adm)h+=`<div class="row" style="gap:8px;align-items:center"><button type="button" class="btn primary" data-solacao="gerar">Gerar link para o colaborador</button><span class="note">Gera o link do formulário e já abre o WhatsApp de ${esc(dd.colaborador_nome||'colaborador')}.</span></div>`;
+    else{const link=solLink(adm.token);
+      h+=`<div class="sol-link"><div><b>Link do colaborador</b> · ${esc({pendente:'aguardando preenchimento',enviado:'formulário enviado',correcao:'correção pedida',aprovado:'admissão concluída'}[adm.status]||adm.status)} · vale até ${solDt(adm.expira_em).slice(0,5)}</div>
+        <code>${esc(link)}</code><div class="row" style="gap:6px;flex-wrap:wrap">
+        <button type="button" class="btn small" data-solcopia="${esc(link)}">Copiar link</button>
+        ${fone?`<a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${fone}?text=${encodeURIComponent(`Olá, ${(adm.colaborador_nome||dd.colaborador_nome||'').split(' ')[0]}! Bem-vindo(a) à ${solCli(s.cliente_id)?.nome||'equipe'}. Para a sua admissão, preencha seus dados e envie os documentos por este link: ${link}`)}">Enviar por WhatsApp</a>`:''}
+        <button type="button" class="btn small" data-solacao="relink">Gerar novo link</button>
+        ${adm.status==='enviado'?'<button type="button" class="btn small" data-solacao="correcao">Pedir correção</button>':''}
+        ${adm.status!=='pendente'?'<button type="button" class="btn small" data-solacao="ficha:pdf">Ficha (PDF)</button><button type="button" class="btn small" data-solacao="ficha:xls">Ficha (Excel)</button>':''}</div></div>`;
+      h+=`<div class="sol-env"><b>Enviar ao colaborador</b><div class="row" style="gap:6px;flex-wrap:wrap">${SOL_MOD.map(mo=>`<button type="button" class="btn small" data-solmod="${mo.k}">+ ${mo.t}</button>`).join('')}</div>
+        <div id="solModBox"></div>${env.map(x=>`<div class="sol-anx"><span><b>${esc(x.titulo)}</b><small>${x.retorno_documento?(x.retorno_anexo_id?'✓ '+esc(x.retorno_documento)+' recebido':'Aguardando: '+esc(x.retorno_documento)):'✓ aviso enviado'} · ${solDt(x.criado_em)}</small></span></div>`).join('')}</div>`;
+    }
+  }else if(adm&&env.length)h+=`<div class="sol-env"><b>Enviado ao colaborador</b>${env.map(x=>`<div class="sol-anx"><span><b>${esc(x.titulo)}</b><small>${x.retorno_documento?(x.retorno_anexo_id?'✓ '+esc(x.retorno_documento)+' recebido':'Aguardando: '+esc(x.retorno_documento)):'aviso'}</small></span></div>`).join('')}</div>`;
+  return h+'</section>';
+}
+function solModForm(k){
+  const mo=SOL_MOD.find(x=>x.k===k),box=$('solModBox');if(!mo||!box)return;
+  box.innerHTML=`<div class="sol-modf" data-mod="${k}"><b>${esc(mo.t)}</b>
+    ${mo.arq==='gerar'?'<p class="note">A guia da Corpori sai preenchida com os dados do formulário (nome, CPF, nascimento, sexo, cargo, setor, empresa, unidade, data e turno escolhidos pelo colaborador).</p>':''}
+    ${mo.arq==='anexar'?'<label class="f">Arquivo (PDF)<input type="file" id="solModArq" accept="application/pdf,image/*"></label>':''}
+    <label class="f">Mensagem para o colaborador<textarea id="solModTxt" rows="3">${esc(mo.txt)}</textarea></label>
+    ${mo.ret?`<p class="note">O colaborador deverá devolver: <b>${esc(mo.ret)}</b></p>`:''}
+    <div class="row" style="gap:6px;justify-content:flex-end">${mo.arq==='gerar'?'<button type="button" class="btn small" data-solacao="guia:ver">Ver a guia</button>':''}
+    <button type="button" class="btn small" data-solacao="mod:fechar">Cancelar</button><button type="button" class="btn primary small" data-solacao="mod:enviar">Enviar pelo link</button></div></div>`;
+}
+// guia da Corpori preenchida (modelos/guia_corpori.pdf; campos em docs/solicitacoes/INSTRUCOES.md, seção 5)
+async function solGuia(){
+  const {s,adm}=SOL.det,d=adm.dados||{},dd=s.dados||{},c=solCli(s.cliente_id)||{},cg=SOL.cargos.find(x=>x.id===adm.cargo_id)||{};
+  if(!window.PDFLib)await new Promise((ok,ko)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';sc.onload=ok;sc.onerror=()=>ko(new Error('não carregou o gerador de PDF (verifique a internet)'));document.head.appendChild(sc)});
+  const rp=await fetch('modelos/guia_corpori.pdf');if(!rp.ok)throw new Error('modelo da guia não encontrado (modelos/guia_corpori.pdf)');const bytes=await rp.arrayBuffer();
+  const pdf=await PDFLib.PDFDocument.load(bytes),f=pdf.getForm();
+  const tx=(k,v)=>{try{f.getTextField(k).setText(String(v||''))}catch(e){}},ck=k=>{try{f.getCheckBox(k).check()}catch(e){}};
+  tx('razao_social',(c.ficha&&(c.ficha.razao_social||c.ficha.razao))||c.nome);tx('cnpj',c.cnpj);tx('nome_funcionario',d.nome||adm.colaborador_nome);tx('cpf',d.cpf);
+  tx('setor',adm.setor);tx('cargo',adm.cargo_nome);tx('data_nascimento',solD(d.nascimento));tx('data_admissao',solD(dd.data_inicio));
+  if(d.sexo==='M')ck('sexo_m');if(d.sexo==='F')ck('sexo_f');ck('exame_01');
+  const APT={'Postos de Combustíveis':'aptidao_01','Trabalho em Altura':'aptidao_02','Manipulação de Alimentos':'aptidao_03','Espaço Confinado':'aptidao_04','Serviços de Eletricidade':'aptidao_05'};
+  (cg.aptidoes||[]).forEach(a=>APT[a]&&ck(APT[a]));
+  const un=SOL.unidades.find(u=>u.nome===d.exame_unidade);if(un&&un.campo_pdf)ck(un.campo_pdf);
+  tx('agendamento_data',/^o quanto/i.test(d.exame_data||'')?'O quanto antes':solD(d.exame_data));tx('agendamento_hora',d.exame_turno?d.exame_turno[0].toUpperCase()+d.exame_turno.slice(1):'');
+  return new Blob([await pdf.save()],{type:'application/pdf'});
+}
+// ficha de admissão para a contabilidade (modelo próprio): PDF pela impressão do navegador ou Excel
+function solFichaDados(){
+  const {s,adm}=SOL.det,d=adm.dados||{},dd=s.dados||{},c=solCli(s.cliente_id)||{};
+  return [['Empresa',[['Empresa',c.nome],['CNPJ',c.cnpj],['Solicitado por',s.criado_por_nome]]],
+   ['Admissão',[['Cargo',adm.cargo_nome],['Setor',adm.setor],['Salário',adm.salario],['Horário',dd.horario],['Data de início',solD(dd.data_inicio)],['Experiência',(SOL_EXP[dd.experiencia]||'')+(solVenc(dd.data_inicio,dd.experiencia)?' — '+solVenc(dd.data_inicio,dd.experiencia):'')],
+     ['Vale-transporte',d.vale_transporte==='sim'?'Sim — '+(d.vt_linha||''):'Não'],['Uniforme',d.tamanho_calcado?'Calçado '+d.tamanho_calcado+' · Roupa '+(d.tamanho_roupa||''):'']]],
+   ['Dados pessoais',[['Nome completo',d.nome],['Nome social',d.nome_social],['Nome da mãe',d.nome_mae],['Nome do pai',d.nome_pai],['Nascimento',solD(d.nascimento)],['Sexo',{F:'Feminino',M:'Masculino'}[d.sexo]],['Local de nascimento',d.local_nascimento],['Raça/cor',d.raca_cor],['Estado civil',d.estado_civil],['Escolaridade',d.escolaridade]]],
+   ['Documentos',[['CPF',d.cpf],['RG',d.rg],['Órgão emissor',d.rg_orgao],['Emissão do RG',solD(d.rg_emissao)]]],
+   ['Endereço e contato',[['Endereço',d.endereco],['Complemento',d.complemento],['Bairro',d.bairro],['Cidade',d.cidade],['CEP',d.cep],['Telefone',d.telefone],['E-mail',d.email]]],
+   ['Cônjuge',d.tem_conjuge==='sim'?[['Nome',d.conjuge_nome],['Naturalidade',d.conjuge_naturalidade],['Nascimento',solD(d.conjuge_nascimento)]]:[['Cônjuge','Não possui']]]];
+}
+function solFicha(tipo){
+  const {adm,anx}=SOL.det,d=adm.dados||{},sec=solFichaDados(),deps=d.tem_dependentes==='sim'?(d.dependentes||[]):[],nome=d.nome||adm.colaborador_nome||'colaborador';
+  const docs=anx.filter(x=>/^admissao\//.test(x.caminho)&&!/\/equipe\//.test(x.caminho)).map(x=>x.documento||x.nome);
+  if(tipo==='xls'){const rows=[['Ficha de admissão — '+nome],[]];sec.forEach(([t,ps])=>{rows.push([t]);ps.forEach(([r,v])=>rows.push([r,v||'']));rows.push([])});
+    rows.push(['Dependentes']);rows.push(['Nome','Parentesco','Nascimento','CPF']);deps.forEach(x=>rows.push([x.nome,x.parentesco,solD(x.nascimento),x.cpf]));rows.push([]);
+    rows.push(['Documentos anexados']);docs.forEach(x=>rows.push(['✓ '+x]));rows.push([]);rows.push(['Aceite LGPD em '+solDt(adm.consentimento_em)]);
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:28},{wch:44},{wch:16},{wch:20}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Ficha de admissão');
+    XLSX.writeFile(wb,'Ficha de admissão - '+nome+'.xlsx');return}
+  const w=window.open('','_blank');if(!w){alert('Libere as janelas pop-up para gerar a ficha.');return}
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Ficha de admissão — ${esc(nome)}</title><style>
+    body{font:12px Arial,sans-serif;color:#13232B;margin:18px}h1{background:#013B3C;color:#fff;margin:0 0 10px;padding:12px 14px;font-size:18px}
+    h2{font-size:13px;color:#025556;margin:12px 0 4px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #DCE4E1;padding:4px 6px;vertical-align:top;text-align:left}
+    td small{display:block;color:#5B6B70;font-size:9px}td b{font-size:11px}.p{color:#5B6B70;font-size:10px;margin-top:12px}</style></head><body>
+    <h1>Ficha de admissão · ${esc(nome)}</h1>${sec.map(([t,ps])=>{let r='';for(let i=0;i<ps.length;i+=3)r+='<tr>'+ps.slice(i,i+3).map(([l,v])=>`<td><small>${esc(l)}</small><b>${esc(v||'—')}</b></td>`).join('')+'</tr>';return `<h2>${esc(t)}</h2><table>${r}</table>`}).join('')}
+    <h2>Dependentes</h2><table><tr><th>Nome</th><th>Parentesco</th><th>Nascimento</th><th>CPF</th></tr>${deps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.parentesco)}</td><td>${solD(x.nascimento)}</td><td>${esc(x.cpf)}</td></tr>`).join('')||'<tr><td colspan="4">Sem dependentes</td></tr>'}</table>
+    <h2>Documentos anexados</h2><table>${docs.map(x=>`<tr><td>✓ ${esc(x)}</td></tr>`).join('')||'<tr><td>—</td></tr>'}</table>
+    <p class="p">Dados informados pelo colaborador pelo link de admissão, com aceite LGPD em ${solDt(adm.consentimento_em)}. Gerada pelo Portal Controlacs em ${dBR(TODAY)}.</p>
+    <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+}
+async function solAcao(k){
+  const {s,adm}=SOL.det,id=s.id,re=()=>solDet(id);let r;
+  if(k==='assumir')r=await sb.from('sol_solicitacoes').update({responsavel:ME.user_id}).eq('id',id);
+  else if(k.startsWith('st:'))r=await sb.from('sol_solicitacoes').update({status:k.slice(3),...(s.responsavel?{}:{responsavel:ME.user_id})}).eq('id',id);
+  else if(k==='cancelar'){if(!confirm('Cancelar esta solicitação?'))return;r=await sb.from('sol_solicitacoes').update({status:'cancelada'}).eq('id',id)}
+  else if(k.startsWith('etapa:'))r=await sb.rpc('sol_admissao_etapa',{p_solicitacao:id,p_etapa:+k.slice(6)});
+  else if(k==='setor')r=await sb.from('sol_admissoes').update({setor:$('solSetor').value.trim()||null,salario:$('solSal').value.trim()||null}).eq('id',adm.id);
+  else if(k==='gerar'||k==='relink'){if(k==='relink'&&!confirm('Gerar um novo link? O link antigo para de funcionar.'))return;
+    r=await sb.rpc('sol_admissao_gerar_link',{p_solicitacao:id});
+    if(!r.error&&k==='gerar'){const dd=s.dados||{},fone=solFone(dd.colaborador_whatsapp),link=solLink(r.data);
+      if(fone)window.open(`https://wa.me/${fone}?text=${encodeURIComponent(`Olá, ${(dd.colaborador_nome||'').split(' ')[0]}! Bem-vindo(a) à ${solCli(s.cliente_id)?.nome||'equipe'}. Para a sua admissão, preencha seus dados e envie os documentos por este link: ${link}`)}`,'_blank')}}
+  else if(k==='correcao'){const m=prompt('O que o colaborador precisa corrigir? (ele verá este recado)');if(!m)return;r=await sb.rpc('sol_admissao_pedir_correcao',{p_solicitacao:id,p_msg:m})}
+  else if(k.startsWith('ficha:')){solFicha(k.slice(6));return}
+  else if(k==='mod:fechar'){$('solModBox').innerHTML='';return}
+  else if(k==='guia:ver'){try{const b=await solGuia();window.open(URL.createObjectURL(b),'_blank')}catch(e){alert('Não foi possível gerar a guia: '+(e.message||e))}return}
+  else if(k==='mod:enviar'){const box=$('solModBox').querySelector('[data-mod]'),mo=SOL_MOD.find(x=>x.k===box.dataset.mod),txt=$('solModTxt').value.trim();
+    let blob=null,nome='';
+    try{if(mo.arq==='gerar'){blob=await solGuia();nome='Guia de exame - '+((adm.dados||{}).nome||adm.colaborador_nome||'colaborador')+'.pdf'}
+      else if(mo.arq==='anexar'){const f=$('solModArq').files[0];if(!f){toast('Escolha o arquivo.');return}blob=f;nome=f.name}}catch(e){alert('Não foi possível gerar a guia: '+(e.message||e));return}
+    if(blob){const caminho=`admissao/${adm.token}/equipe/${crypto.randomUUID()}.${/\.(\w+)$/.exec(nome)?.[1]||'pdf'}`;
+      const up=await sb.storage.from('solicitacoes').upload(caminho,blob,{contentType:blob.type||'application/pdf'});if(up.error){alert(up.error.message);return}
+      r=await sb.rpc('sol_admissao_enviar_doc',{p_solicitacao:id,p_titulo:mo.t,p_caminho:caminho,p_nome:nome,p_instrucoes:txt,p_retorno:mo.ret||null})}
+    else r=await sb.rpc('sol_admissao_avisar',{p_solicitacao:id,p_titulo:mo.t,p_texto:txt});
+    if(!r.error){const fone=solFone(adm.colaborador_whatsapp||(s.dados||{}).colaborador_whatsapp);
+      if(fone)window.open(`https://wa.me/${fone}?text=${encodeURIComponent(`Olá! O RH enviou para você: ${mo.t}. Veja no seu link de admissão: ${solLink(adm.token)}`)}`,'_blank');
+      if(mo.k==='guia'){const un=SOL.unidades.find(u=>u.nome===(adm.dados||{}).exame_unidade);if(un)toast('Guia enviada. Lembre de mandar também para a unidade '+un.nome+' (WhatsApp '+un.whatsapp+').')}}}
+  if(r&&r.error){alert('Não foi possível: '+r.error.message);return}
+  if(!k.startsWith('mod:'))toast('Feito.');re();
+}
+async function solEnviar(){
+  const t=$('solMsg').value.trim(),fs=$('solArq').files,int=$('solInt')?.checked;if(!t&&!fs.length)return;
+  $('solEnviar').disabled=true;const s=SOL.det.s;
+  for(const f of fs)await solUpload(s,f,'',int);
+  if(t){const {error}=await sb.from('sol_mensagens').insert({solicitacao_id:s.id,texto:t,interno:!!int});if(error){alert(error.message);$('solEnviar').disabled=false;return}}
+  else if(fs.length)await sb.from('sol_mensagens').insert({solicitacao_id:s.id,texto:'Enviei '+fs.length+' arquivo(s).',interno:!!int});
+  solDet(s.id);
+}
+$('viewSol').addEventListener('click',async e=>{const b=e.target.closest('button,[data-solcopia]');if(!b)return;
+  if(b.id==='solNovaBtn'){SOL.novo={tipo:null};solNova();return}
+  if(b.dataset.solf){SOL.filtro=b.dataset.solf;solLista();return}
+  if(b.dataset.solabre){SOL.sel=b.dataset.solabre;solDet(SOL.sel);return}
+  if(b.dataset.solvolta){solSair();SOL.sel=null;solLista();return}
+  if(b.dataset.soltipo){const cli=$('solNCli')?.value;SOL.novo={tipo:b.dataset.soltipo,cli};solNova();return}
+  if(b.id==='solNCriar'){solCriar();return}
+  if(b.id==='solEnviar'){solEnviar();return}
+  if(b.dataset.solacao){b.disabled=true;try{await solAcao(b.dataset.solacao)}finally{if(b.isConnected)b.disabled=false}return}
+  if(b.dataset.solmod){solModForm(b.dataset.solmod);return}
+  if(b.dataset.solcopia){try{await navigator.clipboard.writeText(b.dataset.solcopia);toast('Link copiado.')}catch(x){prompt('Copie o link:',b.dataset.solcopia)}return}
+  if(b.dataset.solbaixa){const {data,error}=await sb.storage.from('solicitacoes').createSignedUrl(b.dataset.solbaixa,300);if(error){alert(error.message);return}window.open(data.signedUrl,'_blank');return}
+});
+$('viewSol').addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='solPri'){const {error}=await sb.from('sol_solicitacoes').update({prioridade:t.value}).eq('id',SOL.sel);if(error)alert(error.message);else solDet(SOL.sel);return}
+  if(t.id==='solNIni'||t.id==='solNExp'){const v=solVenc($('solNIni').value,$('solNExp').value);$('solNVenc').textContent=v}
+});
+// ================= fim SOLICITAÇÕES =================
+
 function openView(){
+  if(VIEW!=='solic')solSair();
   viewDaEmp();renderNav();
-  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewNR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewSol','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewNR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2558,6 +2906,7 @@ function openView(){
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;parcAbas();renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
+  else if(VIEW==='solic'){$('viewSol').hidden=false;renderSol()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='agenda'){$('viewAgenda').hidden=false;renderAgenda()}
@@ -2613,7 +2962,7 @@ async function boot(){
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
   show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);nvMostra();
-  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge();ctlBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge();ctlBadge();solBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 // Lembrar login (07/11): guarda só o e-mail neste aparelho; a senha fica no gerenciador de senhas do navegador/celular (nunca no portal)
 const LGK='ctl_login_lembrar';
