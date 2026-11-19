@@ -8944,7 +8944,8 @@ function abrirGF(r){
       +sel('grupo','Grupo (clientes)',['',...GFGRUPOS],'')
       +inp('telefone','Telefone')+inp('email','E-mail')
       +`<label class="f">CEP<input id="gf_cep" value="${v('cep')}" inputmode="numeric" placeholder="00000-000"></label>`+inp('endereco','Endereço','rua, avenida','wide')+inp('numero','Número')+inp('complemento','Complemento')+inp('bairro','Bairro')+inp('cidade','Cidade')+inp('uf','UF')
-      +sel('pix_tipo','Tipo da chave Pix',['',...PIXTIPOS],'')+inp('pix_chave','Chave Pix')+inp('banco','Banco')+inp('agencia','Agência')+inp('conta','Conta','com o dígito')+obs+ativo
+      +sel('pix_tipo','Tipo da chave Pix',['',...PIXTIPOS],'')+inp('pix_chave','Chave Pix')+inp('banco','Banco')+inp('agencia','Agência')+inp('conta','Conta','com o dígito')
+      +`<label class="wide" style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px" title="Nunca vai por Pix. Na remessa do Inter fica de fora para pagar à mão (o Inter manda transferência como Pix)"><input type="checkbox" id="gf_so_ted" style="width:auto"${r?.so_ted?' checked':''}> Só aceita TED (nunca Pix)</label>`+obs+ativo
       +(r?.fornecedor_bc?`<p class="note wide" style="margin:0">Veio da lista de fornecedores do Bom Controle. Na exportação para o BC continuam valendo o nome e o CNPJ de lá.</p>`:'');
   }
   $('gfFields').innerHTML=h;$('gfErr').hidden=true;
@@ -9002,6 +9003,7 @@ $('gfForm').addEventListener('submit',async e=>{e.preventDefault();
       ...(GFREC||GFR?.situacao_receita!=null||val('cep')||val('endereco')||val('uf')||GFR?.cep!=null?{cep:val('cep'),endereco:val('endereco'),numero:val('numero'),complemento:val('complemento'),bairro:val('bairro'),uf:(val('uf')||'').toUpperCase()||null,
         situacao_receita:GFREC?.sit??GFR?.situacao_receita??null,situacao_em:GFREC?.em??GFR?.situacao_em??null}:{}),
       pix_tipo:val('pix_tipo'),pix_chave:val('pix_chave'),banco:val('banco'),agencia:val('agencia'),conta:val('conta'),obs:val('obs'),ativo:$('gf_ativo').checked,
+      ...($('gf_so_ted')&&($('gf_so_ted').checked||GFR?.so_ted)?{so_ted:$('gf_so_ted').checked}:{}),   // só TED (Carol, 19/11; v163)
       cliente_id:null};   // todo cadastro vale para todas as empresas, inclusive as futuras (Carol, 05/11; v101)
     const d=gfDig(row.documento);
     if(d&&d.length!==11&&d.length!==14)return err('O CNPJ tem 14 números e o CPF tem 11.');
@@ -9063,7 +9065,7 @@ const pesOpts=(ls,ent)=>[...ls].sort((a,b)=>((a.papel===(ent?'fornecedor':'clien
 async function gfPessoasDe(cid,papel){
   const key=cid+'|'+papel;
   // todos os cadastros, com os do papel pedido (cliente ou fornecedor) primeiro
-  if(GFP.key!==key){const ls=await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo,papel,parceiro_id,banco,agencia,conta').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'));
+  if(GFP.key!==key){const ls=await todas(()=>sb.from('fin_pessoas').select('id,nome,fantasia,documento,fornecedor_bc,pix_chave,pix_tipo,papel,parceiro_id,banco,agencia,conta,so_ted').or(`cliente_id.eq.${cid},cliente_id.is.null`).eq('ativo',true).order('nome'));
     GFP={key,lista:ls.filter(p=>p.papel===papel||p.papel==='ambos').concat(ls.filter(p=>p.papel!==papel&&p.papel!=='ambos'))}}
   return GFP.lista;
 }
@@ -10814,6 +10816,7 @@ function favConta(t,p){const pa=p?.parceiro_id&&RM.parc?.[p.parceiro_id],o=pa&&p
     fdoc:soDig(pa?(pa.titular_doc||pa.cpf_cnpj||''):(p?.documento||'')),fnome:pa?.titular||t.pessoa_nome||p?.nome||'',poup:/poup/i.test(o.tipo_conta||'')}}
 // como cada conta a pagar vai no arquivo: boleto, conta de consumo/tributo, Pix ou TED.
 // Quem tem chave Pix e conta bancária pode ir por Pix (padrão) ou TED (escolha na lista: pref).
+const soTedDe=p=>!!(p?.so_ted||p?.parceiro_id&&RM.parc?.[p.parceiro_id]?.so_ted);
 function rmForma(t,pes,pref){
   const lin=soDig(t.linha_digitavel);
   if(lin){const b=boletoDe(lin);if(!b)return {erro:'linha digitável não confere'};
@@ -10822,6 +10825,8 @@ function rmForma(t,pes,pref){
   const ted=!fc?null:!fc.banco?{erro:`TED: banco "${fc.bancoTxt||'em branco'}" sem código no cadastro (use, por exemplo, "341 - Itaú")`}
     :!fc.conta||!fc.ag?{erro:'TED: agência ou conta do favorecido incompleta no cadastro'}
     :!(fc.fdoc.length===11||fc.fdoc.length===14)?{erro:'TED: falta o CPF/CNPJ do favorecido no cadastro'}:{forma:'ted',...fc};
+  // SÓ TED (Carol, 19/11; v163): marcado no cadastro do fornecedor ou do parceiro, nunca vai por Pix (ex.: Clínica Viva Simon)
+  if(soTedDe(pes))return ted?(ted.erro?ted:{...ted,soTed:true}):{erro:'Só TED (marcado no cadastro): falta banco, agência e conta no cadastro'};
   const chave=t.pix_chave||pes?.pix_chave;
   if(chave){const p=pixDe(chave,pes?.pix_chave===chave?pes?.pix_tipo:null),pix=p?{forma:'pix',...p}:{erro:'chave Pix inválida: '+chave};
     if(ted&&!ted.erro){if(!p)return ted;pix.alt=ted.alt=true;return pref==='ted'?ted:pix}
@@ -11158,9 +11163,11 @@ function rmDesenha(){
   const pes=GFP.lista,falta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
   const so=RM.so?.cli===cliAtual()?.id?RM.so:null;
   const ab=GT.lista.filter(t=>falta(t)>0.004&&(so?so.ids.has(t.id):!ate||t.vencimento<=ate)&&(!t.sem_remessa||RM.tirados));
-  const sant=bancoDe(GFC.lista.find(c=>c.id===RM.conta))==='santander';
+  const bk=bancoDe(GFC.lista.find(c=>c.id===RM.conta)),sant=bk==='santander';
   RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
     let f=rmForma(t,p,RM.pref?.[t.id]||RM.padrao);if(sant&&f.forma==='boleto'&&!soDig(rmDoc(p)))f={erro:'boleto sem CNPJ/CPF do fornecedor no cadastro (o Santander exige)'};
+    // o Inter faz a transferência para outro banco pelo Pix (agência e conta): quem só aceita TED fica fora do arquivo, para pagar à mão (Carol, 19/11)
+    if(bk==='inter'&&f.soTed)f={erro:'Só TED (marcado no cadastro): o Inter manda transferência como Pix. Pague esta por TED à mão ou pela remessa de outro banco'};
     return {t,p,f,ja,it,valor:falta(t)}});
   $('rmBody').innerHTML=RM.lista.map((x,i)=>{const ok=!x.f.erro&&!x.ja&&!x.t.sem_remessa;
     return `<tr><td><input type="checkbox" data-id="${i}" style="width:auto"${ok?' checked':' disabled'}></td><td class="${x.t.vencimento<TODAY?'neg':''}">${dBR(x.t.vencimento)}</td><td class="l"><b>${esc(x.t.pessoa_nome||'')}</b>${x.t.descricao?`<br>${mu(esc(x.t.descricao))}`:''}</td><td class="l">${x.f.erro?`<span class="neg">${esc(x.f.erro)}</span>`:(x.f.alt&&!x.ja?`<select data-fm="${i}" style="width:auto;padding:2px 6px" aria-label="Pagar por Pix ou TED"><option value="pix"${x.f.forma==='pix'?' selected':''}>Pix</option><option value="ted"${x.f.forma==='ted'?' selected':''}>TED</option></select>`:RMNOME[x.f.forma])+(x.f.forma==='pix'?`<br>${mu(esc(x.f.chave))}`:x.f.forma==='ted'?`<br>${mu(esc(tedTxt(x.f)))}`:x.f.forma==='boleto'?`<br>${mu((x.f.venc?'venc. '+dBR(x.f.venc)+' · ':'')+(x.f.nominal?fm(x.f.nominal):''))}`:'')}${!x.ja&&!x.t.sem_remessa&&x.f.forma!=='boleto'&&x.f.forma!=='consumo'?rmBolHtml(i):''}${x.ja?`<br><span class="chip ${RMSTATUS[x.it.status][0]}">${RMSTATUS[x.it.status][1]}</span>${ENV&&x.it.id?` <button type="button" class="btn small ghost" data-act="rm_libitem" data-i="${i}" title="O banco não pagou este pagamento (limite, saldo, recusa): libera só ele para outra remessa">Liberar</button>`:''}`:''}</td><td>${fm(x.valor)}${x.t.sem_remessa?`<br><span class="chip c-none">Tirado da remessa</span> <button type="button" class="btn small ghost" data-act="rm_tirar" data-i="${i}" data-volta="1" title="Volta a aparecer aqui para gerar remessa">Voltar para a remessa</button>`
@@ -14342,7 +14349,8 @@ async function abrirParceiro(p,modo){
       ${e?'<p class="note" style="margin:6px 0 0">“Copiar” leva o texto do desconto para colar no comprovante.</p>':''}</div>`;
     h+=`<div><h3 style="margin-bottom:6px">${p?'Dados do parceiro':'Dados'}</h3>${pCampos('pc',p,!editaCad,false)}
       ${p&&!editaCad?'<p class="note" style="margin:6px 0 0">Os dados já foram conferidos pelo escritório. Para trocar a conta, use “Informar alteração de conta”.</p>':''}
-      ${e&&p?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px"><input type="checkbox" id="pc_ativo" style="width:auto"${p.ativo?' checked':''}> Parceiro ativo</label>`:''}</div>`;
+      ${e&&p?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px"><input type="checkbox" id="pc_ativo" style="width:auto"${p.ativo?' checked':''}> Parceiro ativo</label>`:''}
+      ${e?`<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:600;font-size:14px" title="Nunca vai por Pix. Na remessa do Inter fica de fora para pagar à mão (o Inter manda transferência como Pix). Vale em todas as empresas."><input type="checkbox" id="pc_so_ted" style="width:auto"${p?.so_ted?' checked':''}> Só aceita TED (nunca Pix)</label>`:''}</div>`;
     if(hist.length)h+=`<div><h3 style="margin-bottom:6px">Histórico</h3>${hist.map(x=>`<p class="note" style="margin:0 0 4px">${dBR(String(x[0]).slice(0,10))} · ${esc(x[1])}</p>`).join('')}</div>`;
   }
   h+='<p class="err" id="rpErr" hidden></p>';
@@ -14400,6 +14408,7 @@ async function rpAcao(act,el){
       if(!('nome_global' in (p||PARC[0]||{nome_global:null})))delete o.nome_global;
       if((o.banco||o.agencia||o.conta)&&!temConta(o))return rpErr('Complete banco, agência e conta, ou deixe em branco e preencha depois.');
       if(o.pix_chave&&(!p||o.pix_chave!==p.pix_chave)&&!(await parcPixOk(o.pix_chave,p?[p.id]:[]))){el.disabled=false;return}
+      if(e&&$('pc_so_ted')&&($('pc_so_ted').checked||p?.so_ted))o.so_ted=$('pc_so_ted').checked;   // só TED (Carol, 19/11; v163)
       if(p){if(e&&$('pc_ativo'))o.ativo=$('pc_ativo').checked;o.atualizado_em=new Date().toISOString();
         const {error}=await sb.from('parceiros').update(o).eq('id',p.id);if(error){if(v120(error))return rpErr(v120Msg);throw error}return recarregar('Parceiro salvo')}
       o.cliente_id=$('pc_cliente').value;o.conferido=e;
@@ -16272,6 +16281,7 @@ const MANUAL=[
 <li><b>Tirar da remessa:</b> no Envio de remessa, cada lançamento tem o botão <b>Tirar da remessa</b> (embaixo do valor). Ele sai da lista e não vai em nenhum arquivo, mas a conta a pagar continua em aberto em Contas a pagar, para pagar de outro jeito. Para desfazer, marque <b>Mostrar os que foram tirados da remessa</b> e clique em <b>Voltar para a remessa</b>.</li>
 <li><b>Repasse no banco errado:</b> se mandou um repasse de parceiro para a remessa da empresa ou do banco errado, clique em <b>Voltar ao repasse</b> (embaixo do valor, na lista do Envio de remessa). A conta a pagar é excluída e o repasse volta para o Repasse de parceiros; lá, escolha a empresa certa em “Pagar em” e mande de novo para a remessa. Só funciona enquanto o pagamento não foi pago nem está numa remessa enviada (se estiver, cancele a remessa ou use Liberar antes).</li>
 <li><b>TED:</b> a conta a pagar sem boleto e sem chave Pix vai por TED, com o banco, a agência e a conta do cadastro do fornecedor (no repasse, a conta do parceiro, com o CPF/CNPJ do titular). Quem tem Pix e conta pode escolher Pix ou TED na coluna “Como paga”, ou todos de uma vez em “Quem tem Pix e conta, pagar por”. No cadastro, o banco precisa do número (ex.: 341 - Itaú) ou do nome de um banco conhecido. Na primeira TED de cada banco, faça um teste com valor pequeno.</li>
+<li><b>Só aceita TED:</b> fornecedor ou parceiro que não recebe por Pix (ex.: Clínica Viva Simon) tem a marca “Só aceita TED (nunca Pix)” no cadastro. Ele nunca vai por Pix. Na remessa do <b>Inter</b> ele fica de fora, com o aviso para pagar à mão por TED, porque o Inter manda as transferências para outros bancos como Pix (mesmo quando o arquivo pede TED). No Sicredi e no Santander vai por TED no arquivo.</li>
 <li><b>Sicredi:</b> o arquivo leva o dígito da agência (cooperativa), calculado pelo portal; se a agência for cadastrada com o dígito (ex.: 0737-4), vale o dígito cadastrado. Não edite o arquivo no Bloco de notas.</li>
 <li><b>Ver os pagamentos de uma remessa:</b> em <b>Remessas geradas</b>, clique em <b>Pagamentos</b> na linha da remessa. Abre a lista com cada pagamento e a situação. Se o banco não pagou um deles, clique em <b>Liberar</b> ao lado dele.</li>
 <li><b>Liberar um pagamento só:</b> se o banco não pagou um dos pagamentos da remessa (por exemplo, limite diário) e você não quer esperar o retorno, clique em <b>Liberar</b> ao lado dele na lista de contas do Envio de remessa. Só ele volta a ficar livre para outra remessa; os outros continuam aguardando o retorno. Confira antes no banco que ele não foi pago.</li>
@@ -17010,6 +17020,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-19so-ted',data:'2026-11-19',t:'Cadastro: “Só aceita TED (nunca Pix)”',itens:[
+    {x:'No cadastro do fornecedor (Gestão financeira › Cadastros) e do parceiro (Parceiros) há a marca “Só aceita TED (nunca Pix)”. Vale em todas as empresas.',mods:['gfremessa','gfrepasse','repasse'],para:'esc'},
+    {x:'No Envio de remessa, quem tem a marca nunca vai por Pix. Na remessa do Inter fica de fora, com o aviso para pagar à mão por TED, porque o Inter manda as transferências para outros bancos como Pix. Nos outros bancos vai por TED no arquivo. A Clínica Viva Simon (Fpolis e Kobrasol) já está marcada.',para:'esc'}]},
   {k:'2026-11-18nfse-email-lote',data:'2026-11-18',t:'Notas fiscais: enviar várias por e-mail de uma vez',itens:[
     {x:'Controlacs › Notas fiscais e Parceiros MP › Notas fiscais emitidas ganharam caixinhas para marcar as notas e o botão “✉ Enviar por e-mail”. Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF e o XML. Vale para todas as empresas que emitem pelo portal.',mods:['ctlnfse','gfnfrel'],para:'master'},
     {x:'Antes de enviar abre a conferência: o e-mail de cada tomador (vem do cadastro e dá para trocar ou digitar), o assunto e a mensagem com os dados de cada nota, cópia para a empresa e o PDF. As notas que já foram enviadas vêm desmarcadas e a lista mostra “✉ data” em quem já recebeu.',para:'master'},
