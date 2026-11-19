@@ -2,6 +2,12 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 10:30 · conta 1 (thread "Importar e gerar contratos de clientes") · branch `claude/project-thread-yylf97` (NÃO publicado, aguarda OK da Carol)**
+  - **Feito:** Gestão Controlacs › Clientes/Contratos/Documentos: **📄 Importar contrato** (lê PDF/Word e grava cliente, contrato, arquivo e modelo), **📝 Modelos de contrato** (modelo padrão melhorado + editor) e, dentro do contrato, **📝 Gerar contrato pelo modelo** (PDF + envio à Autentique). Detalhes em `docs/contratos/README.md`. Manual e Novidades atualizados.
+  - Mudanças pequenas em código existente: `ctMostra` tira a classe `ktLargo`; `ctAbreAss(c,pre)` aceita documento e signatários já escolhidos (sem `pre` funciona como antes, mas sugere o representante salvo do cliente); `fcSyncCtl` liga a empresa nova ao cliente criado pela importação (`FC.ligaCtl`) em vez de criar outro.
+  - **Banco:** v162 = tabela `ctl_modelos_contrato` (o MCP não deixou criar tabela; a Carol roda no SQL Editor). Próximo SQL livre: **v163**.
+  - **Testado:** no navegador com o Supabase simulado e o contrato real da Viva (leitura, gravar, desfazer, gerar PDF, abrir a Autentique). **Pendente:** Carol rodar a v162, conferir o modelo e dar OK para publicar; teste real com a Autentique.
+
 - **19/11/2026 09:00 · conta 2 · branch `feat/cadastrar-fornecedor-rotina`**
   - **Rotina diária, modo escritório:** em Boletos e notas a pagar, Cartão de crédito e Tesouraria, o campo do fornecedor ganhou o botão **+ Cadastrar** (o mesmo `data-pesnova`/`PESNOVA` da Gestão financeira). O cadastro usa a empresa do lançamento (`regCli()`).
   - **Leitura do documento anexado:** antes era só em Boletos e notas a pagar. Agora também vale no Cartão de crédito, na Tesouraria e nas saídas do fechamento de caixa.

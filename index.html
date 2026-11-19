@@ -599,6 +599,16 @@ input.bxsel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3
 .bxcodtag{justify-self:start;font-size:12px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:6px;padding:1px 7px}
 /* Gestão da Controlacs (v104) */
 #dlgCtl{width:min(820px,calc(100vw - 32px))}
+/* contratos: importar, modelos e gerar (Carol, 19/11) */
+#dlgCtl.ktLargo{width:min(1180px,calc(100vw - 32px))}
+.ktH{font-size:14px;margin:14px 0 4px}
+.ktEd{display:grid;grid-template-columns:1fr 250px;gap:10px}.ktEd textarea{width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.45}
+.ktCampos{max-height:560px;overflow:auto;font-size:12px}.ktCampos .btn{display:block;width:100%;text-align:left;margin-top:2px;padding:3px 6px}
+.ktDoc{background:#fff;color:#222;border:1px solid var(--line,#ddd);border-radius:8px;padding:28px 34px;max-height:520px;overflow:auto;font-size:13px;line-height:1.5;text-align:justify;margin-top:6px}
+.ktDoc p{margin:0 0 6px}.ktDoc .ktTit{text-align:center;font-size:15px;margin:0 0 12px}.ktDoc .ktSub,.ktDoc .ktCl{text-align:center;font-size:13px;margin:14px 0 6px}
+.ktDoc .ktAss{text-align:center;margin:26px 0 0}.ktFalta{background:#fde68a;color:#7c2d12}
+.ktGrp{border:1px solid var(--line,#ddd);border-radius:8px;padding:6px 10px;margin-top:6px}.ktGrp summary{cursor:pointer}
+@media (max-width:760px){.ktEd{grid-template-columns:1fr}.ktCampos{max-height:200px}.ktDoc{padding:16px}}
 .ctsv{display:flex;gap:10px;align-items:center}.ctsv label{display:flex;gap:8px;align-items:center;flex:1;margin:0;font-weight:500;cursor:pointer}.ctsv input[type=checkbox]{width:auto;flex:none}.ctsv .money{max-width:140px}
 /* filtro com caixinhas: escolher mais de uma opção (Carol, 12/11) */
 .msdd{position:relative;width:100%;min-width:160px;max-width:340px}
@@ -4597,6 +4607,8 @@ async function fcSyncCtl(emp,criar){try{
   const {data:cs}=await sb.from('ctl_clientes').select('id').eq('empresa_id',emp.id);
   if(cs?.length){await sb.from('ctl_clientes').update(row).eq('empresa_id',emp.id);return cs[0].id}
   if(!criar)return null;
+  // cliente criado ao importar o contrato (Carol, 19/11): liga à empresa nova em vez de criar outro
+  if(FC?.ligaCtl){const {error}=await sb.from('ctl_clientes').update({...row,empresa_id:emp.id}).eq('id',FC.ligaCtl);if(error)throw error;return FC.ligaCtl}
   const {data,error}=await sb.from('ctl_clientes').insert({...row,nome:emp.nome,empresa_id:emp.id,situacao:emp.ativo===false?'encerrado':'ativo'}).select('id').single();
   if(error)throw error;return data.id}catch(x){console.error(x);toast('A empresa foi salva, mas não consegui atualizar o cliente em Gestão Controlacs.');return null}}
 async function fcDesfaz(id){const c=CLIENTES.find(x=>x.id===id),ant=c?.ficha_ant;if(!ant){toast('Não há alteração para desfazer.');return}
@@ -14999,6 +15011,8 @@ async function ctCarrega(){
   // NFS-e (v131); sem a v131 o resto continua funcionando
   const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em,extra').order('criado_em',{ascending:false})]);
   CTL.nsOk=!ne.error&&!nn.error;CTL.nsEmit=ne.data||[];CTL.ns=nn.data||[];
+  // modelos de contrato (v162); sem a v162 vale só o modelo padrão (Carol, 19/11)
+  const md=await sb.from('ctl_modelos_contrato').select('*').is('excluido_em',null).order('nome');CTL.modOk=!md.error;CTL.mod=md.data||[];
   // CRM (v133); sem a v133 o resto continua funcionando
   await crmCarrega().catch(()=>{CRM.ok=false});
 }
@@ -15013,6 +15027,8 @@ function ctBadgeCalc(){
   const nc=crmBadgeN();if((NAVBADGE.ctlcrm||0)!==nc){NAVBADGE.ctlcrm=nc;if((NAVBADGE.ctlpainel||0)===n)renderNav()}
   if((NAVBADGE.ctlpainel||0)!==n){NAVBADGE.ctlpainel=n;renderNav()}
 }
+// importar contrato e modelos de contrato em Clientes e em Contratos (Carol, 19/11)
+const KTBAR='<button class="btn" data-ctnovo="ktimp" title="Lê um contrato em PDF ou Word e preenche o cliente e o contrato">📄 Importar contrato</button><button class="btn" data-ctnovo="ktmods">📝 Modelos de contrato</button>';
 const CTSITBOX={ctlnfse:{emitida:'Emitidas',cancelada:'Canceladas',rejeitada:'Recusadas (não viraram nota)'},ctlfin:{aberto:'Em aberto',atrasado:'Atrasados (todos os meses)',pago:'Pagos e recebidos'},ctlcli:CTSIT.ctlcli,ctlcont:CTSIT.ctlcont,ctlserv:{ativo:'Ativos',inativo:'Inativos'},ctldocs:CTDOC};
 async function renderCtl(){
   document.querySelectorAll('#tabsCtl button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===VIEW));
@@ -15021,7 +15037,7 @@ async function renderCtl(){
     if(VIEW==='ctlcli')$('ctSit').value='ativo';if(VIEW==='ctlcont')$('ctSit').value='vigente';if(VIEW==='ctlserv')$('ctSit').value='ativo'}
   $('ctMesBox').hidden=VIEW!=='ctlfin'&&VIEW!=='ctlnfse';$('ctTipoBox').hidden=VIEW!=='ctlfin';if(!$('ctMes').value)$('ctMes').value=TODAY.slice(0,7);
   $('ctBusca').placeholder={ctlnfse:'Buscar por número, tomador, CNPJ, descrição, valor ou data',ctlfin:'Buscar descrição, cliente ou categoria',ctlcli:'Buscar por nome, CNPJ/CPF ou contato',ctlcont:'Buscar por contrato ou cliente',ctlserv:'Buscar serviço',ctldocs:'Buscar documento ou cliente'}[VIEW]||'Buscar';
-  $('ctAcoes').innerHTML={ctlcrm:'<button class="btn primary" data-ctnovo="crmnova">+ Nova oportunidade</button>',ctlnfse:'<button class="btn" data-ctnovo="nfxml">Baixar XMLs</button><button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
+  $('ctAcoes').innerHTML={ctlcrm:'<button class="btn primary" data-ctnovo="crmnova">+ Nova oportunidade</button>',ctlnfse:'<button class="btn" data-ctnovo="nfxml">Baixar XMLs</button><button class="btn" data-ctnovo="nfcfg">Dados fiscais</button><button class="btn primary" data-ctnovo="nfemit">+ Emitir NFS-e</button>',ctlpainel:'',ctlcli:KTBAR+'<button class="btn primary" data-ctnovo="cli">+ Novo cliente</button>',ctlcont:KTBAR+'<button class="btn primary" data-ctnovo="cont">+ Novo contrato</button>',ctlserv:'<button class="btn primary" data-ctnovo="serv">+ Novo serviço</button>',ctldocs:'<button class="btn" data-ctnovo="ktimp">📄 Importar contrato</button><button class="btn primary" data-ctnovo="doc">+ Novo documento</button>',ctlfin:'<button class="btn" data-ctnovo="gerar" title="Cria a mensalidade do mês escolhido para cada contrato vigente com valor mensal. Não repete as que já existem.">Gerar mensalidades do mês</button><button class="btn" data-ctnovo="despesa">+ Despesa</button><button class="btn primary" data-ctnovo="receita">+ Receita</button>'}[VIEW]||'';
   $('ctConteudo').innerHTML='<p class="note">Carregando…</p>';
   try{await ctCarrega()}catch(e){console.error(e);$('ctConteudo').innerHTML=`<div class="alerta bad"><b>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Esta área precisa da atualização v104 do banco.':'Erro ao carregar.'}</b><span>${/ctl_|schema cache|does not exist/i.test(e.message||'')?'Rode o SQL “v104 - Gestao da Controlacs” no Supabase e atualize a página.':'Verifique a internet e tente de novo.'}</span></div>`;return}
   ctDesenha();ctBadgeCalc();
@@ -15115,6 +15131,7 @@ $('ctAcoes').addEventListener('click',e=>{const b=e.target.closest('[data-ctnovo
   if(t==='crmnova')return crmAbre(null);
   if(t==='nfxml')return nsAbreLote();if(t==='nfcfg')return nsAbreCfg();if(t==='nfemit')return nsAbreEmit();
   if(t==='gerar')return ctGera(b);if(t==='receita'||t==='despesa')return ctAbreLanc(null,t);
+  if(t==='ktimp')return ktImpAbre({});if(t==='ktmods')return ktModLista();
   if(t==='cli')(typeof fcAbre==='function'?fcAbre(null,{ctl:true}):ctAbreCli(null));else if(t==='cont')ctAbreCont(null);else if(t==='serv')ctAbreServ(null);else ctAbreDoc(null)});
 async function ctBaixa(id){const d=CTL.docs.find(x=>x.id===id);if(!d?.caminho)return;
   const {data,error}=await sb.storage.from('controlacs').createSignedUrl(d.caminho,3600);if(error)return fail(error,'Não foi possível abrir o arquivo');window.open(data.signedUrl,'_blank','noopener')}
@@ -15141,7 +15158,7 @@ const ctV=id=>{const el=$(id);return el?(el.value??'').trim():''};
 const ctNull=id=>ctV(id)||null;
 const ctBtn=(act,txt,cl)=>`<button type="button" class="btn ${cl||''}" data-ctact="${act}">${txt}</button>`;
 function ctMostra(tipo,obj,titulo,chip,corpo,foot){
-  CTL.dlg={tipo,obj};$('ctdTitle').textContent=titulo;$('ctdChip').innerHTML=chip||'';
+  CTL.dlg={tipo,obj};dlgCtl.classList.remove('ktLargo');$('ctdTitle').textContent=titulo;$('ctdChip').innerHTML=chip||'';
   $('ctdBody').innerHTML=corpo+'<p class="err" id="ctdErr" hidden></p>';
   $('ctdFoot').innerHTML=foot;if(!dlgCtl.open)dlgCtl.showModal();
 }
@@ -15164,7 +15181,7 @@ function ctAbreCli(c){
     <label class="f wide">Endereço<input id="ct_end" value="${esc(c?.endereco||'')}"${ro}></label>
     <label class="f wide">Anotações<textarea id="ct_obs" rows="3">${esc(c?.obs||'')}</textarea></label></div>
     ${c?`<div class="f wide" style="margin-top:14px"><span>Contratos</span>${cs.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th class="l">Contrato</th><th>Situação</th><th>Valor mensal</th><th>Próximo reajuste</th></tr></thead><tbody>${cs.map(x=>`<tr data-ctcont="${x.id}"><td class="l">${esc(x.titulo)}</td><td>${ctChip('ctlcont',x.situacao)}</td><td>${fm(x.valor_mensal)}</td><td>${ctReajChip(x)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum contrato.</p>'}
-      <div><button type="button" class="btn small" data-ctact="novocont">+ Novo contrato</button></div></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><button type="button" class="btn small" data-ctact="novocont">+ Novo contrato</button><button type="button" class="btn small" data-ctact="ktimp">📄 Importar contrato</button></div></div>
     <div class="f wide" style="margin-top:14px"><span>Documentos</span>${ctDocsLista(ds)}<div><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button></div></div>`:''}`,
     (c?ctBtn('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
   if(!c)$('ct_nome').focus();
@@ -15205,9 +15222,9 @@ function ctAbreCont(c,reaj,cliId){
       <p class="note" style="margin:0">Ao confirmar, o valor mensal passa a ser o valor novo e o próximo reajuste vai para ${'<span id="rj_prox"></span>'}.</p>
       <div class="row"><span class="spacer"></span><button type="button" class="btn primary small" data-ctact="aplicar">Confirmar reajuste</button></div></div>
     <div class="f wide" style="margin-top:14px"><span>Histórico de reajustes</span>${hist.length?`<div class="card tablebox" style="margin-top:6px"><table><thead><tr><th>Data</th><th>Índice</th><th>Percentual</th><th>De</th><th>Para</th><th class="l">Observação</th><th></th></tr></thead><tbody>${hist.map(r=>`<tr><td>${dBR(r.data)}</td><td>${esc(r.indice||'')}</td><td>${ctPct(r.percentual)}</td><td>${fm(r.valor_anterior)}</td><td>${fm(r.valor_novo)}</td><td class="l">${esc(r.obs||'')}</td><td><button type="button" class="btn ghost small" data-ctact="apagareaj" data-id="${r.id}" title="Apaga só o registro do histórico; o valor do contrato não muda">✕</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="note" style="margin:4px 0 0">Nenhum reajuste aplicado ainda.</p>'}</div>
-    <div class="f wide" style="margin-top:14px"><span>Documentos do contrato</span>${ctDocsLista(ds)}<div><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button></div></div>
+    <div class="f wide" style="margin-top:14px"><span>Documentos do contrato</span>${ctDocsLista(ds)}<div class="row" style="gap:6px;flex-wrap:wrap"><button type="button" class="btn small" data-ctact="novodoc">+ Anexar documento</button><button type="button" class="btn small" data-ctact="ktger">📝 Gerar contrato pelo modelo</button><button type="button" class="btn small" data-ctact="ktimp">📄 Ler um contrato e preencher</button></div></div>
     <div class="f wide" style="margin-top:14px"><span>Assinatura eletrônica (Autentique)</span>${ctAssLista(CTL.ass.filter(a=>a.contrato_id===c.id))}
-      <div class="row" style="gap:8px"><button type="button" class="btn small primary" data-ctact="assenvia">✍ Enviar para assinatura</button>${CTL.ass.some(a=>a.contrato_id===c.id&&a.status==='enviado')?'<button type="button" class="btn small" data-ctact="assatualiza">Atualizar situação</button>':''}</div></div>`:''}`,
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn small" data-ctact="ktger" title="Monta o contrato com os dados do cliente e envia">📝 Gerar pelo modelo e enviar</button><button type="button" class="btn small primary" data-ctact="assenvia">✍ Enviar para assinatura</button>${CTL.ass.some(a=>a.contrato_id===c.id&&a.status==='enviado')?'<button type="button" class="btn small" data-ctact="assatualiza">Atualizar situação</button>':''}</div></div>`:''}`,
     (c?ctBtn('excluir','Excluir','ghost')+ctBtn('reajuste','Aplicar reajuste','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
   if(c){ctRjProx();if(reaj)$('ct_reajBox').scrollIntoView({block:'nearest'})}else $('ct_titulo').focus();
 }
@@ -15232,7 +15249,7 @@ function ctAbreDoc(d,pre){
     <label class="f">Validade (opcional)<input type="date" id="ct_val" value="${d?.validade||''}"></label>
     <label class="f wide">${d?.caminho?`Arquivo atual: <a href="#" data-ctbaixa="${d.id}">📎 ${esc(d.nome_arquivo||'abrir')}</a> · trocar por outro`:'Arquivo (PDF, Word, Excel ou foto, até 20 MB)'}<input type="file" id="ct_file"></label>
     <label class="f wide">Observação<textarea id="ct_obs" rows="2">${esc(d?.obs||'')}</textarea></label></div>`,
-    (d?ctBtn('excluir','Excluir','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
+    (d?ctBtn('excluir','Excluir','ghost'):'')+(d?.caminho&&/\.(pdf|docx)$/i.test(d.nome_arquivo||d.caminho)?ctBtn('ktlerdoc','📄 Ler este contrato','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('salvar','Salvar','primary'));
   if(!d)$('ct_nome').focus();
 }
 const ctLSit=l=>l.pago_em?'pago':l.vencimento<TODAY?'atrasado':'aberto';
@@ -15869,16 +15886,16 @@ async function ctAssAtualiza(bt,silencioso){
   if(VIEW?.startsWith('ctl'))ctDesenha();
   if(dlgCtl.open&&CTL.dlg?.tipo==='cont'&&CTL.dlg.obj){const c=CTL.cont.find(x=>x.id===CTL.dlg.obj.id);if(c)ctAbreCont(c)}
 }
-function ctAbreAss(c){
+function ctAbreAss(c,pre){
   const pdfs=CTL.docs.filter(d=>d.caminho&&/\.pdf$/i.test(d.nome_arquivo||d.caminho)&&(d.contrato_id===c.id||d.cliente_id===c.cliente_id)&&!/\(assinado\)$/.test(d.nome));
   const cli=ctCli(c.cliente_id);
   ctMostra('ass',c,'Enviar para assinatura','<span class="chip c-done">Autentique</span>',
-    `<div id="ct_assTok"></div><p class="note" style="margin:0">A Autentique envia um e-mail para cada pessoa assinar. Quando todos assinarem, o PDF assinado, com a página de autenticação, fica guardado nos documentos do cliente. Plano gratuito: PDF de até 5 MB e o limite de documentos por mês da sua conta.</p>
-    <div class="fields"><label class="f wide">Contrato em PDF *<select id="as_doc">${pdfs.map(d=>`<option value="${d.id}">${esc(d.nome)} · ${esc(d.nome_arquivo||'')}</option>`).join('')}<option value="">Enviar outro PDF agora…</option></select></label>
+    `<div id="ct_assTok"></div>${pre?'<div class="alerta" style="margin:0 0 8px"><b>Contrato gerado pelo modelo e guardado nos documentos.</b><span>Confira quem assina e clique em Enviar para assinatura.</span><div><button type="button" class="btn small" data-ctact="ktdesfaz">↶ Desfazer (apagar o contrato gerado)</button></div></div>':''}<p class="note" style="margin:0">A Autentique envia um e-mail para cada pessoa assinar. Quando todos assinarem, o PDF assinado, com a página de autenticação, fica guardado nos documentos do cliente. Plano gratuito: PDF de até 5 MB e o limite de documentos por mês da sua conta.</p>
+    <div class="fields"><label class="f wide">Contrato em PDF *<select id="as_doc">${pdfs.map(d=>`<option value="${d.id}"${d.id===pre?.doc?' selected':''}>${esc(d.nome)} · ${esc(d.nome_arquivo||'')}</option>`).join('')}<option value="">Enviar outro PDF agora…</option></select></label>
     <label class="f wide" id="as_fileBox"${pdfs.length?' hidden':''}>Arquivo PDF<input type="file" id="as_file" accept="application/pdf"></label>
-    <label class="f wide">Nome do documento na Autentique<input id="as_nome" maxlength="180" value="${esc('Contrato '+c.titulo+(cli?' · '+cli.nome:''))}"></label>
+    <label class="f wide">Nome do documento na Autentique<input id="as_nome" maxlength="180" value="${esc(pre?.nome||'Contrato '+c.titulo+(cli?' · '+cli.nome:''))}"></label>
     <label class="f wide">Mensagem no e-mail (opcional)<textarea id="as_msg" rows="2" placeholder="Ex.: Segue o contrato de prestação de serviços para assinatura."></textarea></label>
-    <div class="f wide"><span>Quem assina</span><div id="as_sig" style="display:grid;gap:6px">${ctAssSigLinha(cli?.contato||'',cli?.email||'')}${ctAssSigLinha(ME.nome||'Controlacs',ME.email||'')}</div><div><button type="button" class="btn small" data-ctact="assmais">+ Pessoa</button></div></div></div>`,
+    <div class="f wide"><span>Quem assina</span><div id="as_sig" style="display:grid;gap:6px">${pre?.sig?pre.sig.map(([n,e])=>ctAssSigLinha(n||'',e||'')).join(''):ctAssSigLinha(cli?.extra?.representante?.nome||cli?.contato||'',cli?.extra?.representante?.email||cli?.email||'')+ctAssSigLinha(ME.nome||'Controlacs',ME.email||'')}</div><div><button type="button" class="btn small" data-ctact="assmais">+ Pessoa</button></div></div></div>`,
     ctBtn('voltacont','Voltar ao contrato','ghost')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('assmanda','Enviar para assinatura','primary'));
   ctAut({acao:'status'}).then(r=>{if(r&&!r.token&&$('ct_assTok'))$('ct_assTok').innerHTML=CTSEMTOKEN}).catch(()=>{});
 }
@@ -15921,6 +15938,7 @@ async function ctAcao(act,bt){
   const {tipo,obj}=CTL.dlg||{};
   if(act==='fechar')return dlgCtl.close();
   if(act.startsWith('ns'))return nsAcao(act,bt);
+  if(/^k[tg]/.test(act))return ktAcao(act,bt);
   if(act==='duplanc')return ctDupLanc(obj);
   if(act==='novocont')return ctAbreCont(null,false,obj.id);
   if(act==='ficha'&&obj?.empresa_id&&typeof fcAbre==='function'){dlgCtl.close();return fcAbre(obj.empresa_id)}
@@ -16001,6 +16019,688 @@ async function ctAcao(act,bt){
   if(!obj&&tipo==='cli')return ctAbreCli(ctCli(data.id)||data);
   if(!obj&&tipo==='cont')return ctAbreCont(CTL.cont.find(x=>x.id===data.id)||data);
   dlgCtl.close();
+}
+// ===== CONTRATOS: importar (ler o contrato), modelos e gerar o contrato preenchido para assinar (Carol, 19/11; v162) =====
+// Carol, 19/11: "no módulo Controlacs, Clientes, ter opção de importar o contrato e o sistema lê as informações, já deixa o modelo
+// pronto para quando tiver novos, já ser preenchido direto pelo sistema e depois encaminhado para assinatura via Autentique".
+// - Importar (PDF ou Word .docx): lê as partes, CNPJ, endereço, representante e CPF, serviços, valores, vencimento, reajuste,
+//   vigência e data; mostra tudo para conferir e grava: cliente (só o que estiver vazio), contrato, o arquivo nos documentos e,
+//   se quiser, o texto vira um modelo com {{campos}}. Tudo tem Desfazer.
+// - Modelos (tabela ctl_modelos_contrato, v162): texto com {{campos}} e blocos {{#rh}}...{{/rh}} que só entram quando o
+//   contrato tem aquele serviço. Numeração das cláusulas e dos itens é automática (## cláusula, + item, ++ subitem).
+//   Há um modelo padrão já melhorado no código (sem dado pessoal); os da Carol ficam no banco.
+// - Gerar: preenche o modelo com a ficha da empresa, o cliente e o contrato, mostra a prévia, gera o PDF (pdf-lib), guarda nos
+//   documentos e abre o envio para a Autentique com quem assina já preenchido.
+// Carol, 19/11: o reajuste precisa deixar claro que o VOLUME de demandas também muda o valor (financeiro: faturamento,
+// lançamentos e conferências; RH: aumento do quadro de colaboradores).
+const KT_MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const ktDataExt=s=>s?`${+s.slice(8,10)} de ${KT_MESES[+s.slice(5,7)-1]} de ${s.slice(0,4)}`:'';
+const KT_ORD=['PRIMEIRA','SEGUNDA','TERCEIRA','QUARTA','QUINTA','SEXTA','SÉTIMA','OITAVA','NONA','DÉCIMA','DÉCIMA PRIMEIRA','DÉCIMA SEGUNDA','DÉCIMA TERCEIRA','DÉCIMA QUARTA','DÉCIMA QUINTA','DÉCIMA SEXTA','DÉCIMA SÉTIMA','DÉCIMA OITAVA','DÉCIMA NONA','VIGÉSIMA'];
+const KT_NUMEXT=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte'];
+const ktNumExt=n=>{n=+n;if(!Number.isFinite(n))return '';if(n<=20)return KT_NUMEXT[n];const t=Math.round(n*100)/100;return extenso(t).replace(/ reais?( e .*)?$/,'').replace(/ de$/,'')};
+const ktNE=n=>n===''||n==null?'':`${String(n).padStart(2,'0')} (${ktNumExt(n)})`;
+// campos que o modelo pode usar (o que aparece na lista do editor e no formulário do gerar)
+const KT_CAMPOS=[
+  ['Contratada (Controlacs)',[['contratada_razao','Razão social'],['contratada_cnpj','CNPJ'],['contratada_endereco','Endereço'],['contratada_representante','Representante'],['contratada_cpf','CPF do representante'],['contratada_email','E-mail de quem assina']]],
+  ['Contratante (cliente)',[['contratante_razao','Razão social'],['contratante_cnpj','CNPJ'],['contratante_endereco','Endereço'],['contratante_representante','Representante'],['contratante_cpf','CPF do representante'],['contratante_email','E-mail de quem assina']]],
+  ['Valores',[['valor_mensal','Mensalidade (R$)'],['valor_implantacao','Auditoria inicial / implantação (R$)'],['parcelas_implantacao','Parcelas da implantação'],['taxa_visita','Taxa por visita extra (R$)'],['vencimento_texto','Vencimento (texto)'],['multa','Multa por atraso (%)'],['juros','Juros ao mês (%)']]],
+  ['Volume contratado (faixa do plano)',[['limite_colaboradores','RH: colaboradores ativos'],['limite_lancamentos','Financeiro: lançamentos por mês'],['limite_contas','Financeiro: contas bancárias'],['limite_faturamento','Financeiro: faturamento mensal (R$)'],['meses_excesso','Meses acima da faixa para rever']]],
+  ['Prazos e condições',[['indice_reajuste','Índice do reajuste'],['vigencia_meses','Vigência (meses)'],['aviso_dias','Aviso prévio (dias)'],['prazo_atendimento','Prazo de atendimento'],['horario','Horário de atendimento'],['visitas_mes','Visitas presenciais no mês'],['sistema_financeiro','Sistema financeiro usado'],['armazenamento','Onde os dados ficam guardados'],['email_lgpd','E-mail para pedidos da LGPD']]],
+  ['Assinatura',[['cidade_assinatura','Cidade'],['data_assinatura','Data (por extenso)'],['foro','Foro (cidade)']]]];
+const KT_ROT=Object.fromEntries(KT_CAMPOS.flatMap(g=>g[1]));
+const KT_DINHEIRO=['valor_mensal','valor_implantacao','taxa_visita','limite_faturamento'];
+// Modelo padrão (melhorado a partir do contrato de DP e RH assinado em 09/2025 e do modelo de BPO financeiro). Sem dado pessoal:
+// os dados da Controlacs vêm do modelo salvo no banco ou são digitados ao gerar.
+const KT_PADRAO_TXT=`# CONTRATO DE PRESTAÇÃO DE SERVIÇOS {{titulo_servicos}}
+
+### IDENTIFICAÇÃO DAS PARTES CONTRATANTES
+
+**CONTRATADA:** {{contratada_razao}}, inscrita no CNPJ sob o nº {{contratada_cnpj}}, com sede na {{contratada_endereco}}, neste ato representada por seu(sua) sócio(a) administrador(a) {{contratada_representante}}, inscrito(a) no CPF sob o nº {{contratada_cpf}}.
+
+**CONTRATANTE:** {{contratante_razao}}, inscrita no CNPJ sob o nº {{contratante_cnpj}}, com sede na {{contratante_endereco}}, neste ato representada por seu(sua) sócio(a) administrador(a) {{contratante_representante}}, inscrito(a) no CPF sob o nº {{contratante_cpf}}.
+
+Pelo presente instrumento particular de prestação de serviços, as partes acima identificadas estabelecem, de comum acordo, as seguintes cláusulas e condições:
+
+## DO OBJETO DO CONTRATO
+
++ O presente contrato tem por objeto a prestação, pela CONTRATADA à CONTRATANTE, dos serviços descritos nesta cláusula, incluindo, mas não se limitando a:
+{{#rh}}
+++ **Departamento Pessoal (DP) e RH Administrativo:**
++++ Admissões: coleta e conferência de documentos, envio à contabilidade, cadastro no sistema de ponto e orientações iniciais (boas práticas, uso correto dos EPIs e regimento interno, se houver);
++++ Rescisões: preparação de documentos, comunicação à contabilidade e apoio no processo burocrático;
++++ Gestão do ponto eletrônico: cadastros, ajustes, relatórios de faltas, horas extras e banco de horas;
++++ Folha de pagamento: preenchimento da planilha, envio à contabilidade, revisão da folha, impressão e digitalização para arquivamento;
++++ Benefícios: solicitação e controle de vale-transporte, vale-alimentação, combustível, plano de saúde e outros benefícios acordados;
++++ Medicina ocupacional: acompanhamento dos exames admissionais, periódicos e demissionais e dos laudos técnicos obrigatórios (PCMSO, PGR e LTCAT);
++++ eSocial e obrigações legais: organização e coleta das informações, dando apoio à contabilidade e à clínica de medicina ocupacional;
++++ Rotinas administrativas de DP e RH: organização de documentos, orientações trabalhistas e padronização de processos internos.
+{{/rh}}
+{{#fin}}
+++ **BPO Financeiro:**
++++ Registro das contas a pagar e a receber a partir dos documentos enviados pela CONTRATANTE;
++++ Conciliação bancária e conferência das movimentações das contas bancárias e do caixa;
++++ Emissão e envio de notas fiscais de serviço eletrônicas (NFS-e) e de boletos, quando solicitados;
++++ Controle das faturas de cartão de crédito;
++++ Relatórios gerenciais: DRE gerencial, fluxo de caixa, contas em atraso, inadimplência e análise de pagamentos e recebimentos.
+{{/fin}}
+{{#implantacao}}
++ A CONTRATADA realizará uma auditoria inicial nos processos {{escopo_auditoria}} da CONTRATANTE, para identificar falhas, riscos e oportunidades de melhoria. O relatório da auditoria será apresentado à CONTRATANTE com as não conformidades encontradas e as sugestões de adequação.
+{{/implantacao}}
+
+## DAS CONDIÇÕES E DA EXECUÇÃO DOS SERVIÇOS
+
++ A CONTRATADA executará as atividades em ambiente remoto{{#visitas_mes}}, podendo realizar {{visitas_mes}} visita(s) presencial(is) por mês sem custo adicional{{/visitas_mes}}.{{#taxa_visita}} Demais visitas presenciais poderão ser realizadas mediante solicitação, com cobrança de taxa de deslocamento de R$ {{taxa_visita}} ({{taxa_visita_extenso}}) por visita.{{/taxa_visita}}
++ A CONTRATADA estará disponível em horário comercial, {{horario}}, exceto feriados nacionais e do município da sua sede.
++ A CONTRATADA terá prazo de até {{prazo_atendimento}} para atender às solicitações da CONTRATANTE, considerando a complexidade da demanda.
++ As solicitações, os documentos e as informações serão trocados preferencialmente pelo Portal do Cliente da CONTRATADA, por e-mail ou por outro canal combinado entre as partes, que servirão como registro das solicitações e dos prazos.
+{{#fin}}
++ No BPO Financeiro, a CONTRATANTE fornecerá o acesso de consulta ao internet banking, os extratos e os documentos das transações (boletos, notas fiscais, recibos e comprovantes). A CONTRATADA não é obrigada a registrar informações recebidas depois de 2 (dois) dias úteis da data em que ocorreram, sem prejuízo de registrá-las quando possível.
+{{/fin}}
+
+## DOS DEVERES DA CONTRATADA
+
+- Executar os serviços com zelo, diligência, sigilo e em conformidade com a legislação vigente;
+- Manter a confidencialidade de todos os dados e documentos fornecidos;
+- Informar à CONTRATANTE as inconformidades encontradas{{#rh}} em jornadas, benefícios, documentos ou laudos técnicos{{/rh}}{{#fin}} nos lançamentos, documentos e saldos{{/fin}};
+{{#rh}}
+- Apoiar na organização dos processos para a correta transmissão ao eSocial (a transmissão é responsabilidade da contabilidade);
+{{/rh}}
+- Responsabilizar-se pelos seus colaboradores e prepostos que atuarem nos serviços contratados.
+
+## NÃO SÃO DEVERES DA CONTRATADA
+
+{{#rh}}
+- A aplicação de medidas disciplinares (advertência, suspensão e justa causa), que deve ser feita pela própria CONTRATANTE;
+- A transmissão direta de eventos ao eSocial (atividade da contabilidade);
+- Negociações diretas com sindicatos, colaboradores ou terceiros, salvo quando formalmente acordado;
+{{/rh}}
+{{#fin}}
+- A realização de pagamentos, a negociação com fornecedores e clientes e as decisões gerenciais, que são da CONTRATANTE;
+- A decisão sobre emitir ou não nota fiscal e as omissões de receita por parte da CONTRATANTE;
+- O controle do dinheiro em espécie;
+{{/fin}}
+- A veracidade das informações e dos documentos fornecidos pela CONTRATANTE. A CONTRATADA não responde pelas consequências de informações, declarações ou documentos inidôneos, incompletos ou enviados fora do prazo.
+
+## DOS DEVERES DA CONTRATANTE
+
+- Fornecer todos os dados, documentos e informações necessários, de forma correta, completa e no prazo solicitado;
+{{#rh}}
+- Manter atualizados os registros da empresa e disponibilizar os exames e laudos técnicos obrigatórios (PCMSO, PGR e LTCAT);
+{{/rh}}
+- Comunicar à CONTRATADA, com antecedência, mudanças que aumentem o volume de demandas{{#rh}}, como admissões em quantidade e abertura de novas unidades{{/rh}}{{#fin}}, como novas contas bancárias, novas unidades e aumento relevante do faturamento{{/fin}};
+- Efetuar pontualmente os pagamentos previstos na cláusula de remuneração.
+
+## DA CONFIDENCIALIDADE
+
++ As partes manterão sigilo absoluto sobre todas as informações{{#rh}} trabalhistas, previdenciárias e cadastrais{{/rh}}{{#fin}} financeiras, bancárias e fiscais{{/fin}} a que tiverem acesso em razão deste contrato, não podendo repassá-las a terceiros sem autorização expressa da outra parte, nem permitir que seus colaboradores as utilizem para fins diferentes do objeto deste contrato.
+
+## DA REMUNERAÇÃO, DO VOLUME DE DEMANDAS E DO REAJUSTE
+
++ Pelos serviços contratados, a CONTRATANTE pagará à CONTRATADA os seguintes valores:
+{{#implantacao}}
+- Auditoria inicial: R$ {{valor_implantacao}} ({{valor_implantacao_extenso}}){{#parcelas_implantacao}}, podendo ser parcelada em até {{parcelas_implantacao_ext}} vezes{{/parcelas_implantacao}};
+{{/implantacao}}
+- Mensalidade: R$ {{valor_mensal}} ({{valor_mensal_extenso}}).
++ O pagamento deverá ser efetuado até {{vencimento_texto}}, mediante a apresentação da nota fiscal emitida pela CONTRATADA, por boleto, Pix ou transferência.
++ O pagamento em atraso terá multa de {{multa}}% e juros de {{juros}}% ao mês, calculados por dia de atraso, sobre o valor devido.
++ O valor da mensalidade foi definido com base no volume de demandas da CONTRATANTE na data da assinatura deste contrato, conforme o plano contratado:
+{{#rh}}
+++ DP e RH Administrativo: até {{limite_colaboradores}} colaboradores ativos.
+{{/rh}}
+{{#fin}}
+++ BPO Financeiro: até {{limite_lancamentos}} lançamentos por mês (pagamentos, recebimentos e transferências), {{limite_contas}} conta(s) bancária(s){{#limite_faturamento}} e faturamento mensal de até R$ {{limite_faturamento}}{{/limite_faturamento}}.
+{{/fin}}
++ O volume de demandas também influencia o valor dos serviços. Sempre que o volume ultrapassar o plano contratado por {{meses_excesso}} meses seguidos, a mensalidade será revista, independentemente do reajuste anual: {{#fin}}no BPO Financeiro, o aumento do faturamento da CONTRATANTE e, por consequência, da quantidade de lançamentos e conferências{{/fin}}{{#ambos}}; {{/ambos}}{{#rh}}no DP e RH, o aumento do quadro de colaboradores{{/rh}}. A CONTRATADA enviará à CONTRATANTE, por e-mail, o novo valor e o termo aditivo, que passa a valer a partir do mês seguinte ao envio.
++ Os valores serão reajustados anualmente, na data de renovação do contrato, pela variação acumulada do {{indice_reajuste}} nos últimos 12 (doze) meses ou por negociação entre as partes. Se o índice for negativo, o valor não será reduzido. O reajuste anual é aplicado sem prejuízo da revisão por volume de demandas prevista no item anterior.
++ Os serviços solicitados pela CONTRATANTE que não estejam previstos na cláusula do objeto serão cobrados à parte, conforme orçamento aprovado previamente pela CONTRATANTE.
+
+## DA VIGÊNCIA
+
++ O presente contrato terá vigência de {{vigencia_meses_ext}} meses a partir da assinatura, com renovação automática por igual período, salvo manifestação contrária de qualquer das partes, por escrito, com antecedência mínima de {{aviso_dias_ext}} dias.
+
+## DA RESCISÃO
+
++ O contrato poderá ser rescindido por qualquer das partes, a qualquer tempo, mediante aviso prévio por escrito de {{aviso_dias_ext}} dias, sem ônus adicionais, ressalvadas as obrigações e os pagamentos referentes aos serviços prestados até a data do término.
++ A CONTRATADA poderá suspender os serviços ou rescindir o contrato se a CONTRATANTE deixar de pagar qualquer valor por mais de 30 (trinta) dias, mediante comunicação por escrito.
+
+## LEI GERAL DE PROTEÇÃO DE DADOS
+
++ Para os fins deste contrato:
+++ “LGPD” significa a Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018);
+++ As partes reconhecem que a CONTRATADA realizará o tratamento de dados pessoais no contexto da prestação dos serviços, sendo a CONTRATADA a Operadora e a CONTRATANTE a Controladora dos dados pessoais;
+++ Os dados serão armazenados {{armazenamento}}.
++ São obrigações da CONTRATADA:
+++ Realizar o tratamento dos dados pessoais nos limites e para as finalidades permitidas por este contrato;
+++ Manter os dados pessoais em absoluto sigilo e exigir de seus colaboradores que tratem os dados pessoais a observância dessas obrigações.
++ Da exclusão dos dados:
+++ Após o término deste contrato, a CONTRATANTE poderá requerer cópia dos dados pessoais que estejam nos sistemas e em posse da CONTRATADA, bem como a completa exclusão desses dados, pelo e-mail {{email_lgpd}}, com o assunto “Excluir dados pessoais”;
+++ Caso a CONTRATANTE não se manifeste, a CONTRATADA eliminará em definitivo de seus sistemas os registros dos dados pessoais após o período de 2 (dois) anos.
+
+## DISPOSIÇÕES FINAIS
+
++ Os signatários deste instrumento declaram, sob as penas da lei, que são os representantes legais das partes, com poderes para assumir as obrigações descritas neste contrato.
++ O presente contrato tem natureza estritamente civil e comercial e não gera vínculo empregatício entre a CONTRATANTE e a CONTRATADA, seus colaboradores ou prestadores de serviço, ficando cada parte responsável pelas obrigações trabalhistas, previdenciárias, fiscais e tributárias da sua própria atividade.
++ As partes reconhecem como válida a assinatura eletrônica deste contrato, nos termos da Lei nº 14.063/2020 e da MP nº 2.200-2/2001, dispensada a assinatura em papel.
+
+## DO FORO
+
++ Fica eleito o foro da Comarca de {{foro}}, com expressa renúncia a qualquer outro, por mais privilegiado que seja, para dirimir as questões oriundas da interpretação e da execução do presente contrato.
+
+E, por estarem justas e contratadas, as partes assinam o presente contrato eletronicamente, para um só efeito.
+
+>> {{cidade_assinatura}}, {{data_assinatura}}.
+
+{{assinaturas}}`;
+const KT_PADRAO={id:'padrao',nome:'Modelo padrão Controlacs (melhorado)',servicos:['rh','fin'],corpo:KT_PADRAO_TXT,contratada:{},
+  padrao:{multa:'2',juros:'1',meses_excesso:'2',prazo_atendimento:'48 (quarenta e oito) horas úteis',horario:'de segunda a sexta-feira, das 8h às 18h',visitas_mes:'01 (uma)',
+    indice_reajuste:'IPCA',vigencia_meses:'12',aviso_dias:'30',armazenamento:'em nuvem (OneDrive) e no Portal do Cliente da CONTRATADA',limite_contas:'02 (duas)'},fixo:true};
+// melhorias do modelo padrão em relação ao contrato antigo (aparecem no editor para a Carol conferir)
+const KT_MELHORIAS=['Volume de demandas no valor: faixa do plano (colaboradores no RH; lançamentos, contas e faturamento no financeiro) e revisão quando passar da faixa por 2 meses seguidos, com aditivo por e-mail (Carol, 19/11).',
+  'Multa de 2% e juros de 1% ao mês por atraso (o contrato antigo não tinha).','Reajuste anual pelo índice acumulado de 12 meses, sem redução se o índice for negativo.',
+  'Serviços fora do objeto cobrados à parte, com orçamento aprovado.','Suspensão ou rescisão por falta de pagamento acima de 30 dias.',
+  'Cliente avisa com antecedência mudanças que aumentam o volume (admissões em quantidade, contas novas, unidades novas).','Portal do Cliente como canal oficial das solicitações e dos prazos.',
+  'Assinatura eletrônica reconhecida (Lei 14.063/2020), no lugar de “2 vias de igual teor”.','Numeração automática das cláusulas e itens (o contrato antigo pulava a numeração e misturava benefícios com medicina ocupacional).',
+  'Um modelo só para RH, financeiro ou os dois: os trechos de cada serviço entram conforme o contrato do cliente.'];
+const ktMods=()=>[KT_PADRAO,...(CTL.mod||[]).filter(m=>!m.excluido_em)];
+const ktServTipo=c=>{const n=(c?.servicos||[]).map(x=>x.nome||'').join(' ')+' '+(c?.titulo||''),x=c?.extra?.kt||{};
+  const rh=x.rh??/\b(rh|dp|departamento pessoal|folha|benef)/i.test(n),fin=x.fin??/financ|bpo fin|contas a pagar|concilia/i.test(n);return {rh:!!rh,fin:!!fin}};
+const ktCnpj=s=>{const d=fcDig(s);return d.length===14?fcCnpjFmt(d):d.length===11?d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/,'$1.$2.$3-$4'):String(s||'')};
+const ktEnd=e=>{if(!e)return '';const a=[[e.logradouro,e.numero].filter(Boolean).join(', '),e.complemento,e.bairro].filter(Boolean).join(', ');
+  return [a,[e.cidade,e.uf].filter(Boolean).join('/')].filter(Boolean).join(' – ')+(fcDig(e.cep).length===8?', CEP '+fcCepFmt(e.cep):'')};
+// os valores dos campos para um contrato: modelo (padrões e contratada) < ficha/cliente/contrato < o que já foi digitado neste contrato
+function ktCampos(c,mod){
+  const cli=ctCli(c?.cliente_id),emp=cli?.empresa_id&&CLIENTES.find(x=>x.id===cli.empresa_id),fd=emp&&V154(emp)?fcDados(emp):null,rep=cli?.extra?.representante||{};
+  const t=ktServTipo(c),x=c?.extra?.kt||{};
+  // dados da Controlacs: os do modelo; se o modelo não tiver (ex.: o padrão), os do último modelo salvo que tenha
+  const outro=(CTL.mod||[]).find(m=>m.contratada?.razao),ct=mod?.contratada?.razao?mod.contratada:(outro?.contratada||{}),pd0=outro?.padrao||{};
+  const v={...KT_PADRAO.padrao,...(mod?.fixo?Object.fromEntries(['email_lgpd','foro','cidade_assinatura'].filter(k=>pd0[k]).map(k=>[k,pd0[k]])):{}),...(mod?.padrao||{}),
+    contratada_razao:ct.razao||'',contratada_cnpj:ct.cnpj||'',contratada_endereco:ct.endereco||'',contratada_representante:ct.representante||'',contratada_cpf:ct.cpf||'',contratada_email:ct.email||ME?.email||'',
+    contratante_razao:fd?.razao||cli?.razao_social||cli?.nome||'',contratante_cnpj:ktCnpj(fd?.cnpj||cli?.cnpj_cpf||''),contratante_endereco:(fd&&ktEnd(fd.end))||cli?.endereco||'',
+    contratante_representante:rep.nome||fd?.contato?.responsavel||cli?.contato||'',contratante_cpf:rep.cpf||'',contratante_email:rep.email||fd?.contato?.email||cli?.email||'',
+    valor_mensal:c?.valor_mensal!=null?showMoney(c.valor_mensal):'',
+    vencimento_texto:c?.dia_vencimento?`o dia ${String(c.dia_vencimento).padStart(2,'0')} do mês subsequente à prestação dos serviços`:'',
+    indice_reajuste:c?.indice_reajuste&&!/percentual|outro/i.test(c.indice_reajuste)?c.indice_reajuste:(mod?.padrao?.indice_reajuste||'IPCA'),
+    data_assinatura:ktDataExt(TODAY),rh:t.rh?'1':'',fin:t.fin?'1':'',...x.campos};
+  if(c?.inicio&&c?.fim&&!x.campos?.vigencia_meses){const m=Math.round((dObj(c.fim)-dObj(c.inicio))/(864e5*30.44));if(m>0)v.vigencia_meses=String(m)}
+  return v}
+// completa os campos derivados (extenso, título, escopo) antes de aplicar no texto
+function ktDeriva(v){const o={...v},num=k=>parseMoney(o[k]);
+  KT_DINHEIRO.forEach(k=>{const n=num(k);if(n!=null&&!isNaN(n)&&n>0){o[k]=showMoney(n);o[k+'_extenso']=extenso(n)}else if(k!=='valor_mensal'){o[k]=''}});
+  o.implantacao=num('valor_implantacao')>0?'1':'';
+  ['parcelas_implantacao','vigencia_meses','aviso_dias'].forEach(k=>{const n=parseInt(o[k],10);o[k+'_ext']=n>0?ktNE(n):''});
+  o.parcelas_implantacao_ext=parseInt(o.parcelas_implantacao,10)>0?`${parseInt(o.parcelas_implantacao,10)} (${ktNumExt(parseInt(o.parcelas_implantacao,10))})`:'';
+  o.ambos=o.rh&&o.fin?'1':'';
+  o.titulo_servicos=o.rh&&o.fin?'DE BPO FINANCEIRO, DP E RH ADMINISTRATIVO':o.fin?'DE BPO FINANCEIRO':o.rh?'DE DP E RH ADMINISTRATIVO':'';
+  o.escopo_auditoria=o.rh&&o.fin?'financeiros, de Departamento Pessoal e de RH Administrativo':o.fin?'financeiros':'de Departamento Pessoal e RH Administrativo';
+  return o}
+// aplica os campos no texto: blocos {{#x}}…{{/x}} (entra se x tiver valor) e {{x}}; o que ficar vazio vira ____ e entra na lista "falta"
+function ktAplica(corpo,v){const o=ktDeriva(v),falta=new Set();let t=String(corpo||'');
+  for(let i=0;i<6;i++){const n=t.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,(m,k,d)=>o[k]?d:'');if(n===t)break;t=n}
+  t=t.replace(/\{\{(\w+)\}\}/g,(m,k)=>{if(k==='assinaturas'||k==='quebra')return m;const x=o[k];if(x==null||String(x).trim()===''){falta.add(k);return '________'}return String(x)});
+  t=t.replace(/\n{3,}/g,'\n\n');return {texto:t,falta:[...falta],campos:o}}
+// texto → blocos com numeração automática (## cláusula, + item, ++ subitem, +++, - marcador, # título, ### subtítulo, >> à direita)
+function ktBlocos(t){const out=[];let cl=0,n=[0,0,0];
+  String(t||'').split('\n').forEach(raw=>{const l=raw.trim();if(!l)return;let m;
+    if(l==='{{assinaturas}}')return out.push({k:'ass'});if(l==='{{quebra}}')return out.push({k:'pg'});
+    if((m=l.match(/^###\s+(.*)/)))return out.push({k:'sub',t:m[1]});
+    if((m=l.match(/^##\s+(.*)/))){cl++;n=[0,0,0];return out.push({k:'cl',num:'CLÁUSULA '+(KT_ORD[cl-1]||cl+'ª'),t:m[1]})}
+    if((m=l.match(/^#\s+(.*)/)))return out.push({k:'tit',t:m[1]});
+    if((m=l.match(/^(\+{1,3})\s+(.*)/))){const d=m[1].length;n[d-1]++;for(let i=d;i<3;i++)n[i]=0;
+      return out.push({k:'it',d,num:[cl||1,...n.slice(0,d)].join('.'),t:m[2]})}
+    if((m=l.match(/^[-•]\s+(.*)/)))return out.push({k:'bul',t:m[1]});
+    if((m=l.match(/^>>\s*(.*)/)))return out.push({k:'dir',t:m[1]});
+    out.push({k:'p',t:l})});
+  return out}
+// prévia em HTML (a mesma diagramação do PDF, mais simples)
+function ktHtml(bl,v){const neg=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/________/g,'<span class="ktFalta">________</span>');
+  return bl.map(b=>b.k==='tit'?`<h3 class="ktTit">${neg(b.t)}</h3>`:b.k==='sub'?`<h4 class="ktSub">${neg(b.t)}</h4>`:b.k==='cl'?`<h4 class="ktCl">${b.num}<br>${neg(b.t)}</h4>`
+    :b.k==='it'?`<p style="margin-left:${(b.d-1)*18}px"><b>${b.num}</b> ${neg(b.t)}</p>`:b.k==='bul'?`<p style="margin-left:14px">• ${neg(b.t)}</p>`:b.k==='dir'?`<p style="text-align:right">${neg(b.t)}</p>`
+    :b.k==='pg'?'<hr>':b.k==='ass'?ktAssin(v).map(a=>`<div class="ktAss"><div>${'_'.repeat(38)}</div><b>${esc(a[0])}</b><div>${esc(a[1])}</div></div>`).join(''):`<p>${neg(b.t)}</p>`).join('')}
+const ktAssin=v=>[[`CONTRATADA – ${v.contratada_razao||'________'}`,[v.contratada_representante,v.contratada_cpf?'CPF '+v.contratada_cpf:''].filter(Boolean).join(' · ')],
+  [`CONTRATANTE – ${v.contratante_razao||'________'}`,[v.contratante_representante,v.contratante_cpf?'CPF '+v.contratante_cpf:''].filter(Boolean).join(' · ')]];
+// PDF (A4, Helvetica, texto justificado, negrito com **, rodapé com página) pela pdf-lib
+async function ktPdf(bl,v,titulo){
+  if(!window.PDFLib)await new Promise((ok,ko)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';sc.onload=ok;sc.onerror=()=>ko(new Error('não carregou o gerador de PDF (verifique a internet)'));document.head.appendChild(sc)});
+  const {PDFDocument,StandardFonts,rgb}=PDFLib,pdf=await PDFDocument.create(),F=await pdf.embedFont(StandardFonts.Helvetica),B=await pdf.embedFont(StandardFonts.HelveticaBold);
+  const W=595.28,H=841.89,ML=70,MR=60,MT=70,MB=70,LW=W-ML-MR,cor=rgb(0.1,0.1,0.1);
+  const limpa=s=>String(s||'').replace(/ /g,' ').replace(/[^\x20-\xff–—‘’“”•…€]/g,' ');
+  pdf.setTitle(limpa(titulo||'Contrato'));pdf.setCreator('Portal do Cliente Controlacs');
+  let pg=null,y=0;const nova=()=>{pg=pdf.addPage([W,H]);y=H-MT};nova();
+  const precisa=h=>{if(y-h<MB)nova()};
+  // palavras com negrito: "**texto**" liga e desliga
+  const palavras=t=>{const o=[];let neg=false;limpa(t).split(/(\*\*)/).forEach(p=>{if(p==='**'){neg=!neg;return}p.split(/\s+/).forEach(w=>{if(w)o.push({w,f:neg?B:F})})});return o};
+  function par(t,{sz=10.5,lh=15,x0=0,num=null,alin='just',f0=null,antes=0,depois=6}={}){
+    const ws=palavras(t);if(f0)ws.forEach(w=>w.f=f0);
+    if(num)ws.unshift({w:num,f:B});
+    const larg=w=>w.f.widthOfTextAtSize(w.w,sz),esp=F.widthOfTextAtSize(' ',sz),max=LW-x0,ls=[];let cur=[],cw=0;
+    ws.forEach(w=>{const lw=larg(w);if(cur.length&&cw+esp+lw>max){ls.push(cur);cur=[];cw=0}cw+=(cur.length?esp:0)+lw;cur.push(w)});if(cur.length)ls.push(cur);
+    y-=antes;
+    ls.forEach((l,i)=>{precisa(lh);const tot=l.reduce((s,w)=>s+larg(w),0),ult=i===ls.length-1;
+      let x=ML+x0,gap=esp;
+      if(alin==='centro')x=ML+(LW-(tot+esp*(l.length-1)))/2;else if(alin==='dir')x=ML+LW-(tot+esp*(l.length-1));else if(alin==='just'&&!ult&&l.length>1)gap=(max-tot)/(l.length-1);
+      // cada trecho com a mesma fonte sai numa string só e a justificação usa o espaçamento de palavras do PDF (Tw):
+      // assim o visualizador mantém os espaços mesmo quando a fonte dele é um pouco mais larga
+      const runs=[];l.forEach(w=>{const r=runs[runs.length-1];if(r&&r.f===w.f)r.ws.push(w.w);else runs.push({f:w.f,ws:[w.w]})});
+      const tw=gap-esp;runs.forEach(r=>{const s=r.ws.join(' ');if(tw)pg.pushOperators(PDFLib.setWordSpacing(tw));pg.drawText(s,{x,y:y-sz,size:sz,font:r.f,color:cor});if(tw)pg.pushOperators(PDFLib.setWordSpacing(0));
+        x+=r.f.widthOfTextAtSize(s,sz)+(r.ws.length-1)*tw+gap});y-=lh});
+    y-=depois}
+  for(const b of bl){
+    if(b.k==='tit')par(b.t,{sz:13,lh:18,alin:'centro',f0:B,depois:14});
+    else if(b.k==='sub')par(b.t,{sz:11,lh:15,alin:'centro',f0:B,antes:4,depois:10});
+    else if(b.k==='cl'){precisa(60);par(b.num,{sz:11,lh:15,alin:'centro',f0:B,antes:10,depois:0});par(b.t,{sz:11,lh:15,alin:'centro',f0:B,depois:8})}
+    else if(b.k==='it')par(b.t,{x0:(b.d-1)*18,num:b.num});
+    else if(b.k==='bul')par('•  '+b.t,{x0:14});
+    else if(b.k==='dir')par(b.t,{alin:'dir',antes:10,depois:16});
+    else if(b.k==='pg')nova();
+    else if(b.k==='ass'){precisa(190);y-=20;
+      for(const a of ktAssin(v)){precisa(80);y-=34;const lx=ML+LW*0.15,lw2=LW*0.7;pg.drawLine({start:{x:lx,y},end:{x:lx+lw2,y},thickness:0.7,color:cor});y-=4;
+        par(a[0],{sz:10,lh:13,alin:'centro',f0:B,depois:0});if(a[1])par(a[1],{sz:9.5,lh:13,alin:'centro',depois:0});y-=14}}
+    else par(b.t)}
+  const ps=pdf.getPages(),rod=limpa('Contrato de prestação de serviços · '+(v.contratante_razao||''));
+  ps.forEach((p,i)=>{const t=`${i+1} de ${ps.length}`;p.drawText(rod.slice(0,90),{x:ML,y:36,size:8,font:F,color:rgb(0.45,0.45,0.45)});p.drawText(t,{x:W-MR-F.widthOfTextAtSize(t,8),y:36,size:8,font:F,color:rgb(0.45,0.45,0.45)})});
+  return await pdf.save()}
+// ---------- leitura do arquivo ----------
+// Word (.docx) sem biblioteca: o .docx é um zip; abre o word/document.xml com o DecompressionStream do navegador
+async function ktDocx(buf){const u=new Uint8Array(buf),dv=new DataView(buf);let e=-1;
+  for(let i=u.length-22;i>=Math.max(0,u.length-70000);i--)if(dv.getUint32(i,true)===0x06054b50){e=i;break}
+  if(e<0)throw new Error('O arquivo não parece um Word (.docx).');
+  let p=dv.getUint32(e+16,true);const n=dv.getUint16(e+10,true),dec=new TextDecoder();let ent=null;
+  for(let k=0;k<n;k++){const nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),nome=dec.decode(u.subarray(p+46,p+46+nl));
+    if(nome==='word/document.xml')ent={met:dv.getUint16(p+10,true),tam:dv.getUint32(p+20,true),off:dv.getUint32(p+42,true)};p+=46+nl+xl+cl}
+  if(!ent)throw new Error('Não encontrei o texto dentro do Word.');
+  const lo=ent.off,ini=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=u.subarray(ini,ini+ent.tam);
+  let xml;if(ent.met===0)xml=dec.decode(raw);else{if(typeof DecompressionStream==='undefined')throw new Error('Este navegador não abre Word. Salve o contrato em PDF e importe de novo.');
+    xml=await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text()}
+  const d=new DOMParser().parseFromString(xml,'application/xml'),W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',body=d.getElementsByTagNameNS(W,'body')[0],ps=[];
+  const txt=el=>{let s='';el.querySelectorAll('*').forEach(x=>{if(x.namespaceURI!==W)return;if(x.localName==='t')s+=x.textContent;else if(x.localName==='tab')s+=' ';else if(x.localName==='br')s+='\n'});return s};
+  const para=pe=>{let s=txt(pe);if(pe.getElementsByTagNameNS(W,'numPr').length&&s.trim()&&!/^\s*(\d|[•\-–])/.test(s))s='• '+s;return s};
+  [...(body?.children||[])].forEach(el=>{if(el.localName==='p')para(el).split('\n').forEach(x=>ps.push(x));
+    else if(el.localName==='tbl')el.querySelectorAll('tr').forEach(tr=>ps.push([...tr.children].filter(c=>c.localName==='tc').map(c=>txt(c).trim()).join(' | ')))});
+  return ps.map(s=>s.replace(/\s+/g,' ').trim())}
+// PDF: texto linha por linha; sem texto (escaneado) → OCR das primeiras páginas
+// (as palavras que o PDF corta em pedaços, como "Fl orianópolis", são juntadas pela distância entre os pedaços)
+async function ktPdfLinhas(file,prog){const t=await pdfTexto(file),doc=pdfTexto.doc;let lay='';
+  for(let p=1;p<=Math.min(doc.numPages,12);p++){const its=(await (await doc.getPage(p)).getTextContent()).items.filter(i=>i.str&&i.transform).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],w:i.width||0,h:Math.abs(i.transform[3])||8}));
+    its.sort((a,b)=>b.y-a.y||a.x-b.x);const ls=[];its.forEach(i=>{const l=ls.find(l=>Math.abs(l.y-i.y)<=Math.max(2.5,Math.min(l.h,i.h)*0.45));if(l)l.its.push(i);else ls.push({y:i.y,h:i.h,its:[i]})});
+    lay+=ls.map(l=>{l.its.sort((a,b)=>a.x-b.x);let s='',fim=null;l.its.forEach(i=>{const gap=fim==null?0:i.x-fim;s+=(fim!=null&&(gap>i.h*0.2||/\s$/.test(s)||/^\s/.test(i.s))?' ':'')+i.s.trim();fim=i.x+i.w});return s}).join('\n')+'\n'}
+  if(t.replace(/\s/g,'').length<300){lay='';
+    for(let p=1;p<=Math.min(doc.numPages,8);p++){prog?.(`Lendo a página ${p} de ${Math.min(doc.numPages,8)} (documento escaneado)…`);
+      const its=await ocrPagina(await doc.getPage(p)),ls=[];its.sort((a,b)=>a.y-b.y||a.x-b.x).forEach(i=>{const l=ls.find(l=>Math.abs(l.y-i.y)<6);if(l)l.its.push(i);else ls.push({y:i.y,its:[i]})});
+      lay+=ls.map(l=>l.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ')).join('\n')+'\n'}}
+  return lay.split('\n').map(s=>s.replace(/\s+/g,' ').trim())}
+// junta as linhas do PDF em parágrafos (a linha que começa com número, marcador, cláusula ou título abre parágrafo novo)
+function ktParagrafos(ls){const out=[],caps=s=>s.length<110&&/[A-ZÀ-Ú]{3}/.test(s)&&s===s.toUpperCase();let max=0;
+  ls.forEach(l=>{if(l.length>max)max=l.length});
+  ls.forEach(l=>{if(!l||/^\d{1,3}$/.test(l))return;const ant=out[out.length-1];
+    const novo=!ant||/^(CL[ÁA]USULA\b|\d+(\.\d+)+\.?\s|[•\-–]\s|[a-z]\)\s|CONTRATAD[AO]\s*:|CONTRATANTE\s*:|E,? por estarem|Pelo presente)/i.test(l)||caps(l)||ant.caps||(/[.:;]$/.test(ant.ult)&&ant.ult.length<max*0.82);
+    if(novo)out.push({t:l,ult:l,caps:caps(l)});else{ant.t=(ant.t.endsWith('-')&&/\d$/.test(ant.t.slice(-2,-1))?ant.t:ant.t+' ')+l;ant.ult=l}});
+  return out.map(x=>x.t.replace(/\s+/g,' ').trim())}
+// os dados do contrato
+const KT_MES={janeiro:1,fevereiro:2,'março':3,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+function ktLe(ps,tudo){
+  const T=ps.join('\n'),flat=T.replace(/\s+/g,' '),r={avisos:[]};
+  const cnpjRe=/(\d{2})\.?\s*(\d{3})\.?\s*(\d{3})\s*\/?\s*(\d{4})\s*-?\s*(\d{2})/,cpfRe=/(\d{3})\.?\s*(\d{3})\.?\s*(\d{3})\s*-?\s*(\d{2})/;
+  const parte=(rot,ate)=>{const m=flat.match(new RegExp(rot+'\\s*:\\s*(.+?)(?='+ate+')','i'));if(!m)return null;const b=m[1];
+    let razao=(b.match(/^(?:a\s+)?(?:empresa\s+)?(.+?)\s*,\s*(?:com registro|inscrit|pessoa jur|com sede|estabelecid|sediad|CNPJ)/i)||[])[1]||'',fant='';
+    const pd=razao.split(/\s+[-–]\s+/);if(pd.length>1&&/\b(LTDA|S\.?A\.?|EIRELI|ME|EPP|SLU|SS)\b/i.test(pd[0])){razao=pd[0];fant=pd.slice(1).join(' - ')}
+    const cn=b.match(cnpjRe),end=(b.match(/(?:estabelecid[oa]|sediad[oa]|com sede|domiciliad[oa])\s+(?:na|no|em|à)?\s*(.+?)\s*,\s*(?:neste ato\s+)?representad/i)||[])[1]||'';
+    const rep=(b.match(/administrador(?:\(a\)|a)?\s+(?:o\s+|a\s+|sr\.?\s+|sra\.?\s+)?(.+?)\s*,\s*(?:portador|inscrit|brasileir|CPF)/i)||b.match(/representad[oa][^,]*?\s+por\s+(?:seu\s+|sua\s+)?(?:s[óo]ci[oa]\S*\s+)?(.+?)\s*,/i)||[])[1]||'';
+    const cp=(b.match(new RegExp('CPF[^0-9]{0,12}'+cpfRe.source,'i'))||[]);
+    return {razao:razao.trim(),fantasia:fant.trim(),cnpj:cn?`${cn[1]}.${cn[2]}.${cn[3]}/${cn[4]}-${cn[5]}`:'',endereco:end.trim(),representante:rep.replace(/^(o|a)\s+/i,'').trim(),cpf:cp[1]?`${cp[1]}.${cp[2]}.${cp[3]}-${cp[4]}`:''}};
+  r.contratada=parte('CONTRATADA','CONTRATANTE\\s*:|Pelo presente|CL[ÁA]USULA|$');r.contratante=parte('CONTRATANTE','CONTRATADA\\s*:|Pelo presente|CL[ÁA]USULA|$');
+  // quem é a Controlacs: se a "contratada" não for ela e a "contratante" for, troca
+  const ehCtl=p=>p&&/controlacs|acs consultoria/i.test(p.razao+' '+p.fantasia);
+  if(ehCtl(r.contratante)&&!ehCtl(r.contratada)){const x=r.contratada;r.contratada=r.contratante;r.contratante=x}
+  // e-mails de quem assinou (relatório da Autentique: "Nome (email, CPF 000.000.000-00) assinou")
+  const em={};for(const m of String(tudo||T).replace(/\s+/g,' ').matchAll(/\(([^\s,()]+@[^\s,()]+)\s*,\s*CPF\s*([\d.\-]+)\)/gi))em[fcDig(m[2])]=m[1].toLowerCase();
+  [r.contratada,r.contratante].forEach(p=>{if(p&&p.cpf&&em[fcDig(p.cpf)])p.email=em[fcDig(p.cpf)]});
+  r.autentique=/autentique/i.test(tudo||'')?{assinado:/Assinaturas conclu[ií]das:\s*(\d+)\s*de\s*\1\b/i.test(tudo),id:((tudo||'').match(/Identificador:\s*([0-9a-f]{20,})/i)||[])[1]||''}:null;
+  // objeto e serviços
+  const sec=(a,b)=>{const m=flat.match(new RegExp(a+'([\\s\\S]*?)(?='+b+'|$)','i'));return m?m[1]:''};
+  const obj=sec('CL[ÁA]USULA PRIMEIRA','CL[ÁA]USULA SEGUNDA')||flat.slice(0,4000);
+  r.rh=/departamento pessoal|\bDP\b|RH administrativo|folha de pagamento|admiss/i.test(obj);
+  r.fin=/contas? a pagar|contas a receber|concilia[çc][ãa]o banc|BPO financeiro|rotinas financeiras|fluxo de caixa/i.test(obj);
+  r.titulo=r.rh&&r.fin?'BPO financeiro, DP e RH administrativo':r.fin?'BPO financeiro':r.rh?'DP e RH administrativo':'Prestação de serviços';
+  // valores: o rótulo antes do R$ diz o que é
+  const vals=[...flat.matchAll(/R\$\s*([\d.]+,\d{2})(\s*\([^)]*\))?/g)].map(m=>({v:parseMoney(m[1]),txt:m[0],ctx:flat.slice(Math.max(0,m.index-160),m.index).toLowerCase()}));
+  const acha=re=>vals.find(x=>re.test(x.ctx.slice(-110)));
+  const vis=acha(/visita|deslocamento/),impl=acha(/auditoria|implanta|setup|ades[ãa]o/),mens=vals.find(x=>x!==vis&&x!==impl&&/mensal|mensalidade/.test(x.ctx.slice(-110)));
+  r.valor_mensal=mens?.v??null;r.valor_implantacao=impl&&impl!==mens?impl.v:null;r.taxa_visita=vis&&vis!==mens?vis.v:null;r.valores=vals;
+  r.parcelas=+((flat.match(/parcelad[oa]s?\s+em\s+at[ée]\s+(\d+)/i)||[])[1])||null;
+  r.limite_colaboradores=+((flat.match(/at[ée]\s+(\d+)\s+colaboradores/i)||[])[1])||null;
+  r.limite_lancamentos=+((flat.match(/(\d+)\s*(?:\|\s*)?transa[çc][õo]es\s+por\s+m[êe]s/i)||[])[1])||null;
+  // vencimento
+  let m=flat.match(/at[ée]\s+o\s+(\d{1,2})\s*[ºo°]?\s*(?:\([^)]*\)\s*)?dia\s+(útil|util)/i);
+  if(m){r.dia_vencimento=+m[1];r.vencimento_texto=`o ${+m[1]}º (${ktNumExt(+m[1]).replace(/^um$/,'primeiro').replace(/^dois$/,'segundo').replace(/^três$/,'terceiro').replace(/^quatro$/,'quarto').replace(/^cinco$/,'quinto').replace(/^seis$/,'sexto').replace(/^sete$/,'sétimo').replace(/^oito$/,'oitavo').replace(/^nove$/,'nono').replace(/^dez$/,'décimo')}) dia útil do mês subsequente à prestação dos serviços`}
+  else if((m=flat.match(/at[ée]\s+o\s+dia\s+(\d{1,2})/i))){r.dia_vencimento=+m[1];r.vencimento_texto=`o dia ${String(+m[1]).padStart(2,'0')} do mês ${/m[êe]s corrente/i.test(flat.slice(m.index,m.index+80))?'corrente':'subsequente'} à prestação dos serviços`}
+  // reajuste, vigência, aviso, prazo, foro, e-mail da LGPD
+  const rj=sec('reajust','CL[ÁA]USULA')||flat;m=rj.match(/\b(IPCA|IGP-?M|INPC|sal[áa]rio m[íi]nimo)\b/i);
+  r.indice=m?({ipca:'IPCA','igp-m':'IGP-M',igpm:'IGP-M',inpc:'INPC'}[m[1].toLowerCase()]||'Salário mínimo'):null;
+  r.vigencia_meses=+((flat.match(/vig[êe]ncia\s+(?:de|por\s+prazo\s+de|por)?\s*(\d+)/i)||[])[1])||null;
+  r.renova=/renova[çc][ãa]o autom[áa]tica|renovad[oa]\s+automaticamente/i.test(flat);
+  r.aviso_dias=+((flat.match(/anteced[êe]ncia\s+m[íi]nima\s+de\s+(\d+)/i)||flat.match(/aviso\s+pr[ée]vio\s+de\s+(\d+)/i)||[])[1])||null;
+  m=flat.match(/prazo\s+de\s+at[ée]\s+(\d+)\s*(h|horas)\s*(úteis|uteis)?/i);r.prazo_atendimento=m?`${m[1]} (${ktNumExt(+m[1])}) horas${m[3]?' úteis':''}`:null;
+  m=flat.match(/(\d{1,2})\s*\([^)]*\)\s*visita\s+presencial\s+mensal/i)||flat.match(/(\d{1,2})\s*\(\w+\)\s*visitas?\s+presenc/i);r.visitas_mes=m?ktNE(+m[1]).replace(/\(um\)/,'(uma)').replace(/\(dois\)/,'(duas)'):null;
+  r.foro=((flat.match(/foro\s+da\s+(?:cidade|comarca)\s+de\s+([A-ZÀ-Úa-zà-ú' ]+?)\s*[,.]/i)||[])[1]||'').trim()||null;
+  r.email_lgpd=((sec('prote[çc][ãa]o de dados','CL[ÁA]USULA').match(/[\w.+-]+@[\w-]+\.[\w.]+/)||[])[0]||'').replace(/\.$/,'')||null;
+  r.armazenamento=((flat.match(/dados ser[ãa]o armazenados\s+(.+?)\./i)||[])[1]||'').trim()||null;
+  // data e cidade da assinatura: a última "Cidade, 15 de setembro de 2025"
+  const ds=[...flat.matchAll(/([A-ZÀ-Ú][A-Za-zÀ-ú' ]{2,40}?)\s*,\s*(\d{1,2})\s+de\s+([A-Za-zçÇ]+)\s+de\s+(\d{4})/g)].filter(x=>KT_MES[x[3].toLowerCase()]);
+  const d=ds[ds.length-1];if(d){r.data=`${d[4]}-${String(KT_MES[d[3].toLowerCase()]).padStart(2,'0')}-${d[2].padStart(2,'0')}`;r.cidade=d[1].trim().split(/\s+(?=[A-ZÀ-Ú])/).slice(-3).join(' ')}
+  if(!r.contratante?.cnpj)r.avisos.push('Não encontrei o CNPJ do contratante. Confira o arquivo.');
+  if(r.valor_mensal==null)r.avisos.push('Não encontrei a mensalidade. Digite o valor.');
+  return r}
+// o texto do contrato vira modelo: marca títulos, cláusulas, itens e troca os dados do cliente por {{campos}}
+function ktParaModelo(ps,r){const out=[];let fim=false,clPend=false;
+  const ini=ps.findIndex(p=>/^CONTRATO DE/i.test(p));
+  for(const p0 of ps.slice(ini>0?ini:0)){if(fim)break;const p=p0.trim();if(!p)continue;let m;
+    if(/^(Relat[óo]rio de auditoria|Identificador:|Trilha de auditoria)/i.test(p))break;
+    if(/^E,? por estarem/i.test(p)){out.push('E, por estarem justas e contratadas, as partes assinam o presente contrato eletronicamente, para um só efeito.','','>> {{cidade_assinatura}}, {{data_assinatura}}.','','{{assinaturas}}');fim=true;break}
+    if(!out.length&&/^CONTRATO DE/i.test(p)){out.push('# '+p,'');continue}
+    if(/^IDENTIFICA[ÇC][ÃA]O DAS PARTES/i.test(p)){out.push('### '+p,'');continue}
+    if((m=p.match(/^CL[ÁA]USULA\s+[A-ZÀ-Ú]+(?:\s+[A-ZÀ-Ú]+)?\s*(?:[-–—:]\s*(.+))?$/i))&&p.length<90){if(m[1]){out.push('','## '+m[1].toUpperCase(),'');clPend=false}else clPend=true;continue}
+    if(clPend){out.push('','## '+p.toUpperCase(),'');clPend=false;continue}
+    if((m=p.match(/^(\d+)((?:\.\d+)+)\.?\s+(.*)/))){out.push('+'.repeat(Math.min(3,m[2].split('.').length-1))+' '+m[3]);continue}
+    if((m=p.match(/^[•\-–]\s*(.*)/))){out.push('- '+m[1]);continue}
+    if(/\|/.test(p)&&p.split('|').length>1){out.push(p.replace(/\s*\|\s*/g,': '));continue}
+    if(/^_{3,}|^Contratad[ao]\s*[-–]|^Contratante\s*[-–]|^Assinado digitalmente$/i.test(p))continue;
+    out.push(p,'')}
+  let t=out.join('\n').replace(/\n{3,}/g,'\n\n');const trocas=[];
+  const troca=(de,para,rot)=>{if(!de||String(de).length<3)return;const re=new RegExp(String(de).replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+'),'g');const n=(t.match(re)||[]).length;if(n){t=t.replace(re,para);trocas.push(rot)}};
+  [['contratante','contratante'],['contratada','contratada']].forEach(([k,c])=>{const p=r[k];if(!p)return;
+    troca(p.razao&&p.fantasia?`${p.razao} - ${p.fantasia}`:'',`{{${c}_razao}}`,'');troca(p.razao,`{{${c}_razao}}`,`razão social do ${c}`);troca(p.cnpj,`{{${c}_cnpj}}`,`CNPJ do ${c}`);
+    troca(p.endereco,`{{${c}_endereco}}`,`endereço do ${c}`);troca(p.representante,`{{${c}_representante}}`,`representante do ${c}`);troca(p.cpf,`{{${c}_cpf}}`,`CPF do ${c}`)});
+  const tv=(v,k,rot)=>{if(v==null)return;const s=showMoney(v).replace('.','\\.?');const re=new RegExp('R\\$\\s*'+s+'(\\s*\\([^)]*\\))?','g');if(re.test(t)){t=t.replace(re,`R$ {{${k}}} ({{${k}_extenso}})`);trocas.push(rot)}};
+  tv(r.valor_mensal,'valor_mensal','mensalidade');tv(r.valor_implantacao,'valor_implantacao','auditoria inicial');tv(r.taxa_visita,'taxa_visita','taxa da visita');
+  if(r.limite_colaboradores)troca(`até ${r.limite_colaboradores} colaboradores`,'até {{limite_colaboradores}} colaboradores','limite de colaboradores');
+  if(r.email_lgpd)troca(r.email_lgpd,'{{email_lgpd}}','e-mail da LGPD');
+  if(r.foro)t=t.replace(new RegExp('Foro da (?:Cidade|Comarca) de\\s+'+r.foro.replace(/\s+/g,'\\s+'),'i'),()=>{trocas.push('foro');return 'Foro da Comarca de {{foro}}'});
+  return {corpo:t.trim(),trocas:trocas.filter(Boolean)}}
+// ---------- tela de importar ----------
+let KT=null;
+// próximo aniversário do contrato (o reajuste é anual); se o deste ano já passou, avisa na tela para conferir se foi aplicado
+const ktProxReaj=ini=>{if(!ini)return '';let d=ctMeses(ini,12);while(d<TODAY)d=ctMeses(d,12);return d};
+function ktImpAbre(pre){pre=pre||{};KT={pre};
+  ctMostra('ktimp',pre.cont||pre.cli||null,'Importar contrato','<span class="chip c-done">Lê o PDF ou o Word</span>',
+    `<p class="note" style="margin:0 0 8px">Escolha o contrato em PDF (assinado ou não, inclusive escaneado) ou em Word (.docx). O sistema lê as partes, o CNPJ, o endereço, o representante, os serviços, os valores, o vencimento, o reajuste, a vigência e a data. Nada é gravado antes de você conferir e clicar em <b>Gravar</b>, e tudo tem Desfazer.</p>
+    <div class="fields"><label class="f wide">Arquivo do contrato (PDF ou .docx)<input type="file" id="kt_file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label></div>
+    <p class="note" id="kt_prog" style="margin:6px 0 0"></p><div id="kt_rev"></div>`,
+    (pre.voltar?ctBtn('ktvolta','Voltar','ghost'):'')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('ktgrava','Gravar','primary'));
+  dlgCtl.classList.add('ktLargo');$('ctdFoot').querySelector('[data-ctact="ktgrava"]').disabled=true;
+  $('kt_file').onchange=()=>{const f=$('kt_file').files[0];if(f)ktLeArquivo(f)};
+  if(pre.arquivo)ktLeArquivo(pre.arquivo,pre.docExistente);
+}
+async function ktLeArquivo(f,docExistente){const pr=$('kt_prog');pr.textContent='Lendo o contrato…';$('kt_rev').innerHTML='';
+  try{let ps,tudo;
+    if(/\.docx$/i.test(f.name)||/wordprocessingml/.test(f.type)){ps=await ktDocx(await f.arrayBuffer());tudo=ps.join('\n')}
+    else if(/\.doc$/i.test(f.name))throw new Error('Arquivo .doc antigo: no Word, use Salvar como › Documento do Word (.docx) ou PDF e importe de novo.');
+    else if(/\.pdf$/i.test(f.name)||f.type==='application/pdf'){const ls=await ktPdfLinhas(f,t=>pr.textContent=t);tudo=ls.join('\n');ps=ktParagrafos(ls)}
+    else throw new Error('Escolha um PDF ou um Word (.docx).');
+    const r=ktLe(ps,tudo);KT.f=f;KT.ps=ps;KT.r=r;KT.docExistente=docExistente||null;
+    pr.textContent=`Lido: ${f.name}${r.autentique?.assinado?' · assinado pela Autentique':''}. Confira e corrija o que precisar.`;ktRevisa();
+  }catch(e){console.error(e);pr.innerHTML=`<span class="neg">${esc(e.senha?'O PDF tem senha.':e.message||'Não consegui ler o arquivo.')}</span>`}}
+// cliente pelo CNPJ: o da Gestão Controlacs ou a empresa do portal
+function ktAchaCli(cnpj){const d=fcDig(cnpj);if(d.length<11)return {};
+  const cli=CTL.cli.find(c=>fcDig(c.cnpj_cpf)===d)||CTL.cli.find(c=>{const e=c.empresa_id&&CLIENTES.find(x=>x.id===c.empresa_id);return e&&fcDig(e.cnpj)===d});
+  const emp=CLIENTES.find(x=>fcDig(x.cnpj)===d);return {cli,emp}}
+function ktRevisa(){const r=KT.r,p=r.contratante||{},q=r.contratada||{},pre=KT.pre;
+  const {cli,emp}=ktAchaCli(p.cnpj),cliPre=pre.cli||(pre.cont&&ctCli(pre.cont.cliente_id));
+  const alvo=cliPre?.id||cli?.id||(emp?'emp:'+emp.id:'novo');
+  const i=(id,t,v,o='')=>`<label class="f${/wide/.test(o)?' wide':''}">${t}<input id="${id}" value="${esc(v??'')}" ${o.replace('wide','')}></label>`;
+  const conts=c=>CTL.cont.filter(x=>x.cliente_id===c);
+  $('kt_rev').innerHTML=`${r.avisos.length?`<div class="alerta" style="margin:8px 0"><b>Confira</b><span>${r.avisos.map(esc).join(' ')}</span></div>`:''}
+  <h3 class="ktH">Contratante (cliente)</h3><div class="fields">${i('kt_razao','Razão social',p.razao,'wide')}${i('kt_cnpj','CNPJ',p.cnpj)}${i('kt_rep','Representante',p.representante)}${i('kt_cpf','CPF do representante',p.cpf)}${i('kt_email','E-mail de quem assina',p.email)}${i('kt_end','Endereço',p.endereco,'wide')}</div>
+  <h3 class="ktH">Cliente no sistema</h3><div class="fields"><label class="f wide">Gravar em<select id="kt_alvo">
+    ${CTL.cli.map(c=>`<option value="${c.id}"${c.id===alvo?' selected':''}>Cliente: ${esc(c.nome)}${c.id===cli?.id?' (mesmo CNPJ)':''}</option>`).join('')}
+    ${emp&&!cli?`<option value="emp:${emp.id}"${alvo==='emp:'+emp.id?' selected':''}>Empresa do portal: ${esc(emp.nome)} (mesmo CNPJ), criar o cliente ligado</option>`:''}
+    <option value="novo"${alvo==='novo'?' selected':''}>Cliente novo (cadastro com estes dados)</option></select></label>
+    <label class="f wide" id="kt_contBox">Contrato<select id="kt_cont"></select></label></div>
+  <p class="note" style="margin:2px 0 0">Do cliente, só os campos vazios são preenchidos (o que já está no cadastro não muda). Representante, CPF e e-mail ficam guardados para os próximos contratos.</p>
+  <h3 class="ktH">Contrato</h3><div class="fields">${i('kt_tit','Nome do contrato',r.titulo,'wide')}
+    <div class="f wide"><span>Serviços</span><div class="row" style="gap:16px;flex-wrap:wrap"><label class="row" style="gap:6px"><input type="checkbox" id="kt_rh" style="width:auto"${r.rh?' checked':''}> DP e RH administrativo</label><label class="row" style="gap:6px"><input type="checkbox" id="kt_fin" style="width:auto"${r.fin?' checked':''}> BPO financeiro</label></div></div>
+    ${i('kt_ini','Início (data da assinatura)',r.data||'','type="date"')}${i('kt_reaj','Próximo reajuste',ktProxReaj(r.data),'type="date"')}${i('kt_vig','Vigência (meses)',r.vigencia_meses||12,'type="number" min="1" max="120"')}
+    <label class="f">Renovação<select id="kt_ren"><option value="1"${r.renova!==false?' selected':''}>Automática</option><option value="0"${r.renova===false?' selected':''}>Precisa renovar</option></select></label>
+    ${i('kt_valor','Mensalidade',showMoney(r.valor_mensal),'class="money" inputmode="decimal"')}${i('kt_dia','Dia do vencimento',r.dia_vencimento||'','type="number" min="1" max="31"')}${i('kt_vtxt','Vencimento (como está no contrato)',r.vencimento_texto||'','wide')}
+    <label class="f">Índice do reajuste<select id="kt_ind">${ctOpts(CTIND,r.indice||'IPCA')}</select></label>${i('kt_aviso','Aviso prévio (dias)',r.aviso_dias||30,'type="number" min="0" max="365"')}
+    ${i('kt_impl','Auditoria inicial / implantação',showMoney(r.valor_implantacao),'class="money" inputmode="decimal"')}${i('kt_parc','Parcelas da implantação',r.parcelas||'','type="number" min="1" max="24"')}
+    ${i('kt_vis','Taxa por visita extra',showMoney(r.taxa_visita),'class="money" inputmode="decimal"')}${i('kt_lcol','RH: até quantos colaboradores',r.limite_colaboradores||'','type="number" min="0"')}${i('kt_llan','Financeiro: até quantos lançamentos/mês',r.limite_lancamentos||'','type="number" min="0"')}
+    ${i('kt_prazo','Prazo de atendimento',r.prazo_atendimento||'')}${i('kt_foro','Foro',r.foro||'')}${i('kt_cid','Cidade da assinatura',r.cidade||'')}</div>
+  <h3 class="ktH">Contratada (Controlacs)</h3><div class="fields">${i('kt_crazao','Razão social',q.razao,'wide')}${i('kt_ccnpj','CNPJ',q.cnpj)}${i('kt_crep','Representante',q.representante)}${i('kt_ccpf','CPF',q.cpf)}${i('kt_cemail','E-mail',q.email)}${i('kt_cend','Endereço',q.endereco,'wide')}</div>
+  <h3 class="ktH">O que gravar</h3><div style="display:grid;gap:6px">
+    <label class="row" style="gap:6px"><input type="checkbox" id="kt_gcli" style="width:auto" checked> Preencher o cadastro do cliente (só o que estiver vazio)</label>
+    <label class="row" style="gap:6px"><input type="checkbox" id="kt_gcont" style="width:auto" checked> Contrato em Contratos e reajustes (valor, vencimento, reajuste em 12 meses, serviços)</label>
+    <label class="row" style="gap:6px"><input type="checkbox" id="kt_gdoc" style="width:auto"${KT.docExistente?' disabled':' checked'}> ${KT.docExistente?'O arquivo já está nos documentos':'Guardar o arquivo nos documentos do cliente'+(r.autentique?.assinado?' (como contrato assinado)':'')}</label>
+    <label class="row" style="gap:6px"><input type="checkbox" id="kt_gmod" style="width:auto"${CTL.modOk&&!(CTL.mod||[]).length?' checked':''}${CTL.modOk?'':' disabled'}> Usar o texto deste contrato como modelo para os próximos clientes${CTL.modOk?'':' <span class="muted">(rode a atualização v162 do banco)</span>'}</label></div>`;
+  const desCont=()=>{const a=$('kt_alvo').value,ks=/^emp:|novo/.test(a)?[]:conts(a);
+    $('kt_cont').innerHTML=`<option value="">Criar um contrato novo</option>${ks.map(k=>`<option value="${k.id}"${k.id===pre.cont?.id?' selected':''}>Atualizar: ${esc(k.titulo)} (${esc(CTSIT.ctlcont[k.situacao]?.[1]||k.situacao)})</option>`).join('')}`;$('kt_contBox').hidden=!ks.length};
+  $('kt_alvo').onchange=desCont;desCont();
+  const rjAnt=r.data&&ctMeses(ktProxReaj(r.data),-12);if(rjAnt&&rjAnt>r.data)$('kt_reaj').insertAdjacentHTML('afterend',`<span class="note">O reajuste de ${dBR(rjAnt)} já passou. Se ainda não foi aplicado, ponha essa data aqui para o aviso aparecer.</span>`);
+  $('ctdFoot').querySelector('[data-ctact="ktgrava"]').disabled=false;
+}
+const ktN=id=>{const v=ctV(id);return v===''?null:Number(v)};
+const ktM=id=>{const v=parseMoney(ctV(id));return v==null||isNaN(v)?null:v};
+// acha ou cria o serviço pelo nome (para marcar no contrato); devolve {id,nome} e se foi criado
+async function ktServico(nome,cob,criados){const s=CTL.serv.find(x=>semAcento(x.nome)===semAcento(nome));if(s)return s;
+  const {data,error}=await sb.from('ctl_servicos').insert({nome,cobranca:cob||'mensal',ativo:true}).select().single();if(error)throw error;criados.push(data.id);CTL.serv.push(data);return data}
+async function ktGrava(bt){const r=KT.r;if(!r)return;
+  const alvo=$('kt_alvo').value,un={cli:null,cliNovo:null,cont:null,contAnt:null,doc:null,arq:null,mod:null,serv:[]};
+  const rep={nome:ctV('kt_rep'),cpf:ctV('kt_cpf'),email:ctV('kt_email')};
+  bt.disabled=true;$('ctdErr').hidden=true;
+  try{
+    // 1) cliente
+    let cli=/^emp:|novo/.test(alvo)?null:ctCli(alvo);
+    const dados={razao_social:ctV('kt_razao')||null,cnpj_cpf:ctV('kt_cnpj')||null,endereco:ctV('kt_end')||null,contato:rep.nome||null,email:rep.email||null};
+    if(!cli){const emp=alvo.startsWith('emp:')?CLIENTES.find(x=>x.id===alvo.slice(4)):null;
+      const nome=emp?.nome||r.contratante?.fantasia||ctV('kt_razao')||'Cliente';
+      const {data,error}=await sb.from('ctl_clientes').insert({nome,...dados,empresa_id:emp?.id||null,situacao:'ativo',cliente_desde:ctV('kt_ini')||null,extra:{representante:rep}}).select().single();
+      if(error)throw error;cli=data;un.cliNovo=data.id}
+    else if($('kt_gcli').checked){const upd={};Object.entries(dados).forEach(([k,v])=>{if(v&&!String(cli[k]||'').trim())upd[k]=v});
+      if(!cli.cliente_desde&&ctV('kt_ini'))upd.cliente_desde=ctV('kt_ini');
+      const ra=cli.extra?.representante||{};upd.extra={...(cli.extra||{}),representante:{nome:ra.nome||rep.nome,cpf:ra.cpf||rep.cpf,email:ra.email||rep.email}};
+      un.cli={id:cli.id,ant:Object.fromEntries(Object.keys(upd).map(k=>[k,cli[k]??null]))};
+      const {error}=await sb.from('ctl_clientes').update({...upd,atualizado_em:new Date().toISOString()}).eq('id',cli.id);if(error)throw error}
+    // 2) contrato
+    let cont=null;
+    if($('kt_gcont').checked){const sv=[];
+      if($('kt_rh').checked)sv.push(await ktServico('DP e RH administrativo','mensal',un.serv));if($('kt_fin').checked)sv.push(await ktServico('BPO financeiro','mensal',un.serv));
+      const ini=ctV('kt_ini')||null,vig=ktN('kt_vig')||12,valor=ktM('kt_valor'),ren=$('kt_ren').value==='1';
+      const campos={vencimento_texto:ctV('kt_vtxt'),valor_implantacao:showMoney(ktM('kt_impl')),parcelas_implantacao:ctV('kt_parc'),taxa_visita:showMoney(ktM('kt_vis')),
+        limite_colaboradores:ctV('kt_lcol'),limite_lancamentos:ctV('kt_llan'),prazo_atendimento:ctV('kt_prazo'),foro:ctV('kt_foro'),cidade_assinatura:ctV('kt_cid'),vigencia_meses:String(vig),aviso_dias:ctV('kt_aviso'),
+        ...(r.visitas_mes?{visitas_mes:r.visitas_mes}:{}),...(ini?{data_assinatura:ktDataExt(ini)}:{})};
+      Object.keys(campos).forEach(k=>{if(!campos[k])delete campos[k]});
+      const obs=['Importado do arquivo '+KT.f.name+' em '+dBR(TODAY)+'.',ktM('kt_impl')?`Auditoria inicial ${fm(ktM('kt_impl'))}${ctV('kt_parc')?' em até '+ctV('kt_parc')+'x':''}.`:'',ktM('kt_vis')?`Visita extra ${fm(ktM('kt_vis'))}.`:'',ctV('kt_vtxt')?'Vencimento: '+ctV('kt_vtxt')+'.':'',ctV('kt_prazo')?'Atendimento em até '+ctV('kt_prazo')+'.':''].filter(Boolean).join(' ');
+      const servicos=sv.map(s=>({id:s.id,nome:s.nome,valor:sv.length===1?valor:null}));
+      const row={titulo:ctV('kt_tit')||r.titulo,cliente_id:cli.id,situacao:'vigente',inicio:ini,fim:ren||!ini?null:ctMeses(ini,vig),renovacao_automatica:ren,valor_mensal:valor,
+        dia_vencimento:ktN('kt_dia'),servicos,indice_reajuste:$('kt_ind').value,data_reajuste:ctV('kt_reaj')||(ini?ktProxReaj(ini):null),periodicidade_meses:12,atualizado_em:new Date().toISOString()};
+      const ex=ctV('kt_cont')&&CTL.cont.find(x=>x.id===ctV('kt_cont'));
+      const kt={rh:$('kt_rh').checked,fin:$('kt_fin').checked,campos,importado:{arquivo:KT.f.name,em:TODAY,autentique:r.autentique?.id||null}};
+      if(ex){const upd={...row,obs:[ex.obs,obs].filter(Boolean).join('\n'),extra:{...(ex.extra||{}),kt}};
+        un.contAnt={id:ex.id,ant:Object.fromEntries(Object.keys(upd).map(k=>[k,ex[k]??null]))};
+        const {data,error}=await sb.from('ctl_contratos').update(upd).eq('id',ex.id).select().single();if(error)throw error;cont=data}
+      else{const {data,error}=await sb.from('ctl_contratos').insert({...row,obs,extra:{kt}}).select().single();if(error)throw error;cont=data;un.cont=data.id}}
+    // 3) arquivo
+    let docId=KT.docExistente?.id||null;
+    if(!KT.docExistente&&$('kt_gdoc').checked){const up=await ctUpload(KT.f);un.arq=up.caminho;
+      const {data,error}=await sb.from('ctl_documentos').insert({nome:'Contrato '+(ctV('kt_tit')||r.titulo)+(r.autentique?.assinado?' (assinado)':'')+(ctV('kt_ini')?' '+dBR(ctV('kt_ini')):''),tipo:'contrato',cliente_id:cli.id,contrato_id:cont?.id||null,obs:r.autentique?.assinado?'Assinado pela Autentique'+(r.autentique.id?' ('+r.autentique.id.slice(0,16)+'…)':'')+'. Importado em '+dBR(TODAY)+'.':'Importado em '+dBR(TODAY)+'.',...up}).select().single();
+      if(error)throw error;docId=data.id;un.doc=data.id}
+    else if(KT.docExistente&&cont&&!KT.docExistente.contrato_id){await sb.from('ctl_documentos').update({contrato_id:cont.id,cliente_id:KT.docExistente.cliente_id||cli.id}).eq('id',KT.docExistente.id)}
+    // 4) modelo
+    if($('kt_gmod').checked&&CTL.modOk){const {corpo,trocas}=ktParaModelo(KT.ps,{...r,contratante:{...r.contratante,razao:ctV('kt_razao'),cnpj:ctV('kt_cnpj'),endereco:ctV('kt_end'),representante:rep.nome,cpf:rep.cpf}});
+      const contratada={razao:ctV('kt_crazao'),cnpj:ctV('kt_ccnpj'),endereco:ctV('kt_cend'),representante:ctV('kt_crep'),cpf:ctV('kt_ccpf'),email:ctV('kt_cemail')};
+      const padrao={};[['foro','kt_foro'],['cidade_assinatura','kt_cid'],['prazo_atendimento','kt_prazo'],['indice_reajuste','kt_ind']].forEach(([k,id])=>{const v=id==='kt_ind'?$('kt_ind').value:ctV(id);if(v)padrao[k]=v});
+      if(r.email_lgpd)padrao.email_lgpd=r.email_lgpd;if(r.armazenamento)padrao.armazenamento=r.armazenamento;
+      const {data,error}=await sb.from('ctl_modelos_contrato').insert({nome:'Modelo '+(ctV('kt_tit')||r.titulo)+' (de '+(ctV('kt_razao')||'contrato importado').split(' ').slice(0,3).join(' ')+')',servicos:[$('kt_rh').checked&&'rh',$('kt_fin').checked&&'fin'].filter(Boolean),corpo,contratada,padrao,origem_documento_id:docId,extra:{trocas}}).select().single();
+      if(error)throw error;un.mod=data.id}
+    await ctCarrega().catch(()=>{});ctDesenha();ctBadgeCalc();
+    const feito=[un.cliNovo?'cliente novo':un.cli?'cadastro do cliente':'',cont?(un.contAnt?'contrato atualizado':'contrato'):'',un.doc?'arquivo nos documentos':'',un.mod?'modelo':''].filter(Boolean).join(', ');
+    KT.desfaz=()=>ktDesfazImp(un);toastDesfazer('Contrato importado: '+feito+'.',KT.desfaz);
+    ktDepois(cli,cont,un);
+  }catch(e){console.error(e);bt.disabled=false;await ktDesfazImp(un,true).catch(()=>{});ctErr('Não foi possível gravar. Nada ficou pela metade. '+(e.message||''))}}
+async function ktDesfazImp(un,quieto){
+  if(un.mod)await sb.from('ctl_modelos_contrato').delete().eq('id',un.mod);
+  if(un.doc)await sb.from('ctl_documentos').delete().eq('id',un.doc);if(un.arq)await sb.storage.from('controlacs').remove([un.arq]).catch(()=>{});
+  if(un.cont)await sb.from('ctl_contratos').delete().eq('id',un.cont);if(un.contAnt)await sb.from('ctl_contratos').update(un.contAnt.ant).eq('id',un.contAnt.id);
+  for(const s of un.serv)await sb.from('ctl_servicos').delete().eq('id',s);
+  if(un.cliNovo)await sb.from('ctl_clientes').delete().eq('id',un.cliNovo);if(un.cli)await sb.from('ctl_clientes').update(un.cli.ant).eq('id',un.cli.id);
+  if(quieto)return;await ctCarrega().catch(()=>{});ctDesenha();ctBadgeCalc();if(dlgCtl.open&&/^kt/.test(CTL.dlg?.tipo||''))dlgCtl.close();toast('Importação desfeita: tudo voltou como estava.')}
+// depois de gravar: completar a ficha da empresa, abrir o contrato ou o modelo
+function ktDepois(cli,cont,un){const emp=cli?.empresa_id&&CLIENTES.find(x=>x.id===cli.empresa_id),r=KT.r;
+  ctMostra('ktok',cont||cli,'Contrato importado','<span class="chip c-ok">Gravado</span>',
+    `<p style="margin:0 0 10px">Gravado em <b>${esc(cli.nome)}</b>${cont?`, contrato <b>${esc(cont.titulo)}</b>${cont.valor_mensal!=null?' de '+fm(cont.valor_mensal)+' por mês':''}${cont.data_reajuste?', próximo reajuste em '+dBR(cont.data_reajuste):''}`:''}. Use o <b>↶ Desfazer</b> do aviso para voltar tudo.</p>
+    <div style="display:grid;gap:8px">
+    ${typeof fcAbre==='function'?(emp?`<div class="row" style="gap:8px"><button type="button" class="btn" data-ctact="ktficha">📋 Completar a ficha da empresa ${esc(emp.nome)} com os dados do contrato</button></div>`
+      :`<div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-ctact="ktfichanova">📋 Cadastrar a empresa no portal (ficha com busca na Receita)</button><span class="note">Só se este cliente também vai usar o portal.</span></div>`):''}
+    ${cont?`<div class="row" style="gap:8px"><button type="button" class="btn" data-ctact="ktabrecont">Abrir o contrato</button></div>`:''}
+    ${un.mod?`<div class="row" style="gap:8px"><button type="button" class="btn" data-ctact="ktabremod" data-id="${un.mod}">📝 Conferir o modelo criado</button><span class="note">Os dados do cliente viraram campos que o sistema preenche nos próximos contratos.</span></div>`:''}</div>`,
+    ctBtn('ktdesfaz','↶ Desfazer a importação','ghost')+'<span class="spacer"></span>'+ctBtn('fechar','Fechar','primary'));
+  KT.ok={cli,cont,emp}}
+// abre a ficha e preenche só o que estiver vazio (a ficha tem o próprio Salvar e Desfazer)
+function ktPreencheFicha(){const {cli,emp}=KT.ok,r=KT.r,p={...r.contratante},novo=!emp;dlgCtl.close();
+  if(novo)fcAbre(null,{ctl:true});else fcAbre(emp.id);if(!FC)return;if(novo)FC.ligaCtl=cli.id;
+  const poe=(id,v)=>{const el=$(id);if(el&&v&&!el.value.trim()){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))}};
+  poe('fc_razao',p.razao);poe('fc_fantasia',p.fantasia);poe('fc_resp',p.representante);poe('fc_email',p.email);
+  if(r.rh&&$('fc_rh')&&!$('fc_rh').checked){$('fc_rh').checked=true;$('fc_rh').dispatchEvent(new Event('change',{bubbles:true}))}
+  if(r.fin===false&&r.rh&&novo&&$('fc_fin'))$('fc_fin').checked=false;if(r.fin&&$('fc_fin'))$('fc_fin').checked=true;
+  if(p.cnpj&&!fcDig($('fc_cnpj').value)){$('fc_cnpj').value=p.cnpj;FC.ultCnpj=fcDig(p.cnpj);fcReceita(false)}
+  fcChip();toast('A ficha abriu com os dados do contrato nos campos vazios. Confira e clique em Salvar.')}
+// ---------- modelos ----------
+function ktModLista(){
+  const l=ktMods();
+  ctMostra('ktmods',null,'Modelos de contrato','',
+    `${CTL.modOk?'':'<div class="alerta" style="margin:0 0 10px"><b>Falta a atualização v162 do banco.</b><span>Sem ela dá para usar o modelo padrão e gerar contratos, mas não para guardar modelos seus.</span></div>'}
+    <p class="note" style="margin:0 0 8px">O modelo é o texto do contrato com campos entre chaves, como <code>{{contratante_razao}}</code>, que o sistema preenche com os dados da ficha, do cliente e do contrato. Para criar um a partir de um contrato que você já tem, use <b>📄 Importar contrato</b>.</p>
+    <div class="card tablebox"><table><thead><tr><th class="l">Modelo</th><th class="l">Serviços</th><th>Atualizado</th><th></th></tr></thead><tbody>
+    ${l.map(m=>`<tr><td class="l"><b>${esc(m.nome)}</b>${m.fixo?'<br><span class="muted">Já vem no sistema. Para mudar, faça uma cópia.</span>':''}</td><td class="l">${(m.servicos||[]).map(s=>s==='rh'?'DP e RH':'Financeiro').join(' e ')||'—'}</td><td>${m.atualizado_em?dtBR(m.atualizado_em):'—'}</td>
+      <td style="white-space:nowrap"><button type="button" class="btn small" data-ctact="ktmodabre" data-id="${m.id}">${m.fixo?'Ver':'Editar'}</button>${CTL.modOk?`<button type="button" class="btn small" data-ctact="ktmoddup" data-id="${m.id}">⧉ Copiar</button>`:''}${m.fixo?'':`<button type="button" class="btn ghost small" data-ctact="ktmodexc" data-id="${m.id}" title="Excluir (tem Desfazer)">✕</button>`}</td></tr>`).join('')}</tbody></table></div>`,
+    '<span class="spacer"></span>'+ctBtn('fechar','Fechar','ghost')+ctBtn('ktnovoimp','📄 Importar contrato','')+(CTL.modOk?ctBtn('ktmodnovo','+ Novo modelo','primary'):''));
+}
+function ktModAbre(m,copia){const ro=m?.fixo&&!copia,cli=CTL.cli.find(c=>CTL.cont.some(k=>k.cliente_id===c.id))||CTL.cli[0];
+  const x=copia?{...m,id:null,fixo:false,nome:(m.nome||'')+' (cópia)'}:m||{nome:'',servicos:['rh'],corpo:KT_PADRAO_TXT,contratada:{},padrao:{...KT_PADRAO.padrao}};
+  KT={...(KT||{}),mod:x};const ct=x.contratada||{},pd=x.padrao||{};
+  const i=(id,t,v)=>`<label class="f">${t}<input id="${id}" value="${esc(v??'')}"${ro?' readonly':''}></label>`;
+  ctMostra('ktmod',x,ro?x.nome:x.id?'Editar modelo':'Novo modelo',ro?'<span class="chip c-none">Só leitura</span>':'',
+    `<div class="fields"><label class="f wide">Nome do modelo *<input id="km_nome" value="${esc(x.nome)}"${ro?' readonly':''}></label>
+    <div class="f wide"><span>Serve para</span><div class="row" style="gap:16px"><label class="row" style="gap:6px"><input type="checkbox" id="km_rh" style="width:auto"${(x.servicos||[]).includes('rh')?' checked':''}${ro?' disabled':''}> DP e RH</label><label class="row" style="gap:6px"><input type="checkbox" id="km_fin" style="width:auto"${(x.servicos||[]).includes('fin')?' checked':''}${ro?' disabled':''}> BPO financeiro</label></div></div></div>
+    ${x.fixo||m?.fixo?`<details class="card" style="padding:8px 12px;margin:8px 0" open><summary><b>O que este modelo melhora em relação ao contrato antigo</b></summary><ul style="margin:6px 0 0;padding-left:18px">${KT_MELHORIAS.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></details>`:''}
+    ${x.extra?.trocas?.length?`<p class="note">Campos trocados pelo sistema na importação: ${esc(x.extra.trocas.join(', '))}. Confira se sobrou algum dado do cliente antigo no texto.</p>`:''}
+    <h3 class="ktH">Dados da Controlacs (contratada)</h3><div class="fields">${i('km_crazao','Razão social',ct.razao)}${i('km_ccnpj','CNPJ',ct.cnpj)}${i('km_cend','Endereço',ct.endereco)}${i('km_crep','Representante',ct.representante)}${i('km_ccpf','CPF',ct.cpf)}${i('km_cemail','E-mail de quem assina',ct.email)}</div>
+    <h3 class="ktH">Valores padrão</h3><div class="fields">${['multa','juros','meses_excesso','prazo_atendimento','horario','visitas_mes','indice_reajuste','vigencia_meses','aviso_dias','limite_contas','armazenamento','email_lgpd','cidade_assinatura','foro'].map(k=>i('km_p_'+k,KT_ROT[k]||k,pd[k]??KT_PADRAO.padrao[k]??'')).join('')}</div>
+    <h3 class="ktH">Texto do contrato</h3>
+    <div class="ktEd"><textarea id="km_corpo" rows="26" spellcheck="true"${ro?' readonly':''}>${esc(x.corpo)}</textarea>
+      <div class="ktCampos"><b>Campos</b> <span class="muted">(clique para pôr no texto)</span>${KT_CAMPOS.map(([g,cs])=>`<div class="muted" style="margin-top:6px">${esc(g)}</div>${cs.map(([k,t])=>`<button type="button" class="btn small ghost" data-ctact="ktcampo" data-k="${k}" title="{{${k}}}">${esc(t)}</button>`).join('')}`).join('')}
+      <div class="muted" style="margin-top:8px">Como escrever</div><div class="note" style="margin:0"><code>## TÍTULO</code> cláusula (numera sozinha)<br><code>+</code> item, <code>++</code> subitem, <code>+++</code><br><code>-</code> marcador · <code>**negrito**</code><br><code>{{#rh}}…{{/rh}}</code> só com RH<br><code>{{#fin}}…{{/fin}}</code> só com financeiro<br><code>{{#valor_implantacao}}…{{/valor_implantacao}}</code> só se tiver valor<br><code>&gt;&gt;</code> à direita · <code>{{assinaturas}}</code> · <code>{{quebra}}</code> nova página</div></div></div>
+    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><label class="f" style="min-width:240px">Prévia com os dados de<select id="km_prev"><option value="">Exemplo (sem cliente)</option>${CTL.cont.map(k=>`<option value="${k.id}">${esc(k.titulo)} · ${esc(ctCli(k.cliente_id)?.nome||'')}</option>`).join('')}</select></label>
+      <button type="button" class="btn small" data-ctact="ktmodprev">Ver prévia</button><button type="button" class="btn small" data-ctact="ktmodpdf">Ver em PDF</button></div><div id="km_prevBox"></div>`,
+    (x.id&&!ro?ctBtn('ktmodexc','Excluir','ghost'):'')+(x.extra?.anterior&&!ro?ctBtn('ktmoddesf','↶ Desfazer a última alteração','ghost'):'')+ctBtn('ktmods','Voltar aos modelos','ghost')+'<span class="spacer"></span>'+(ro?(CTL.modOk?ctBtn('ktmoddup','⧉ Fazer uma cópia para editar','primary'):''):ctBtn('ktmodsalva','Salvar modelo','primary')));
+  if(ro)$('ctdFoot').querySelector('[data-ctact="ktmoddup"]')?.setAttribute('data-id','padrao');
+  dlgCtl.classList.add('ktLargo');
+}
+function ktModLe(){const p={};$('ctdBody').querySelectorAll('[id^="km_p_"]').forEach(el=>{if(el.value.trim())p[el.id.slice(5)]=el.value.trim()});
+  return {nome:ctV('km_nome'),servicos:[$('km_rh').checked&&'rh',$('km_fin').checked&&'fin'].filter(Boolean),corpo:$('km_corpo').value,
+    contratada:{razao:ctV('km_crazao'),cnpj:ctV('km_ccnpj'),endereco:ctV('km_cend'),representante:ctV('km_crep'),cpf:ctV('km_ccpf'),email:ctV('km_cemail')},padrao:p}}
+const KT_EXEMPLO={contratante_razao:'EMPRESA EXEMPLO LTDA',contratante_cnpj:'00.000.000/0001-00',contratante_endereco:'Rua Exemplo, 100, Centro – Florianópolis/SC',contratante_representante:'Nome do Sócio',contratante_cpf:'000.000.000-00',
+  valor_mensal:'1.300,00',valor_implantacao:'700,00',parcelas_implantacao:'2',taxa_visita:'60,00',limite_colaboradores:'25',limite_lancamentos:'300',vencimento_texto:'o 5º (quinto) dia útil do mês subsequente à prestação dos serviços',rh:'1',fin:'1'};
+function ktModPrev(pdf){const m={...KT.mod,...ktModLe()},k=CTL.cont.find(x=>x.id===$('km_prev').value);
+  const v=k?ktCampos(k,m):{...KT_PADRAO.padrao,...m.padrao,...Object.fromEntries(Object.entries(m.contratada).map(([a,b])=>['contratada_'+a,b])),data_assinatura:ktDataExt(TODAY),...KT_EXEMPLO,rh:$('km_rh').checked||!$('km_fin').checked?'1':'',fin:$('km_fin').checked?'1':''};
+  const a=ktAplica(m.corpo,v),bl=ktBlocos(a.texto);
+  if(pdf)return ktPdf(bl,a.campos,m.nome).then(b=>window.open(URL.createObjectURL(new Blob([b],{type:'application/pdf'})),'_blank')).catch(e=>toast('Não consegui montar o PDF: '+e.message));
+  $('km_prevBox').innerHTML=`${a.falta.length?`<p class="note neg">Campos sem valor nesta prévia: ${esc(a.falta.map(k=>KT_ROT[k]||k).join(', '))}.</p>`:''}<div class="ktDoc">${ktHtml(bl,a.campos)}</div>`;$('km_prevBox').scrollIntoView({block:'nearest',behavior:'smooth'})}
+async function ktModSalva(bt){const m=ktModLe(),x=KT.mod;if(!m.nome)return ctErr('Dê um nome ao modelo.');if(!m.corpo.trim())return ctErr('O texto do contrato está vazio.');
+  const bal=(m.corpo.match(/\{\{#(\w+)\}\}/g)||[]).filter(t=>!m.corpo.includes(t.replace('#','/')));if(bal.length)return ctErr('Falta fechar o bloco '+bal.join(', ')+' (com {{/…}}).');
+  bt.disabled=true;const agora=new Date().toISOString();
+  const row={...m,atualizado_em:agora};
+  if(x?.id){row.extra={...(x.extra||{}),anterior:{nome:x.nome,servicos:x.servicos,corpo:x.corpo,contratada:x.contratada,padrao:x.padrao,em:x.atualizado_em}}}
+  const q=x?.id?sb.from('ctl_modelos_contrato').update(row).eq('id',x.id):sb.from('ctl_modelos_contrato').insert({...row,extra:{...(x?.extra||{}),anterior:undefined}});
+  const {data,error}=await q.select().single();bt.disabled=false;if(error)return fail(error,'Não foi possível salvar o modelo');
+  await ctCarrega().catch(()=>{});
+  if(x?.id)toastDesfazer('Modelo salvo',()=>ktModDesfaz(data.id));else toastDesfazer('Modelo criado',async()=>{await sb.from('ctl_modelos_contrato').delete().eq('id',data.id);await ctCarrega().catch(()=>{});toast('Modelo apagado');if(dlgCtl.open&&/^ktmod/.test(CTL.dlg?.tipo))ktModLista()});
+  ktModLista()}
+async function ktModDesfaz(id){const m=(CTL.mod||[]).find(x=>x.id===id),a=m?.extra?.anterior;if(!a)return toast('Não há alteração para desfazer.');
+  const {error}=await sb.from('ctl_modelos_contrato').update({nome:a.nome,servicos:a.servicos,corpo:a.corpo,contratada:a.contratada,padrao:a.padrao,atualizado_em:new Date().toISOString(),extra:{...m.extra,anterior:null}}).eq('id',id);
+  if(error)return fail(error,'Não foi possível desfazer');await ctCarrega().catch(()=>{});toast('O modelo voltou como estava');if(dlgCtl.open&&/^ktmod/.test(CTL.dlg?.tipo))ktModLista()}
+async function ktModExc(id){const m=(CTL.mod||[]).find(x=>x.id===id);if(!m)return;if(!confirm(`Excluir o modelo “${m.nome}”? Dá para desfazer logo depois.`))return;
+  const {error}=await sb.from('ctl_modelos_contrato').update({excluido_em:new Date().toISOString()}).eq('id',id);if(error)return fail(error,'Não foi possível excluir');
+  await ctCarrega().catch(()=>{});ktModLista();
+  toastDesfazer('Modelo excluído',async()=>{await sb.from('ctl_modelos_contrato').update({excluido_em:null}).eq('id',id);await ctCarrega().catch(()=>{});toast('Modelo de volta');if(dlgCtl.open&&CTL.dlg?.tipo==='ktmods')ktModLista()})}
+// ---------- gerar o contrato pelo modelo ----------
+function ktGerAbre(c,modId){if(!c)return;const t=ktServTipo(c),ms=ktMods();
+  const sug=modId?ms.find(m=>m.id===modId):ms.filter(m=>!m.fixo).find(m=>(t.rh?m.servicos.includes('rh'):true)&&(t.fin?m.servicos.includes('fin'):true))||ms.filter(m=>!m.fixo)[0]||KT_PADRAO;
+  const v=ktCampos(c,sug);KT={...(KT||{}),ger:{c,mod:sug}};
+  const i=(k,o='')=>`<label class="f">${esc(KT_ROT[k]||k)}<input data-ktc="${k}" value="${esc(v[k]??'')}" ${o}></label>`;
+  ctMostra('ktger',c,'Gerar contrato pelo modelo',`<span class="chip c-done">${esc(ctCli(c.cliente_id)?.nome||'')}</span>`,
+    `<div class="fields"><label class="f wide">Modelo<select id="kg_mod">${ms.map(m=>`<option value="${m.id}"${m.id===sug.id?' selected':''}>${esc(m.nome)}</option>`).join('')}</select></label>
+    <div class="f wide"><span>Serviços deste contrato</span><div class="row" style="gap:16px"><label class="row" style="gap:6px"><input type="checkbox" data-ktc="rh" style="width:auto"${v.rh?' checked':''}> DP e RH administrativo</label><label class="row" style="gap:6px"><input type="checkbox" data-ktc="fin" style="width:auto"${v.fin?' checked':''}> BPO financeiro</label></div></div></div>
+    <p class="note" style="margin:4px 0">Os dados vêm da ficha da empresa, do cliente, do contrato e do modelo. O que você mudar aqui vale só para este contrato e fica guardado para a próxima vez (o cadastro não muda).</p>
+    ${KT_CAMPOS.map(([g,cs])=>`<details class="ktGrp"${/Contratante|Valores|Volume/.test(g)?' open':''}><summary><b>${esc(g)}</b></summary><div class="fields">${cs.map(([k])=>i(k,KT_DINHEIRO.includes(k)?'class="money" inputmode="decimal"':'')).join('')}</div></details>`).join('')}
+    <div class="row" style="gap:8px;margin-top:10px"><b>Prévia</b><span class="spacer"></span><button type="button" class="btn small" data-ctact="kgtexto">✎ Ajustar o texto só deste contrato</button></div>
+    <div id="kg_falta"></div><textarea id="kg_txt" rows="18" hidden></textarea><div class="ktDoc" id="kg_prev"></div>`,
+    ctBtn('voltacont','Voltar ao contrato','ghost')+'<span class="spacer"></span>'+ctBtn('kgpdf','Ver em PDF','')+ctBtn('kgguarda','Só guardar o PDF','')+ctBtn('kgenvia','Gerar e enviar para assinatura','primary'));
+  dlgCtl.classList.add('ktLargo');ktGerPrev();
+  $('ctdBody').oninput=e=>{if(CTL.dlg?.tipo==='ktger'&&e.target.matches('[data-ktc]'))ktGerPrev()};
+  $('ctdBody').onchange=e=>{if(CTL.dlg?.tipo!=='ktger')return;if(e.target.id==='kg_mod'){KT.ger.txt=null;ktGerAbreMod()}else if(e.target.matches('[data-ktc]'))ktGerPrev()};
+}
+function ktGerAbreMod(){const m=ktMods().find(x=>x.id===$('kg_mod').value)||KT_PADRAO,c=KT.ger.c,v=ktCampos(c,m),lido=ktGerLe();KT.ger.mod=m;
+  // troca os valores do modelo (contratada e padrões) e mantém o que já foi digitado do cliente e do contrato
+  $('ctdBody').querySelectorAll('[data-ktc]').forEach(el=>{const k=el.dataset.ktc;if(el.type==='checkbox')return;if(/^contratada_/.test(k)||k in (m.padrao||{})||!lido[k])el.value=v[k]??''});ktGerPrev()}
+function ktGerLe(){const o={};$('ctdBody').querySelectorAll('[data-ktc]').forEach(el=>{o[el.dataset.ktc]=el.type==='checkbox'?(el.checked?'1':''):el.value.trim()});return o}
+function ktGerMonta(){const v=ktGerLe(),m=KT.ger.mod;
+  const a=KT.ger.txt!=null?{texto:KT.ger.txt,falta:[...KT.ger.txt.matchAll(/________/g)].length?['algum campo (marcado com ____ no texto)']:[],campos:ktDeriva(v)}:ktAplica(m.corpo,v);return {v,a,bl:ktBlocos(a.texto)}}
+function ktGerPrev(){const {a,bl}=ktGerMonta();
+  $('kg_falta').innerHTML=a.falta.length?`<div class="alerta" style="margin:6px 0"><b>Falta preencher</b><span>${esc(a.falta.map(k=>KT_ROT[k]||k).join(', '))}. No contrato sai “________”.</span></div>`:'';
+  $('kg_prev').innerHTML=ktHtml(bl,a.campos)}
+async function ktGerGera(bt,envia){const c=KT.ger.c,cli=ctCli(c.cliente_id),{v,a,bl}=ktGerMonta();
+  if(a.falta.length&&!confirm(`Falta preencher: ${a.falta.map(k=>KT_ROT[k]||k).join(', ')}. No contrato vai sair “________”. Gerar assim mesmo?`))return;
+  bt.disabled=true;const un={doc:null,arq:null,cont:null,cli:null};
+  try{const bytes=await ktPdf(bl,a.campos,'Contrato '+c.titulo);
+    if(bytes.length>5*1024*1024&&envia)throw new Error('O PDF passou de 5 MB (limite da Autentique).');
+    const nome=`Contrato ${c.titulo} - ${cli?.nome||''} ${TODAY}`.replace(/[\\/:*?"<>|]+/g,' ').trim()+'.pdf';
+    const up=await ctUpload(new File([bytes],nome,{type:'application/pdf'}));un.arq=up.caminho;
+    const {data:d,error}=await sb.from('ctl_documentos').insert({nome:'Contrato '+c.titulo+' (gerado '+dBR(TODAY)+')',tipo:'contrato',cliente_id:c.cliente_id,contrato_id:c.id,obs:'Gerado pelo modelo “'+KT.ger.mod.nome+'”.',...up}).select().single();if(error)throw error;un.doc=d.id;
+    // guarda o que foi digitado: no contrato (valores e condições) e no cliente (representante, CPF e e-mail)
+    const campos={};Object.entries(v).forEach(([k,x])=>{if(!/^contrat(ada|ante)_/.test(k)&&x!==''&&x!==(ktCampos({...c,extra:{...(c.extra||{}),kt:{}}},KT.ger.mod)[k]??''))campos[k]=x});
+    const kt={...(c.extra?.kt||{}),rh:!!v.rh,fin:!!v.fin,campos:{...(c.extra?.kt?.campos||{}),...campos},modelo_id:KT.ger.mod.id,gerado_em:TODAY};
+    un.cont={id:c.id,extra:c.extra??null};await sb.from('ctl_contratos').update({extra:{...(c.extra||{}),kt}}).eq('id',c.id);
+    if(cli){const ra=cli.extra?.representante||{},nr={nome:v.contratante_representante||ra.nome||'',cpf:v.contratante_cpf||ra.cpf||'',email:v.contratante_email||ra.email||''};
+      if(JSON.stringify(nr)!==JSON.stringify({nome:ra.nome||'',cpf:ra.cpf||'',email:ra.email||''})){un.cli={id:cli.id,extra:cli.extra??null};await sb.from('ctl_clientes').update({extra:{...(cli.extra||{}),representante:nr}}).eq('id',cli.id)}}
+    await ctCarrega().catch(()=>{});ctDesenha();
+    const desfaz=async()=>{if(un.doc)await sb.from('ctl_documentos').delete().eq('id',un.doc);if(un.arq)await sb.storage.from('controlacs').remove([un.arq]).catch(()=>{});
+      if(un.cont)await sb.from('ctl_contratos').update({extra:un.cont.extra}).eq('id',un.cont.id);if(un.cli)await sb.from('ctl_clientes').update({extra:un.cli.extra}).eq('id',un.cli.id);
+      await ctCarrega().catch(()=>{});ctDesenha();toast('Contrato gerado apagado; os dados voltaram como estavam.');if(dlgCtl.open&&CTL.dlg?.tipo==='ass')dlgCtl.close()};
+    KT.desfaz=desfaz;toastDesfazer('Contrato gerado e guardado nos documentos.',desfaz);
+    const k=CTL.cont.find(x=>x.id===c.id)||c;
+    if(envia)ctAbreAss(k,{doc:d.id,nome:'Contrato '+c.titulo+(cli?' · '+cli.nome:''),sig:[[v.contratante_representante,v.contratante_email],[v.contratada_representante||ME?.nome||'Controlacs',v.contratada_email||ME?.email||'']]});
+    else ctAbreCont(k);
+  }catch(e){console.error(e);bt.disabled=false;if(un.doc)await sb.from('ctl_documentos').delete().eq('id',un.doc).catch(()=>{});if(un.arq)await sb.storage.from('controlacs').remove([un.arq]).catch(()=>{});ctErr('Não foi possível gerar o contrato. '+(e.message||''))}}
+// ler um contrato que já está nos documentos
+async function ktLerDoc(d){if(!d?.caminho)return;const {data,error}=await sb.storage.from('controlacs').download(d.caminho);if(error)return fail(error,'Não foi possível abrir o arquivo');
+  const f=new File([data],d.nome_arquivo||'contrato.pdf',{type:data.type||(/\.docx$/i.test(d.nome_arquivo)?'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'application/pdf')});
+  ktImpAbre({arquivo:f,docExistente:d,cli:ctCli(d.cliente_id),cont:CTL.cont.find(x=>x.id===d.contrato_id)})}
+// ações (botões data-ctact="kt…" e "kg…")
+async function ktAcao(act,bt){const {obj}=CTL.dlg||{};
+  if(act==='ktimp')return ktImpAbre(CTL.dlg?.tipo==='cli'?{cli:obj,voltar:true}:CTL.dlg?.tipo==='cont'?{cont:obj,voltar:true}:{});
+  if(act==='ktnovoimp')return ktImpAbre({});
+  if(act==='ktvolta'){const p=KT.pre;return p.cont?ctAbreCont(CTL.cont.find(x=>x.id===p.cont.id)||p.cont):p.cli?ctAbreCli(ctCli(p.cli.id)||p.cli):dlgCtl.close()}
+  if(act==='ktgrava')return ktGrava(bt);
+  // o aviso com Desfazer fica atrás da janela aberta: o mesmo Desfazer também vai num botão da janela
+  if(act==='ktdesfaz'){if(!KT?.desfaz)return;const f=KT.desfaz;KT.desfaz=null;$('toast').hidden=true;try{await f()}catch(e){fail(e,'Não foi possível desfazer')}return}
+  if(act==='ktficha'||act==='ktfichanova')return ktPreencheFicha();
+  if(act==='ktabrecont')return ctAbreCont(CTL.cont.find(x=>x.id===KT.ok.cont.id)||KT.ok.cont);
+  if(act==='ktabremod'){const m=(CTL.mod||[]).find(x=>x.id===bt.dataset.id);return m?ktModAbre(m):ktModLista()}
+  if(act==='ktmods')return ktModLista();
+  if(act==='ktmodnovo')return ktModAbre(null);
+  if(act==='ktmodabre')return ktModAbre(ktMods().find(m=>m.id===bt.dataset.id));
+  if(act==='ktmoddup')return ktModAbre(ktMods().find(m=>m.id===(bt.dataset.id||KT.mod?.id)),true);
+  if(act==='ktmodexc')return ktModExc(bt.dataset.id||KT.mod?.id);
+  if(act==='ktmoddesf')return ktModDesfaz(KT.mod.id);
+  if(act==='ktmodsalva')return ktModSalva(bt);
+  if(act==='ktmodprev')return ktModPrev(false);if(act==='ktmodpdf')return ktModPrev(true);
+  if(act==='ktcampo'){const ta=$('km_corpo');if(ta.readOnly)return;const s=ta.selectionStart,t=`{{${bt.dataset.k}}}`;ta.setRangeText(t,s,ta.selectionEnd,'end');ta.focus();return}
+  if(act==='ktger')return ktGerAbre(obj);
+  if(act==='ktlerdoc')return ktLerDoc(obj);
+  if(act==='kgtexto'){const ta=$('kg_txt');if(ta.hidden){ta.value=KT.ger.txt??ktAplica(KT.ger.mod.corpo,ktGerLe()).texto;ta.hidden=false;ta.oninput=()=>{KT.ger.txt=ta.value;ktGerPrev()};bt.textContent='↶ Voltar ao texto do modelo'}
+    else{ta.hidden=true;KT.ger.txt=null;bt.textContent='✎ Ajustar o texto só deste contrato';ktGerPrev()}return}
+  if(act==='kgpdf'){const {a,bl}=ktGerMonta();return ktPdf(bl,a.campos,'Contrato').then(b=>window.open(URL.createObjectURL(new Blob([b],{type:'application/pdf'})),'_blank')).catch(e=>ctErr('Não consegui montar o PDF: '+e.message))}
+  if(act==='kgguarda')return ktGerGera(bt,false);if(act==='kgenvia')return ktGerGera(bt,true);
 }
 $('ctdFoot').addEventListener('click',e=>{const b=e.target.closest('[data-ctact]');if(b)ctAcao(b.dataset.ctact,b)});
 $('ctdBody').addEventListener('click',e=>{const b=e.target.closest('[data-ctact]');if(b){e.stopPropagation();ctAcao(b.dataset.ctact,b)}});
@@ -16332,6 +17032,14 @@ const MANUAL=[
 <li><b>Aplicar reajuste:</b> confira a data, o índice, o percentual e o valor novo e clique em <b>Confirmar reajuste</b>. O valor mensal muda, o próximo reajuste avança e tudo fica no <b>Histórico de reajustes</b> do contrato.</li>
 <li>Dentro do contrato use <b>+ Anexar documento</b> para guardar o contrato assinado, aditivos e propostas.</li>
 </ol>
+<h3>Modelos de contrato e contrato preenchido pelo sistema</h3>
+<ol>
+<li><b>📝 Modelos de contrato</b> mostra os modelos. O <b>Modelo padrão Controlacs (melhorado)</b> já vem pronto, para DP e RH, BPO financeiro ou os dois; para mudar o texto, clique em <b>⧉ Copiar</b> e edite a cópia. Um contrato importado também pode virar modelo.</li>
+<li>No modelo, os dados do cliente ficam como campos entre chaves (ex.: <code>{{contratante_razao}}</code>, <code>{{valor_mensal}}</code>), que você põe no texto clicando na lista ao lado. <code>## TÍTULO</code> é uma cláusula, <code>+</code> é um item e <code>++</code> um subitem: a numeração sai sozinha. O que está entre <code>{{#rh}}</code> e <code>{{/rh}}</code> só entra quando o contrato tem RH (o mesmo com <code>{{#fin}}</code> para o financeiro). <b>Ver prévia</b> e <b>Ver em PDF</b> mostram como fica. Salvar e excluir têm Desfazer.</li>
+<li>Para um cliente novo: cadastre o cliente (ficha da empresa) e o contrato. Dentro do contrato, clique em <b>📝 Gerar contrato pelo modelo</b>. Os dados vêm da ficha, do cliente e do contrato; confira, complete o que faltar (fica marcado em amarelo) e veja a prévia. Dá para ajustar o texto só deste contrato.</li>
+<li><b>Gerar e enviar para assinatura</b> cria o PDF, guarda nos documentos e abre o envio para a Autentique com quem assina já preenchido (o representante do cliente e você). <b>Só guardar o PDF</b> gera sem enviar. O aviso tem Desfazer, que apaga o PDF gerado.</li>
+<li>O modelo padrão deixa claro que o <b>volume de demandas</b> muda o valor: no financeiro, o aumento do faturamento, dos lançamentos e das conferências; no RH, o aumento do quadro de colaboradores. Passou da faixa do plano por 2 meses seguidos, a mensalidade é revista com aditivo por e-mail, além do reajuste anual.</li>
+</ol>
 <h3>Assinatura eletrônica (Autentique)</h3>
 <ol>
 <li>Dentro do contrato, clique em <b>✍ Enviar para assinatura</b>. Escolha o PDF do contrato (ou envie um agora), confira o nome e diga quem assina: nome e e-mail de cada pessoa (o cliente e você já vêm preenchidos; use <b>+ Pessoa</b> para incluir testemunhas ou sócios).</li>
@@ -16361,7 +17069,15 @@ const MANUAL=[
 </ol>`},
     {k:'ctlcli',t:'Clientes',
       txt:`<p>O cadastro dos clientes da Controlacs: nome, razão social, CNPJ/CPF, contato, telefone, e-mail, endereço, desde quando é cliente e anotações. A <b>Situação</b> pode ser Prospecto, Ativo, Suspenso ou Encerrado. Em <b>Empresa no portal</b> dá para ligar ao cadastro da empresa que já usa o portal.</p>
-<p>Ao abrir o cliente aparecem os contratos e os documentos dele, com os botões para criar um contrato ou anexar um documento.</p>`},
+<p>Ao abrir o cliente aparecem os contratos e os documentos dele, com os botões para criar um contrato ou anexar um documento.</p>
+<h3>Importar contrato (PDF ou Word)</h3>
+<ol>
+<li>Clique em <b>📄 Importar contrato</b> (em Clientes, em Contratos e reajustes, em Documentos ou dentro do cliente) e escolha o contrato em PDF ou Word (.docx). PDF escaneado também é lido (demora um pouco mais).</li>
+<li>O sistema lê o contratante e a contratada (razão social, CNPJ, endereço, representante e CPF), o e-mail de quem assinou pela Autentique, os serviços, a mensalidade, a auditoria inicial, a taxa de visita, o limite de colaboradores, o vencimento, o índice de reajuste, a vigência, o aviso prévio, o foro e a data.</li>
+<li>Confira tudo na tela. Pelo CNPJ ele já escolhe o cliente certo (ou a empresa do portal, ou um cliente novo). Do cadastro, só os campos vazios são preenchidos.</li>
+<li>Marque o que gravar: o cadastro do cliente, o contrato (com o próximo reajuste), o arquivo nos documentos e, se quiser, <b>usar o texto como modelo</b> para os próximos clientes. Clique em <b>Gravar</b>. O aviso tem <b>↶ Desfazer</b>, que volta tudo.</li>
+<li>Depois de gravar, o botão <b>📋 Completar a ficha da empresa</b> abre a ficha com os dados do contrato nos campos vazios (ou cadastra a empresa no portal, com a busca na Receita).</li>
+</ol>`},
     {k:'ctlserv',t:'Serviços',
       txt:`<p>A lista dos serviços que você presta (ex.: BPO financeiro, folha de pagamento, consultoria), com a forma de cobrança (mensal, avulso, anual ou por hora), o valor padrão e o que está incluído. Os serviços ativos aparecem para marcar em cada contrato. Serviço que não é mais oferecido: marque como Inativo.</p>`},
     {k:'ctldocs',t:'Documentos e contratos assinados',
@@ -16889,6 +17605,10 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-19contratos-modelo',data:'2026-11-19',t:'Contratos: importar o contrato, modelo e envio para assinatura',itens:[
+    {x:'Controlacs › Clientes e Contratos: botão “📄 Importar contrato”. O sistema lê o PDF ou o Word do contrato (partes, CNPJ, representante, serviços, valores, vencimento, reajuste, vigência e data), preenche o cliente e o contrato e guarda o arquivo. Tudo com Desfazer.',mods:['ctlcli','ctlcont'],para:'master'},
+    {x:'“📝 Modelos de contrato”: o modelo padrão já vem melhorado (volume de demandas no valor, multa e juros, assinatura eletrônica) e um contrato importado também vira modelo, com os dados do cliente trocados por campos.',para:'master'},
+    {x:'Dentro do contrato: “📝 Gerar contrato pelo modelo” monta o contrato com os dados da ficha e do contrato, mostra a prévia, gera o PDF e abre o envio para a Autentique com quem assina já preenchido.',para:'master'}]},
   {k:'2026-11-18nfse-email-lote',data:'2026-11-18',t:'Notas fiscais: enviar várias por e-mail de uma vez',itens:[
     {x:'Controlacs › Notas fiscais e Parceiros MP › Notas fiscais emitidas ganharam caixinhas para marcar as notas e o botão “✉ Enviar por e-mail”. Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF e o XML. Vale para todas as empresas que emitem pelo portal.',mods:['ctlnfse','gfnfrel'],para:'master'},
     {x:'Antes de enviar abre a conferência: o e-mail de cada tomador (vem do cadastro e dá para trocar ou digitar), o assunto e a mensagem com os dados de cada nota, cópia para a empresa e o PDF. As notas que já foram enviadas vêm desmarcadas e a lista mostra “✉ data” em quem já recebeu.',para:'master'},
