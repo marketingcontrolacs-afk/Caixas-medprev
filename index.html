@@ -11134,6 +11134,7 @@ async function renderGR(retHtml){
       <label class="f" title="Para quem tem chave Pix e conta bancária no cadastro (fornecedor ou parceiro)">Quem tem Pix e conta, pagar por<select id="rm_padrao"><option value="pix">Pix</option><option value="ted"${RM.padrao==='ted'?' selected':''}>TED</option></select></label>
     </div>
     <label class="note" style="display:inline-flex;gap:6px;align-items:center;margin:0;cursor:pointer" title="Lançamentos que você tirou da remessa (vai pagar de outro jeito)"><input type="checkbox" id="rm_tirados" style="width:auto"${RM.tirados?' checked':''}> Mostrar os que foram tirados da remessa</label>
+    <div id="rmTir" style="margin:0;padding:12px 16px;border:1px solid var(--warn,#d9a441);border-radius:12px;background:rgba(217,164,65,.12);display:flex;flex-direction:column;gap:6px" hidden></div>
     <div class="tablebox" style="margin:0;max-height:52vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="rm_todas" style="width:auto" aria-label="Marcar todas"></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Como paga</th><th>Valor</th></tr></thead><tbody id="rmBody"></tbody></table></div>
     <div id="rmLote" class="row" style="gap:6px;flex-wrap:wrap" hidden></div>
     <p class="note" id="rmNote" style="margin:0"></p>`
@@ -11162,7 +11163,10 @@ function rmDesenha(){
   RM.conta=$('rm_conta').value;const ate=$('rm_ate').value,mu=t=>`<span class="muted">${t}</span>`;
   const pes=GFP.lista,falta=t=>Math.max(0,r2(t.valor-(GT.pago[t.id]||0)));
   const so=RM.so?.cli===cliAtual()?.id?RM.so:null;
-  const ab=GT.lista.filter(t=>falta(t)>0.004&&(so?so.ids.has(t.id):!ate||t.vencimento<=ate)&&(!t.sem_remessa||RM.tirados));
+  const ab0=GT.lista.filter(t=>falta(t)>0.004&&(so?so.ids.has(t.id):!ate||t.vencimento<=ate)),ab=ab0.filter(t=>!t.sem_remessa||RM.tirados);
+  // TIRADOS À VISTA (Carol, 19/11: "tirei e não aparece para enviar de novo"): aviso com quantos estão fora da lista e botões para ver e trazer todos de volta
+  const tir=ab0.filter(t=>t.sem_remessa);RM.tirLista=tir;
+  if($('rmTir')){$('rmTir').hidden=!tir.length||RM.tirados;$('rmTir').innerHTML=tir.length?`<b>${tir.length} ${tir.length===1?'pagamento foi tirado':'pagamentos foram tirados'} da remessa (${fm(r2(tir.reduce((a,t)=>a+falta(t),0)))}) e não ${tir.length===1?'aparece':'aparecem'} na lista.</b><span>${esc(tir.slice(0,4).map(t=>t.pessoa_nome||t.descricao||'').join(', '))}${tir.length>4?' e mais '+(tir.length-4):''}</span><div class="row" style="gap:8px"><button type="button" class="btn small primary" data-act="rm_trazTodos">↩ Trazer ${tir.length===1?'de volta':'todos de volta'} para a remessa</button><button type="button" class="btn small ghost" data-act="rm_verTir">Ver quais são</button></div>`:''}
   const bk=bancoDe(GFC.lista.find(c=>c.id===RM.conta)),sant=bk==='santander';
   RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
     let f=rmForma(t,p,RM.pref?.[t.id]||RM.padrao);if(sant&&f.forma==='boleto'&&!soDig(rmDoc(p)))f={erro:'boleto sem CNPJ/CPF do fornecedor no cadastro (o Santander exige)'};
@@ -11218,7 +11222,7 @@ async function rmVoltaLote(xs){
   return renderGR()}
 async function rmTiraLote(xs){
   const ls=xs.filter(x=>!x.ja&&!x.t.sem_remessa);if(!ls.length)return alert('Nenhum dos escolhidos pode sair (já tirados ou numa remessa enviada).');
-  if(!confirm(`Tirar ${ls.length} ${ls.length===1?'lançamento':'lançamentos'} (${fm(r2(ls.reduce((s,x)=>s+x.valor,0)))}) da remessa?\n\nEles saem desta lista e não vão em nenhum arquivo de remessa. As contas a pagar continuam em aberto em Contas a pagar. Para trazer de volta, marque “Mostrar os que foram tirados da remessa”.`))return;
+  if(!confirm(`Tirar ${ls.length} ${ls.length===1?'lançamento':'lançamentos'} (${fm(r2(ls.reduce((s,x)=>s+x.valor,0)))}) da remessa?\n\nEles saem desta lista e não vão em nenhum arquivo de remessa. As contas a pagar continuam em aberto em Contas a pagar. Para trazer de volta, use “Trazer todos de volta para a remessa” no aviso acima da lista.`))return;
   const ids=ls.map(x=>x.t.id);
   for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:true}).in('id',ids.slice(i,i+200));if(error)return v122(error)?alert(v122Msg):fail(error,'Não foi possível alterar')}
   ls.forEach(x=>x.t.sem_remessa=true);rmDesenha();
@@ -11282,6 +11286,13 @@ async function rmAcao(a,b){
     const {error}=await sb.from('fin_titulos').update({sem_remessa:!volta}).eq('id',x.t.id);
     if(error)return v122(error)?alert(v122Msg):fail(error,'Não foi possível alterar');
     x.t.sem_remessa=!volta;toast(volta?'Voltou para a remessa':'Tirado da remessa');return rmDesenha()}
+  if(a==='rm_verTir'){RM.tirados=true;if($('rm_tirados'))$('rm_tirados').checked=true;return rmDesenha()}
+  if(a==='rm_trazTodos'){const ts=(RM.tirLista||[]).slice();if(!ts.length)return;const ids=ts.map(t=>t.id);
+    for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:false}).in('id',ids.slice(i,i+200));if(error)return v122(error)?alert(v122Msg):fail(error,'Não foi possível alterar')}
+    ts.forEach(t=>t.sem_remessa=false);rmDesenha();
+    return toastDesfazer(`${ts.length} ${ts.length===1?'pagamento voltou':'pagamentos voltaram'} para a remessa`,async()=>{
+      for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:true}).in('id',ids.slice(i,i+200));if(error)return fail(error)}
+      ts.forEach(t=>t.sem_remessa=true);toast('Desfeito: tirados da remessa de novo');rmDesenha()})}
   if(a==='rm_voltaSem')return rmVoltaLote(RM.lista.filter(x=>x.f.erro&&!x.ja&&!x.t.sem_remessa&&RM.rep?.[x.t.id]));
   if(a==='rm_voltaMarc')return rmVoltaLote([...$('rmBody').querySelectorAll('input[data-id]:checked')].map(c=>RM.lista[+c.dataset.id]));
   if(a==='rm_tiraSem')return rmTiraLote(RM.lista.filter(x=>x.f.erro&&!x.ja&&!x.t.sem_remessa&&!RM.rep?.[x.t.id]));
@@ -11308,6 +11319,9 @@ async function rmAcao(a,b){
     if(!confirm(`Cancelar a remessa nº ${x.nsa} (${x.arquivo})?\n\nUse quando o banco recusou o arquivo ou quando você não vai enviar. Os pagamentos que ainda não foram pagos voltam a aparecer para gerar outra remessa. Se o arquivo já foi aceito pelo banco, cancele também lá, para não pagar duas vezes.`))return;
     const {error}=await sb.from('fin_remessa_itens').update({status:'excluido',atualizado_em:new Date().toISOString()}).eq('remessa_id',x.id).in('status',['enviado','agendado']);
     if(error)return fail(error,'Não foi possível cancelar');
+    // os pagamentos da remessa cancelada voltam livres, mesmo se alguém usou "Tirar da remessa" neles (Carol, 19/11)
+    {const {data:its}=await sb.from('fin_remessa_itens').select('titulo_id').eq('remessa_id',x.id);const tids=[...new Set((its||[]).map(i=>i.titulo_id).filter(Boolean))];
+      for(let i=0;i<tids.length;i+=200)await sb.from('fin_titulos').update({sem_remessa:false}).in('id',tids.slice(i,i+200)).eq('sem_remessa',true)}
     if(x.nsa>0&&confirm(`O banco RECUSOU o arquivo nº ${x.nsa}?\n\nOK = sim, recusou: o próximo arquivo volta a usar o nº ${x.nsa} (o banco não conta arquivo recusado).\nCancelar = não, o banco aceitou: a numeração continua.`)&&!await rmLiberaNsa(x))return;
     toast(`Remessa nº ${x.nsa} cancelada`);GT.key='';return renderGR()}
   if(a!=='rm_gerar')return;
@@ -17025,6 +17039,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-19tirados',data:'2026-11-19',t:'Envio de remessa: pagamentos tirados ficam à vista',itens:[
+    {x:'Quando há pagamentos tirados da remessa, aparece um aviso acima da lista com quantos são e o valor, e os botões “↩ Trazer todos de volta para a remessa” (com Desfazer) e “Ver quais são”.',mods:['gfremessa'],para:'esc'},
+    {x:'Cancelar uma remessa agora deixa os pagamentos dela livres para a próxima, mesmo os que tinham sido tirados da remessa.',para:'esc'}]},
   {k:'2026-11-19desc-arquivo',data:'2026-11-19',t:'Repasse: arquivo de desconto do parceiro (ex.: Top Image)',itens:[
     {x:'No cadastro do parceiro há a marca “Exige arquivo de desconto no repasse”, com o nome do desconto (ex.: Representante). Vale para qualquer parceiro que mande um relatório de guias para descontar.',mods:['gfrepasse','repasse'],para:'esc'},
     {x:'No Repasse da semana, o repasse desse parceiro pede o arquivo (“📎 Anexar arquivo de desconto”) ou “Não tem desconto”. O sistema lê as guias, mostra a conferência (as guias já descontadas antes ficam desmarcadas) e lança o desconto, que sai da conta a pagar. Sem o arquivo ou a marca, não gera remessa nem marca como pago. Tem Desfazer.',mods:['gfrepasse'],para:'esc'},
