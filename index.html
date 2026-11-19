@@ -11130,6 +11130,7 @@ async function renderGR(retHtml){
     </div>
     <label class="note" style="display:inline-flex;gap:6px;align-items:center;margin:0;cursor:pointer" title="Lançamentos que você tirou da remessa (vai pagar de outro jeito)"><input type="checkbox" id="rm_tirados" style="width:auto"${RM.tirados?' checked':''}> Mostrar os que foram tirados da remessa</label>
     <div class="tablebox" style="margin:0;max-height:52vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="rm_todas" style="width:auto" aria-label="Marcar todas"></th><th>Vencimento</th><th class="l">Fornecedor</th><th class="l">Como paga</th><th>Valor</th></tr></thead><tbody id="rmBody"></tbody></table></div>
+    <div id="rmLote" class="row" style="gap:6px;flex-wrap:wrap" hidden></div>
     <p class="note" id="rmNote" style="margin:0"></p>`
       :!bco.ok?`<p class="note" style="margin:0">A remessa do ${bco.n} ainda não está pronta: cada banco tem o próprio layout de pagamentos (CNAB 240). Mande o manual de pagamentos do ${bco.n} e o sistema passa a gerar o arquivo dele. Até lá, pague estas contas pelo internet banking.</p>`
       :bco.k==='santander'?`<p class="note" style="margin:0">Nenhuma conta do Santander com convênio de pagamentos nesta empresa. Em Gestão financeira › Contas bancárias, abra a conta do Santander (o campo Banco precisa dizer Santander), confira a agência e a conta com o dígito e preencha o “Convênio de pagamentos (CNAB)” com o número do convênio de Pagamento a Fornecedores que o banco passou.</p>`
@@ -11173,6 +11174,60 @@ function rmDesenha(){
   rmTotal();
 }
 // boleto na remessa (Carol, 19/11): qualquer conta a pagar que ainda iria por Pix/TED (ou que está sem forma) pode receber o boleto aqui; opcional
+// VOLTAR AO REPASSE / TIRAR DA REMESSA EM LOTE (Carol, 19/11: 28 repasses sem Pix nem conta, um por um não dá).
+// Voltar: exclui a conta a pagar de cada repasse (só sem pagamento e fora de remessa enviada) e ele volta ao Repasse de parceiros.
+// O Desfazer recria as mesmas contas a pagar (mesmo id, então os anexos voltam junto), religa os repasses e os descontos.
+async function rmVoltaLote(xs){
+  const cli=cliAtual(),ls=xs.filter(x=>RM.rep?.[x.t.id]&&!x.ja);if(!ls.length)return alert('Nenhum dos escolhidos veio do Repasse de parceiros (ou estão numa remessa enviada).');
+  const fora=xs.length-ls.length,tot=r2(ls.reduce((s,x)=>s+x.valor,0));
+  if(!confirm(`Voltar ${ls.length} ${ls.length===1?'repasse':'repasses'} (${fm(tot)}) para o Repasse de parceiros?\n\n${ls.slice(0,12).map(x=>'• '+(x.t.pessoa_nome||'')+' · '+fm(x.valor)).join('\n')}${ls.length>12?`\n… e mais ${ls.length-12}`:''}\n\nAs contas a pagar deles em ${cli?.nome||'esta empresa'} são excluídas e eles saem desta lista. No Repasse, corrija a conta ou o Pix e separe de novo em “Pagar em”.${fora?`\n\n${fora} ${fora===1?'fica':'ficam'} de fora (não ${fora===1?'veio':'vieram'} do repasse ou ${fora===1?'está':'estão'} numa remessa enviada).`:''}`))return;
+  const ids=ls.map(x=>x.t.id),pula=new Set();
+  try{for(let i=0;i<ids.length;i+=200){const c=ids.slice(i,i+200);
+      const [{data:pg},{data:rr}]=await Promise.all([sb.from('fin_movimentos').select('titulo_id').in('titulo_id',c),sb.from('fin_remessa_itens').select('titulo_id').in('titulo_id',c).in('status',['enviado','agendado','pago'])]);
+      [...(pg||[]),...(rr||[])].forEach(m=>pula.add(m.titulo_id))}
+    const vai=ls.filter(x=>!pula.has(x.t.id)),vids=vai.map(x=>x.t.id);if(!vai.length)return alert('Todos os escolhidos já têm pagamento ou estão numa remessa enviada. Nada foi alterado.');
+    // guarda tudo para o Desfazer
+    const tits=[],descs=[];for(let i=0;i<vids.length;i+=200){const c=vids.slice(i,i+200);
+      const [{data:t,error:e0},{data:d}]=await Promise.all([sb.from('fin_titulos').select('*').in('id',c),sb.from('repasse_descontos').select('*').in('titulo_id',c)]);if(e0)throw e0;tits.push(...(t||[]));descs.push(...(d||[]))}
+    const ris=vai.map(x=>RM.rep[x.t.id]),lotes=[...new Set(ris.map(r=>r.lote_id))];
+    const {data:lsAnt}=await sb.from('repasse_lotes').select('id,status,finalizado_em').in('id',lotes);
+    for(let i=0;i<vai.length;i+=200){const c=vai.slice(i,i+200);
+      const {error}=await sb.from('repasse_itens').update({titulo_id:null}).in('id',c.map(x=>RM.rep[x.t.id].id));if(error)throw error;
+      await descVolta(c.map(x=>x.t.id));
+      const {error:e2}=await sb.from('fin_titulos').delete().in('id',c.map(x=>x.t.id));if(e2)throw e2}
+    await sb.from('repasse_lotes').update({status:'aberto',finalizado_em:null}).in('id',lotes).eq('status','finalizado');
+    if(RM.so?.ids){vids.forEach(id=>RM.so.ids.delete(id));if(!RM.so.ids.size)RM.so=null}
+    GT.key='';
+    const soIds=RM.so?new Set(RM.so.ids):null;
+    toastDesfazer(`${vai.length} ${vai.length===1?'repasse voltou':'repasses voltaram'} para o Repasse de parceiros${pula.size?` (${pula.size} com pagamento ou remessa enviada ficaram)`:''}`,async()=>{
+      try{for(let i=0;i<tits.length;i+=200){const {error}=await sb.from('fin_titulos').insert(tits.slice(i,i+200));if(error)throw error}
+        for(const r of ris){const {error}=await sb.from('repasse_itens').update({titulo_id:r.titulo_id}).eq('id',r.id).is('titulo_id',null);if(error)throw error}
+        for(const d of descs){const {id,...o}=d;await sb.from('repasse_descontos').update(o).eq('id',id)}
+        for(const l of lsAnt||[])if(l.status==='finalizado')await sb.from('repasse_lotes').update({status:l.status,finalizado_em:l.finalizado_em}).eq('id',l.id);
+        if(RM.so?.ids||soIds){RM.so=RM.so||{cli:cli?.id,data:TODAY,txt:'os repasses marcados'};RM.so.ids=new Set([...(RM.so.ids||[]),...vids])}
+        toast('Desfeito: as contas a pagar voltaram para a remessa')}catch(e){fail(e,'Não foi possível desfazer')}
+      GT.key='';renderGR()});
+  }catch(e){fail(e,'Não foi possível voltar ao repasse')}
+  return renderGR()}
+async function rmTiraLote(xs){
+  const ls=xs.filter(x=>!x.ja&&!x.t.sem_remessa);if(!ls.length)return alert('Nenhum dos escolhidos pode sair (já tirados ou numa remessa enviada).');
+  if(!confirm(`Tirar ${ls.length} ${ls.length===1?'lançamento':'lançamentos'} (${fm(r2(ls.reduce((s,x)=>s+x.valor,0)))}) da remessa?\n\nEles saem desta lista e não vão em nenhum arquivo de remessa. As contas a pagar continuam em aberto em Contas a pagar. Para trazer de volta, marque “Mostrar os que foram tirados da remessa”.`))return;
+  const ids=ls.map(x=>x.t.id);
+  for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:true}).in('id',ids.slice(i,i+200));if(error)return v122(error)?alert(v122Msg):fail(error,'Não foi possível alterar')}
+  ls.forEach(x=>x.t.sem_remessa=true);rmDesenha();
+  toastDesfazer(`${ls.length} ${ls.length===1?'lançamento tirado':'lançamentos tirados'} da remessa`,async()=>{
+    for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:false}).in('id',ids.slice(i,i+200));if(error)return fail(error)}
+    ls.forEach(x=>x.t.sem_remessa=false);toast('Voltaram para a remessa');rmDesenha()})}
+// botões em lote abaixo da lista: com os marcados e com os que estão sem forma de pagamento (Pix, conta ou boleto)
+function rmLoteBar(){const el=$('rmLote');if(!el)return;
+  const marc=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(c=>RM.lista[+c.dataset.id]);
+  const semP=RM.lista.filter(x=>x.f.erro&&!x.ja&&!x.t.sem_remessa),semPR=semP.filter(x=>RM.rep?.[x.t.id]),marcR=marc.filter(x=>RM.rep?.[x.t.id]);
+  const b=(act,t,n,tt)=>n?`<button type="button" class="btn small ghost" data-act="${act}" title="${tt}">${t} (${n})</button>`:'';
+  el.innerHTML=[b('rm_voltaSem','↩ Voltar ao repasse os sem dados de pagamento',semPR.length,'Os repasses sem Pix, conta ou boleto voltam para o Repasse de parceiros, para corrigir o cadastro e separar de novo'),
+    b('rm_voltaMarc','↩ Voltar ao repasse os marcados',marcR.length,'Os repasses marcados voltam para o Repasse de parceiros'),
+    b('rm_tiraSem','Tirar da remessa os sem dados de pagamento',semP.length-semPR.length,'Contas a pagar (não de repasse) sem Pix, conta ou boleto saem desta lista'),
+    b('rm_tiraMarc','Tirar da remessa os marcados',marc.length,'Os marcados saem desta lista; a conta a pagar continua em aberto')].filter(Boolean).join(' ');
+  el.hidden=!el.innerHTML}
 // CPF/CNPJ do favorecido do boleto: o do cadastro do fornecedor; no parceiro sem documento no fornecedor, o CPF/CNPJ do parceiro (Carol, 19/11)
 const rmDoc=p=>p?.documento||(p?.parceiro_id&&RM.parc?.[p.parceiro_id]?.cpf_cnpj)||'';
 const rmBolHtml=i=>`<div class="rmbol" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><span class="btn small ghost fotobtn" title="Opcional: quem recebe por boleto. Pode escolher o boleto e a nota fiscal juntos: a linha digitável é lida do boleto e o pagamento vai como boleto">📎 Anexar boleto<input type="file" multiple accept="${ACCEPT},.xml,text/xml" data-rmbol="${i}" aria-label="Anexar o boleto (e a nota fiscal)"></span><button type="button" class="btn small ghost" data-act="rm_bollinha" data-i="${i}" title="Digitar a linha digitável do boleto">Colar linha</button></div>`;
@@ -11182,7 +11237,7 @@ async function rmBol(x,arg,box){if(!x)return;if(box)box.innerHTML='<span class="
   try{const r=await bolNoTitulo(x.t,arg);refaz();if(!r)return;
     toastDesfazer(`Boleto anexado: ${x.t.pessoa_nome||''} vai como boleto${r.trocaV?`, valor do boleto ${fm(r.trocaV.para)} (era ${fm(r.trocaV.de)})`:''}`,async()=>{try{await r.desfaz();toast('Boleto tirado: voltou como estava')}catch(e){fail(e)}refaz()})}
   catch(e){console.error(e);refaz();alert(e.message||'Não foi possível anexar o boleto.')}}
-function rmTotal(){const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
+function rmTotal(){rmLoteBar();const sel=[...$('rmBody').querySelectorAll('input[data-id]:checked')].map(x=>RM.lista[+x.dataset.id]);
   const semDoc=sel.filter(x=>x.f.forma==='boleto'&&!soDig(rmDoc(x.p))).length,venc=sel.filter(x=>x.t.vencimento<$('rm_data').value).length;
   $('rmNote').textContent=`${sel.length} ${sel.length===1?'pagamento marcado':'pagamentos marcados'}: ${fm(r2(sel.reduce((s,x)=>s+x.valor,0)))}. `
     +(venc?`${venc} já ${venc===1?'estará vencida':'estarão vencidas'} na data do pagamento: o banco pode recusar ou cobrar juros. `:'')
@@ -11220,6 +11275,12 @@ async function rmAcao(a,b){
     const {error}=await sb.from('fin_titulos').update({sem_remessa:!volta}).eq('id',x.t.id);
     if(error)return v122(error)?alert(v122Msg):fail(error,'Não foi possível alterar');
     x.t.sem_remessa=!volta;toast(volta?'Voltou para a remessa':'Tirado da remessa');return rmDesenha()}
+  if(a==='rm_voltaSem')return rmVoltaLote(RM.lista.filter(x=>x.f.erro&&!x.ja&&!x.t.sem_remessa&&RM.rep?.[x.t.id]));
+  if(a==='rm_voltaMarc')return rmVoltaLote([...$('rmBody').querySelectorAll('input[data-id]:checked')].map(c=>RM.lista[+c.dataset.id]));
+  if(a==='rm_tiraSem')return rmTiraLote(RM.lista.filter(x=>x.f.erro&&!x.ja&&!x.t.sem_remessa&&!RM.rep?.[x.t.id]));
+  if(a==='rm_tiraMarc')return rmTiraLote([...$('rmBody').querySelectorAll('input[data-id]:checked')].map(c=>RM.lista[+c.dataset.id]));
+  // um só (botão da linha): o mesmo do lote, que tem Desfazer (Carol, 19/11)
+  if(a==='rm_volta'){const x=RM.lista[+b.dataset.i];if(x&&RM.rep?.[x.t.id])return rmVoltaLote([x])}
   if(a==='rm_volta'){const x=RM.lista[+b.dataset.i],ri=x&&RM.rep?.[x.t.id];if(!ri)return;
     if(x.ja)return alert('Este pagamento está numa remessa enviada ao banco. Cancele a remessa (ou use Liberar) antes.');
     if(!confirm(`Voltar ${x.t.pessoa_nome||'este repasse'} (${fm(x.valor)}) para o Repasse de parceiros?\n\nA conta a pagar dele em ${cli?.nome||'esta empresa'} é excluída e ele some desta lista. No Repasse, escolha de novo em “Pagar em” a empresa certa e mande para a remessa do banco certo.`))return;

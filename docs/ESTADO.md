@@ -2,6 +2,9 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 11:50 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
+  - Envio de remessa, ações em lote abaixo da lista (`rmLoteBar`): "↩ Voltar ao repasse os sem dados de pagamento", "↩ Voltar ao repasse os marcados", "Tirar da remessa os sem dados de pagamento" (contas que não são de repasse) e "Tirar da remessa os marcados". Funções `rmVoltaLote` e `rmTiraLote`, com Desfazer (o voltar recria as mesmas contas a pagar com o mesmo id, religa repasses, descontos e o status do relatório). O "Voltar ao repasse" da linha passou a usar o mesmo caminho, então também tem Desfazer. Sem SQL.
+
 - **19/11/2026 11:30 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - Leitura de boleto (`leArquivoDoc`, vale para todas as telas que leem documentos): PDF com texto mas com os números desenhados como imagem (boleto Bradesco do Santa Luzia/DASA, "Microsoft Print to PDF") não achava a linha digitável. Agora, se o texto tem os rótulos de boleto (ficha de compensação, nosso número, beneficiário…) e nenhuma linha, também lê por OCR e junta com o texto. Testado com o arquivo real: R$ 1.553,13, venc. 19/11/2026. Sem SQL.
 
