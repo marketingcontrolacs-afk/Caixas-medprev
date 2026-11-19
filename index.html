@@ -9837,14 +9837,17 @@ async function leArquivoDoc(f){
   let t='',origem='PDF';
   if(/pdf/i.test(f.type||'')||/\.pdf$/i.test(nome)){
     pdfTexto.lay='';try{t=await pdfTexto(f)}catch(e){if(e?.senha)return {erro:'Este PDF tem senha e não consegui abrir. Anexe de novo e digite a senha quando o sistema pedir.'};throw e}
-    if(t.replace(/\s/g,'').length<40){ // PDF escaneado: lê a 1ª página com OCR
+    // boleto com texto, mas com os números desenhados como imagem (ex.: Bradesco "Microsoft Print to PDF", Santa Luzia/DASA, Carol 19/11):
+    // tem os rótulos do boleto e nenhuma linha digitável no texto; aí também lê por OCR e junta com o texto que já tinha
+    const semTxt=t.replace(/\s/g,'').length<40,bolImg=!semTxt&&!lerTextoDoc(t).bol&&/ficha\s+de\s+compensa|recibo\s+do\s+(sacado|pagador)|nosso\s+n[uú]mero|linha\s+digit[aá]vel|benefici[aá]rio|cedente/i.test(t);
+    if(semTxt||bolImg){ // PDF escaneado: lê a 1ª página com OCR
       // impresso como PDF ou escaneado: OCR página por página (até 3), linha por linha; para quando achar o código de barras (Carol, 18/11)
-      const doc=pdfTexto.doc||await pdfAbre(await f.arrayBuffer(),f.name);t='';
+      const doc=pdfTexto.doc||await pdfAbre(await f.arrayBuffer(),f.name),t0=t,lay0=pdfTexto.lay||'';t='';
       for(let p=1;p<=Math.min(doc.numPages,3);p++){const its=await ocrPagina(await doc.getPage(p)),ls=[];
         its.forEach(i=>{const l=ls.find(l=>Math.abs(l.y-i.y)<1);if(l)l.its.push(i);else ls.push({y:i.y,its:[i]})});
         t+=ocrLimpa(ls.sort((a,b)=>a.y-b.y).map(l=>l.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ')).join('\n'))+'\n';
         if(lerTextoDoc(t).bol)break}
-      pdfTexto.lay=t;origem='PDF escaneado'}
+      if(bolImg){t=t0+'\n'+t;pdfTexto.lay=lay0+'\n'+t}else{pdfTexto.lay=t;origem='PDF escaneado'}}
   }else if(/image/i.test(f.type||'')||/\.(jpe?g|png|webp)$/i.test(nome)){
     const w=await tessW(),{data}=await w.recognize(f);t=ocrLimpa(data.text||'');pdfTexto.lay=t;origem='foto'}
   else return {erro:'Envie o boleto, a nota ou o cupom em PDF, foto ou XML.'};
