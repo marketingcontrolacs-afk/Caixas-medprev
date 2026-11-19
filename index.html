@@ -676,6 +676,52 @@ body.apr-pres .shell{display:block!important;max-width:none!important;padding:16
 body.apr-pres #viewApr{font-size:15px}body.apr-pres .apr-h{font-size:26px}body.apr-pres .tile .v{font-size:30px}
 body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
 @media print{header.top,nav.side,#modrow,#viewApr .tabs,#viewApr .apr-top .row,#viewApr .toolbar,#viewApr button{display:none!important}.shell{display:block!important}#viewApr .card{break-inside:avoid;box-shadow:none;border:1px solid #ccc}#viewApr .apr-det[hidden]{display:table-row!important}}
+/* Solicitações + Admissão (Carol, 18/11) */
+.sol-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 10px}
+.sol-tab{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13px var(--body);padding:7px 12px;border-radius:8px;cursor:pointer}
+.sol-tab[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.sol-lista{display:grid;gap:8px}
+.sol-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;width:100%;text-align:left;padding:13px 16px;cursor:pointer;font:inherit;color:inherit}
+.sol-row:hover{border-color:var(--brand)}
+.sol-num{font-weight:700;color:var(--muted);min-width:40px}
+.sol-tit{flex:1 1 280px;min-width:0;display:grid;gap:2px}.sol-tit small{color:var(--muted)}
+.sol-prazo{font-size:13px;color:var(--muted)}
+.sol-pri-alta{color:var(--warn);font-weight:700;font-size:13px}.sol-pri-urgente{color:var(--bad);font-weight:700;font-size:13px}
+.sol-nova{font-size:11px;font-weight:700;color:#fff;background:var(--bad);border-radius:999px;padding:2px 8px}
+.sol-st-aberta{background:var(--brand-soft);color:var(--brand)}.sol-st-em_andamento{background:#E3ECF8;color:var(--deb)}
+.sol-st-aguardando_cliente{background:var(--warn-soft);color:var(--warn)}.sol-st-concluida{background:var(--ok-soft);color:var(--ok)}.sol-st-cancelada{background:var(--sunk);color:var(--muted)}
+.sol-vazio{padding:28px;text-align:center;color:var(--muted)}
+.sol-tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:14px}
+.sol-tipo{display:grid;gap:4px;text-align:left;padding:12px 14px;cursor:pointer;font:inherit;color:inherit}
+.sol-tipo small{color:var(--muted);font-size:12px}.sol-tipo[aria-pressed="true"]{border:2px solid var(--brand);background:var(--brand-soft)}
+.sol-form,.sol-cab,.sol-acoes,.sol-adm,.sol-lado>.card,.sol-chat{padding:16px;display:grid;gap:10px;margin-top:12px}
+.sol-form h2,.sol-cab h2,.sol-adm h2,.sol-chat h2,.sol-lado h2{font-size:16px;margin:0}
+.sol-g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.sol-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.sol-cab small{color:var(--muted)}
+.sol-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sol-inl{display:flex!important;align-items:center;gap:6px;margin-left:auto}
+.sol-etapas{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
+.sol-etapas li{display:grid;gap:4px;padding:8px;border-radius:8px;background:var(--sunk);color:var(--muted);font-size:12px;line-height:1.25}
+.sol-etapas li span{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:rgba(0,0,0,.06)}
+.sol-etapas li.feita{background:var(--ok-soft);color:var(--ok)}.sol-etapas li.atual{background:var(--brand);color:var(--brand-ink)}.sol-etapas li.atual span{background:rgba(255,255,255,.2)}
+.sol-dados{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px}
+.sol-link,.sol-env,.sol-modf{display:grid;gap:8px;padding:12px;border-radius:10px;background:var(--sunk)}
+.sol-link code{font-size:12px;overflow-wrap:anywhere;color:var(--brand)}
+.sol-cols{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.sol-chat{flex:999 1 420px;min-width:0}.sol-lado{flex:1 1 280px;min-width:0;display:grid}
+.sol-msgs{display:flex;flex-direction:column;gap:8px;max-height:460px;overflow:auto;padding:4px}
+.sol-msg{max-width:80%;padding:9px 12px;border-radius:10px;font-size:14px;white-space:pre-line}
+.sol-msg small{display:block;font-size:11px;opacity:.8;margin-bottom:2px}
+.sol-msg.eu{align-self:flex-end;background:var(--brand);color:var(--brand-ink)}
+.sol-msg.outro{align-self:flex-start;background:var(--surface);border:1px solid var(--line)}
+.sol-msg.int{align-self:flex-end;background:#FFF6D6;border:1px dashed #B88A00;color:#3D3000}
+.sol-msg.sis{align-self:center;background:transparent;color:var(--muted);font-size:12px;text-align:center}
+.sol-escrever{display:grid;gap:8px}.sol-escrever textarea{width:100%}
+.sol-chk{display:flex;align-items:center;gap:6px;font-size:13px}.sol-chk input{width:auto;min-height:0;margin:0}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.sol-anx{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.sol-anx span{display:grid;gap:1px;min-width:0}.sol-anx small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.sol-svtab{width:100%;border-collapse:collapse}.sol-svtab th{text-align:left;font-size:12px;color:var(--muted);padding:4px 6px}.sol-svtab td{padding:4px 6px;vertical-align:middle}.sol-svtab input,.sol-svtab select{width:100%}.sol-inativo{opacity:.55}
+.sol-ev{display:grid;gap:1px;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}.sol-ev small{color:var(--muted);font-size:11px}
 </style>
 </head>
 <body>
@@ -1013,7 +1059,7 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     <div class="tabs ptabs" role="tablist" aria-label="Parceiros" hidden></div>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Notas fiscais emitidas</h1><p class="sub" id="nrSub">As notas fiscais emitidas pelas empresas do grupo: as NFS-e emitidas pelo portal e as marcadas como emitidas fora dele. Para conferir e mandar à contabilidade.</p></div>
-      <div class="row" style="align-items:flex-end"><span class="expgrp" id="nrExp" data-exp="nr"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="nrXml" title="Baixa um .zip com o XML de cada nota filtrada (e do cancelamento) e a planilha da lista">Baixar XMLs (.zip)</button></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="nrExp" data-exp="nr"><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button type="button" class="btn" data-nslbtn="nr" disabled title="Marque as notas na lista: cada uma vai para o e-mail do seu tomador">✉ Enviar por e-mail</button><button class="btn primary" id="nrXml" title="Baixa um .zip com o XML de cada nota filtrada (e do cancelamento) e a planilha da lista">Baixar XMLs (.zip)</button></div>
     </div>
     <div class="toolbar">
       <label class="f">De<input type="date" id="nrDe"></label>
@@ -1346,6 +1392,15 @@ body.apr-pres #viewApr .toolbar .btn,body.apr-pres [data-aprundo]{display:none}
     </div>
     <div class="kanban" id="tBoard"></div>
     <p class="note" id="tNote"></p>
+  </section>
+
+  <!-- SOLICITAÇÕES (Carol, 18/11): pedidos dos clientes, conversa, documentos e admissão -->
+  <section id="viewSol" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><h1 id="solH1">Solicitações</h1><p class="sub" id="solSub"></p></div>
+      <button class="btn primary" id="solNovaBtn" type="button">+ Nova solicitação</button>
+    </div>
+    <div id="solBody"></div>
   </section>
 
   <!-- EXPORTAÇÃO BOM CONTROLE (escritório) -->
@@ -2023,7 +2078,7 @@ const escR=()=>ehEsc()&&!rotCli();
 const ehAdm=()=>ME&&(ME.tipo==='admin'||ME.admin);
 // Operador Controlacs: só os módulos e as empresas que a administradora marcou (vazio = todos);
 // Tarefas, Avisos e Projetos são de toda a equipe
-const SEMPRE=['tarefas','avisos','projetos','gfdash','agenda','manual','gfencerra','gfencrel'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
+const SEMPRE=['tarefas','solic','avisos','projetos','gfdash','agenda','manual','gfencerra','gfencrel'];   // gfencerra: só aparece para a equipe Controlacs (ok do menu)
 // Documentos usa o mesmo acesso de Colaboradores e prazos
 // Configurações, plano de contas e regras das categorias: só o master (a Carol), nunca a equipe (pedido de 29/10)
 const SO_MASTER=['cfg','cfgusr','cfgmapa','cfgcats','cfgfbc','gfplano','ctbplano','ctblayout','ctlpainel','ctlcrm','ctlcli','ctlcont','ctlserv','ctldocs','ctlfin','ctlnfse'];
@@ -2075,6 +2130,7 @@ const ICO={
   avisos:'<path d="M3 10v4h3l6 4V6L6 10z"/><path d="M16 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
   projetos:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
   agenda:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15.5l2 2 4-4"/>',
+  solic:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>',
   tarefas:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   gfpagar:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 13v4M10 15l2 2 2-2"/>',
   gfrec:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 17v-4M10 15l2-2 2 2"/>',
@@ -2187,6 +2243,8 @@ const NAV=[
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
+  // pedidos dos clientes ao escritório, com conversa e admissão de colaboradores (Carol, 18/11)
+  {k:'solic',t:'Solicitações',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0||!!ME?.cliente_id},
   // planner diário de cada usuário; ninguém vê a agenda de outra pessoa (Carol, 04/11)
   {k:'agenda',t:'Agenda',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
@@ -2199,6 +2257,8 @@ const NAV=[
   {k:'cfgusr',t:'Cadastro de usuários',g:'Configurações',s:'Cadastros',ok:ehEsc},
   {k:'cfgmapa',t:'Mapeamento Bom Controle',g:'Configurações',s:'Bom Controle',ok:ehEsc},
   {k:'cfgcats',t:'Categorias',g:'Configurações',s:'Bom Controle',ok:ehEsc},
+  // catálogo de serviços que os clientes pedem em Solicitações, por área do contrato (Carol, 18/11)
+  {k:'solserv',t:'Serviços das solicitações',g:'Configurações',s:'Cadastros',ok:ehAdm},
   // Gestão da Controlacs: clientes, serviços, contratos, reajustes e documentos da própria Controlacs; só a Master (Carol, 05/11; v104)
   {k:'ctlpainel',t:'Painel e avisos de reajuste',g:'Controlacs',s:'Dia a dia',ok:ehAdm},
   // CRM: leads de clientes de BPO, funil, follow-ups e propostas (Carol, 15/11; v133)
@@ -2225,7 +2285,7 @@ const SECOES=['Dia a dia','Caixa e tesouraria','Bancos','Recebíveis','Mensagens
 const MEGA={g:null,t:0};
 const navGrp=n=>typeof n.g==='function'?n.g():n.g;
 // telas que não dependem da empresa escolhida no topo
-const telaSemEmp=k=>k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
+const telaSemEmp=k=>k==='solic'||k==='solserv'||k==='gfapres'||k==='gfencerra'||k==='gfencrel'||k.startsWith('cfg')||k.startsWith('ctl')||k==='avisos'||k==='projetos'||k==='agenda'||k==='manual';
 // o menu mostra só os módulos da empresa escolhida: empresa só de RH mostra só o RH (Carol, 29/10)
 function serveEmp(n){
   const e=escCli.value||EMP;
@@ -2535,9 +2595,342 @@ const cliOuTodas=()=>escCli.value==='*'?TODAS:cliAtual();
 const SOMA_TODAS=new Set([...GTTODAS,'gfcartoes','gfreceb','gfdash','gfresumo','gffluxo','gfdre','gfdcat','gfdforn','gfdforma','pagar','cartao','rh','colab','repasse','tarefas']);
 // a conta ou o lançamento aberto com "Todas as empresas" usa a empresa dele; ao fechar a janela, volta
 document.addEventListener('close',e=>{if(e.target.tagName==='DIALOG'&&!document.querySelector('dialog[open]'))CLIDLG=null},true);
+// ================= SOLICITAÇÕES + ADMISSÃO (Carol, 18/11) =================
+// Portal de pedidos dos clientes: conversa, documentos, histórico e admissão com link para o novo colaborador.
+// Banco: tabelas sol_* e funções sol_admissao_* (docs/solicitacoes/BANCO.md); especificação: docs/solicitacoes/INSTRUCOES.md
+const SOL={tela:'lista',filtro:'todas',sel:null,tipos:[],cargos:[],unidades:[],lista:[],novas:{},ch:null,det:null,novo:{tipo:null}};
+const SOL_ST={aberta:'Aberta',em_andamento:'Em andamento',aguardando_cliente:'Aguardando cliente',concluida:'Concluída',cancelada:'Cancelada'};
+const SOL_PRI={baixa:'Baixa',normal:'Normal',alta:'Alta',urgente:'Urgente'};
+const SOL_ETAPAS=['Solicitação recebida','Link enviado ao colaborador','Colaborador preenchendo','Conferência do RH','Exame admissional','Contrato e eSocial','Admissão concluída'];
+const SOL_EXP={'45+45':'45 + 45 dias','30+60':'30 + 60 dias','15+75':'15 + 75 dias','90':'90 dias','sem':'Sem experiência'};
+// modelos do "Enviar ao colaborador" (assinatura do contrato fica no sistema de ponto: aqui só o aviso)
+const SOL_MOD=[
+  {k:'guia',t:'Guia do exame admissional',arq:'gerar',ret:'Exame admissional (ASO)',txt:'Leve esta guia e um documento com foto à unidade da Corpori que você escolheu. Depois do exame, envie a foto do ASO por este link.'},
+  {k:'carta',t:'Carta de abertura de conta salário',arq:'anexar',ret:'Comprovante da conta salário',txt:'Leve esta carta ao banco com RG, CPF e comprovante de residência. Depois envie aqui o comprovante com agência e conta.'},
+  {k:'contrato',t:'Contrato enviado para assinatura',arq:'',ret:'',txt:'Seu contrato de experiência foi enviado para assinatura no aplicativo de ponto. Abra o app e assine o quanto antes.'}];
+const solDt=s=>s?new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',''):'';
+const solD=s=>s?String(s).slice(0,10).split('-').reverse().join('/'):'—';
+const solCli=id=>CLIENTES.find(c=>c.id===id);
+const solFone=s=>{let n=String(s||'').replace(/\D/g,'');if(n.length>=10&&n.length<=11)n='55'+n;return n};
+const solLink=t=>location.origin+location.pathname.replace(/[^/]*$/,'')+'admissao.html?t='+t;
+function solVenc(ini,exp){if(!ini||!exp||exp==='sem')return '';const d0=dObj(ini),p=String(exp).split('+').map(Number);
+  const v=n=>{const d=new Date(d0);d.setDate(d.getDate()+n-1);return dBR(isoLocal(d))};
+  return p.length>1?`1º vencimento ${v(p[0])} · 2º vencimento ${v(p[0]+p[1])}`:`Fim da experiência ${v(p[0])}`}
+async function solBase(){
+  if(SOL.tipos.length)return;
+  const [t,c,u]=await Promise.all([sb.from('sol_tipos').select('*').eq('ativo',true).order('ordem'),sb.from('sol_cargos').select('*').eq('ativo',true).order('nome'),sb.from('sol_clinica_unidades').select('*').eq('ativo',true).order('ordem')]);
+  SOL.tipos=t.data||[];SOL.cargos=c.data||[];SOL.unidades=u.data||[];
+}
+const solTipo=id=>SOL.tipos.find(t=>t.id===id);
+const solEhAdm=t=>t&&/admiss/i.test(t.nome);
+async function solBadge(){if(!ME)return;try{
+  const {count}=await sb.from('sol_notificacoes').select('id',{count:'exact',head:true}).eq('user_id',ME.user_id).is('lida_em',null);
+  const n=count||0;if((NAVBADGE.solic||0)!==n){NAVBADGE.solic=n;renderNav()}}catch(e){}}
+function solSair(){if(SOL.ch){try{sb.removeChannel(SOL.ch)}catch(e){}SOL.ch=null}}
+async function renderSol(){
+  solSair();await solBase();$('solH1').textContent='Solicitações';
+  if(SOL.tela==='nova')return solNova();
+  if(SOL.tela==='det'&&SOL.sel)return solDet(SOL.sel);
+  return solLista();
+}
+// ---------- lista ----------
+async function solLista(){
+  SOL.tela='lista';const body=$('solBody');
+  const e=escCli.value;let q=sb.from('sol_solicitacoes').select('id,numero,titulo,status,prioridade,prazo,responsavel_nome,criado_por_nome,criado_em,atualizado_em,cliente_id,tipo_id').order('atualizado_em',{ascending:false}).limit(500);
+  if(e&&e!=='*'&&e!=='int'&&CLIENTES.some(c=>c.id===e))q=q.eq('cliente_id',e);
+  const [{data,error},nt]=await Promise.all([q,sb.from('sol_notificacoes').select('solicitacao_id').eq('user_id',ME.user_id).is('lida_em',null)]);
+  if(error){body.innerHTML=`<div class="alerta">Não foi possível carregar: ${esc(error.message)}</div>`;return}
+  SOL.lista=data||[];SOL.novas={};(nt.data||[]).forEach(n=>{if(n.solicitacao_id)SOL.novas[n.solicitacao_id]=1});
+  const esc_=ehEsc(),F=esc_?[['todas','Todas',null],['novas','Novas',['aberta']],['and','Em andamento',['em_andamento']],['aguard','Aguardando cliente',['aguardando_cliente']],['fim','Concluídas',['concluida','cancelada']]]
+    :[['todas','Todas',null],['voce','Precisam de você',['aguardando_cliente']],['and','Em andamento',['aberta','em_andamento']],['fim','Concluídas',['concluida','cancelada']]];
+  const f=F.find(x=>x[0]===SOL.filtro)||F[0],passa=(x,r)=>!x[2]||x[2].includes(r.status);
+  const rows=SOL.lista.filter(r=>passa(f,r));
+  $('solSub').textContent=esc_?'Pedidos de todos os clientes. Clique para abrir a conversa.':'Peça ao escritório o que precisar e acompanhe cada pedido por aqui.';
+  $('solNovaBtn').hidden=false;
+  body.innerHTML=`<div class="sol-tabs" role="group" aria-label="Filtrar">${F.map(x=>`<button type="button" class="sol-tab" data-solf="${x[0]}" aria-pressed="${x[0]===f[0]}">${x[1]} (${SOL.lista.filter(r=>passa(x,r)).length})</button>`).join('')}</div>
+   <div class="sol-lista">${rows.map(r=>{const t=solTipo(r.tipo_id),c=solCli(r.cliente_id);
+     return `<button type="button" class="sol-row card" data-solabre="${r.id}"><span class="sol-num">#${r.numero}</span>
+      <span class="sol-tit"><b>${esc(r.titulo)}</b><small>${esc_?esc(c?c.nome:'')+' · ':''}${esc(t?t.nome:'')} · ${r.responsavel_nome?'Responsável: '+esc(r.responsavel_nome):'Sem responsável'}</small></span>
+      ${r.prioridade==='alta'||r.prioridade==='urgente'?`<span class="sol-pri-${r.prioridade}">${SOL_PRI[r.prioridade]}</span>`:''}
+      <span class="sol-prazo">${r.prazo?'Prazo '+solDt(r.prazo).slice(0,5):''}</span>
+      <span class="chip sol-st-${r.status}">${SOL_ST[r.status]}</span>${SOL.novas[r.id]?'<span class="sol-nova">novidade</span>':''}</button>`}).join('')
+     ||'<div class="card sol-vazio">Nenhuma solicitação nesta situação.</div>'}</div>`;
+}
+// ---------- nova ----------
+// lista de serviços conforme o contrato da empresa (ficha: BPO financeiro / BPO RH); "Outros" sempre (Carol, 18/11)
+const SOL_CAT={rh:'Departamento pessoal (RH)',financeiro:'Financeiro',fiscal:'Fiscal',outro:'Outros'};
+const solContrata=(c,cat)=>!c||cat==='outro'||(cat==='rh'?!!c.bpo_rh:!!c.bpo_financeiro)||!c.bpo_rh&&!c.bpo_financeiro;
+function solNova(){
+  SOL.tela='nova';$('solNovaBtn').hidden=true;$('solSub').textContent='Escolha o serviço que você precisa. O prazo e os documentos aparecem conforme o tipo.';
+  const n=SOL.novo,cl=CLIENTES.filter(c=>c.ativo!==false),ca=cliAtual();if(!n.cli)n.cli=(ca&&cl.some(c=>c.id===ca.id)?ca.id:cl[0]?.id)||'';
+  const emp=solCli(n.cli),tipos=SOL.tipos.filter(t=>solContrata(emp,t.categoria));if(n.tipo&&!tipos.some(t=>t.id===n.tipo))n.tipo=null;
+  const t=solTipo(n.tipo),adm=solEhAdm(t),desc=t&&/desconto/i.test(t.nome),dia=new Date().getDate();
+  const cats=['rh','financeiro','fiscal','outro'].filter(k=>tipos.some(x=>x.categoria===k));
+  $('solBody').innerHTML=`<div class="card sol-form">
+    ${cl.length>1?`<label class="f">Empresa<select id="solNCli">${cl.map(c=>`<option value="${c.id}" ${n.cli===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></label>`:''}
+    <label class="f">Qual serviço você precisa?<select id="solNTipo"><option value="">Selecione o serviço</option>${cats.map(k=>`<optgroup label="${SOL_CAT[k]}">${tipos.filter(x=>x.categoria===k).map(x=>`<option value="${x.id}" ${x.id===n.tipo?'selected':''}>${esc(x.nome)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    ${t?`<p class="note" style="margin:0">${t.sla_horas?'Prazo de atendimento: '+Math.ceil(t.sla_horas/24)+(t.sla_horas<=24?' dia útil':' dias úteis'):'Prazo combinado com a equipe'}</p>
+     ${t.descricao?`<div class="alerta" style="margin:0">${esc(t.descricao)}</div>`:''}
+     ${desc&&dia>20?`<div class="alerta" style="margin:0;border-color:var(--bad);background:var(--bad-soft)">Hoje já passou do dia 20: estes descontos entram na folha do mês que vem.</div>`:''}
+     ${adm?`<div class="sol-g3">
+       <label class="f">Nome do colaborador<input id="solNNome" placeholder="Ex.: Joana Lima"></label>
+       <label class="f">WhatsApp do colaborador<input id="solNWhats" type="tel" placeholder="(48) 99999-0000"></label>
+       <label class="f">Cargo<select id="solNCargo"><option value="">Selecione</option>${SOL.cargos.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')}</select></label>
+       <label class="f">Horário<input id="solNHor" placeholder="Ex.: 07h às 19h (12x36)"></label>
+       <label class="f">Data de início<input id="solNIni" type="date"></label>
+       <label class="f">Período de experiência<select id="solNExp"><option value="">Selecione</option>${Object.entries(SOL_EXP).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label></div>
+       <p class="note" id="solNVenc"></p>
+       <label class="f">Observação (opcional)<input id="solNObs" placeholder="Ex.: vaga da UTI, substitui a Maria"></label>
+       <p class="note">O RH envia um link para o colaborador preencher os dados e mandar os documentos pelo celular. Você acompanha cada etapa por aqui.</p>`
+     :`${(t.documentos||[]).length?`<p class="note" style="margin:0">Documentos que vamos pedir: <b>${esc(t.documentos.join(', '))}</b>. Anexe aqui ou depois, na conversa.</p>`:''}
+       <label class="f">Título (opcional)<input id="solNTit" placeholder="${esc(t.nome)}"></label>
+       <label class="f">Detalhes<textarea id="solNDesc" rows="4" placeholder="Explique o que precisa: colaborador, datas, valores…"></textarea></label>
+       <label class="f">Anexos (opcional)<input id="solNArq" type="file" multiple></label>`}
+     <div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn" data-solvolta="1">Cancelar</button><button type="button" class="btn primary" id="solNCriar">Abrir solicitação</button></div>`
+    :`<div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-solvolta="1">Cancelar</button></div>`}</div>`;
+}
+async function solCriar(){
+  const t=solTipo(SOL.novo.tipo);if(!t)return;const cli=SOL.novo.cli||cliAtual()?.id||ME.cliente_id||CLIENTES[0]?.id;
+  if(!cli){toast('Escolha a empresa.');return}
+  let reg={cliente_id:cli,tipo_id:t.id};
+  if(solEhAdm(t)){const v=k=>($(k)?.value||'').trim();
+    const d={colaborador_nome:v('solNNome'),colaborador_whatsapp:v('solNWhats'),cargo_id:v('solNCargo'),horario:v('solNHor'),data_inicio:v('solNIni'),experiencia:v('solNExp')};
+    if(Object.values(d).some(x=>!x)){toast('Preencha os 6 campos da admissão.');return}
+    d.cargo_nome=SOL.cargos.find(c=>c.id===d.cargo_id)?.nome||'';
+    reg={...reg,titulo:'Admissão de '+d.colaborador_nome,descricao:v('solNObs')||null,dados:d};
+  }else{const tit=($('solNTit').value||'').trim()||t.nome;reg={...reg,titulo:tit,descricao:($('solNDesc').value||'').trim()||null}}
+  $('solNCriar').disabled=true;
+  const {data,error}=await sb.from('sol_solicitacoes').insert(reg).select('id,cliente_id').single();
+  if(error){$('solNCriar').disabled=false;alert('Não foi possível abrir: '+error.message);return}
+  const fs=$('solNArq')?.files;if(fs&&fs.length)for(const f of fs)await solUpload(data,f,'');
+  toast('Solicitação aberta. A equipe foi avisada.');SOL.novo={tipo:null};SOL.sel=data.id;SOL.tela='det';renderSol();
+}
+async function solUpload(s,f,documento,interno){
+  const caminho=`${s.cliente_id}/${s.id}/${crypto.randomUUID()}-${f.name.replace(/[^\w.\-]+/g,'_').slice(-80)}`;
+  const up=await sb.storage.from('solicitacoes').upload(caminho,f,{contentType:f.type||undefined});
+  if(up.error){alert('Falha no envio de '+f.name+': '+up.error.message);return false}
+  const {error}=await sb.from('sol_anexos').insert({solicitacao_id:s.id,caminho,nome:f.name,mime:f.type||null,tamanho:f.size,documento:documento||null,interno:!!interno});
+  if(error){alert(error.message);return false}return true;
+}
+// ---------- detalhe ----------
+async function solDet(id){
+  SOL.tela='det';SOL.sel=id;$('solNovaBtn').hidden=true;const body=$('solBody');
+  const [s,m,a,e,ad]=await Promise.all([sb.from('sol_solicitacoes').select('*').eq('id',id).maybeSingle(),
+    sb.from('sol_mensagens').select('*').eq('solicitacao_id',id).order('criado_em'),
+    sb.from('sol_anexos').select('*').eq('solicitacao_id',id).order('criado_em'),
+    sb.from('sol_eventos').select('*').eq('solicitacao_id',id).order('criado_em',{ascending:false}),
+    sb.from('sol_admissoes').select('*').eq('solicitacao_id',id).maybeSingle()]);
+  if(!s.data){body.innerHTML='<div class="alerta">Solicitação não encontrada ou sem acesso.</div>';return}
+  let env=[];if(ad.data){const r=await sb.from('sol_admissao_envios').select('*').eq('admissao_id',ad.data.id).order('criado_em');env=r.data||[]}
+  SOL.det={s:s.data,msgs:m.data||[],anx:a.data||[],ev:e.data||[],adm:ad.data,env};
+  // marca como lido
+  sb.from('sol_leituras').upsert({solicitacao_id:id,user_id:ME.user_id,lido_em:new Date().toISOString()}).then(()=>{});
+  sb.from('sol_notificacoes').update({lida_em:new Date().toISOString()}).eq('user_id',ME.user_id).eq('solicitacao_id',id).is('lida_em',null).then(()=>solBadge());
+  solDesenha();
+  SOL.ch=sb.channel('sol-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'sol_mensagens',filter:'solicitacao_id=eq.'+id},()=>{if(SOL.sel===id&&SOL.tela==='det'&&VIEW==='solic')solDet(id)}).subscribe();
+}
+function solDesenha(){
+  const {s,msgs,anx,ev,adm,env}=SOL.det,t=solTipo(s.tipo_id),c=solCli(s.cliente_id),eq=ehEsc(),fech=['concluida','cancelada'].includes(s.status);
+  const dd=s.dados||{},isAdm=solEhAdm(t);
+  const acoes=eq?[...(s.responsavel!==ME.user_id&&!fech?[['assumir','Assumir']]:[]),...(!fech?[s.status!=='em_andamento'&&['st:em_andamento','Em andamento'],s.status!=='aguardando_cliente'&&['st:aguardando_cliente','Pedir algo ao cliente'],['st:concluida','Concluir']].filter(Boolean):[['st:em_andamento','Reabrir']])]:[];
+  let h=`<div><button type="button" class="btn small" data-solvolta="1">← Voltar</button></div>
+  <div class="card sol-cab"><div><small>#${s.numero} · ${esc(t?t.nome:'')} · ${esc(c?c.nome:'')}</small><h2>${esc(s.titulo)}</h2>
+    <small>Aberta por ${esc(s.criado_por_nome||'—')} em ${solDt(s.criado_em)} · Prazo ${s.prazo?solDt(s.prazo):'—'} · Responsável: ${esc(s.responsavel_nome||'ainda não definido')}</small>
+    ${s.descricao?`<p style="margin:8px 0 0;white-space:pre-line">${esc(s.descricao)}</p>`:''}</div><span class="chip sol-st-${s.status}">${SOL_ST[s.status]}</span></div>`;
+  if(eq)h+=`<div class="card sol-acoes"><b>Ações da equipe:</b>${acoes.map(([k,l])=>`<button type="button" class="btn small" data-solacao="${k}">${l}</button>`).join('')}
+    <label class="f sol-inl">Prioridade<select id="solPri">${Object.entries(SOL_PRI).map(([v,l])=>`<option value="${v}" ${s.prioridade===v?'selected':''}>${l}</option>`).join('')}</select></label></div>`;
+  else if(s.status==='aberta'&&s.criado_por===ME.user_id)h+=`<div class="card sol-acoes">Ninguém começou a tratar este pedido ainda. <button type="button" class="btn small" data-solacao="cancelar">Cancelar solicitação</button></div>`;
+  if(isAdm)h+=solAdmPainel(s,dd,adm,env,eq);
+  h+=`<div class="sol-cols"><section class="card sol-chat" aria-label="Conversa"><h2>Conversa</h2><div class="sol-msgs">${msgs.map(m=>{
+      const sis=!m.autor&&!/novo colaborador/.test(m.autor_nome||''),meu=m.autor===ME.user_id,cls=sis?'sis':m.interno?'int':meu?'eu':'outro';
+      return `<div class="sol-msg ${cls}">${sis?'':`<small>${esc(m.autor_nome||'')}${m.interno?' · nota interna':''} · ${solDt(m.criado_em)}</small>`}<div>${esc(m.texto)}</div>${sis?`<small>${solDt(m.criado_em)}</small>`:''}</div>`}).join('')||'<p class="note">Nenhuma mensagem ainda.</p>'}</div>
+    ${fech?'<p class="note">Solicitação encerrada. Para algo novo, abra outra solicitação.</p>':`<div class="sol-escrever"><textarea id="solMsg" rows="3" placeholder="${eq?'Responder ao cliente…':'Escreva para o escritório…'}"></textarea>
+      <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">${eq?'<label class="sol-chk"><input type="checkbox" id="solInt"> Nota interna (o cliente não vê)</label>':'<span class="note">A equipe recebe um aviso na hora.</span>'}
+      <span class="row" style="gap:8px"><label class="btn small">Anexar arquivo<input type="file" id="solArq" multiple hidden></label><button type="button" class="btn primary" id="solEnviar">Enviar</button></span></div></div>`}</section>
+  <aside class="sol-lado"><section class="card"><h2>Arquivos</h2>${anx.map(x=>`<div class="sol-anx"><span><b>${esc(x.documento||x.nome)}</b><small>${esc(x.nome)} · ${esc(x.enviado_por_nome||'')} · ${solDt(x.criado_em)}${x.interno?' · interno':''}</small></span><button type="button" class="btn small" data-solbaixa="${esc(x.caminho)}">Baixar</button></div>`).join('')||'<p class="note">Nenhum arquivo.</p>'}</section>
+  <section class="card"><h2>Histórico</h2>${ev.map(x=>`<div class="sol-ev"><span>${esc(solEvTxt(x))}</span><small>${solDt(x.criado_em)}</small></div>`).join('')}</section></aside></div>`;
+  $('solBody').innerHTML=h;
+  const ms=$('solBody').querySelector('.sol-msgs');if(ms)ms.scrollTop=ms.scrollHeight;
+}
+function solEvTxt(x){const quem=x.autor_nome?x.autor_nome+': ':'';
+  return quem+({criada:'abriu a solicitação',status:'status '+(SOL_ST[x.de]||x.de||'')+' → '+(SOL_ST[x.para]||x.para),responsavel:'responsável '+(x.para||'removido'),prioridade:'prioridade '+(SOL_PRI[x.para]||x.para),
+    prazo:'prazo alterado',link_admissao:'link do colaborador: '+x.para,documento_colaborador:'enviou '+x.para,envio_colaborador:'enviou ao colaborador: '+x.para,aviso_colaborador:'aviso ao colaborador: '+x.para,etapa:'etapa: '+x.para}[x.tipo]||x.tipo+' '+(x.para||''))}
+function solAdmPainel(s,dd,adm,env,eq){
+  const et=adm?adm.etapa:1,venc=solVenc(dd.data_inicio,dd.experiencia),fone=solFone(adm?.colaborador_whatsapp||dd.colaborador_whatsapp);
+  let h=`<section class="card sol-adm"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2>Andamento da admissão · etapa ${et} de 7</h2>
+    ${eq&&adm&&et>=3&&et<7?`<button type="button" class="btn small" data-solacao="etapa:${et+1}">Avançar para: ${SOL_ETAPAS[et]}</button>`:''}</div>
+    <ol class="sol-etapas">${SOL_ETAPAS.map((n,i)=>`<li class="${i+1<et?'feita':i+1===et?'atual':''}"><span>${i+1<et?'✓':i+1}</span>${n}</li>`).join('')}</ol>
+    <div class="sol-dados"><span><b>Colaborador:</b> ${esc(adm?.colaborador_nome||dd.colaborador_nome||'—')} · ${esc(dd.colaborador_whatsapp||'')}</span><span><b>Cargo:</b> ${esc(adm?.cargo_nome||dd.cargo_nome||'—')}</span>
+    <span><b>Setor:</b> ${esc(adm?.setor||(eq?'a preencher':'definido pelo RH'))}</span><span><b>Horário:</b> ${esc(dd.horario||'—')}</span><span><b>Início:</b> ${solD(dd.data_inicio)}</span>
+    <span><b>Experiência:</b> ${esc(SOL_EXP[dd.experiencia]||'—')}${venc?' ('+venc+')':''}</span></div>`;
+  if(eq&&adm)h+=`<div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f">Setor<input id="solSetor" value="${esc(adm.setor||'')}" placeholder="Ex.: UTI"></label>
+    <label class="f">Salário<input id="solSal" value="${esc(adm.salario||'')}" placeholder="R$ 0,00"></label><button type="button" class="btn small" data-solacao="setor">Salvar</button>
+    <span class="note">Só a equipe vê o salário.</span></div>`;
+  if(eq){
+    if(!adm)h+=`<div class="row" style="gap:8px;align-items:center"><button type="button" class="btn primary" data-solacao="gerar">Gerar link para o colaborador</button><span class="note">Gera o link do formulário e já abre o WhatsApp de ${esc(dd.colaborador_nome||'colaborador')}.</span></div>`;
+    else{const link=solLink(adm.token);
+      h+=`<div class="sol-link"><div><b>Link do colaborador</b> · ${esc({pendente:'aguardando preenchimento',enviado:'formulário enviado',correcao:'correção pedida',aprovado:'admissão concluída'}[adm.status]||adm.status)} · vale até ${solDt(adm.expira_em).slice(0,5)}</div>
+        <code>${esc(link)}</code><div class="row" style="gap:6px;flex-wrap:wrap">
+        <button type="button" class="btn small" data-solcopia="${esc(link)}">Copiar link</button>
+        ${fone?`<a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${fone}?text=${encodeURIComponent(`Olá, ${(adm.colaborador_nome||dd.colaborador_nome||'').split(' ')[0]}! Bem-vindo(a) à ${solCli(s.cliente_id)?.nome||'equipe'}. Para a sua admissão, preencha seus dados e envie os documentos por este link: ${link}`)}">Enviar por WhatsApp</a>`:''}
+        <button type="button" class="btn small" data-solacao="relink">Gerar novo link</button>
+        ${adm.status==='enviado'?'<button type="button" class="btn small" data-solacao="correcao">Pedir correção</button>':''}
+        ${adm.status!=='pendente'?'<button type="button" class="btn small" data-solacao="ficha:pdf">Ficha (PDF)</button><button type="button" class="btn small" data-solacao="ficha:xls">Ficha (Excel)</button>':''}</div></div>`;
+      h+=`<div class="sol-env"><b>Enviar ao colaborador</b><div class="row" style="gap:6px;flex-wrap:wrap">${SOL_MOD.map(mo=>`<button type="button" class="btn small" data-solmod="${mo.k}">+ ${mo.t}</button>`).join('')}</div>
+        <div id="solModBox"></div>${env.map(x=>`<div class="sol-anx"><span><b>${esc(x.titulo)}</b><small>${x.retorno_documento?(x.retorno_anexo_id?'✓ '+esc(x.retorno_documento)+' recebido':'Aguardando: '+esc(x.retorno_documento)):'✓ aviso enviado'} · ${solDt(x.criado_em)}</small></span></div>`).join('')}</div>`;
+    }
+  }else if(adm&&env.length)h+=`<div class="sol-env"><b>Enviado ao colaborador</b>${env.map(x=>`<div class="sol-anx"><span><b>${esc(x.titulo)}</b><small>${x.retorno_documento?(x.retorno_anexo_id?'✓ '+esc(x.retorno_documento)+' recebido':'Aguardando: '+esc(x.retorno_documento)):'aviso'}</small></span></div>`).join('')}</div>`;
+  return h+'</section>';
+}
+function solModForm(k){
+  const mo=SOL_MOD.find(x=>x.k===k),box=$('solModBox');if(!mo||!box)return;
+  box.innerHTML=`<div class="sol-modf" data-mod="${k}"><b>${esc(mo.t)}</b>
+    ${mo.arq==='gerar'?'<p class="note">A guia da Corpori sai preenchida com os dados do formulário (nome, CPF, nascimento, sexo, cargo, setor, empresa, unidade, data e turno escolhidos pelo colaborador).</p>':''}
+    ${mo.arq==='anexar'?'<label class="f">Arquivo (PDF)<input type="file" id="solModArq" accept="application/pdf,image/*"></label>':''}
+    <label class="f">Mensagem para o colaborador<textarea id="solModTxt" rows="3">${esc(mo.txt)}</textarea></label>
+    ${mo.ret?`<p class="note">O colaborador deverá devolver: <b>${esc(mo.ret)}</b></p>`:''}
+    <div class="row" style="gap:6px;justify-content:flex-end">${mo.arq==='gerar'?'<button type="button" class="btn small" data-solacao="guia:ver">Ver a guia</button>':''}
+    <button type="button" class="btn small" data-solacao="mod:fechar">Cancelar</button><button type="button" class="btn primary small" data-solacao="mod:enviar">Enviar pelo link</button></div></div>`;
+}
+// guia da Corpori preenchida (modelos/guia_corpori.pdf; campos em docs/solicitacoes/INSTRUCOES.md, seção 5)
+async function solGuia(){
+  const {s,adm}=SOL.det,d=adm.dados||{},dd=s.dados||{},c=solCli(s.cliente_id)||{},cg=SOL.cargos.find(x=>x.id===adm.cargo_id)||{};
+  if(!window.PDFLib)await new Promise((ok,ko)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';sc.onload=ok;sc.onerror=()=>ko(new Error('não carregou o gerador de PDF (verifique a internet)'));document.head.appendChild(sc)});
+  const rp=await fetch('modelos/guia_corpori.pdf');if(!rp.ok)throw new Error('modelo da guia não encontrado (modelos/guia_corpori.pdf)');const bytes=await rp.arrayBuffer();
+  const pdf=await PDFLib.PDFDocument.load(bytes),f=pdf.getForm();
+  const tx=(k,v)=>{try{f.getTextField(k).setText(String(v||''))}catch(e){}},ck=k=>{try{f.getCheckBox(k).check()}catch(e){}};
+  tx('razao_social',(c.ficha&&(c.ficha.razao_social||c.ficha.razao))||c.nome);tx('cnpj',c.cnpj);tx('nome_funcionario',d.nome||adm.colaborador_nome);tx('cpf',d.cpf);
+  tx('setor',adm.setor);tx('cargo',adm.cargo_nome);tx('data_nascimento',solD(d.nascimento));tx('data_admissao',solD(dd.data_inicio));
+  if(d.sexo==='M')ck('sexo_m');if(d.sexo==='F')ck('sexo_f');ck('exame_01');
+  const APT={'Postos de Combustíveis':'aptidao_01','Trabalho em Altura':'aptidao_02','Manipulação de Alimentos':'aptidao_03','Espaço Confinado':'aptidao_04','Serviços de Eletricidade':'aptidao_05'};
+  (cg.aptidoes||[]).forEach(a=>APT[a]&&ck(APT[a]));
+  const un=SOL.unidades.find(u=>u.nome===d.exame_unidade);if(un&&un.campo_pdf)ck(un.campo_pdf);
+  tx('agendamento_data',/^o quanto/i.test(d.exame_data||'')?'O quanto antes':solD(d.exame_data));tx('agendamento_hora',d.exame_turno?d.exame_turno[0].toUpperCase()+d.exame_turno.slice(1):'');
+  return new Blob([await pdf.save()],{type:'application/pdf'});
+}
+// ficha de admissão para a contabilidade (modelo próprio): PDF pela impressão do navegador ou Excel
+function solFichaDados(){
+  const {s,adm}=SOL.det,d=adm.dados||{},dd=s.dados||{},c=solCli(s.cliente_id)||{};
+  return [['Empresa',[['Empresa',c.nome],['CNPJ',c.cnpj],['Solicitado por',s.criado_por_nome]]],
+   ['Admissão',[['Cargo',adm.cargo_nome],['Setor',adm.setor],['Salário',adm.salario],['Horário',dd.horario],['Data de início',solD(dd.data_inicio)],['Experiência',(SOL_EXP[dd.experiencia]||'')+(solVenc(dd.data_inicio,dd.experiencia)?' — '+solVenc(dd.data_inicio,dd.experiencia):'')],
+     ['Vale-transporte',d.vale_transporte==='sim'?'Sim — '+(d.vt_linha||''):'Não'],['Uniforme',d.tamanho_calcado?'Calçado '+d.tamanho_calcado+' · Roupa '+(d.tamanho_roupa||''):'']]],
+   ['Dados pessoais',[['Nome completo',d.nome],['Nome social',d.nome_social],['Nome da mãe',d.nome_mae],['Nome do pai',d.nome_pai],['Nascimento',solD(d.nascimento)],['Sexo',{F:'Feminino',M:'Masculino'}[d.sexo]],['Local de nascimento',d.local_nascimento],['Raça/cor',d.raca_cor],['Estado civil',d.estado_civil],['Escolaridade',d.escolaridade]]],
+   ['Documentos',[['CPF',d.cpf],['RG',d.rg],['Órgão emissor',d.rg_orgao],['Emissão do RG',solD(d.rg_emissao)]]],
+   ['Endereço e contato',[['Endereço',d.endereco],['Complemento',d.complemento],['Bairro',d.bairro],['Cidade',d.cidade],['CEP',d.cep],['Telefone',d.telefone],['E-mail',d.email]]],
+   ['Cônjuge',d.tem_conjuge==='sim'?[['Nome',d.conjuge_nome],['Naturalidade',d.conjuge_naturalidade],['Nascimento',solD(d.conjuge_nascimento)]]:[['Cônjuge','Não possui']]]];
+}
+function solFicha(tipo){
+  const {adm,anx}=SOL.det,d=adm.dados||{},sec=solFichaDados(),deps=d.tem_dependentes==='sim'?(d.dependentes||[]):[],nome=d.nome||adm.colaborador_nome||'colaborador';
+  const docs=anx.filter(x=>/^admissao\//.test(x.caminho)&&!/\/equipe\//.test(x.caminho)).map(x=>x.documento||x.nome);
+  if(tipo==='xls'){const rows=[['Ficha de admissão — '+nome],[]];sec.forEach(([t,ps])=>{rows.push([t]);ps.forEach(([r,v])=>rows.push([r,v||'']));rows.push([])});
+    rows.push(['Dependentes']);rows.push(['Nome','Parentesco','Nascimento','CPF']);deps.forEach(x=>rows.push([x.nome,x.parentesco,solD(x.nascimento),x.cpf]));rows.push([]);
+    rows.push(['Documentos anexados']);docs.forEach(x=>rows.push(['✓ '+x]));rows.push([]);rows.push(['Aceite LGPD em '+solDt(adm.consentimento_em)]);
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:28},{wch:44},{wch:16},{wch:20}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Ficha de admissão');
+    XLSX.writeFile(wb,'Ficha de admissão - '+nome+'.xlsx');return}
+  const w=window.open('','_blank');if(!w){alert('Libere as janelas pop-up para gerar a ficha.');return}
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Ficha de admissão — ${esc(nome)}</title><style>
+    body{font:12px Arial,sans-serif;color:#13232B;margin:18px}h1{background:#013B3C;color:#fff;margin:0 0 10px;padding:12px 14px;font-size:18px}
+    h2{font-size:13px;color:#025556;margin:12px 0 4px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #DCE4E1;padding:4px 6px;vertical-align:top;text-align:left}
+    td small{display:block;color:#5B6B70;font-size:9px}td b{font-size:11px}.p{color:#5B6B70;font-size:10px;margin-top:12px}</style></head><body>
+    <h1>Ficha de admissão · ${esc(nome)}</h1>${sec.map(([t,ps])=>{let r='';for(let i=0;i<ps.length;i+=3)r+='<tr>'+ps.slice(i,i+3).map(([l,v])=>`<td><small>${esc(l)}</small><b>${esc(v||'—')}</b></td>`).join('')+'</tr>';return `<h2>${esc(t)}</h2><table>${r}</table>`}).join('')}
+    <h2>Dependentes</h2><table><tr><th>Nome</th><th>Parentesco</th><th>Nascimento</th><th>CPF</th></tr>${deps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.parentesco)}</td><td>${solD(x.nascimento)}</td><td>${esc(x.cpf)}</td></tr>`).join('')||'<tr><td colspan="4">Sem dependentes</td></tr>'}</table>
+    <h2>Documentos anexados</h2><table>${docs.map(x=>`<tr><td>✓ ${esc(x)}</td></tr>`).join('')||'<tr><td>—</td></tr>'}</table>
+    <p class="p">Dados informados pelo colaborador pelo link de admissão, com aceite LGPD em ${solDt(adm.consentimento_em)}. Gerada pelo Portal Controlacs em ${dBR(TODAY)}.</p>
+    <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+}
+async function solAcao(k){
+  const {s,adm}=SOL.det,id=s.id,re=()=>solDet(id);let r;
+  if(k==='assumir')r=await sb.from('sol_solicitacoes').update({responsavel:ME.user_id}).eq('id',id);
+  else if(k.startsWith('st:'))r=await sb.from('sol_solicitacoes').update({status:k.slice(3),...(s.responsavel?{}:{responsavel:ME.user_id})}).eq('id',id);
+  else if(k==='cancelar'){if(!confirm('Cancelar esta solicitação?'))return;r=await sb.from('sol_solicitacoes').update({status:'cancelada'}).eq('id',id)}
+  else if(k.startsWith('etapa:'))r=await sb.rpc('sol_admissao_etapa',{p_solicitacao:id,p_etapa:+k.slice(6)});
+  else if(k==='setor')r=await sb.from('sol_admissoes').update({setor:$('solSetor').value.trim()||null,salario:$('solSal').value.trim()||null}).eq('id',adm.id);
+  else if(k==='gerar'||k==='relink'){if(k==='relink'&&!confirm('Gerar um novo link? O link antigo para de funcionar.'))return;
+    r=await sb.rpc('sol_admissao_gerar_link',{p_solicitacao:id});
+    if(!r.error&&k==='gerar'){const dd=s.dados||{},fone=solFone(dd.colaborador_whatsapp),link=solLink(r.data);
+      if(fone)window.open(`https://wa.me/${fone}?text=${encodeURIComponent(`Olá, ${(dd.colaborador_nome||'').split(' ')[0]}! Bem-vindo(a) à ${solCli(s.cliente_id)?.nome||'equipe'}. Para a sua admissão, preencha seus dados e envie os documentos por este link: ${link}`)}`,'_blank')}}
+  else if(k==='correcao'){const m=prompt('O que o colaborador precisa corrigir? (ele verá este recado)');if(!m)return;r=await sb.rpc('sol_admissao_pedir_correcao',{p_solicitacao:id,p_msg:m})}
+  else if(k.startsWith('ficha:')){solFicha(k.slice(6));return}
+  else if(k==='mod:fechar'){$('solModBox').innerHTML='';return}
+  else if(k==='guia:ver'){try{const b=await solGuia();window.open(URL.createObjectURL(b),'_blank')}catch(e){alert('Não foi possível gerar a guia: '+(e.message||e))}return}
+  else if(k==='mod:enviar'){const box=$('solModBox').querySelector('[data-mod]'),mo=SOL_MOD.find(x=>x.k===box.dataset.mod),txt=$('solModTxt').value.trim();
+    let blob=null,nome='';
+    try{if(mo.arq==='gerar'){blob=await solGuia();nome='Guia de exame - '+((adm.dados||{}).nome||adm.colaborador_nome||'colaborador')+'.pdf'}
+      else if(mo.arq==='anexar'){const f=$('solModArq').files[0];if(!f){toast('Escolha o arquivo.');return}blob=f;nome=f.name}}catch(e){alert('Não foi possível gerar a guia: '+(e.message||e));return}
+    if(blob){const caminho=`admissao/${adm.token}/equipe/${crypto.randomUUID()}.${/\.(\w+)$/.exec(nome)?.[1]||'pdf'}`;
+      const up=await sb.storage.from('solicitacoes').upload(caminho,blob,{contentType:blob.type||'application/pdf'});if(up.error){alert(up.error.message);return}
+      r=await sb.rpc('sol_admissao_enviar_doc',{p_solicitacao:id,p_titulo:mo.t,p_caminho:caminho,p_nome:nome,p_instrucoes:txt,p_retorno:mo.ret||null})}
+    else r=await sb.rpc('sol_admissao_avisar',{p_solicitacao:id,p_titulo:mo.t,p_texto:txt});
+    if(!r.error){const fone=solFone(adm.colaborador_whatsapp||(s.dados||{}).colaborador_whatsapp);
+      if(fone)window.open(`https://wa.me/${fone}?text=${encodeURIComponent(`Olá! O RH enviou para você: ${mo.t}. Veja no seu link de admissão: ${solLink(adm.token)}`)}`,'_blank');
+      if(mo.k==='guia'){const un=SOL.unidades.find(u=>u.nome===(adm.dados||{}).exame_unidade);if(un)toast('Guia enviada. Lembre de mandar também para a unidade '+un.nome+' (WhatsApp '+un.whatsapp+').')}}}
+  if(r&&r.error){alert('Não foi possível: '+r.error.message);return}
+  if(!k.startsWith('mod:'))toast('Feito.');re();
+}
+async function solEnviar(){
+  const t=$('solMsg').value.trim(),fs=$('solArq').files,int=$('solInt')?.checked;if(!t&&!fs.length)return;
+  $('solEnviar').disabled=true;const s=SOL.det.s;
+  for(const f of fs)await solUpload(s,f,'',int);
+  if(t){const {error}=await sb.from('sol_mensagens').insert({solicitacao_id:s.id,texto:t,interno:!!int});if(error){alert(error.message);$('solEnviar').disabled=false;return}}
+  else if(fs.length)await sb.from('sol_mensagens').insert({solicitacao_id:s.id,texto:'Enviei '+fs.length+' arquivo(s).',interno:!!int});
+  solDet(s.id);
+}
+$('viewSol').addEventListener('click',async e=>{const b=e.target.closest('button,[data-solcopia]');if(!b)return;
+  if(b.id==='solNovaBtn'){SOL.novo={tipo:null};solNova();return}
+  if(b.dataset.solf){SOL.filtro=b.dataset.solf;solLista();return}
+  if(b.dataset.solabre){SOL.sel=b.dataset.solabre;solDet(SOL.sel);return}
+  if(b.dataset.solvolta){solSair();SOL.sel=null;solLista();return}
+  if(b.dataset.soltipo){const cli=$('solNCli')?.value;SOL.novo={tipo:b.dataset.soltipo,cli};solNova();return}
+  if(b.id==='solNCriar'){solCriar();return}
+  if(b.id==='solEnviar'){solEnviar();return}
+  if(b.dataset.solacao){b.disabled=true;try{await solAcao(b.dataset.solacao)}finally{if(b.isConnected)b.disabled=false}return}
+  if(b.dataset.solmod){solModForm(b.dataset.solmod);return}
+  if(b.dataset.solcopia){try{await navigator.clipboard.writeText(b.dataset.solcopia);toast('Link copiado.')}catch(x){prompt('Copie o link:',b.dataset.solcopia)}return}
+  if(b.dataset.solbaixa){const {data,error}=await sb.storage.from('solicitacoes').createSignedUrl(b.dataset.solbaixa,300);if(error){alert(error.message);return}window.open(data.signedUrl,'_blank');return}
+});
+$('viewSol').addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='solPri'){const {error}=await sb.from('sol_solicitacoes').update({prioridade:t.value}).eq('id',SOL.sel);if(error)alert(error.message);else solDet(SOL.sel);return}
+  if(t.id==='solNCli'){SOL.novo={cli:t.value,tipo:SOL.novo.tipo};solNova();return}
+  if(t.id==='solNTipo'){SOL.novo={cli:SOL.novo.cli,tipo:t.value||null};solNova();return}
+  if(t.id==='solNIni'||t.id==='solNExp'){const v=solVenc($('solNIni').value,$('solNExp').value);$('solNVenc').textContent=v}
+});
+
+// ---------- cadastro dos serviços (Configurações › Serviços das solicitações; só a Master) ----------
+async function renderSolServ(){
+  solSair();$('solH1').textContent='Serviços das solicitações';$('solNovaBtn').hidden=true;
+  $('solSub').textContent='O que os clientes podem pedir em Solicitações. Cada empresa vê só as áreas do contrato (ficha da empresa: BPO financeiro / BPO RH); "Outros" aparece para todas.';
+  const {data,error}=await sb.from('sol_tipos').select('*').order('categoria').order('ordem');
+  if(error){$('solBody').innerHTML=`<div class="alerta">${esc(error.message)}</div>`;return}
+  const cats=['rh','financeiro','fiscal','outro'];
+  const linha=t=>`<tr data-solsv="${t?t.id:'novo'}"${t&&!t.ativo?' class="sol-inativo"':''}>
+    <td><input data-c="nome" value="${esc(t?t.nome:'')}" placeholder="Nome do serviço"></td>
+    <td><select data-c="categoria">${cats.map(k=>`<option value="${k}" ${(t?t.categoria:'rh')===k?'selected':''}>${SOL_CAT[k]}</option>`).join('')}</select></td>
+    <td><input data-c="prazo" type="number" min="0" step="1" style="width:70px" value="${t&&t.sla_horas?Math.ceil(t.sla_horas/24):''}" placeholder="dias"></td>
+    <td><input data-c="documentos" value="${esc(t?(t.documentos||[]).join('; '):'')}" placeholder="Separe por ;"></td>
+    <td><input data-c="descricao" value="${esc(t?t.descricao||'':'')}" placeholder="Orientação para o cliente"></td>
+    <td><input data-c="ordem" type="number" style="width:60px" value="${t?t.ordem:50}"></td>
+    <td style="text-align:center"><input data-c="ativo" type="checkbox" ${!t||t.ativo?'checked':''} style="width:auto;min-height:0"></td>
+    <td><button type="button" class="btn small ${t?'':'primary'}" data-solsvsalva="1">${t?'Salvar':'Incluir'}</button></td></tr>`;
+  $('solBody').innerHTML=`<div class="card sol-form"><h2>Incluir serviço</h2><div class="tablebox"><table class="sol-svtab"><thead><tr><th>Serviço</th><th>Área</th><th>Prazo (dias)</th><th>Documentos pedidos</th><th>Orientação</th><th>Ordem</th><th>Ativo</th><th></th></tr></thead><tbody>${linha(null)}</tbody></table></div></div>
+   ${cats.map(k=>{const ts=(data||[]).filter(x=>x.categoria===k);return ts.length?`<div class="card sol-form"><h2>${SOL_CAT[k]} (${ts.filter(x=>x.ativo).length} ativos)</h2><div class="tablebox"><table class="sol-svtab"><thead><tr><th>Serviço</th><th>Área</th><th>Prazo (dias)</th><th>Documentos pedidos</th><th>Orientação</th><th>Ordem</th><th>Ativo</th><th></th></tr></thead><tbody>${ts.map(linha).join('')}</tbody></table></div></div>`:''}).join('')}
+   <p class="note">Desativar esconde o serviço da lista dos clientes. As solicitações antigas continuam com o nome. A admissão usa o serviço com "Admissão" no nome.</p>`;
+}
+$('viewSol').addEventListener('click',async e=>{const b=e.target.closest('[data-solsvsalva]');if(!b)return;
+  const tr=b.closest('tr'),v=c=>tr.querySelector(`[data-c="${c}"]`),id=tr.dataset.solsv,nome=v('nome').value.trim();
+  if(!nome){toast('Informe o nome do serviço.');return}
+  const dias=parseInt(v('prazo').value,10);
+  const reg={nome,categoria:v('categoria').value,sla_horas:dias>0?dias*24:null,documentos:v('documentos').value.split(';').map(x=>x.trim()).filter(Boolean),
+    descricao:v('descricao').value.trim()||null,ordem:parseInt(v('ordem').value,10)||50,ativo:v('ativo').checked};
+  b.disabled=true;const r=id==='novo'?await sb.from('sol_tipos').insert(reg):await sb.from('sol_tipos').update(reg).eq('id',id);b.disabled=false;
+  if(r.error){alert('Não foi possível salvar: '+r.error.message);return}
+  SOL.tipos=[];toast(id==='novo'?'Serviço incluído.':'Serviço salvo.');renderSolServ();
+});
+// ================= fim SOLICITAÇÕES =================
+
 function openView(){
+  if(VIEW!=='solic')solSair();
   viewDaEmp();renderNav();
-  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewNR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
+  ['viewApr','viewEnc','viewEncRel','viewTodas','viewDash','viewOp','viewEsc','viewMod','viewCfg','viewRH','viewFolha','viewColab','viewDocs','viewBC','viewRep','viewPremio','viewAdto','viewPonto','viewBen','viewTar','viewSol','viewAgenda','viewManual','viewAv','viewProj','viewGF','viewGT','viewGTe','viewGX','viewGC','viewCV','viewRC','viewRN','viewNF','viewPR','viewNR','viewGR','viewRel','viewFat','viewPC','viewCtb','viewCtl'].forEach(x=>$(x).hidden=true);
   if(escCli.value==='*'&&!SOMA_TODAS.has(VIEW)&&!telaSemEmp(VIEW)){$('viewTodas').hidden=false;renderTodas();avBanner();tpBanner();soVerBanner();rotBanner();return}
   const cli=cliAtual();
   // Financeiro › Caixa é a tela de lançamento (o escritório vê igual ao operador);
@@ -2558,6 +2951,8 @@ function openView(){
   else if(VIEW==='bc'){$('viewBC').hidden=false;initExport()}
   else if(VIEW==='repasse'){$('viewRep').hidden=false;parcAbas();renderRep()}
   else if(VIEW==='tarefas'){$('viewTar').hidden=false;renderTarefas()}
+  else if(VIEW==='solic'){$('viewSol').hidden=false;renderSol()}
+  else if(VIEW==='solserv'){$('viewSol').hidden=false;renderSolServ()}
   else if(VIEW==='avisos'){$('viewAv').hidden=false;renderAvisos();nvHistorico()}
   else if(VIEW==='projetos'){$('viewProj').hidden=false;renderProj()}
   else if(VIEW==='agenda'){$('viewAgenda').hidden=false;renderAgenda()}
@@ -2613,7 +3008,7 @@ async function boot(){
   const salva=(()=>{try{return localStorage.getItem(SECK)}catch(e){return null}})(),volta=NAV.find(n=>n.k===salva&&n.ok()&&!n.soon&&eqPode(n.k));
   // ao atualizar a página, volta para a tela em que estava; no primeiro acesso, todos abrem no dashboard
   show('app');go(volta?volta.k:eqPode('gfdash')?'gfdash':first.k);nvMostra();
-  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge();ctlBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
+  const novid=()=>{parcPendentes();tPendentes();tNovidades();avNovidades();pjNovidades();tcAtrasos();gteNovidades();ctbPendencias();agBadge();ctlBadge();solBadge()};novid();clearInterval(boot.t);boot.t=setInterval(novid,60000);
 }
 // Lembrar login (07/11): guarda só o e-mail neste aparelho; a senha fica no gerenciador de senhas do navegador/celular (nunca no portal)
 const LGK='ctl_login_lembrar';
@@ -2730,7 +3125,16 @@ $('saidas').addEventListener('input',e=>{
 $('saidas').addEventListener('change',async e=>{
   if(e.target.type!=='file'||!e.target.files[0])return;const i=+e.target.closest('.saida').dataset.i;
   toast('Enviando arquivo…');
-  try{draftSaidas[i].anexo={...await uploadAnexo(e.target.files[0],OPCLI.id,$('opData').value),categoria:'Comprovante da saída'};renderSaidas();toast('Arquivo anexado')}catch(err){toast(err.message)}
+  const f=e.target.files[0];
+  try{draftSaidas[i].anexo={...await uploadAnexo(f,OPCLI.id,$('opData').value),categoria:'Comprovante da saída'};renderSaidas();toast('Arquivo anexado')}catch(err){toast(err.message);return}
+  // lê o comprovante e preenche o que estiver em branco: valor, nº da nota e, em Outras despesas, o fornecedor (Carol, 19/11)
+  if(!(/pdf|image|xml/i.test(f.type||'')||/\.(pdf|jpe?g|png|webp|xml)$/i.test(f.name||'')))return;
+  try{const r=await leArquivoDoc(f),s=draftSaidas[i];if(!s||r.erro)return;const lidos=[];
+    const v=r2(+(r.bol?.valor||r.valor||0));if(!(s.valor>0)&&v>0){s.valor=v;lidos.push('valor '+fm(v))}
+    const nf=r.nfseNum||r.numero||r.nfe?.numero||'';if(s.tipo!==DEV&&s.tipo!=='Repasse'&&!(s.guia||'').trim()&&nf){s.guia=String(nf);lidos.push('nº '+nf)}
+    if(s.tipo===OUTRAS&&!(s.descricao||'').trim()&&(r.nome||r.servico)){s.descricao=[r.nome,r.servico].filter(Boolean).join(' - ').slice(0,120);lidos.push('descrição')}
+    if(lidos.length){renderSaidas();updateOp();toast('Lido do comprovante: '+lidos.join(', ')+'. Confira.')}}
+  catch(err){console.error(err)}
 });
 $('saidas').addEventListener('click',e=>{
   const row=e.target.closest('.saida');if(!row)return;
@@ -3160,7 +3564,7 @@ async function exportRows(){
   // só entra o que o escritório já confirmou a categoria; o resto vai para o quadro de confirmação
   await loadFbc();
   if(MODCAT.includes(orig))await syncRecorrentes(orig,escCli.value);
-  const pend=[],conf=r=>{if(r.categoria_ok&&(!FBC.lista.length||FBC.map[r.fornecedor_bc]))return true;pend.push(r);return false};
+  const pend=[],conf=r=>{if(r.categoria_ok&&(!FBC.lista.length||FBC.map[r.fornecedor_bc]||r.fornecedor_bc===FBC_SEM))return true;pend.push(r);return false};
   const fb=r=>{const x=FBC.map[r.fornecedor_bc];return x?{nome:x.razao_social,cnpj:x.documento||''}:{}};
   const catDe=r=>r.categoria;
   // com rateio sai uma linha por filial, com a filial no Departamento
@@ -3192,10 +3596,10 @@ async function exportRows(){
       push('Depósito bancário - entrada',r.data,r.valor,{tipo:'Receita',cat:catDep,conta:banco,doc:r.documento,obs:o})});
   }else if(orig==='pagar'){
     (await loadMod('contas_pagar','vencimento')).filter(conf).forEach(r=>
-      pushRat('Contas a pagar',r.vencimento,r,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,...fb(r),doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor}`+(r.obs?' | '+r.obs:'')}));
+      pushRat('Contas a pagar',r.vencimento,r,{tipo:'Despesa',cat:catDe(r),conta:r.banco,nome:r.fornecedor,...fb(r),doc:r.documento,status:r.conferido?'Pago':'Em aberto',pag:r.conferido?(r.pago_em||r.vencimento):'',obs:`Conta a pagar - ${r.fornecedor||r.sobre||''}`+(r.obs?' | '+r.obs:'')}));
   }else if(orig==='cartao'){
     (await loadMod('cartao_notas','data')).filter(conf).forEach(r=>
-      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,...fb(r),doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
+      push('Cartão de crédito',r.data,r.valor,{tipo:'Despesa',cat:catDe(r),nome:r.fornecedor,...fb(r),doc:r.documento,obs:`Cartão de crédito${cli?.cartao_final?' final '+cli.cartao_final:''} - ${r.fornecedor||r.sobre||''} - ${r.parcelas}x`+(r.obs?' | '+r.obs:'')}));
   }
   // o que falta confirmar aparece sempre, de qualquer data e mesmo sem estar conferido/pago
   if(MODCAT.includes(orig)){
@@ -3363,6 +3767,9 @@ $('rFields').addEventListener('change',e=>{if(e.target.id==='rEmp'){renderRateio
 
 // ---------- categorias automáticas (contas a pagar, cartão e despesas da tesouraria) ----------
 const MODCAT=['pagar','cartao','tesouraria'];
+// Salvar sem fornecedor (Carol, 19/11): na conferência, o fornecedor do Bom Controle pode ficar em branco; o lançamento
+// fica marcado com FBC_SEM e vai para a exportação só com o nome digitado (sem CNPJ).
+const FBC_SEM='-';
 const TABCAT={pagar:'contas_pagar',cartao:'cartao_notas',tesouraria:'tesouraria'};
 const fornDe=r=>r.fornecedor||r.descricao||'';
 const textoDe=r=>[r.sobre,r.descricao,r.obs].filter(Boolean).join(' ');
@@ -3376,7 +3783,7 @@ async function renderExConf(){
   const dk=exOrig.value==='pagar'?'vencimento':'data';
   box.innerHTML=`<div class="alerta" style="gap:10px"><div><b>${EXPEND.length} ${EXPEND.length===1?'lançamento aguarda':'lançamentos aguardam'} a confirmação da categoria</b><br><span class="note">Só entram na planilha do Bom Controle depois de confirmados. Confira a sugestão, troque se precisar e confirme.</span></div>
     <div class="tablebox" style="margin:0;max-height:360px;overflow:auto;background:var(--surface);border-radius:8px"><table class="cfg"><thead><tr><th>Data</th><th class="l">Fornecedor</th><th class="l">No Bom Controle</th><th class="l">Do que se trata</th><th>Valor</th><th class="l">Categoria</th><th></th></tr></thead><tbody>${
-      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBRv(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${r.categoria_ok?'<span class="chip c-ok">categoria ok · falta o fornecedor</span> ':sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
+      EXPEND.map(r=>{const sg=r.categoria||sugerirCat(fornDe(r),textoDe(r));return `<tr data-id="${r.id}"><td>${dBRv(r[dk])}</td><td class="l">${esc(fornDe(r))}</td><td class="l">${(x=>x?esc(x.razao_social):r.fornecedor_bc===FBC_SEM?'<span class="muted">sem fornecedor</span>':FBC.lista.length?'<span class="neg">escolha em Conferir</span>':'—')(FBC.map[r.fornecedor_bc]||FBC.map[sugerirFbc(r)])}</td><td class="l" style="white-space:normal">${esc(r.sobre||r.obs||'')}</td><td>${fm(r.valor)}</td><td><input list="catsListEx" value="${esc(sg)}" placeholder="Escolha a categoria" style="min-width:220px"></td><td class="l">${(EXDOCS[r.id]||[]).length?`<span class="muted" title="Documentos">📎${EXDOCS[r.id].length}</span> `:'<span class="neg">sem documento</span> '}${r.categoria_ok?'<span class="chip c-ok">categoria ok · falta o fornecedor</span> ':sg?'<span class="chip c-warn">sugerida</span> ':''}<button type="button" class="btn small" data-cc>Conferir</button> <button type="button" class="btn small primary" data-ok>Confirmar</button></td></tr>`}).join('')}</tbody></table></div>
     <div class="row"><button type="button" class="btn small" id="exConfTodas">Confirmar todas que têm categoria</button><button type="button" class="btn small ghost" data-catnova-input="">+ Cadastrar nova categoria</button></div>
     <datalist id="catsListEx">${catOpts()}</datalist></div>`;
 }
@@ -3415,7 +3822,7 @@ async function abrirCC(i){
     ${Array.isArray(r.rateio)&&r.rateio.length?`<p class="note" style="margin:0"><b>Rateio:</b> ${r.rateio.map(x=>esc(x.filial)+' '+fm(x.valor)).join(' · ')}</p>`:''}
     ${orig==='pagar'?`<p class="note" style="margin:0">${r.conferido?`Paga em ${dBR(r.pago_em||r.vencimento)}${r.banco?' pelo '+esc(r.banco):''}`:'Ainda não paga'}</p>`:''}
     ${FBC.lista.length?(()=>{const k=r.fornecedor_bc&&FBC.map[r.fornecedor_bc]?r.fornecedor_bc:sugerirFbc(r),x=FBC.map[k];
-      return `<label class="f"><span>Fornecedor no Bom Controle ${x&&!r.fornecedor_bc?'<span class="chip c-warn">sugerido</span>':''}${x?.bloqueado?' <span class="chip c-bad">bloqueado no BC</span>':''}</span><input id="ccFbc" list="fbcList" value="${x?esc(fbcRotulo(x)):''}" placeholder="Digite o nome ou o CNPJ/CPF"></label>`})():''}
+      return `<label class="f"><span>Fornecedor no Bom Controle ${x&&!r.fornecedor_bc?'<span class="chip c-warn">sugerido</span>':''}${x?.bloqueado?' <span class="chip c-bad">bloqueado no BC</span>':''}</span><input id="ccFbc" list="fbcList" value="${x?esc(fbcRotulo(x)):''}" placeholder="Digite o nome ou o CNPJ/CPF (pode ficar em branco)"></label>`})():''}
     <label class="f"><span>Categoria no Bom Controle ${sg&&!r.categoria?'<span class="chip c-warn">sugerida</span>':''}</span><input id="ccCat" list="catsListCC" value="${esc(sg)}" placeholder="Escolha do plano de contas"><button type="button" class="btn small ghost" data-catnova-input="ccCat" style="justify-self:start;margin-top:4px">+ Cadastrar nova categoria</button></label><datalist id="catsListCC">${catOpts()}</datalist>`;
   if(!dlgCC.open)dlgCC.showModal();
 }
@@ -3434,7 +3841,9 @@ $('ccOk').onclick=async()=>{
   if(!m&&Array.isArray(r.rateio)&&r.rateio.length&&Math.abs(r2(upd.valor)-r2(r.rateio.reduce((a,x)=>a+x.valor,0)))>=0.005)m='O valor mudou e não bate mais com o rateio. Ajuste o rateio no lançamento.';
   if(m){err.textContent=m;err.hidden=false;return}
   let fbc=null;
-  if(FBC.lista.length){fbc=FBC.porRotulo[$('ccFbc').value.trim()];if(!fbc){err.textContent='Escolha o fornecedor na lista do Bom Controle. Se ele não existir, cadastre no Bom Controle e importe a lista de novo.';err.hidden=false;return}upd.fornecedor_bc=fbc}
+  if(FBC.lista.length){const tx=$('ccFbc').value.trim();fbc=tx?FBC.porRotulo[tx]:null;
+    if(tx&&!fbc){err.textContent='Esse fornecedor não está na lista do Bom Controle. Escolha um da lista ou apague o campo para salvar sem fornecedor.';err.hidden=false;return}
+    upd.fornecedor_bc=fbc||FBC_SEM}
   upd.valor=r2(upd.valor);upd.categoria=cat;upd.categoria_ok=true;if(trocou)upd.cliente_id=emp;
   $('ccOk').disabled=true;
   let {error}=await sb.from(TABCAT[orig]).update(upd).eq('id',r.id);
@@ -3443,7 +3852,7 @@ $('ccOk').onclick=async()=>{
   $('ccOk').disabled=false;
   if(error){fail(error);return}
   if(trocou)toast('Lançamento passado para '+(CLIENTES.find(c=>c.id===emp)?.nome||'a outra empresa'));
-  await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat,fbc);toast('Confirmado');
+  await aprenderCat(upd.fornecedor||upd.descricao||fornDe(r),cat,fbc);toast(fbc||!FBC.lista.length?'Confirmado':'Confirmado sem fornecedor');
   EXPEND.splice(CCI,1);await aplicaRecorrentes(orig,upd.cliente_id||r.cliente_id);abrirCC(CCI);
 };
 // Lançamentos recorrentes (ex.: "Frutas da semana"): o mesmo texto de "do que se trata" (na tesouraria, a descrição)
@@ -3473,8 +3882,8 @@ async function confirmarCat(tr){
   const r=EXPEND.find(x=>x.id===tr.dataset.id),cat=tr.querySelector('input').value.trim();
   if(!cat){toast('Escolha a categoria de '+fornDe(r)+'.');return false}
   const fbc=r.fornecedor_bc&&FBC.map[r.fornecedor_bc]?r.fornecedor_bc:sugerirFbc(r);
-  if(FBC.lista.length&&!fbc){toast('Use “Conferir” para escolher o fornecedor do Bom Controle de '+fornDe(r)+'.');return false}
-  const {error}=await sb.from(TABCAT[exOrig.value]).update({categoria:cat,categoria_ok:true,fornecedor_bc:fbc||null}).eq('id',r.id);
+  if(FBC.lista.length&&!fbc&&r.fornecedor_bc!==FBC_SEM){toast('Use “Conferir” para escolher o fornecedor do Bom Controle de '+(fornDe(r)||'este lançamento')+' (ou deixar em branco).');return false}
+  const {error}=await sb.from(TABCAT[exOrig.value]).update({categoria:cat,categoria_ok:true,fornecedor_bc:fbc||r.fornecedor_bc||null}).eq('id',r.id);
   if(error){fail(error);return false}
   await aprenderCat(fornDe(r),cat,fbc);await aplicaRecorrentes(exOrig.value,r.cliente_id);return true;
 }
@@ -4214,12 +4623,12 @@ $('tbCfg').addEventListener('change',async e=>{const id=e.target.closest('tr').d
 const MODCFG={
   pagar:{titulo:'Boletos e notas fiscais a pagar',tabela:'contas_pagar',dataK:'vencimento',
     sub:'Envie o boleto e a nota fiscal de cada conta. A Controlacs faz o pagamento.',
-    campos:[['linha_digitavel','Linha digitável do boleto','linha',0],['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
+    campos:[['linha_digitavel','Linha digitável do boleto','linha',0],['fornecedor','Fornecedor (opcional)','text',0],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou documento','text',1],['vencimento','Vencimento','date',1],['valor','Valor','money',1],['obs','Observação','textarea',0]],
     cats:['Boleto','Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe o boleto ou a nota fiscal.',
     conf:['Marcar como paga','Desfazer pagamento'],okTxt:'Paga',novo:'Nova conta'},
   cartao:{titulo:'Cartão de crédito',tabela:'cartao_notas',dataK:'data',
     sub:'Notas fiscais das compras pagas com o cartão de crédito da empresa.',
-    campos:[['data','Data da compra','date',1],['fornecedor','Fornecedor','text',1],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou cupom','text',1],['valor','Valor total','money',1],['parcelas','Parcelas','parc',1],['obs','Observação','textarea',0]],
+    campos:[['data','Data da compra','date',1],['fornecedor','Fornecedor (opcional)','text',0],['sobre','Do que se trata esta despesa','sobre',1],['documento','Nº da NF ou cupom','text',1],['valor','Valor total','money',1],['parcelas','Parcelas','parc',1],['obs','Observação','textarea',0]],
     cats:['Nota fiscal','Outro documento'],precisaDoc:()=>'Anexe a nota fiscal da compra.',
     conf:['Conferido com a fatura','Desfazer conferência'],okTxt:'Conferido',novo:'Nova nota'},
   tesouraria:{titulo:'Tesouraria',tabela:'tesouraria',dataK:'data',
@@ -4405,7 +4814,9 @@ async function openReg(r,pre){
     if(tp==='linha')return `<label class="f wide">${lab}<input data-k="${k}" inputmode="numeric" value="${esc(v(k)||'')}" placeholder="Cole aqui, ou anexe o boleto em PDF, que o valor e o vencimento são preenchidos sozinhos"${dis}><input type="hidden" data-k="nfe_chave" value="${esc(r?.nfe_chave||'')}"></label>${simp?'':'<div class="note wide" id="rLeitura" style="margin-top:-6px"></div>'}`;
     if(tp==='sobre')return simp?`<label class="f wide">${lab}<textarea data-k="${k}" rows="2" placeholder="${MOD==='cartao'?'Ex.: material de escritório na papelaria; almoço com a equipe; peça para a impressora':'Ex.: conta de luz de outubro da loja; material de limpeza; conserto do ar-condicionado da recepção'}"${dis}>${esc(v(k)||'')}</textarea></label><p class="note wide" style="margin:-6px 0 0">${SIMP_DICA}</p>`
       :`<label class="f wide">${lab}<input data-k="${k}" value="${esc(v(k))}" placeholder="Ex.: conta de luz, material de limpeza, conserto do ar-condicionado"${dis}></label>`;
-    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${dis}></label>`;
+    // escritório: cadastrar o fornecedor na hora, dentro do próprio lançamento (Carol, 19/11)
+    const pn=ed&&escR()&&(k==='fornecedor'||MOD==='tesouraria'&&k==='descricao');
+    return `<label class="f">${lab}<input data-k="${k}" type="${tp==='date'?'date':'text'}" value="${esc(v(k)||'')}"${pn?' data-pesnova':''}${dis}>${pn?PESNOVA:''}</label>`;
   };
   // cliente nos boletos e notas a pagar: só anexa e diz do que se trata; o resto é opcional e a Controlacs completa (Carol, 04/11)
   $('rFields').innerHTML=simp?(MOD==='cartao'?`<p class="note wide" style="margin:0">Anexe a <b>nota fiscal</b> ou o <b>cupom</b> da compra logo abaixo e escreva do que se trata. Não precisa preencher mais nada: a Controlacs confere com a fatura do cartão e completa o resto.</p>`
@@ -4413,6 +4824,7 @@ async function openReg(r,pre){
     +campo(cfg.campos.find(c=>c[0]==='sobre'))
     +`<details class="wide"${r&&(r.fornecedor||r.valor)?' open':''}><summary class="note" style="cursor:pointer">${MOD==='cartao'?'Outros dados da compra (opcional): data, fornecedor, nº da nota, valor, parcelas':'Outros dados do boleto (opcional): linha digitável, fornecedor, nº da nota, vencimento, valor'}</summary><div class="fields" style="margin-top:10px">${cfg.campos.filter(c=>c[0]!=='sobre').map(campo).join('')}</div></details><div class="note wide" id="rLeitura"></div>`
     :cfg.campos.map(campo).join('');
+  if(!simp&&!$('rLeitura'))$('rFields').insertAdjacentHTML('beforeend','<div class="note wide" id="rLeitura"></div>');   // cartão e tesouraria: mensagem da leitura do anexo (Carol, 19/11)
   // fornecedor: sugere os nomes do cadastro único de clientes e fornecedores (vale para todas as empresas; v101)
   pesListaLiga($('rFields'));
   // quem lança em mais de uma empresa escolhe a empresa aqui mesmo; o escritório também usa para corrigir a empresa errada
@@ -4658,7 +5070,7 @@ function bolConfere(bol,ref){if(!bol)return '';const ms=[];
   // emissor que não aplicou a regra de 2025 do fator de vencimento (passou de 9999 e escreveu 5 números, empurrando o valor):
   // ex.: Royalties DIMAK venc. 20/11/2026 "1 10636000927875" = fator 10636 + valor 9.278,75 (Carol, 18/11)
   const f5=ms.length?bolFora(bol):null;
-  if(f5)return `o boleto foi emitido fora do padrão dos bancos (fator de vencimento com 5 números): o certo seria vencimento ${dBR(f5.venc)} e valor ${fm(f5.valor)}, mas o banco vai ler ${fm(bol.valor)} e ${dBR(bol.venc)}. Peça um boleto novo ao fornecedor ou pague por Pix/TED`;
+  if(f5)return `o boleto foi emitido fora do padrão dos bancos (fator de vencimento com 5 números): o certo é vencimento ${dBR(f5.venc)} e valor ${fm(f5.valor)} (o banco mostra o certo porque consulta o boleto registrado). Use a linha do DDA: ${f5.linha}`;
   return ms.join(' e ')}
 // e monta a linha certa (fator da regra de 2025 + valor com 10 números + DV), que é a mesma do DDA do banco (Carol, 18/11: Sicredi DDA conferido)
 function bolFora(bol){const d=soDig(bol?.linha||'');if(bol?.tipo!=='banco'||d.length!==47||+d.slice(33,38)<10000)return null;
@@ -4729,7 +5141,7 @@ function pdfLinhas(items){
 function ocrLimpa(t){return String(t||'').replace(/(\d)[Oo](?=[\d\s.,\-\/]|$)/gm,'$10').replace(/(^|[\s.])[Oo](\d)/gm,'$10$2').replace(/(\d),\s(\d{2})(?!\d)/g,'$1,$2').replace(/[—–]/g,'-')}
 // Boletos e notas fiscais a pagar: preenche o que estiver vazio e avisa quando o digitado não bate
 const rCampo=k=>$('rFields').querySelector(`[data-k="${k}"]`);
-async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem,mais){
+async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico,nome:nomeLido},origem,mais){
   const avisos=[],lidos=[];
   const poe=(k,v,txt,fmt)=>{const el=rCampo(k);if(!el||v==null||v==='')return;
     const atual=el.classList.contains('money')?parseMoney(el.value):el.value.trim();
@@ -4750,9 +5162,21 @@ async function aplicarLeitura({bol,nfe,cnpjs,valor:vt,numero,servico},origem,mai
   if(servico){const so=rCampo('sobre'),ob=rCampo('obs');
     if(so&&!so.disabled&&(!so.value.trim()||/^previsto:/i.test(so.value.trim()))){so.value=servico;lidos.push('descrição do serviço')}
     else if(ob&&!ob.disabled&&!ob.value.trim()&&chave(so?.value||'')!==chave(servico)){ob.value=servico;lidos.push('descrição do serviço (em Observação)')}}
-  if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº');
-    const {data:nome}=await sb.rpc('fornecedor_por_documento',{doc:nfe.cnpj}).then(r=>r,()=>({data:null}));
-    if(nome)poe('fornecedor',nome,'fornecedor');else if(!rCampo('fornecedor')?.value.trim())avisos.push('CNPJ do emitente da nota: '+nfe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')+' (fornecedor ainda não cadastrado no escritório)')}
+  if(nfe){const h=rCampo('nfe_chave');if(h)h.value=nfe.chave;poe('documento',nfe.numero,'NF nº')}
+  // fornecedor pelo CNPJ do documento: o da chave da NF-e ou o primeiro CNPJ do arquivo que não seja o da empresa.
+  // Se não estiver no cadastro, fica o nome lido e o “+ Cadastrar” já abre com o CNPJ (Carol, 19/11)
+  {const fk=MOD==='tesouraria'?'descricao':'fornecedor',fe=rCampo(fk),meu=soDig(regCli()?.cnpj),
+      docs=[...new Set([nfe?.cnpj,...(cnpjs||[])].filter(d=>d&&d!==meu))];
+    if(fe&&!fe.disabled&&!fe.value.trim()&&docs.length){
+      const ls=await pesLista().catch(()=>[]);let pe=null;
+      for(const d of docs){pe=ls.find(x=>soDig(x.documento)===d);if(pe)break}
+      if(!pe)for(const d of docs){pe=cnpjRaiz(ls,d);if(pe)break}
+      let nome=pe?pesNome(pe):null;
+      if(!nome){const {data}=await sb.rpc('fornecedor_por_documento',{doc:docs[0]}).then(r=>r,()=>({data:null}));if(typeof data==='string')nome=data}
+      if(nome)poe(fk,nome,'fornecedor');
+      else{const cf=pnFmt(docs[0]);fe.dataset.pesdoc=docs[0];if(nomeLido)poe(fk,nomeLido,'fornecedor');
+        avisos.push(`fornecedor do CNPJ ${cf} ainda não está cadastrado`+(fe.hasAttribute('data-pesnova')?': use “+ Cadastrar” embaixo do campo':''))}
+      if(fe.hasAttribute('data-pesnova'))pnBtn(fe)}}
   const box=$('rLeitura');if(!box)return;
   const de=origem==='linha'?'da linha digitável':origem==='foto'?'da foto':'do '+origem;
   const html=!bol&&!nfe&&!prevDif&&!(vt>0)&&!numero&&!servico?'':(lidos.length?`<span class="pos">✓ Lido ${de}: ${esc(lidos.join(', '))}.</span> `:`<span class="muted">Lido ${de}; os campos já estavam preenchidos.</span> `)
@@ -4767,7 +5191,7 @@ $('rFields').addEventListener('click',e=>{if(e.target.id==='rPrevOk')regPrevOk()
 // leitura do boleto anexado. Roda ANTES do envio do arquivo (capture), porque o envio limpa o campo do arquivo e a leitura
 // ficava sem o arquivo. Também lê PDF escaneado e foto (OCR), como em Contas a pagar (Carol, 13/11)
 $('rDocs').addEventListener('change',async e=>{const fs=[...(e.target.files||[])].filter(f=>/pdf|image/i.test(f.type||'')||/\.(pdf|jpe?g|png|webp)$/i.test(f.name||''));
-  if(MOD!=='pagar'||!fs.length||!regEditavel())return;
+  if(!['pagar','cartao','tesouraria'].includes(MOD)||!fs.length||!regEditavel())return;   // cartão e tesouraria também (Carol, 19/11)
   const box=$('rLeitura'),cats=MODCFG[MOD].cats,pad=e.target.dataset.cat;
   // vários arquivos de uma vez (ex.: boleto e nota): o boleto é lido primeiro e cada leitura vai somando na mensagem
   const it=fs.map(f=>({f,cat:catPeloNome(f.name,cats,pad)})).sort((a,b)=>(a.cat==='Nota fiscal')-(b.cat==='Nota fiscal'));
@@ -4779,12 +5203,12 @@ $('rDocs').addEventListener('change',async e=>{const fs=[...(e.target.files||[])
       // na nota fiscal o valor não dispara o aviso do previsto (o valor da nota pode ter retenções); só preenche se estiver vazio
       const vt=r.bol?null:nota?(REGPRE?null:r.valor):r.valor,numero=r.nfseNum||(nota||!r.bol?r.numero:'')||'',servico=r.servico||'';
       if(box&&!mais)box.innerHTML='';
-      if(r.bol||r.nfe||vt>0||numero||servico){if(nm&&box)box.insertAdjacentHTML('beforeend',`<div class="note" style="margin:4px 0 0">${nm}</div>`);await aplicarLeitura({bol:r.bol,nfe:r.nfe,cnpjs:r.cnpjs,valor:vt,numero,servico},r.origem,true)}
-      else if(box)box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}${nota?'Não achei o nº nem a descrição nesta nota.':'Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.'}</div>`)}
+      if(r.bol||r.nfe||vt>0||numero||servico||(r.cnpjs||[]).length){if(nm&&box)box.insertAdjacentHTML('beforeend',`<div class="note" style="margin:4px 0 0">${nm}</div>`);await aplicarLeitura({bol:MOD==='pagar'?r.bol:null,nfe:r.nfe,cnpjs:r.cnpjs,valor:MOD==='pagar'?vt:r.bol?.valor||r.valor,numero,servico,nome:r.nome},r.origem,true)}
+      else if(box)box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}${nota?'Não achei o nº nem a descrição nesta nota.':MOD!=='pagar'?'Não achei o valor nem o nº neste arquivo.':'Não achei a linha digitável nem o valor neste arquivo. Se for boleto, cole a linha digitável acima.'}</div>`)}
     catch(err){console.error(err);if(box){if(!mais)box.innerHTML='';box.insertAdjacentHTML('beforeend',`<div class="muted">${nm}Não consegui ler este arquivo.</div>`)}}
     n++}},true);
 // leitura mais rápida (Carol, 13/11): o leitor de PDF já carrega ao clicar para anexar, enquanto a pessoa escolhe o arquivo
-$('rDocs').addEventListener('pointerdown',e=>{if(MOD!=='pagar'||!e.target.closest('.fotobtn'))return;
+$('rDocs').addEventListener('pointerdown',e=>{if(!['pagar','cartao','tesouraria'].includes(MOD)||!e.target.closest('.fotobtn'))return;
   if(!window.pdfjsLib)carregaJs(PDFJS+'pdf.min.js').then(()=>{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js'}).catch(()=>{})},true);
 $('rFields').addEventListener('input',e=>{if(e.target.dataset.k!=='linha_digitavel')return;const d=soDig(e.target.value),box=$('rLeitura');
   if(d.length<44){if(box)box.innerHTML='';return}
@@ -9459,7 +9883,7 @@ async function gtLeArquivo(f,mais,cat){
     if(!$('gt_pessoa').value.trim()){const fo=guiaForn(g,cli?.id,GFP.lista||[]);if(fo)poe('gt_pessoa',fo,'fornecedor');else avisos.push('escolha o fornecedor da guia (ex.: Receita Federal ou Ministério da Economia)')}
     if(g.itens.length>1&&Math.abs(g.soma-(g.valor||0))>=0.01)avisos.push(`a soma dos códigos da guia (${fm(g.soma)}) não bate com o total (${fm(g.valor)}): confira o rateio`)}
   // boleto: linha digitável (o campo já preenche valor e vencimento e avisa se o boleto estiver lançado em outra conta)
-  if(r.bol?.corrigida)avisos.push(`o boleto veio com a linha digitável fora do padrão dos bancos (vencimento com 5 números); usei a linha corrigida, que é a mesma do DDA (${fm(r.bol.valor)}, venc. ${dBR(r.bol.venc)}). Confira com o DDA antes de pagar`);
+  if(r.bol?.corrigida)avisos.push(`o boleto veio com a linha digitável e o código de barras fora do padrão (vencimento com 5 números; o banco mostra certo porque consulta o boleto registrado). Usei a linha corrigida, a mesma do DDA (${fm(r.bol.valor)}, venc. ${dBR(r.bol.venc)})`);
   if(r.bol){const el=$('gt_linha_digitavel');if(el&&!soDig(el.value)){el.value=r.bol.linha||r.bol.barra;el.dispatchEvent(new Event('input',{bubbles:true}));lidos.push('linha digitável')}
     poe('gt_valor',r.bol.valor,'valor',fm,true);poe('gt_vencimento',r.bol.venc,'vencimento',dBR);if(!$('gt_forma').value)$('gt_forma').value='Boleto'}
   // vencimento das duplicatas da nota (a próxima ainda não vencida; senão, a primeira)
@@ -12115,7 +12539,7 @@ document.addEventListener('focusout',e=>{const i=e.target.closest?.('input[data-
 document.addEventListener('click',async e=>{const b=e.target.closest?.('[data-pesnova-btn]');if(!b)return;e.preventDefault();
   const inp=b.parentElement.querySelector('input[data-pesnova]');if(!inp)return;
   const v=inp.value.trim(),soNum=/^[\d.\-\/\s]+$/.test(v);
-  const p=await pesNova(cliAtual(),pnPapelDe(inp),v&&!pnTem(inp)&&!soNum?v:'',soNum?v:inp.dataset.pesdoc||'');if(!p)return;
+  const p=await pesNova(dlgReg.open&&dlgReg.contains(inp)&&regCli()||cliAtual(),pnPapelDe(inp),v&&!pnTem(inp)&&!soNum?v:'',soNum?v:inp.dataset.pesdoc||'');if(!p)return;
   const nome=pesNome(p);
   const dl=lstDe(inp);if(dl&&![...dl.options].some(o=>o.value===nome)){const o=document.createElement('option');o.value=nome;dl.appendChild(o)}
   inp.value=nome;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));pnBtn(inp)});
@@ -14573,7 +14997,7 @@ async function ctCarrega(){
   // assinaturas pela Autentique (v105); sem a v105 o resto do módulo continua funcionando
   const a=await sb.from('ctl_assinaturas').select('*').order('criado_em',{ascending:false});CTL.assOk=!a.error;CTL.ass=a.data||[];
   // NFS-e (v131); sem a v131 o resto continua funcionando
-  const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em').order('criado_em',{ascending:false})]);
+  const [ne,nn]=await Promise.all([sb.from('nfse_emitentes').select('*').order('nome'),sb.from('nfse_notas').select('id,emitente_id,ambiente,serie,ndps,chave,numero_nfse,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,erros,alertas,cancelada_em,cancel_motivo,ctl_lancamento_id,criado_em,extra').order('criado_em',{ascending:false})]);
   CTL.nsOk=!ne.error&&!nn.error;CTL.nsEmit=ne.data||[];CTL.ns=nn.data||[];
   // CRM (v133); sem a v133 o resto continua funcionando
   await crmCarrega().catch(()=>{CRM.ok=false});
@@ -14699,7 +15123,7 @@ document.addEventListener('click',e=>{
   const bx=e.target.closest('[data-ctbaixa]');if(bx){e.preventDefault();e.stopPropagation();return ctBaixa(bx.dataset.ctbaixa)}
   if(e.target.closest('[data-ctassat]')){e.stopPropagation();return ctAssAtualiza(e.target.closest('[data-ctassat]'))}
   const nse=e.target.closest('[data-nsemit]');if(nse){e.stopPropagation();return nsAbreEmit(CTL.lanc.find(x=>x.id===nse.dataset.nsemit))}
-  const nsv=e.target.closest('[data-nsver]');if(nsv&&!e.target.closest('button:not([data-nsver]),input,select')){e.preventDefault();e.stopPropagation();return nsAbreNota(CTL.ns.find(x=>x.id===nsv.dataset.nsver))}
+  const nsv=e.target.closest('[data-nsver]');if(nsv&&!e.target.closest('button:not([data-nsver]),input,select,.nslc')){e.preventDefault();e.stopPropagation();return nsAbreNota(CTL.ns.find(x=>x.id===nsv.dataset.nsver))}
   const nsc=e.target.closest('[data-nscanc]');if(nsc){e.stopPropagation();return nsAbreCanc(CTL.ns.find(x=>x.id===nsc.dataset.nscanc))}
   const bxl=e.target.closest('[data-ctbx]');if(bxl){e.stopPropagation();return ctBaixaHoje(bxl)}
   const rj=e.target.closest('[data-ctreaj]');if(rj){e.stopPropagation();return ctAbreCont(CTL.cont.find(c=>c.id===rj.dataset.ctreaj),true)}
@@ -14889,11 +15313,13 @@ function nsDesenha(b,sit,tem){
       <div class="card tile"><div class="k">Canceladas no mês</div><div class="v">${doMes.filter(n=>n.situacao==='cancelada').length}</div><div class="n">${fm(doMes.filter(n=>n.situacao==='cancelada').reduce((s,n)=>s+(Number(n.valor)||0),0))}</div></div>
       <div class="card tile"><div class="k">Recusadas para conferir</div><div class="v ${rej.length?'neg':''}">${rej.length}</div><div class="n">todos os meses</div></div></div>
     ${!CTL.nsEmit.length?'<div class="alerta"><b>Comece pelos “Dados fiscais”.</b><span>Cadastre a empresa que emite (CNPJ, cidade, regime e o serviço padrão).</span></div>':''}
-    ${tab('<th>Emissão</th><th>Nº NFS-e</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th>Situação</th><th></th>',
-      l.map(n=>`<tr data-nsver="${n.id}"><td>${dBR(nsData(n))}</td><td><b>${esc(n.numero_nfse||'—')}</b>${n.ambiente==2?' '+nsAmbChip(2):''}</td><td>${dBR(n.competencia)}</td><td class="l">${esc(n.tomador_nome||'')}</td><td class="l">${esc(nsDoc(n.tomador_doc))}</td><td class="l">${esc((n.descricao||'').slice(0,90))}</td><td>${fm(n.valor)}</td><td>${nsChip(n)}</td>
+    <div class="row" style="justify-content:flex-end;margin:10px 0 6px">${nslBotao('ns')}</div>
+    ${tab(nslTh('ns')+'<th>Emissão</th><th>Nº NFS-e</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th>Situação</th><th></th>',
+      l.map(n=>`<tr data-nsver="${n.id}">${nslTd('ns',n.id,!!n.chave&&['emitida','cancelada'].includes(n.situacao))}<td>${dBR(nsData(n))}</td><td><b>${esc(n.numero_nfse||'—')}</b>${n.ambiente==2?' '+nsAmbChip(2):''}</td><td>${dBR(n.competencia)}</td><td class="l">${esc(n.tomador_nome||'')}</td><td class="l">${esc(nsDoc(n.tomador_doc))}</td><td class="l">${esc((n.descricao||'').slice(0,90))}</td><td>${fm(n.valor)}</td><td>${nsChip(n)}${nslJa(n.extra?.emails)}</td>
         <td style="white-space:nowrap">${n.situacao==='emitida'?`<button type="button" class="btn small ghost" data-nscanc="${n.id}">Cancelar</button>`:''}${DUPIC}</td></tr>`).join(''),
       doMes.length?'Nenhuma nota com estes filtros.':'Nenhuma nota emitida neste mês.')}`;
-  $('ctNote').textContent='Clique na nota para ver, imprimir, baixar o XML ou cancelar. A busca acha por qualquer coluna (número, tomador, CNPJ, descrição, valor ou data). As notas emitidas no site nacional não aparecem aqui.';
+  nslPoda('ns',l.filter(n=>n.chave&&['emitida','cancelada'].includes(n.situacao)).map(n=>n.id));
+  $('ctNote').textContent='Clique na nota para ver, imprimir, baixar o XML ou cancelar. Para mandar várias por e-mail, marque as caixinhas e clique em “✉ Enviar por e-mail”. A busca acha por qualquer coluna (número, tomador, CNPJ, descrição, valor ou data). As notas emitidas no site nacional não aparecem aqui.';
 }
 // ---- emitir ----
 // tomador da NFS-e pela ficha da empresa ligada ao cliente (Carol 18/11)
@@ -15172,6 +15598,121 @@ async function nsEnviaEmail(bt){
   }catch(e){ctErr('Não foi possível enviar: '+(e.message||e))}
   bt.disabled=false;bt.textContent=txt;
 }
+// ---- Enviar várias NFS-e por e-mail de uma vez (Carol, 18/11) ----
+// Peça única para TODA lista de NFS-e do portal (Controlacs › Notas fiscais, Parceiros MP › Notas fiscais emitidas e o fim da
+// emissão em lote dos parceiros), para todas as empresas que emitem pelo portal, inclusive as cadastradas depois.
+// Marque as notas na lista (caixinha) e clique em “✉ Enviar por e-mail”: abre a conferência com o e-mail do tomador de cada nota
+// (dá para trocar ou desmarcar). Cada nota vai num e-mail só dela, pela mesma função do envio individual (nfse-email), que
+// registra o envio na nota (data, para quem e quem enviou). E-mail enviado não tem desfazer: por isso a conferência e a confirmação.
+// Tela nova com lista de NFS-e: use nslTh(k) no cabeçalho, nslTd(k,id,temXml) em cada linha, nslBotao(k) na barra e nslPoda(k,ids) ao desenhar.
+const NSL={sel:{},dlg:null};
+const NSL_RE=/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/,nslSep=v=>String(v||'').split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean);
+const nslSet=k=>NSL.sel[k]||(NSL.sel[k]=new Set());
+const nslTh=k=>`<th class="nosort nslc" style="width:30px"><input type="checkbox" data-nslall="${k}" title="Marcar todas as notas da lista" aria-label="Marcar todas as notas"></th>`;
+const nslTd=(k,id,ok)=>ok?`<td class="nslc"><input type="checkbox" data-nsl="${k}" value="${id}"${nslSet(k).has(id)?' checked':''} aria-label="Marcar a nota para enviar por e-mail"></td>`
+  :'<td class="nslc"><input type="checkbox" disabled title="Nota sem XML no portal: não dá para enviar por e-mail" aria-label="Nota sem XML"></td>';
+const nslBotao=k=>`<button type="button" class="btn" data-nslbtn="${k}" disabled title="Marque as notas na lista: cada uma vai para o e-mail do seu tomador">✉ Enviar por e-mail</button>`;
+// chip “✉ enviada” na lista, com a data e para quem
+const nslJa=env=>{env=env||[];if(!env.length)return '';const u=env[env.length-1];
+  return ` <span class="chip c-ok" title="${esc(env.map(x=>'Enviada em '+dtBR(x.em)+' para '+(x.para||[]).join(', ')).join('\n'))}">✉ ${dtBR(u.em).slice(0,8)}</span>`};
+// a seleção guarda só o que está na lista (quem sai do filtro sai da seleção)
+function nslPoda(k,ids){const s=nslSet(k),v=new Set(ids);[...s].forEach(id=>{if(!v.has(id))s.delete(id)});nslBtn(k)}
+function nslBtn(k){const n=nslSet(k).size;
+  document.querySelectorAll(`[data-nslbtn="${k}"]`).forEach(b=>{b.disabled=!n;b.classList.toggle('primary',!!n);b.textContent=n?`✉ Enviar ${n} por e-mail`:'✉ Enviar por e-mail'});
+  document.querySelectorAll(`[data-nslall="${k}"]`).forEach(a=>{const cx=[...(a.closest('table')||document).querySelectorAll(`input[data-nsl="${k}"]`)];
+    a.checked=cx.length>0&&cx.every(c=>c.checked);a.indeterminate=!a.checked&&cx.some(c=>c.checked);a.disabled=!cx.length})}
+document.addEventListener('change',e=>{const t=e.target;if(!t?.dataset)return;
+  if(t.dataset.nsl){const s=nslSet(t.dataset.nsl);t.checked?s.add(t.value):s.delete(t.value);return nslBtn(t.dataset.nsl)}
+  if(t.dataset.nslall){const k=t.dataset.nslall;(t.closest('table')||document).querySelectorAll(`input[data-nsl="${k}"]`).forEach(c=>{c.checked=t.checked;t.checked?nslSet(k).add(c.value):nslSet(k).delete(c.value)});nslBtn(k)}});
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-nslbtn]');if(b){e.stopPropagation();return nslAbre([...nslSet(b.dataset.nslbtn)],b.dataset.nslbtn)}
+  const c=e.target.closest?.('[data-nslids]');if(c){e.stopPropagation();nslAbre(c.dataset.nslids.split(',').filter(Boolean),'nfe')}});
+// e-mail de cada nota: 1) o do tomador gravado na nota; 2) o último para o qual ela já foi enviada; 3) o cliente da Controlacs com o
+// mesmo CNPJ/CPF; 4) a ficha da empresa com o mesmo CNPJ; 5) o cadastro de pessoas (parceiros e fornecedores) com o mesmo documento
+async function nslEmails(ns){
+  const docs=[...new Set(ns.map(n=>nsSo(n.tomador_doc)).filter(Boolean))];let cli=[],pes=[];
+  try{cli=await todas(()=>sb.from('ctl_clientes').select('cnpj_cpf,email').not('email','is',null))}catch(_){}
+  try{const fm_=[...new Set(docs.flatMap(d=>[d,nsDoc(d)]))];for(let i=0;i<fm_.length;i+=100){const {data}=await sb.from('fin_pessoas').select('documento,email').in('documento',fm_.slice(i,i+100)).not('email','is',null);pes=pes.concat(data||[])}}catch(_){}
+  const fic=d=>{try{const c=(typeof CLIENTES!=='undefined'?CLIENTES:[]).find(c=>'ficha' in c&&fcDig(fcDados(c).cnpj)===d);return c?fcDados(c).contato.email||'':''}catch(_){return ''}};
+  const out={};for(const n of ns){const d=nsSo(n.tomador_doc),u=(n.extra?.emails||[]).slice(-1)[0];
+    out[n.id]=n.tomador?.email||(u?.para||[]).join('; ')||(d&&(cli.find(c=>nsSo(c.cnpj_cpf)===d)?.email||fic(d)||pes.find(p=>nsSo(p.documento)===d)?.email))||''}
+  return out}
+const NSL_MSG='Olá,\n\nSegue a nota fiscal de serviço nº [número], no valor de [valor], referente a [descrição].\nO PDF (DANFSe) e o arquivo XML estão anexos.\n\nQualquer dúvida, estamos à disposição.\n\n[empresa]';
+const NSL_ASS='Nota fiscal de serviço nº [número] - [empresa]';
+const nslTroca=(t,n,e)=>String(t||'').replace(/\[número\]/gi,n.numero_nfse||'').replace(/\[valor\]/gi,fm(n.valor)).replace(/\[descrição\]/gi,n.descricao||'nossos serviços')
+  .replace(/\[tomador\]/gi,n.tomador_nome||'').replace(/\[empresa\]/gi,e.razao_social||e.nome||'Controlacs').replace(/\[competência\]/gi,n.competencia?dBR(n.competencia).slice(3):'');
+function nslDlg(){let d=$('dlgNSL');if(d)return d;
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="dlgNSL" style="width:min(1150px,calc(100vw - 32px))"><div class="dh"><h2 id="nslTit">Enviar notas por e-mail</h2></div><div class="db" id="nslBody"></div>
+    <div class="df"><span class="note" id="nslNote" style="margin:0"></span><span class="spacer"></span><button type="button" class="btn ghost" data-nsla="fechar">Fechar</button><button type="button" class="btn primary" data-nsla="enviar" id="nslEnv" hidden>Enviar</button></div></dialog>`);
+  d=$('dlgNSL');
+  d.addEventListener('click',e=>{const b=e.target.closest('[data-nsla]');if(!b)return;if(b.dataset.nsla==='fechar'){if(NSL.dlg?.enviando)return;return d.close()}if(b.dataset.nsla==='enviar')return nslEnvia(b)});
+  d.addEventListener('cancel',e=>{if(NSL.dlg?.enviando)e.preventDefault()});
+  d.addEventListener('close',()=>{const D=NSL.dlg;if(D?.mudou&&D.depois)D.depois()});
+  d.addEventListener('change',e=>{const tr=e.target.closest('tr[data-i]');if(!tr||!e.target.matches('[data-nslm]'))return;NSL.dlg.l[+tr.dataset.i].marc=e.target.checked;nslConta()});
+  d.addEventListener('input',e=>{const tr=e.target.closest('tr[data-i]');if(!tr||!e.target.matches('[data-nslp]'))return;const x=NSL.dlg.l[+tr.dataset.i];x.para=e.target.value;
+    if(nslSep(x.para).length&&!x.marc&&!x.ja.length){x.marc=true;tr.querySelector('[data-nslm]').checked=true}nslConta()});
+  return d}
+// k: lista de onde veio (para atualizar ao fechar); ids das notas
+async function nslAbre(ids,k){if(!ids?.length)return toast('Marque as notas na lista.');
+  const d=nslDlg();NSL.dlg={k,l:[],emit:[],mudou:false,depois:k==='ns'?async()=>{await ctCarrega().catch(()=>{});ctDesenha()}:k==='nr'?()=>renderNR():null};
+  $('nslTit').textContent='Enviar notas por e-mail';$('nslBody').innerHTML='<p class="muted">Carregando as notas e os e-mails dos tomadores…</p>';$('nslNote').textContent='';$('nslEnv').hidden=true;
+  if(!d.open)d.showModal();
+  try{let ns=[];for(let i=0;i<ids.length;i+=100){const {data,error}=await sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,tomador_doc,tomador_nome,tomador,descricao,ctribnac,valor,situacao,cancelada_em,extra').in('id',ids.slice(i,i+100));if(error)throw error;ns=ns.concat(data||[])}
+    ns=ns.filter(n=>n.chave);if(!ns.length)throw new Error('Nenhuma das notas marcadas tem XML autorizado no portal.');
+    const {data:em,error:ee}=await sb.from('nfse_emitentes').select('*').in('id',[...new Set(ns.map(n=>n.emitente_id))]);if(ee)throw ee;
+    NSL.dlg.emit=em||[];(em||[]).forEach(e=>{if(!CTL.nsEmit.some(x=>x.id===e.id))CTL.nsEmit.push(e)});   // o DANFSe (PDF) usa os dados da empresa que emitiu
+    const mail=await nslEmails(ns);
+    ns.sort((a,b)=>String(a.emitida_em||'').localeCompare(String(b.emitida_em||''))||String(a.numero_nfse||'').localeCompare(String(b.numero_nfse||''),undefined,{numeric:true}));
+    NSL.dlg.l=ns.map(n=>{const ja=n.extra?.emails||[];return {n,para:mail[n.id]||'',ja,marc:!ja.length&&!!mail[n.id],st:''}});
+  }catch(e){console.error(e);$('nslBody').innerHTML=`<div class="alerta bad"><b>Não foi possível abrir as notas.</b><span>${esc(e.message||String(e))}</span></div>`;return}
+  const D=NSL.dlg,emps=[...new Set(D.l.map(x=>x.n.emitente_id))].map(id=>D.emit.find(e=>e.id===id)).filter(Boolean),cpe=emps.filter(e=>e.email);
+  $('nslTit').textContent=`Enviar ${D.l.length} ${D.l.length===1?'nota':'notas'} por e-mail`;
+  $('nslBody').innerHTML=`<p class="note" style="margin:0 0 10px">Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF (DANFSe) e o XML anexos, de <b>notas@controlacs.com.br</b> com o nome da empresa que emitiu. Confira os e-mails abaixo: dá para trocar, pôr mais de um (separe com ;) ou desmarcar a nota. As notas que já foram enviadas vêm desmarcadas.</p>
+    <div class="card tablebox" style="max-height:46vh;overflow:auto"><table><thead><tr><th class="nosort" style="width:30px"><input type="checkbox" id="nslTodas" title="Marcar todas" aria-label="Marcar todas"></th><th>Nº NFS-e</th><th class="l">Empresa que emitiu</th><th class="l">Tomador</th><th>Valor</th><th class="l">E-mail do tomador (Para)</th><th class="l">Envio</th></tr></thead><tbody id="nslLinhas"></tbody></table></div>
+    <div class="fields" style="margin-top:12px">
+      <label class="f wide">Assunto<input id="nsl_ass" value="${esc(NSL_ASS)}"></label>
+      <label class="f wide">Mensagem<textarea id="nsl_msg" rows="7">${esc(NSL_MSG)}</textarea></label>
+      <p class="muted wide" style="font-size:12px;margin:0;grid-column:1/-1">[número], [valor], [descrição], [tomador], [competência] e [empresa] são trocados pelos dados de cada nota.</p>
+      <label class="wide" style="display:flex;gap:8px;align-items:center;grid-column:1/-1;font-size:14px"><input type="checkbox" id="nsl_cpemp" ${cpe.length?'checked':'disabled'} style="width:auto"> Mandar cópia para o e-mail da empresa que emitiu${cpe.length?' ('+esc(cpe.map(e=>e.email).join(', '))+')':' (nenhuma tem e-mail em Dados fiscais)'}</label>
+      <label class="f wide">Outra cópia (opcional)<input id="nsl_cc" placeholder="financeiro@empresa.com.br"></label>
+      <label class="wide" style="display:flex;gap:8px;align-items:center;grid-column:1/-1;font-size:14px"><input type="checkbox" id="nsl_pdf" checked style="width:auto"> Anexar o PDF (DANFSe) além do XML</label></div>
+    <p class="err" id="nslErr" hidden></p>`;
+  $('nslTodas').onchange=e=>{D.l.forEach(x=>{if(x.st!=='ok')x.marc=e.target.checked});nslLinhas()};
+  $('nslEnv').hidden=false;nslLinhas()}
+function nslLinhas(){const D=NSL.dlg,tb=$('nslLinhas');if(!tb)return;
+  tb.innerHTML=D.l.map((x,i)=>{const n=x.n,e=D.emit.find(y=>y.id===n.emitente_id)||{},trava=D.enviando||x.st==='ok';
+    const av=[n.situacao==='cancelada'?'<span class="chip c-bad" title="O tomador recebe também o XML do cancelamento">Cancelada</span>':'',Number(n.ambiente)===2?nsAmbChip(2):'',
+      x.ja.length?`<span class="chip c-warn" title="${esc(x.ja.map(j=>dtBR(j.em)+' para '+(j.para||[]).join(', ')).join('\n'))}">Já enviada em ${dtBR(x.ja[x.ja.length-1].em)}</span>`:''].filter(Boolean).join(' ');
+    const st=x.st==='ok'?'<span class="chip c-ok">Enviado ✓</span>':x.st==='erro'?`<span class="chip c-bad">Não enviado</span><br><span class="muted" style="font-size:12px">${esc(x.erro||'')}</span>`:x.st?`<span class="muted">${esc(x.st)}</span>`:'';
+    return `<tr data-i="${i}"><td><input type="checkbox" data-nslm${x.marc&&x.st!=='ok'?' checked':''}${trava?' disabled':''} aria-label="Enviar a nota ${esc(n.numero_nfse||'')}"></td><td><b>${esc(n.numero_nfse||'—')}</b><br><span class="muted" style="font-size:12px">${dBR((n.emitida_em||'').slice(0,10))}</span></td>
+      <td class="l" style="white-space:nowrap">${esc(e.nome||'')}</td><td class="l" style="white-space:normal;min-width:170px">${esc(n.tomador_nome||'')}<br><span class="muted" style="font-size:12px">${esc(nsDoc(n.tomador_doc))}</span></td><td><b>${fm(n.valor)}</b></td>
+      <td class="l" style="min-width:240px"><input data-nslp value="${esc(x.para)}" placeholder="Sem e-mail no cadastro: digite aqui"${trava?' disabled':''} style="width:100%" aria-label="E-mail do tomador">${av?'<div style="margin-top:4px">'+av+'</div>':''}</td><td class="l" style="min-width:110px">${st}</td></tr>`}).join('');
+  const t=$('nslTodas'),liv=D.l.filter(x=>x.st!=='ok');if(t){t.checked=liv.length>0&&liv.every(x=>x.marc);t.indeterminate=!t.checked&&liv.some(x=>x.marc);t.disabled=!!D.enviando||!liv.length}
+  nslConta()}
+function nslConta(){const D=NSL.dlg;if(!D||D.enviando)return;const f=D.l.filter(x=>x.marc&&x.st!=='ok'),sem=f.filter(x=>!nslSep(x.para).length),ok=D.l.filter(x=>x.st==='ok').length;
+  const b=$('nslEnv');b.disabled=!f.length;b.textContent=f.length?`Enviar ${f.length} ${f.length===1?'e-mail':'e-mails'}`:'Enviar';b.hidden=!f.length&&ok>0;
+  $('nslNote').textContent=(ok?`${ok} ${ok===1?'enviada':'enviadas'}. `:'')+(f.length?`${f.length} ${f.length===1?'nota marcada':'notas marcadas'}${sem.length?`, ${sem.length} sem e-mail`:''}.`:ok?'':'Nenhuma nota marcada.')}
+async function nslEnvia(b){const D=NSL.dlg,fila=D.l.filter(x=>x.marc&&x.st!=='ok'),er=t=>{$('nslErr').textContent=t;$('nslErr').hidden=false};$('nslErr').hidden=true;
+  if(!fila.length)return er('Marque pelo menos uma nota.');
+  const sem=fila.filter(x=>!nslSep(x.para).length);if(sem.length)return er(`Falta o e-mail ${sem.length===1?'da nota':'das notas'} ${sem.map(x=>'nº '+(x.n.numero_nfse||'')).join(', ')}. Digite o e-mail ou desmarque a nota.`);
+  const ruim=fila.filter(x=>nslSep(x.para).some(m=>!NSL_RE.test(m)));if(ruim.length)return er(`Confira o e-mail ${ruim.length===1?'da nota':'das notas'} ${ruim.map(x=>'nº '+(x.n.numero_nfse||'')).join(', ')}.`);
+  const cc=nslSep($('nsl_cc').value);if(cc.some(m=>!NSL_RE.test(m)))return er('Confira o e-mail da cópia.');
+  const ass=$('nsl_ass').value,msg=$('nsl_msg').value,cpEmp=$('nsl_cpemp').checked,pdf=$('nsl_pdf').checked,dest=[...new Set(fila.flatMap(x=>nslSep(x.para).map(m=>m.toLowerCase())))];
+  if(!msg.trim())return er('Escreva a mensagem do e-mail.');
+  if(!confirm(`Enviar ${fila.length} ${fila.length===1?'nota':'notas'} por e-mail, cada uma para o e-mail do seu tomador (${dest.length} ${dest.length===1?'endereço':'endereços'} diferentes)?\n\nDepois de enviado, o e-mail não tem como ser desfeito.`))return;
+  D.enviando=true;b.disabled=true;fila.forEach(x=>{x.st='Na fila…';x.erro=''});nslLinhas();let ok=0,i=0,para=false;
+  for(const x of fila){i++;if(para){x.st='';continue}const n=x.n,e=D.emit.find(y=>y.id===n.emitente_id)||{};
+    $('nslNote').textContent=`Enviando ${i} de ${fila.length}…`;
+    try{let p='';if(pdf){x.st='Gerando o PDF…';nslLinhas();p=await nsPdfB64(n)}
+      x.st='Enviando…';nslLinhas();
+      const ccs=[...new Set([...(cpEmp&&e.email&&NSL_RE.test(e.email)?[e.email]:[]),...cc])].filter(m=>!nslSep(x.para).some(y=>y.toLowerCase()===m.toLowerCase())).slice(0,9);
+      const {data,error}=await sb.functions.invoke('nfse-email',{body:{nota_id:n.id,para:x.para,cc:ccs.join(';'),assunto:nslTroca(ass,n,e),mensagem:nslTroca(msg,n,e),pdf_b64:p}});
+      if(error){let j=null;try{j=await error.context.json()}catch(_){}const z=new Error(j?.erro||error.message);z.falta=j?.falta;throw z}
+      x.st='ok';x.ja=[...x.ja,data.envio];n.extra={...(n.extra||{}),emails:[...(n.extra?.emails||[]),data.envio]};ok++;D.mudou=true;nslSet(D.k||'').delete(n.id);
+    }catch(z){console.error(z);x.st='erro';x.erro=z.message||String(z);if(z.falta==='resend'||/Master|configurado/i.test(x.erro))para=true}   // sem chave ou sem permissão: nem tenta as outras
+    nslLinhas()}
+  D.enviando=false;b.disabled=false;nslLinhas();
+  const nok=fila.length-ok;$('nslNote').textContent=`${ok} de ${fila.length} ${ok===1?'enviada':'enviadas'}.`+(nok?` ${nok} não ${nok===1?'foi':'foram'}: veja o motivo na linha e clique em Enviar de novo.`:'');
+  toast(nok?`${ok} enviadas, ${nok} com problema`:`${ok} ${ok===1?'e-mail enviado':'e-mails enviados'}`)}
 // ---- relatório: baixar os XMLs das notas de um período (zip com os XMLs + planilha com a lista) ----
 function nsAbreLote(){
   const ini=TODAY.slice(0,8)+'01';
@@ -15720,6 +16261,7 @@ const MANUAL=[
 <ul><li>Escolha o período (pela data de emissão ou de competência), a empresa, a situação (emitida pelo portal, cancelada ou emitida fora do portal) e o ambiente. A busca acha por qualquer coluna.</li>
 <li><b>Exportar</b> gera o Excel ou o PDF só com o que está filtrado; <b>Imprimir</b> imprime a lista.</li>
 <li><b>Baixar XMLs (.zip)</b> baixa o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa, com a planilha da lista.</li>
+<li><b>✉ Enviar por e-mail</b>: marque as notas nas caixinhas (a do cabeçalho marca todas) e envie. Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF e o XML. Antes de enviar, confira e troque os e-mails; as notas já enviadas vêm desmarcadas e mostram “✉ data” na lista. E-mail enviado não tem desfazer.</li>
 <li>Os quadros do alto somam as notas válidas (sem as canceladas) e mostram o total de cada empresa.</li></ul>`},
     {k:'gfrestit',t:'Restituições efetuadas',img:'gfrestit.png',
       txt:`<p>Relatório dos repasses já pagos, pela data do pagamento: empresa que pagou, conta, forma, valor pago, bruto, descontos, valor da NF e se a nota foi emitida.</p>
@@ -15806,7 +16348,7 @@ const MANUAL=[
 <li>Para emitir: <b>+ Emitir NFS-e</b>, ou o botão <b>Emitir NF</b> na receita do Financeiro (a nota fica ligada à receita). Escolha o cliente, confira o tomador, a competência, o valor e a descrição e clique em Emitir.</li>
 <li>Se o emissor recusar, a tentativa aparece como <b>Recusada</b> com o motivo. Use <b>Corrigir e tentar de novo</b> ou <b>Descartar</b> (o descarte também tem <b>Desfazer</b>).</li>
 <li>Para desfazer uma nota emitida: abra a nota e clique em <b>Cancelar NFS-e</b>, com o motivo. O cancelamento vai para o emissor nacional e não tem volta; para corrigir, cancele e emita outra.</li>
-<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. <b>Enviar por e-mail</b> manda o PDF e o XML ao cliente (confira o e-mail, a cópia e a mensagem antes; e-mail enviado não tem como desfazer, por isso o sistema pede confirmação). A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
+<li>Na nota: <b>Imprimir</b> abre o DANFSe no modelo oficial (NT 008/2026, com QR Code); clique em <b>Imprimir / Salvar em PDF</b> e escolha “Salvar como PDF” para ter o arquivo. <b>Baixar XML</b> baixa o arquivo da nota. <b>Enviar por e-mail</b> manda o PDF e o XML ao cliente (confira o e-mail, a cópia e a mensagem antes; e-mail enviado não tem como desfazer, por isso o sistema pede confirmação). Para mandar várias de uma vez, marque as caixinhas na lista e clique em <b>✉ Enviar por e-mail</b>: cada nota vai para o e-mail do seu tomador, depois de uma tela de conferência. A consulta oficial fica em www.nfse.gov.br, com a chave de acesso.</li>
 </ol>`},
     {k:'ctlfin',t:'Financeiro da Controlacs',img:'ctlfin.png',
       txt:`<p>As contas da própria Controlacs, separadas das empresas: as mensalidades dos clientes, outras receitas e as despesas. Só a Master vê.</p>
@@ -16347,6 +16889,10 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-18nfse-email-lote',data:'2026-11-18',t:'Notas fiscais: enviar várias por e-mail de uma vez',itens:[
+    {x:'Controlacs › Notas fiscais e Parceiros MP › Notas fiscais emitidas ganharam caixinhas para marcar as notas e o botão “✉ Enviar por e-mail”. Cada nota vai num e-mail só dela, para o e-mail do seu tomador, com o PDF e o XML. Vale para todas as empresas que emitem pelo portal.',mods:['ctlnfse','gfnfrel'],para:'master'},
+    {x:'Antes de enviar abre a conferência: o e-mail de cada tomador (vem do cadastro e dá para trocar ou digitar), o assunto e a mensagem com os dados de cada nota, cópia para a empresa e o PDF. As notas que já foram enviadas vêm desmarcadas e a lista mostra “✉ data” em quem já recebeu.',para:'master'},
+    {x:'Ao terminar a emissão em lote dos parceiros, o botão “✉ Enviar as notas emitidas por e-mail” já abre a conferência com as notas que acabaram de sair.',para:'master'}]},
   {k:'2026-11-18guias',data:'2026-11-18',t:'Contas a pagar: guias, rateio na categoria, lote e recibos',itens:[
     {x:'Importar documentos em lote: arraste vários boletos, notas, guias, faturas e recibos de uma vez. O sistema separa um lançamento por documento e junta a nota e o boleto do mesmo fornecedor e mesmo valor.',para:'esc'},
     {x:'Guias de imposto (DARF, DCTFWeb, GPS, DAS e FGTS), inclusive as impressas como PDF: o sistema lê valor, vencimento, competência e os códigos, e escolhe a categoria pelo código (Configurações › Categorias › Códigos das guias).',para:'esc'},
@@ -18079,14 +18625,14 @@ async function renderNR(){
     const {data:gs,error:eg}=await sb.from('repasse_grupos').select('*');if(eg)throw eg;
     const G=(gs||[]).find(g=>(g.empresas||[]).includes(cli.id)),emps=G?G.empresas:[cli.id];NR.grupo=G;NR.emps=emps;
     const {data:em,error:ee}=await sb.from('nfse_emitentes').select('*').in('cliente_id',emps);if(ee)throw ee;NR.emit=em||[];
-    let ns=[];if(NR.emit.length){let q=sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,cancelada_em,cancel_motivo,tomador_nome,tomador_doc,descricao,ctribnac,valor,situacao').in('emitente_id',NR.emit.map(e=>e.id)).in('situacao',['emitida','cancelada']);
+    let ns=[];if(NR.emit.length){let q=sb.from('nfse_notas').select('id,emitente_id,ambiente,numero_nfse,ndps,chave,competencia,emitida_em,cancelada_em,cancel_motivo,tomador_nome,tomador_doc,descricao,ctribnac,valor,situacao,extra').in('emitente_id',NR.emit.map(e=>e.id)).in('situacao',['emitida','cancelada']);
       if(amb)q=q.eq('ambiente',Number(amb));
       q=por==='competencia'?q.gte('competencia',de).lte('competencia',ate):q.gte('emitida_em',de+'T00:00:00-03:00').lte('emitida_em',ate+'T23:59:59-03:00');
       ns=await todas(()=>q.order('emitida_em'))}
     // notas marcadas como emitidas fora do portal (sem XML): só quando o período é pela emissão, e em produção
     let fora=[];if(G&&amb!=='2'){fora=await todas(()=>sb.from('repasse_itens').select('id,nome,empresa_id,nf_emitida_em,nf_numero,liquidez,bruto,valor,parceiro_nf_id').eq('grupo_id',G.id).is('nfse_nota_id',null).gte('nf_emitida_em',de).lte('nf_emitida_em',ate));
       const pa=await todas(()=>sb.from('parceiros_nf').select('id,cpf_cnpj,nome_global').eq('grupo_id',G.id));fora.forEach(f=>f._p=pa.find(p=>p.id===f.parceiro_nf_id))}
-    NR.l=[...ns.map(n=>{const e=NR.emit.find(x=>x.id===n.emitente_id);return {id:n.id,emp:e?.cliente_id,empNome:e?.nome||'',numero:n.numero_nfse||'',emissao:(n.emitida_em||'').slice(0,10),emitida_em:n.emitida_em,competencia:n.competencia,tomador:n.tomador_nome||'',doc:n.tomador_doc||'',descricao:n.descricao||'',valor:+n.valor||0,sit:n.situacao,amb:n.ambiente,chave:n.chave||'',cancel:n.cancelada_em}}),
+    NR.l=[...ns.map(n=>{const e=NR.emit.find(x=>x.id===n.emitente_id);return {id:n.id,emp:e?.cliente_id,empNome:e?.nome||'',numero:n.numero_nfse||'',emissao:(n.emitida_em||'').slice(0,10),emitida_em:n.emitida_em,competencia:n.competencia,tomador:n.tomador_nome||'',doc:n.tomador_doc||'',descricao:n.descricao||'',valor:+n.valor||0,sit:n.situacao,amb:n.ambiente,chave:n.chave||'',cancel:n.cancelada_em,emails:n.extra?.emails||[]}}),
       ...fora.map(f=>({id:f.id,emp:f.empresa_id,empNome:rnEmpNome(f.empresa_id),numero:f.nf_numero||'',emissao:f.nf_emitida_em,competencia:null,tomador:f._p?.nome_global||f.nome.trim(),doc:f._p?.cpf_cnpj||'',descricao:'Marcada como emitida fora do portal',valor:f.bruto!=null?+f.liquidez:+f.valor,sit:'fora',amb:1,chave:''}))]
       .sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
   }catch(e){console.error(e);return vazio(/nfse_|permission|RLS/i.test(e.message||'')?'Só a Master vê as notas fiscais. Se for a Master, rode a atualização v131 do banco.':'Erro ao carregar as notas. Verifique a internet e tente de novo.')}
@@ -18101,14 +18647,14 @@ function nrDesenha(){const l=nrFiltrados(),sm=x=>r2(x.reduce((a,n)=>a+n.valor,0)
   $('nrTiles').innerHTML=[['Notas válidas',fm(sm(l.filter(n=>n.sit!=='cancelada'))),`${l.filter(n=>n.sit!=='cancelada').length} notas`],['Emitidas pelo portal',String(k('emitida').length),fm(sm(k('emitida')))],['Canceladas',String(k('cancelada').length),fm(sm(k('cancelada')))],['Emitidas fora do portal',String(k('fora').length),k('fora').length?'sem XML no portal':''],
     ...[...new Set(l.map(n=>n.emp))].map(id=>{const x=l.filter(n=>n.emp===id&&n.sit!=='cancelada');return [esc(rnEmpNome(id)),fm(sm(x)),`${x.length} notas válidas`]})]
     .map(t=>`<div class="card tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="n">${t[2]}</div></div>`).join('');
-  $('nrHead').innerHTML='<tr><th class="l">Empresa que emitiu</th><th>Nº NFS-e</th><th>Emissão</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th class="l">Situação</th><th class="l">Chave de acesso</th></tr>';
-  $('nrBody').innerHTML=l.map(n=>`<tr><td class="l" style="white-space:nowrap">${esc(n.empNome)}</td><td><b>${esc(n.numero||'—')}</b>${Number(n.amb)===2?' '+nsAmbChip(2):''}</td><td style="white-space:nowrap">${n.emissao?dBR(n.emissao):''}</td><td style="white-space:nowrap">${n.competencia?dBR(n.competencia):mu('—')}</td>
+  $('nrHead').innerHTML='<tr>'+nslTh('nr')+'<th class="l">Empresa que emitiu</th><th>Nº NFS-e</th><th>Emissão</th><th>Competência</th><th class="l">Tomador</th><th class="l">CNPJ/CPF</th><th class="l">Descrição</th><th>Valor</th><th class="l">Situação</th><th class="l">Chave de acesso</th></tr>';
+  $('nrBody').innerHTML=l.map(n=>`<tr>${nslTd('nr',n.id,!!n.chave&&n.sit!=='fora')}<td class="l" style="white-space:nowrap">${esc(n.empNome)}</td><td><b>${esc(n.numero||'—')}</b>${Number(n.amb)===2?' '+nsAmbChip(2):''}</td><td style="white-space:nowrap">${n.emissao?dBR(n.emissao):''}</td><td style="white-space:nowrap">${n.competencia?dBR(n.competencia):mu('—')}</td>
     <td class="l" style="white-space:normal;min-width:180px">${esc(n.tomador)}</td><td class="l" style="white-space:nowrap">${esc(nsDoc(n.doc))}</td><td class="l" style="white-space:normal;max-width:280px">${esc(n.descricao.slice(0,140))}</td><td><b>${fm(n.valor)}</b></td>
-    <td class="l"><span class="chip ${NRSIT[n.sit][0]}">${NRSIT[n.sit][1]}</span>${n.cancel?'<br>'+mu(dtBR(n.cancel)):''}</td><td class="l" style="font-size:11px;word-break:break-all;min-width:160px">${esc(n.chave)}</td></tr>`).join('')
-    ||`<tr><td class="l muted" colspan="10">Nenhuma nota neste período e filtros.</td></tr>`;
-  $('nrFoot').innerHTML=l.length?`<tr><th class="l" colspan="7">${l.length} ${l.length===1?'nota':'notas'} · válidas (sem as canceladas)</th><th>${fm(sm(l.filter(n=>n.sit!=='cancelada')))}</th><th colspan="2"></th></tr>`:'';
-  $('nrXml').disabled=!l.some(n=>n.chave);
-  $('nrNote').textContent='Exportar gera o Excel ou o PDF só com o que está filtrado; Baixar XMLs gera um .zip com o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa e a planilha da lista. As notas emitidas fora do portal não têm XML aqui: entram só na lista. O total não soma as canceladas.';
+    <td class="l"><span class="chip ${NRSIT[n.sit][0]}">${NRSIT[n.sit][1]}</span>${nslJa(n.emails)}${n.cancel?'<br>'+mu(dtBR(n.cancel)):''}</td><td class="l" style="font-size:11px;word-break:break-all;min-width:160px">${esc(n.chave)}</td></tr>`).join('')
+    ||`<tr><td class="l muted" colspan="11">Nenhuma nota neste período e filtros.</td></tr>`;
+  $('nrFoot').innerHTML=l.length?`<tr><th></th><th class="l" colspan="7">${l.length} ${l.length===1?'nota':'notas'} · válidas (sem as canceladas)</th><th>${fm(sm(l.filter(n=>n.sit!=='cancelada')))}</th><th colspan="2"></th></tr>`:'';
+  $('nrXml').disabled=!l.some(n=>n.chave);nslPoda('nr',l.filter(n=>n.chave&&n.sit!=='fora').map(n=>n.id));
+  $('nrNote').textContent='Exportar gera o Excel ou o PDF só com o que está filtrado; Baixar XMLs gera um .zip com o XML de cada NFS-e filtrada (e o do cancelamento), uma pasta por empresa e a planilha da lista. Para mandar várias notas por e-mail, marque as caixinhas e clique em “✉ Enviar por e-mail”: cada uma vai para o e-mail do seu tomador. As notas emitidas fora do portal não têm XML aqui: entram só na lista. O total não soma as canceladas.';
 }
 ['nrDe','nrAte','nrPor','nrAmb'].forEach(id=>$(id).addEventListener('change',()=>renderNR()));
 ['nrEmp','nrSit'].forEach(id=>$(id).addEventListener('change',()=>nrDesenha()));
@@ -18491,7 +19037,7 @@ function nfeDesenha(){const d=NF.dlg,mu=t=>`<span class="muted">${t}</span>`;
       return `<tr data-i="${i}"><td class="l" style="white-space:normal;min-width:200px"><b>${esc(x.nome)}</b>${chave(x.nome)!==chave(x.it.nome)?'<br>'+mu(esc(x.it.nome.trim())):''}${x.ps?.cep?'':'<br>'+mu('sem endereço no cadastro (a nota sai sem o endereço)')}</td>
         <td class="l">${x.res?.ok?esc(nsDoc(x.doc)):`<input class="nfedoc" value="${esc(nsDoc(x.doc))}" inputmode="numeric" style="max-width:170px" aria-label="CNPJ ou CPF de ${esc(x.nome)}">`}</td>
         <td><b>${fm(x.valor)}</b></td><td class="l" style="white-space:nowrap">${esc(rnEmpNome(x.it.empresa_id))}</td><td class="l">${st}</td></tr>`}).join('')}</tbody></table></div>
-    <p class="note" id="nfeProg" style="margin:8px 0 0">${prontas.length?`${prontas.length} ${prontas.length===1?'nota pronta':'notas prontas'} · ${fm(r2(prontas.reduce((a,x)=>a+x.valor,0)))}.`:d.linhas.some(x=>x.res?.ok)?'Notas emitidas. Elas aparecem também em Controlacs › Notas fiscais.':'Nenhuma nota pronta para emitir.'}</p><p class="err" id="nfdErr" hidden></p>`;
+    <p class="note" id="nfeProg" style="margin:8px 0 0">${prontas.length?`${prontas.length} ${prontas.length===1?'nota pronta':'notas prontas'} · ${fm(r2(prontas.reduce((a,x)=>a+x.valor,0)))}.`:d.linhas.some(x=>x.res?.ok)?'Notas emitidas. Elas aparecem também em Controlacs › Notas fiscais.':'Nenhuma nota pronta para emitir.'}</p>${!prontas.length&&d.linhas.some(x=>x.res?.ok&&x.res.nota)?`<p style="margin:8px 0 0"><button type="button" class="btn" data-nslids="${d.linhas.filter(x=>x.res?.ok&&x.res.nota).map(x=>x.res.nota).join(',')}" title="Cada nota vai para o e-mail do seu tomador, com o PDF e o XML">✉ Enviar as notas emitidas por e-mail</button></p>`:''}<p class="err" id="nfdErr" hidden></p>`;
   const sv=$('nfdFoot').querySelector('[data-act="salvar"]');sv.hidden=!prontas.length;sv.disabled=false;sv.textContent=`Emitir ${prontas.length} ${prontas.length===1?'NFS-e':'NFS-e'}`;
   $('nfeComp').onchange=()=>d.comp=$('nfeComp').value;$('nfeDesc').oninput=()=>d.desc=$('nfeDesc').value;
   $('nfdBody').querySelectorAll('.nfedoc').forEach(inp=>inp.onchange=()=>{const x=d.linhas[+inp.closest('tr').dataset.i];x.doc=nfeDig(inp.value);nfeDesenha()});
