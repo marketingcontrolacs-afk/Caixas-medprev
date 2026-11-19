@@ -2,6 +2,9 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 11:30 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
+  - Leitura de boleto (`leArquivoDoc`, vale para todas as telas que leem documentos): PDF com texto mas com os números desenhados como imagem (boleto Bradesco do Santa Luzia/DASA, "Microsoft Print to PDF") não achava a linha digitável. Agora, se o texto tem os rótulos de boleto (ficha de compensação, nosso número, beneficiário…) e nenhuma linha, também lê por OCR e junta com o texto. Testado com o arquivo real: R$ 1.553,13, venc. 19/11/2026. Sem SQL.
+
 - **19/11/2026 09:45 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - O boleto do repasse (publicado às 09:30, portal #119) agora aceita **vários arquivos de uma vez** (boleto e NF, também XML). O arquivo com a linha digitável vira o boleto; os outros vão para os anexos como "Nota fiscal" (ou "Outros"). O XML só é lido.
   - O botão aparece também no repasse **sem empresa**: abre "Qual empresa vai pagar?", cria a conta a pagar (o mesmo que "Pagar em", `rnPagarEm`) e anexa. No Envio de remessa também vale para vários arquivos.
