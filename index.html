@@ -17039,6 +17039,9 @@ $('ctConteudo').addEventListener('dragend',e=>{e.target.closest?.('.crmcard')?.c
 $('ctConteudo').addEventListener('dragover',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();document.querySelectorAll('#crmBoard .kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('ctConteudo').addEventListener('drop',e=>{const col=e.target.closest('#crmBoard .kcol');if(!col||!CRM.drag)return;e.preventDefault();col.classList.remove('over');const o=CRM.op.find(x=>x.id===CRM.drag);CRM.drag=null;crmMuda(o,col.dataset.crmcol)});
 const NOVIDADES=[
+  {k:'2026-11-19bol-guardado',data:'2026-11-19',t:'Repasse: o boleto anexado fica só guardado',itens:[
+    {x:'No Repasse da semana, anexar o boleto num repasse que ainda não tem conta a pagar só guarda o boleto (“📎 Boleto guardado”, com Ver e Tirar boleto). Não cria a conta a pagar e não manda nada para a remessa.',mods:['repasse','gfrepasse'],para:'esc'},
+    {x:'Quando você usar “Pagar em” (ou Gerar), a conta a pagar já sai como boleto, com o valor do boleto e os arquivos anexados. Se for pagar à mão, é só não mandar para a remessa.',para:'esc'}]},
   {k:'2026-11-19tirados',data:'2026-11-19',t:'Envio de remessa: pagamentos tirados ficam à vista',itens:[
     {x:'Quando há pagamentos tirados da remessa, aparece um aviso acima da lista com quantos são e o valor, e os botões “↩ Trazer todos de volta para a remessa” (com Desfazer) e “Ver quais são”.',mods:['gfremessa'],para:'esc'},
     {x:'Cancelar uma remessa agora deixa os pagamentos dela livres para a próxima, mesmo os que tinham sido tirados da remessa.',para:'esc'}]},
@@ -18108,6 +18111,8 @@ function rnFiltrados(){
 }
 // boleto no repasse (Carol, 19/11): opcional, para o parceiro que recebe por boleto; vai na remessa como boleto
 function rnBolHtml(t,it){if(!t&&(!it||it.titulo_id))return '';
+  // boleto guardado no repasse, ainda sem conta a pagar (Carol, 19/11; v165): não vai para a remessa até ela mandar
+  if(!t&&it.boleto?.linha)return `<div class="rnbol" style="margin-top:4px"><span class="chip c-ok" title="Linha digitável: ${esc(it.boleto.linha)}">📎 Boleto guardado${it.boleto.venc?' · venc. '+dBR(it.boleto.venc):''}${it.boleto.valor?' · '+fm(it.boleto.valor):''}</span> <button type="button" class="btn small ghost" data-rn="bolVer">Ver</button> <button type="button" class="btn small ghost" data-rn="bolTiraIt" title="Tirar o boleto deste repasse">Tirar boleto</button><br><span class="muted">Fica só guardado. Quando você usar “Pagar em” (ou Gerar), a conta a pagar já sai como boleto.</span></div>`;
   if(t&&soDig(t.linha_digitavel))return `<div class="rnbol" style="margin-top:4px"><span class="chip c-ok" title="Linha digitável: ${esc(soDig(t.linha_digitavel))}">📎 Vai por boleto</span> <button type="button" class="btn small ghost" data-rn="bolTira" title="Tirar o boleto: volta a ir por Pix ou conta, pelo cadastro do parceiro">Tirar boleto</button></div>`;
   return `<div class="rnbol" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"><span class="btn small ghost fotobtn" title="Opcional: para o parceiro que recebe por boleto. Pode escolher o boleto e a nota fiscal juntos: a linha digitável é lida do boleto e a remessa paga como boleto">📎 Anexar boleto<input type="file" multiple accept="${ACCEPT},.xml,text/xml" data-rnbol aria-label="Anexar o boleto (e a nota fiscal) deste repasse"></span><button type="button" class="btn small ghost" data-rn="bolLinha" title="Digitar a linha digitável do boleto">Colar linha</button></div>`}
 const rnFormaCad=t=>{const pe=RN.pes.find(x=>x.id===t.pessoa_id),p=pe&&RN.parc.find(x=>x.id===pe.parceiro_id);return p?.pix_chave?'Pix':p?.conta?'Transferência':null};
@@ -18120,8 +18125,31 @@ function rnEscolheEmp(it){return new Promise(res=>{let d=$('dlgRnBolEmp');
     <label class="f">Empresa que vai pagar<select id="rbeEmp">${emps.map(id=>`<option value="${id}"${id===it.empresa_id?' selected':''}>${esc(rnEmpNome(id))}</option>`).join('')}</select></label>
     <div class="row" style="justify-content:flex-end;gap:8px;margin-top:10px"><button type="button" class="btn ghost" id="rbeCanc">Cancelar</button><button type="button" class="btn primary" id="rbeOk">Continuar</button></div></form>`;
   $('rbeCanc').onclick=()=>{d.close();res(null)};$('rbeOk').onclick=()=>{const v=$('rbeEmp').value;d.close();res(v)};d.oncancel=()=>res(null);d.showModal()})}
+// BOLETO SÓ GUARDADO (Carol, 19/11): no repasse sem conta a pagar, anexar o boleto NÃO cria a conta a pagar nem manda para a remessa
+// (às vezes ela paga à mão). Lê a linha digitável, guarda os arquivos e a linha em repasse_itens.boleto (v165); a conta a pagar
+// só nasce quando ela usar “Pagar em”/Gerar, e aí já sai como boleto, com o valor do boleto e os anexos.
+async function rnBolItem(it,{files,linha},box){
+  const bx=box&&document.body.contains(box)?box:document.querySelector(`#rnBody tr[data-id="${it.id}"] .rnbol`);if(bx)bx.innerHTML='<span class="muted">Lendo o boleto…</span>';
+  const fs=files||[],emp=it.empresa_id||RN.grupo.empresas[0],ups=[];
+  try{let bol=null,bolF=null;const outros=[];
+    for(const f of fs){const xml=/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||'');let r={};
+      try{r=await leArquivoDoc(f)}catch(e){console.error(e)}
+      if(!bol&&r.bol&&!xml){bol=r.bol;bolF=f;continue}
+      if(!xml)outros.push({f,cat:r.nfe||r.nfseNum||r.numero||/\b(nf|nota)/i.test(f.name||'')?'Nota fiscal':'Outros'})}
+    if(!bol&&linha)bol=boletoDe(linha);
+    if(!bol)throw new Error(fs.length?'Não achei a linha digitável. Use “Colar linha” e digite a linha digitável do boleto.':'Linha digitável inválida. Confira os números.');
+    const susp=bolConfere(bol,+it.valor);if(susp)throw new Error(`A linha digitável lida não confere: ${susp}. Não anexei; confira o boleto.`);
+    if(bol.corrigida&&!confirm(`O boleto veio com a linha digitável fora do padrão; usei a linha corrigida, a mesma do DDA (${fm(bol.valor)}, venc. ${dBR(bol.venc)}). Guardar assim?`))return rnDesenha();
+    for(const [f,cat] of [...(bolF?[[bolF,'Boleto ou fatura']]:[]),...outros.map(o=>[o.f,o.cat])]){const up=await uploadAnexo(f,emp,'financeiro');ups.push({caminho:up.caminho,nome_arquivo:up.nome_arquivo,categoria:cat})}
+    const ant=it.boleto||null,novo={linha:soDig(bol.linha||bol.barra),valor:bol.valor||null,venc:bol.venc||null,arqs:ups};
+    const {error}=await sb.from('repasse_itens').update({boleto:novo}).eq('id',it.id);if(error)throw /boleto/.test(error.message||'')?new Error('Rode antes a atualização v165 do banco no Supabase.'):error;
+    it.boleto=novo;rnDesenha();
+    toastDesfazer(`Boleto guardado: ${(it.nome||'').trim()}${bol.venc?' (venc. '+dBR(bol.venc)+')':''}. Não foi para a remessa`,async()=>{
+      const {error:e1}=await sb.from('repasse_itens').update({boleto:ant}).eq('id',it.id);if(e1)return fail(e1);it.boleto=ant;
+      await sb.storage.from('anexos').remove(ups.map(u=>u.caminho)).catch(()=>{});toast('Boleto tirado');rnDesenha()});
+  }catch(e){console.error(e);if(ups.length)await sb.storage.from('anexos').remove(ups.map(u=>u.caminho)).catch(()=>{});rnDesenha();alert(e.message||'Não foi possível anexar o boleto.')}}
 async function rnBol(it,arg,box){
-  if(!it.titulo_id){const emp=await rnEscolheEmp(it);if(!emp)return rnDesenha();await rnPagarEm([it],emp);if(!it.titulo_id)return rnDesenha()}
+  if(!it.titulo_id)return rnBolItem(it,arg,box);
   const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t)return;
   const bx=box&&document.body.contains(box)?box:document.querySelector(`#rnBody tr[data-id="${it.id}"] .rnbol`);if(bx)bx.innerHTML='<span class="muted">Lendo o boleto…</span>';
   try{const r=await bolNoTitulo(t,arg);if(!r)return rnDesenha();rnDesenha();
@@ -18311,7 +18339,7 @@ function rnDesenha(){
   const faltaG=G.empresas.length<1?`<b>O grupo ${esc(G.nome)} tem ${G.empresas.length} ${G.empresas.length===1?'empresa':'empresas'}. Confira em “Empresas do grupo”.</b><br>`:'';
   $('rnNote').innerHTML=faltaG+(RN.nf.length?'':'<b>O controle de NF está vazio: importe a planilha de controle de NF dos parceiros.</b><br>')
     +'Para separar, marque os repasses e clique em “Pagar em” da empresa: a coluna “Pagar em” é preenchida e a conta a pagar já é criada nessa empresa (se o repasse estava em outra empresa e ainda não foi pago, a conta a pagar muda para a nova). Use o filtro Situação “Falta pagar” para ver só o que ainda não foi pago. Parceiro com alteração de conta fica em vermelho e com desconto a fazer fica em amarelo; ao importar o relatório, aparece um aviso com os dois. '
-    +'Pagou pelo internet banking? Marque os repasses e use “Marcar como pago”: escolha a data e a conta de cada empresa, e o pagamento entra nas Contas a pagar e no extrato da conta. Para pagar por remessa, marque só os repasses que vão no arquivo e clique em “Gerar remessa”: escolha a empresa e o Envio de remessa abre só com eles (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte; quem recebe por boleto: use “📎 Anexar boleto” na coluna Situação e ele vai na remessa como boleto). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
+    +'Pagou pelo internet banking? Marque os repasses e use “Marcar como pago”: escolha a data e a conta de cada empresa, e o pagamento entra nas Contas a pagar e no extrato da conta. Para pagar por remessa, marque só os repasses que vão no arquivo e clique em “Gerar remessa”: escolha a empresa e o Envio de remessa abre só com eles (vão por Pix; quem não tem chave Pix no cadastro fica de fora e precisa ser pago à parte; quem recebe por boleto: use “📎 Anexar boleto” na coluna Situação; o boleto fica só guardado e, quando a conta a pagar for criada, ela já sai como boleto). A empresa escolhida fica salva na hora, então dá para separar aos poucos. A conta e o Pix vêm do cadastro do parceiro na empresa escolhida (Comunicação › Parceiros). Ao gerar, cada repasse vira uma conta a pagar na empresa escolhida, com vencimento na data de pagamento. Trocar a situação da NF de um parceiro vale também para os próximos relatórios.';
 }
 // quadros de valores do alto podem ser recolhidos; a escolha fica guardada neste computador (Carol, 12/11)
 const RNMINK='ctl_rn_quadros_min';
@@ -18360,6 +18388,10 @@ $('rnBody').addEventListener('click',async e=>{const b=e.target.closest('[data-r
   if(b.dataset.rn==='daDesfaz'){b.disabled=true;await rnDADesfaz(it);b.disabled=false}
   if(b.dataset.rn==='daVer'&&it.desc_arq?.caminho){const {data,error}=await sb.storage.from('anexos').createSignedUrl(it.desc_arq.caminho,300);if(error)return fail(error);window.open(data.signedUrl,'_blank')}
   if(b.dataset.rn==='bolLinha'){const l=prompt('Linha digitável do boleto (só os números, pode colar com pontos e espaços):');if(l&&soDig(l)){b.disabled=true;await rnBol(it,{linha:l});b.disabled=false}}
+  if(b.dataset.rn==='bolVer'){const a=it.boleto?.arqs?.[0];if(!a)return alert('Boleto digitado à mão (sem arquivo). Linha: '+(it.boleto?.linha||''));const {data,error}=await sb.storage.from('anexos').createSignedUrl(a.caminho,300);if(error)return fail(error);window.open(data.signedUrl,'_blank')}
+  if(b.dataset.rn==='bolTiraIt'){if(!it.boleto||!confirm(`Tirar o boleto guardado de ${(it.nome||'').trim()}?`))return;const ant=it.boleto;b.disabled=true;
+    const {error}=await sb.from('repasse_itens').update({boleto:null}).eq('id',it.id);if(error){b.disabled=false;return fail(error)}it.boleto=null;rnDesenha();
+    toastDesfazer('Boleto tirado do repasse',async()=>{const {error:e1}=await sb.from('repasse_itens').update({boleto:ant}).eq('id',it.id);if(e1)return fail(e1);it.boleto=ant;toast('O boleto voltou');rnDesenha()})}
   if(b.dataset.rn==='bolTira'){const t=it.titulo_id&&RN.tits[it.titulo_id];if(!t||!confirm(`Tirar o boleto de ${(it.nome||'').trim()}?\n\nA conta a pagar volta a ir por Pix ou conta, pelo cadastro do parceiro.`))return;b.disabled=true;
     try{const r=await bolTiraTitulo(t,rnFormaCad(t));rnDesenha();toastDesfazer('Boleto tirado do repasse',async()=>{try{await r.desfaz();toast('O boleto voltou')}catch(e){fail(e)}rnDesenha()})}catch(e){b.disabled=false;fail(e)}}
   if(b.dataset.rn==='descFeito'){const d=RN.desc.find(x=>x.id===b.dataset.desc);if(!d)return;const t=it.titulo_id&&RN.tits[it.titulo_id];
@@ -18709,9 +18741,14 @@ async function rnCriaTitulos(ls,venc,cont){
       let liq=r2(+it.valor);const usa=[];
       for(const d of rnDescPend(p)){if(+d.valor<liq-0.004){liq=r2(liq-(+d.valor));usa.push(d)}else cont.semCaber=(cont.semCaber||0)+1}
       row.valor=liq;
+      // boleto guardado no repasse (v165): a conta a pagar já nasce como boleto; vale o valor do boleto (retenção de impostos, Carol 19/11)
+      const bg=it.boleto?.linha?it.boleto:null;
+      if(bg){row.forma='Boleto';row.linha_digitavel=bg.linha;row.pix_chave=null}
       if(usa.length){row.obs+=` · Relatório ${fm(it.valor)} − desconto ${usa.map(descTxtCurto).join(' − ')} = a pagar ${fm(liq)}`;row.descricao+=usa.map(descDescr).join('')}
+      if(bg&&+bg.valor>0&&Math.abs(+bg.valor-row.valor)>0.004){const dif=r2(row.valor-(+bg.valor));row.obs+=` · Valor do boleto ${fm(bg.valor)} (era ${fm(row.valor)}; ${dif>0?'retenção/diferença de '+fm(dif):'diferença de '+fm(-dif)+' a mais'})`;row.valor=r2(+bg.valor)}
       const {data,error}=await sb.from('fin_titulos').insert(row).select('*').single();if(error)throw error;
       const {error:e2}=await sb.from('repasse_itens').update({titulo_id:data.id}).eq('id',it.id);if(e2)throw e2;
+      if(bg?.arqs?.length){const {error:e3}=await sb.from('documentos').insert(bg.arqs.map(a=>({cliente_id:id,modulo:'financeiro',registro_id:data.id,categoria:a.categoria,nome_arquivo:a.nome_arquivo,caminho:a.caminho})));if(e3)console.error(e3)}
       for(const d of usa){await descMarca(d,{titulo_id:data.id,repasse_item_id:it.id,valor_repasse:+it.valor});RN.desc=RN.desc.filter(x=>x.id!==d.id);cont.desc=(cont.desc||0)+1}
       // arquivo de desconto do repasse (v164) vai junto para os anexos da conta a pagar
       if(it.desc_arq?.caminho){const {data:dd}=await sb.from('documentos').insert({cliente_id:id,modulo:'financeiro',registro_id:data.id,categoria:'Outros',nome_arquivo:it.desc_arq.arquivo||'Arquivo de desconto',caminho:it.desc_arq.caminho}).select('id').single();

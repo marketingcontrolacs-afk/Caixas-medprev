@@ -2,6 +2,9 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 16:05 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · publicado (OK da Carol)**
+  - **Boleto só guardado no repasse** (Carol, 19/11: anexar não pode mandar sozinho para a remessa; às vezes ela paga à mão). No repasse SEM conta a pagar, "📎 Anexar boleto"/"Colar linha" (`rnBolItem`) só lê a linha e guarda arquivos + linha em `repasse_itens.boleto` (**v165** RODADA); não cria conta a pagar. Chip "📎 Boleto guardado" com Ver e Tirar boleto (Desfazer). `rnCriaTitulos` (Pagar em / Gerar) cria a conta já como Boleto, com o valor do boleto (diferença na obs) e os anexos. Repasse que já tem conta a pagar continua anexando nela (`bolNoTitulo`).
+
 - **19/11/2026 15:20 · conta 1 (thread "Anexar boleto no pagamento de parceiros") · branch `claude/project-thread-hna1z9` (ainda não publicado)**
   - Envio de remessa: aviso `#rmTir` acima da lista quando há pagamentos tirados da remessa (quantos, valor, nomes), com "↩ Trazer todos de volta para a remessa" (`rm_trazTodos`, com Desfazer) e "Ver quais são" (`rm_verTir`). Cancelar remessa (`rm_cancelar`) agora também tira o `sem_remessa` dos títulos dela. Sem SQL. **Pendente:** OK da Carol.
 
