@@ -1864,7 +1864,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <form method="dialog" novalidate>
     <div class="dh"><h2>Ligar a lançamentos do sistema</h2></div>
     <div class="db"><p class="note" id="gclLinha" style="margin:0"></p>
-      <div class="row" style="gap:8px;margin:10px 0;flex-wrap:wrap"><input id="gclBusca" placeholder="Buscar nome, descrição ou valor" style="max-width:320px"><label class="note" style="display:inline-flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="gclLonge" style="width:auto"> Mostrar datas mais distantes</label></div>
+      <div class="row" style="gap:8px;margin:10px 0;flex-wrap:wrap"><input id="gclBusca" placeholder="Buscar nome, descrição ou valor" style="max-width:320px"><label class="note" style="display:inline-flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="gclLonge" style="width:auto"> Mostrar datas mais distantes</label><label class="note" style="display:inline-flex;gap:6px;align-items:center;margin:0" title="Para conferir se algum lançamento foi conciliado com a linha errada"><input type="checkbox" id="gclConc" style="width:auto"> Mostrar também os já conciliados</label></div>
       <div class="tablebox" style="margin:0;max-height:48vh;overflow:auto"><table><thead><tr><th></th><th>Data</th><th class="l">Lançamento no sistema</th><th>Valor</th></tr></thead><tbody id="gclBody"></tbody></table></div>
       <p id="gclTot" style="margin:10px 0 0;font-weight:600"></p><p class="err" id="gclErr" hidden></p></div>
     <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="gclFecha">Fechar</button><button type="button" class="btn primary" id="gclOk" disabled>Conciliar</button></div>
@@ -14066,34 +14066,47 @@ function gcSugestoes(){
 // Ligar (Carol, 19/11): a pessoa escolhe os lançamentos do sistema e as contas em aberto que formam a linha do banco
 // (ex.: o banco somou 4 Pix numa linha). Quando a soma bate, concilia tudo nesta linha, como a remessa (ofx_soma).
 const GCL={l:null,sel:new Set()};
-function gclCands(){const l=GCL.l,tipo=l.valor>0?'entrada':'saida',lim=$('gclLonge').checked?60:15,q=$('gclBusca').value.trim().toLowerCase(),usados=new Set();
+// Busca digitada ou "datas mais distantes": procura em todo o período carregado (até 60 dias antes e depois).
+// "Mostrar também os já conciliados": lista os lançamentos já conciliados, para conferir e trocar de linha
+// se foram ligados errado (ex.: restituição de 09/10 paga de novo em 12/11) (Carol, 19/11)
+const gclLinhaDe=id=>GC.linhas.find(x=>x.id===id);
+function gclCands(){const l=GCL.l,tipo=l.valor>0?'entrada':'saida',q=$('gclBusca').value.trim().toLowerCase(),lim=$('gclLonge').checked||q?9999:15,vConc=$('gclConc').checked,usados=new Set();
   GC.linhas.forEach(x=>{if(x.id!==l.id&&GC.sug[x.id]?.k==='mov')usados.add(GC.sug[x.id].mov.id)});
-  const ms=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&x.tipo===tipo&&Math.abs(difDias(x.data,l.data))<=lim).map(x=>({k:'m',id:x.id,o:x,data:x.data,valor:+x.valor,txt:[x.pessoa_nome,x.descricao,x.categoria].filter(Boolean).join(' · ')||'lançamento',obs:usados.has(x.id)?'sugerido em outra linha':''}));
+  const ja=x=>!!(x.ofx_id||x.ofx_soma&&x.conciliado),aqui=x=>x.ofx_id===l.id||x.ofx_soma===l.id,V0=Math.abs(+l.valor);
+  const obsConc=x=>{const o=gclLinhaDe(x.ofx_id||x.ofx_soma);return x.ofx_id||x.ofx_soma?`✓ já conciliado${o?' com a linha do banco de '+dBR(o.data)+(o.nome?' ('+o.nome+')':''):' com outra linha do banco'}`:'✓ conciliado sem linha do banco'};
+  const ms=GC.movs.filter(x=>x.tipo===tipo&&!aqui(x)&&(vConc||!ja(x))&&(Math.abs(difDias(x.data,l.data))<=lim||Math.abs(+x.valor-V0)<0.005)).map(x=>({k:'m',id:x.id,o:x,data:x.data,valor:+x.valor,conc:ja(x),txt:[x.pessoa_nome,x.descricao,x.categoria].filter(Boolean).join(' · ')||'lançamento',obs:ja(x)||x.conciliado?obsConc(x):usados.has(x.id)?'sugerido em outra linha':''}));
   const ts=GC.tits.filter(x=>x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(difDias(x.vencimento,l.data))<=lim*2).map(x=>({k:'t',id:x.id,o:x,data:x.vencimento,valor:r2(x.valor-(GC.pago[x.id]||0)),txt:(x.tipo==='pagar'?'Conta a pagar: ':'Conta a receber: ')+[x.pessoa_nome,x.descricao].filter(Boolean).join(' · '),obs:'em aberto · venc.'}));
   // lançamento sem par em outra conta da empresa (ex.: Pix do PagBank para o Inter): liga como transferência (Carol, 19/11)
   const os=(GC.outras||[]).filter(x=>x.tipo!==tipo&&Math.abs(difDias(x.data,l.data))<=lim).map(x=>({k:'o',id:x.id,o:x,data:x.data,valor:+x.valor,txt:`Transferência ${tipo==='entrada'?'de':'para'} ${contaNome(x.conta_id)||'outra conta'}: ${[x.pessoa_nome,x.descricao].filter(Boolean).join(' · ')||'lançamento'}`,obs:'outra conta'}));
   const V=Math.abs(+l.valor);
   return [...ms,...ts,...os].filter(c=>!q||c.txt.toLowerCase().includes(q)||fm(c.valor).replace(/[^\d,]/g,'').includes(q.replace(/[^\d,]/g,'')||'§'))
-    .sort((a,b)=>(GCL.sel.has(b.k+b.id)-GCL.sel.has(a.k+a.id))||((Math.abs(b.valor-V)<0.005)-(Math.abs(a.valor-V)<0.005))||((b.valor<=V)-(a.valor<=V))||Math.abs(difDias(a.data,l.data))-Math.abs(difDias(b.data,l.data))||b.valor-a.valor)}
+    .sort((a,b)=>(GCL.sel.has(b.k+b.id)-GCL.sel.has(a.k+a.id))||(!!a.conc-!!b.conc)||((Math.abs(b.valor-V)<0.005)-(Math.abs(a.valor-V)<0.005))||((b.valor<=V)-(a.valor<=V))||Math.abs(difDias(a.data,l.data))-Math.abs(difDias(b.data,l.data))||b.valor-a.valor)}
 function gclDesenha(){const l=GCL.l,v=Math.abs(+l.valor),cs=gclCands();
-  $('gclBody').innerHTML=cs.map(c=>`<tr><td><input type="checkbox" data-gcl="${c.k+c.id}" style="width:auto"${GCL.sel.has(c.k+c.id)?' checked':''}></td><td>${dBR(c.data)}</td><td class="l" style="white-space:normal">${esc(c.txt)}${c.obs?` <span class="muted">${esc(c.obs)}${c.k==='t'?' '+dBR(c.data):''}</span>`:''}</td><td>${fm(c.valor)}</td></tr>`).join('')
-    ||'<tr><td></td><td class="l muted" colspan="3">Nenhum lançamento sem conciliação perto desta data. Marque “Mostrar datas mais distantes” ou use Lançar.</td></tr>';
+  $('gclBody').innerHTML=cs.map(c=>`<tr><td><input type="checkbox" data-gcl="${c.k+c.id}" style="width:auto"${GCL.sel.has(c.k+c.id)?' checked':''}></td><td>${dBR(c.data)}</td><td class="l" style="white-space:normal">${esc(c.txt)}${c.obs?` <span class="${c.conc?'chip c-done':'muted'}">${esc(c.obs)}${c.k==='t'?' '+dBR(c.data):''}</span>`:''}</td><td>${fm(c.valor)}</td></tr>`).join('')
+    ||'<tr><td></td><td class="l muted" colspan="3">Nenhum lançamento encontrado. Digite o nome ou o valor na busca, marque “Mostrar datas mais distantes” ou “Mostrar também os já conciliados”, ou use Lançar.</td></tr>';
   const tot=gclSoma(),falta=r2(v-tot),ok=GCL.sel.size&&Math.abs(falta)<0.005;
   $('gclTot').innerHTML=`Selecionados: ${GCL.sel.size} · ${fm(tot)} de ${fm(v)} · `+(ok?'<span class="pos">a soma bate ✓</span>':`<span class="neg">${falta>0?'faltam':'passou'} ${fm(Math.abs(falta))}</span>`);
   $('gclOk').disabled=!ok}
 GCL.mapa=()=>{const m=new Map();(GC.outras||[]).forEach(x=>m.set('o'+x.id,{k:'o',o:x,valor:+x.valor}));GC.movs.forEach(x=>m.set('m'+x.id,{k:'m',o:x,valor:+x.valor}));GC.tits.forEach(x=>m.set('t'+x.id,{k:'t',o:x,valor:r2(x.valor-(GC.pago[x.id]||0))}));return m};
 function gclSoma(){const m=GCL.mapa();return r2([...GCL.sel].reduce((a,k)=>a+(m.get(k)?.valor||0),0))}
-function gclAbre(l){GCL.l=l;GCL.sel=new Set();$('gclBusca').value='';$('gclLonge').checked=false;$('gclErr').hidden=true;
+function gclAbre(l){GCL.l=l;GCL.sel=new Set();$('gclBusca').value='';$('gclLonge').checked=false;$('gclConc').checked=false;$('gclErr').hidden=true;
   $('gclLinha').innerHTML=`Banco: <b>${dBR(l.data)}</b> · ${esc(histDe(l))} · <b class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</b>${l.qtd>1?`<br>O banco somou ${l.qtd} lançamentos: ${(l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + ')}`:''}<br>Marque os lançamentos do sistema (ou as contas em aberto) que formam esta linha. Quando a soma bater, clique em Conciliar.`;
   gclDesenha();$('dlgGCL').showModal()}
 $('gclBody').addEventListener('change',e=>{const k=e.target.dataset.gcl;if(!k)return;e.target.checked?GCL.sel.add(k):GCL.sel.delete(k);gclDesenha()});
-$('gclBusca').oninput=gclDesenha;$('gclLonge').onchange=gclDesenha;$('gclFecha').onclick=()=>$('dlgGCL').close();
+$('gclBusca').oninput=gclDesenha;$('gclLonge').onchange=gclDesenha;$('gclConc').onchange=gclDesenha;$('gclFecha').onclick=()=>$('dlgGCL').close();
 $('gclOk').onclick=async()=>{const l=GCL.l,m=GCL.mapa(),it=[...GCL.sel].map(k=>m.get(k)).filter(Boolean);
   const os=it.filter(x=>x.k==='o');
   if(os.length&&it.length>1){$('gclErr').textContent='A transferência de outra conta é ligada sozinha: marque só ela (o valor tem que ser o mesmo da linha do banco).';$('gclErr').hidden=false;return}
   if(os.length){GC.sug[l.id]={k:'transf',mov:os[0].o,txt:''};$('gclOk').disabled=true;
     try{await gcAprovar([l]);$('dlgGCL').close();renderGC()}catch(err){console.error(err);delete GC.sug[l.id];$('gclErr').textContent=err.message||'Não foi possível conciliar.';$('gclErr').hidden=false;$('gclOk').disabled=false}return}
   const ms=it.filter(x=>x.k==='m').map(x=>x.o),ts=it.filter(x=>x.k==='t').map(x=>x.o);
+  // já conciliados em outra linha: saem de lá (a outra linha volta a ficar pendente) e vêm para esta (Carol, 19/11)
+  const mj=ms.filter(x=>x.ofx_id||x.ofx_soma);
+  if(mj.length){const ds=mj.map(x=>{const o=gclLinhaDe(x.ofx_id||x.ofx_soma);return `• ${dBR(x.data)} ${x.pessoa_nome||''} ${fm(+x.valor)}`+` (estava na linha do banco de ${o?dBR(o.data):'outra data'}, que volta a ficar pendente)`}).join('\n');
+    if(!confirm(`Estes lançamentos já estavam conciliados e vão passar para esta linha do banco:\n\n${ds}\n\nContinuar?`))return;
+    const {error:ej}=await sb.from('fin_movimentos').update({ofx_id:null,ofx_soma:null}).in('id',mj.map(x=>x.id));
+    if(ej){$('gclErr').textContent=ej.message||'Não foi possível tirar da outra linha.';$('gclErr').hidden=false;return}
+    mj.forEach(x=>{x.ofx_id=null;x.ofx_soma=null})}
   // linhas que tinham estes lançamentos como sugestão deixam de ter
   GC.linhas.forEach(x=>{const g=GC.sug[x.id];if(x.id!==l.id&&g&&(g.mov&&ms.includes(g.mov)||g.tit&&ts.includes(g.tit)||(g.ms||[]).some(y=>ms.includes(y))||(g.ts||[]).some(y=>ts.includes(y))))delete GC.sug[x.id]});
   GC.sug[l.id]={k:'rem',rem:null,ms,ts,n:it.length,nomes:[],txt:''};

@@ -2,6 +2,8 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 02:40 · conta 2 · `feat/ligar-ja-conciliados`:** no **🔗 Ligar** da Conciliação: (1) nova opção **"Mostrar também os já conciliados"**, que lista os lançamentos já ligados a outra linha do banco com a etiqueta "✓ já conciliado com a linha de dd/mm", para conferir; ao escolher um deles, ele sai da outra linha (que volta a ficar pendente) depois de uma confirmação; (2) o que tem o **mesmo valor** da linha aparece em qualquer data do período carregado (±60 dias), e a busca digitada procura em todas as datas. Caso real: restituição da Clínica Integrada de Psicologia e Fonoaudiologia (R$ 670, lançada em 09/10) paga em 12/11.
+
 - **20/11/2026 02:40 · conta 2 · `feat/conciliacao-lancar-completo`**
   - **"+ Lançar" na Conciliação** (uma linha) abre a tela normal de conta a pagar/receber (`abrirGT` com `pre.gc`), já preenchida com data, valor, descrição, conta e categoria sugerida, com documentos, anexos, competência e parcelas. O botão é "🔗 Salvar e conciliar": entra quitada e ligada **à própria linha do banco** (não usa `concLigar`, que podia pegar outra linha de mesmo valor). Depois volta para a Conciliação (`renderGC`).
   - Transferência, baixa de conta em aberto e vários lançamentos: botão no aviso da tela abre o diálogo antigo (`abrirGC`); no diálogo antigo, "📄 Lançamento completo" volta para a tela normal. Várias linhas selecionadas continuam no diálogo antigo.
