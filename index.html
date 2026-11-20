@@ -13433,15 +13433,23 @@ async function abrirAvulso(m,pre){
     ${soloTxt}<label class="f" id="ga_catBox"${tipo==='transf'?' hidden':''}>Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${(m||pre)?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}" autocomplete="off" data-pesnova>${PESNOVA}<datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
     <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
-  </div>${deParaTxt}${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
+  </div>${deParaTxt}${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${m?gxConcBox(m):''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
   $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf';$('ga_catBox').hidden=t==='transf'};
   $('gtdFoot').innerHTML=`${m?'<button type="button" class="btn ghost" data-act="av_apagar">Apagar</button>'+dupBtn('data-act="av_dup"'):''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="av_salvar">Salvar</button>`;
   dlgGT.showModal();
   if(!m){if(pre?.dest&&$('ga_dest'))$('ga_dest').value=pre.dest;dupMarca($('gtdBody'),['#ga_data','#ga_documento'],'Preencha a data e o nº do documento (vieram em branco).')}
   faInit(cli,m?[m.id]:null,[]);
 }
+// situação da conciliação no lançamento avulso, igual à conta a pagar e a receber: Desconciliar ou 🔗 Conciliar (Carol, 19/11)
+function gxConcBox(m){const c=movConc(m);
+  return `<div style="background:var(--sunk);padding:10px 12px;border-radius:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${c?(m.ofx_id||m.ofx_soma?'<b class="pos">✓ Conciliado</b> com o extrato do banco':'<b class="pos">✓ Conciliado</b> (sem linha do extrato)'):'<b>Não conciliado</b> com o extrato do banco'}</span><span class="spacer"></span>${c?'<button type="button" class="btn small" data-act="av_desconc">Desconciliar</button>':'<button type="button" class="btn small" data-act="av_conc">🔗 Conciliar</button>'}</div>`}
 async function gxAcao(a){
   const c=GX.conta,cli=cliAtual(),m=GXR;
+  if(a==='av_desconc'||a==='av_conc'){if(!m)return;
+    if(a==='av_desconc'){if(!confirm('Desconciliar este lançamento? Ele continua no extrato da conta; só a ligação com o extrato do banco é desfeita e a linha do banco volta a ficar pendente na Conciliação.'))return;
+      const {error}=await sb.from('fin_movimentos').update({ofx_id:null,ofx_soma:null,conciliado:false}).eq('id',m.id);if(error)return fail(error,'Não foi possível desconciliar');toast('Desconciliado')}
+    else{let r;try{r=await concLigar([m])}catch(e){return fail(e,'Não foi possível conciliar')}toast(concTxt(r))}
+    dlgGT.close();GT.key='';return gxVolta()}
   if(a==='av_dup')return gxDup(m);
   if(a==='av_apagar'){
     if(!confirm(m.transf_id?'Apagar a transferência (sai das duas contas)?':'Apagar este lançamento?'))return;
