@@ -2,6 +2,9 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 03:40 · conta 2 · `feat/sem-avulso`:** **acabou o "lançamento avulso"** (decisão da Carol). (1) O nome sumiu: o lançamento antigo sem conta a pagar/receber abre como **Pagamento**, **Recebimento** ou **Transferência**. (2) Tudo que é novo entra pela conta a pagar ou a receber (com "$ Salvar quitado"); à parte só a transferência entre contas. "+ Criar" da Movimentação e do Extrato da conta: Conta a pagar, Conta a receber, Transferência. Duplicar um pagamento antigo abre uma conta a pagar nova. `renderGT` volta para a Conciliação ou o Extrato quando o diálogo foi aberto lá. (3) Os ~84 mil lançamentos antigos (histórico do Bom Controle) ficam como estão.
+  - **Pendente para 20/11 de manhã:** conferir a Tesouraria da MPA de Pato Branco (as meninas disseram que o saldo está errado).
+
 - **20/11/2026 03:25 · conta 2 · `feat/avulso-igual-conta`:** o Lançamento avulso ficou na mesma ordem da conta a pagar e a receber (Fornecedor ou Cliente, Descrição, Documento, Categoria, Tipo, Data, Valor) e ganhou **Forma de pagamento** (`fin_movimentos.forma`). Com isso, as três entradas de lançamento usam o mesmo desenho: conta a pagar/receber, avulso e o "+ Lançar" da Conciliação (que já abre a conta a pagar/receber). Rodapé igual: Apagar, Duplicar, Fechar, Salvar.
 
 - **20/11/2026 03:10 · conta 2 · `feat/desconciliar-rapido`:** na Movimentação financeira e nas Contas a pagar e a receber, clicar no ícone 🔗 da situação (ou na etiqueta "✓ Conciliado") desconcilia direto, só com a mensagem de confirmação, sem abrir o lançamento. Se não estiver conciliado, o mesmo ícone concilia com o extrato já importado. **Regra (Carol):** ações rápidas, sem abrir tela.

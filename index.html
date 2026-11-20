@@ -904,7 +904,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <section id="viewGT" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="gtTitle"></h1><p class="sub" id="gtSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtLote" hidden title="Arraste vários boletos, notas, guias e faturas de uma vez: o sistema separa em lançamentos e junta a nota com o boleto do mesmo fornecedor e valor">📥 Importar documentos em lote</button><button class="btn" id="gtRecibos" hidden title="Criar, imprimir e guardar recibos (aluguel, serviço e outros)">🧾 Recibos</button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn" id="gtRepRel" hidden title="Repasses de parceiros pagos e em aberto no período, agrupados pela linha do banco (ex.: remessa)">Relatório de repasses</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button><details class="expdd" id="gtCriar" hidden><summary class="btn primary" title="Lançar na Movimentação financeira, como o Criar do Bom Controle">+ Criar ▾</summary><div class="expmenu"><button type="button" data-cr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-cr="receber">↑ Conta a receber (receita)</button><button type="button" data-cr="transf">⇄ Transferência entre contas</button><button type="button" data-cr="avulso">$ Lançamento já quitado direto na conta (ex.: tarifa)</button></div></details></div>
+      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtLote" hidden title="Arraste vários boletos, notas, guias e faturas de uma vez: o sistema separa em lançamentos e junta a nota com o boleto do mesmo fornecedor e valor">📥 Importar documentos em lote</button><button class="btn" id="gtRecibos" hidden title="Criar, imprimir e guardar recibos (aluguel, serviço e outros)">🧾 Recibos</button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn" id="gtRepRel" hidden title="Repasses de parceiros pagos e em aberto no período, agrupados pela linha do banco (ex.: remessa)">Relatório de repasses</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button><details class="expdd" id="gtCriar" hidden><summary class="btn primary" title="Lançar na Movimentação financeira, como o Criar do Bom Controle">+ Criar ▾</summary><div class="expmenu"><button type="button" data-cr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-cr="receber">↑ Conta a receber (receita)</button><button type="button" data-cr="transf">⇄ Transferência entre contas</button></div></details></div>
     </div>
     <div class="alerta" id="mvAviso" hidden></div>
     <div class="tiles" id="gtTiles"></div>
@@ -986,7 +986,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <section id="viewGX" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1>Extrato da conta</h1><p class="sub" id="gxSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="expgrp" id="gxBaixar" data-exp="gx" hidden><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><button class="btn primary" id="gxAvulso" hidden>+ Lançamento avulso</button></div>
+      <div class="row" style="align-items:flex-end"><span class="expgrp" id="gxBaixar" data-exp="gx" hidden><details class="expdd"><summary class="btn" title="Gera o arquivo só com o que está filtrado na tela">Exportar ▾</summary><div class="expmenu"><button type="button" data-expf="xlsx">Excel (.xlsx)</button><button type="button" data-expf="pdf">PDF</button></div></details><button type="button" class="btn" data-expf="print" title="Imprime só o que está filtrado na tela">Imprimir</button></span><details class="expdd" id="gxAvulso" hidden><summary class="btn primary" title="Lançar nesta conta">+ Criar ▾</summary><div class="expmenu"><button type="button" data-gxcr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-gxcr="receber">↑ Conta a receber (receita)</button><button type="button" data-gxcr="transf">⇄ Transferência entre contas</button></div></details></div>
     </div>
     <div class="toolbar">
       <label class="f">Conta<select id="gxConta"></select></label>
@@ -9141,7 +9141,7 @@ function gtSit(t){const pg=GT.pago[t.id]||0,sd=r2(t.valor-pg);
 }
 function gtVazio(t,cl){$('gtHead').innerHTML='';$('gtTot').innerHTML='';$('gtPag').hidden=true;$('gtFoot').innerHTML='';$('gtTiles').innerHTML='';$('gtBody').innerHTML=`<tr><td class="l ${cl||'muted'}">${t}</td></tr>`;$('gtNote').textContent=''}
 const GTMODOS={
-  gfmov:['Movimentação financeira','Todos os lançamentos da empresa por data: o que foi pago e recebido, as transferências, os lançamentos avulsos e as contas em aberto. Use os filtros para ver só o que precisa.'],
+  gfmov:['Movimentação financeira','Todos os lançamentos da empresa por data: o que foi pago e recebido, as transferências e as contas em aberto. Use os filtros para ver só o que precisa.'],
   gfpagar:['Contas a pagar','Tudo o que a empresa tem para pagar. Ao registrar o pagamento, o valor entra no extrato da conta usada.'],
   gfrec:['Contas a receber','Tudo o que a empresa tem para receber. Ao registrar o recebimento, o valor entra no extrato da conta.'],
   gfinad:['Inadimplência','Contas a receber vencidas e ainda não recebidas, por cliente e por tempo de atraso.'],
@@ -9164,6 +9164,8 @@ async function gtCarrega(tipo,cli){
   GT.key=key;
 }
 async function renderGT(){
+  // os diálogos de conta a pagar e a receber também abrem na Conciliação e no Extrato da conta: ao salvar, volta para a tela certa (Carol, 20/11)
+  if(VIEW==='gfconc')return renderGC();if(VIEW==='gfext')return renderGX();
   const M=VIEW,tod=escCli.value==='*'&&GTTODAS.includes(M),cli=tod?{id:'*',nome:TODAS.nome}:cliAtual(),tipo=M==='gfpagar'?'pagar':M==='gfrec'||M==='gfinad'?'receber':'mov';
   if(M==='gfmov'&&GT.modo!=='gfmov'){$('gtIni').value='';$('gtFim').value='';MV.lim=300}   // a movimentação abre com tudo
   GT.modo=M;if(M!=='gfmov')$('mvAviso').hidden=true;
@@ -11789,7 +11791,7 @@ function relDesp(){
     ||'<tr><td class="l muted" colspan="6">Nenhuma despesa no período.</td></tr>';
   $('relFoot').innerHTML=ls.length?`<tr><td class="l">Total</td><td>${itens.length}</td>${cvl(T)}${V?cvl(r2(ls.reduce((s,[,o])=>s+o.a,0))):''}<td>100%</td><td></td></tr>`:'';
   $('relTiles').innerHTML=tileH([[V?'Despesas que vencem no período':'Total pago no período',fm(T),itens.length+' lançamentos','neg'],['Maior '+nome.toLowerCase(),ls[0]?esc(ls[0][0]).slice(0,28):'—',ls[0]?fm(ls[0][1].v):''],[nome==='Categoria'?'Categorias':nome==='Fornecedor'?'Fornecedores':'Formas',String(ls.length),'no período'],['Média por lançamento',fm(itens.length?r2(T/itens.length):0),'']]);
-  $('relNote').textContent=V?'Considera as contas a pagar pelo vencimento, pagas ou não.':'Considera o que saiu das contas no período (pagamentos, lançamentos avulsos e compras no cartão pela data da compra). Transferências entre contas e o pagamento da fatura do cartão não entram.';
+  $('relNote').textContent=V?'Considera as contas a pagar pelo vencimento, pagas ou não.':'Considera o que saiu das contas no período (pagamentos e compras no cartão pela data da compra). Transferências entre contas e o pagamento da fatura do cartão não entram.';
 }
 // previsão orçamentária: orçado por categoria e mês (6 meses) × realizado
 function relOrc(){
@@ -13406,13 +13408,17 @@ function gxDesenha(){
   $('gxNote').textContent=(nc.length&&GX.ver!=='nconc'?`Atenção: ${nc.length} ${nc.length===1?'lançamento do período ainda não está conciliado':'lançamentos do período ainda não estão conciliados'} com o extrato do banco (${fm(r2(nc.reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)))}). ${GX.ver==='conc'?'Eles não entram nesta visão: escolha “Só não conciliados” para ver.':'Escolha “Só conciliados” para conferir com o extrato do banco.'} `:'')
     +(GX.ver==='nconc'?'Só os lançamentos ainda não conciliados: o saldo anterior é a soma dos não conciliados antes do período. ':'')
     +(c.saldo_data&&GX.ini<c.saldo_data?`O saldo inicial da conta (${fm(c.saldo_inicial)}) é do início de ${dBR(c.saldo_data)}; o que for anterior a essa data não entra. `:'')
-    +'Os pagamentos e recebimentos entram aqui sozinhos. Tarifas, transferências e outros lançamentos sem conta a pagar ou receber entram por “Lançamento avulso” (clique num avulso para corrigir).';
+    +'Os pagamentos e recebimentos entram aqui sozinhos. Tarifas e outras despesas entram por “+ Criar › Conta a pagar” com “$ Salvar quitado”; a transferência, por “+ Criar › Transferência entre contas”.';
   $('gxBaixar').hidden=false;
 }
 ['gxConta','gxIni','gxFim'].forEach(id=>$(id).onchange=renderGX);
 // lançamento avulso: entrada, saída ou transferência entre contas da mesma empresa
 let GXR=null;
-$('gxAvulso').onclick=()=>abrirAvulso(null);
+// Sem "lançamento avulso" (Carol, 20/11): o que é novo entra pela conta a pagar ou a receber (com "Salvar quitado");
+// à parte só a transferência entre contas. Os lançamentos antigos sem conta continuam abrindo como Pagamento ou Recebimento.
+$('gxAvulso').addEventListener('click',e=>{const b=e.target.closest('[data-gxcr]');if(!b)return;$('gxAvulso').open=false;const k=b.dataset.gxcr;
+  if(k==='transf')return abrirAvulso(null,{tipo:'transf'});
+  abrirGT(null,k,{conta_id:GX.conta.id})});
 $('gxBody').addEventListener('click',e=>{const so=e.target.closest('tr[data-soma]');if(so){GX.abre||=new Set();const k=so.dataset.soma;GX.abre.has(k)?GX.abre.delete(k):GX.abre.add(k);return gxDesenha()}const tr=e.target.closest('tr.click');if(tr)abrirAvulso(GX.per.find(m=>m.id===tr.dataset.id))});
 DUPROW.gxBody=tr=>gxDup(GX.per.find(m=>m.id===tr?.dataset.id));
 $('gxBody').addEventListener('keydown',e=>{const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();abrirAvulso(GX.per.find(m=>m.id===tr.dataset.id))}});
@@ -13425,6 +13431,8 @@ async function gxDup(m){if(!m)return;const cli=cliAtual();
     if(m.tipo==='entrada'){const k=o&&((GT.contas||[]).find(c=>c.id===o)||(CGRUPO||[]).find(c=>c.id===o));
       if(!k||k.cliente_id&&k.cliente_id!==cli?.id)return toast('Para duplicar esta transferência, abra a saída dela na conta de origem e use ⧉ Duplicar lá.');
       GX.conta=k;pre.dest=m.conta_id}else pre.dest=o}
+  if(!m.transf_id){dupIni('lançamento “'+(m.descricao||m.pessoa_nome||'')+'” de '+dBR(m.data));GTBOL=null;
+    return abrirGT(null,m.tipo==='entrada'?'receber':'pagar',{valor:+m.valor,descricao:m.descricao,categoria:m.categoria,pessoa_nome:m.pessoa_nome,conta_id:m.conta_id,forma:m.forma})}
   dupIni('lançamento “'+(m.descricao||m.pessoa_nome||'')+'” de '+dBR(m.data));return abrirAvulso(null,pre)}
 async function abrirAvulso(m,pre){
   GXR=m;const cli=cliAtual();let plano=[],outras=[],pes=[];try{[plano,outras,pes]=await Promise.all([planoDe(cli),contasGrupo(cli),gfPessoasTodas(cli.id).catch(()=>[])])}catch(e){console.error(e)}
@@ -13440,7 +13448,7 @@ async function abrirAvulso(m,pre){
     if(!o){try{GXCG=await trContas()}catch(e){GXCG=[]}
       soloTxt=`<label class="f wide" id="ga_outraBox">${m.tipo==='saida'?'Foi para (conta de destino)':'Veio de (conta de origem)'}<select id="ga_outra"><option value="">Escolha…</option>${trOpts(GXCG,cli,c.id,'')}</select><span class="note">Se for a Tesouraria, liga ao lançamento da tesouraria; se não estiver lançado lá, é criado na tesouraria.</span></label>`}}
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if((m||pre)?.categoria&&!cats.includes((m||pre).categoria))cats.unshift((m||pre).categoria);
-  $('gtdTitle').textContent=(m?'Lançamento avulso':'Novo lançamento avulso')+' · '+c.nome;$('gtdChip').innerHTML='';
+  $('gtdTitle').textContent=(m?(m.transf_id?'Transferência':m.tipo==='entrada'?'Recebimento':'Pagamento'):'Nova transferência')+' · '+c.nome;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<div class="fields">
     <!-- mesma ordem da conta a pagar e a receber (Carol, 20/11) -->
     <label class="f wide" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}" autocomplete="off" data-pesnova>${PESNOVA}<datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
@@ -13456,6 +13464,7 @@ async function abrirAvulso(m,pre){
   $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf';$('ga_catBox').hidden=t==='transf';$('ga_formaBox').hidden=t==='transf'};
   $('gtdFoot').innerHTML=`${m?'<button type="button" class="btn ghost" data-act="av_apagar">Apagar</button>'+dupBtn('data-act="av_dup"'):''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="av_salvar">Salvar</button>`;
   dlgGT.showModal();
+  if(!m&&$('ga_tipo')?.querySelector('option[value="transf"]')){$('ga_tipo').value='transf';$('ga_tipo').onchange();$('ga_tipo').disabled=true}
   if(!m){if(pre?.dest&&$('ga_dest'))$('ga_dest').value=pre.dest;dupMarca($('gtdBody'),['#ga_data','#ga_documento'],'Preencha a data e o nº do documento (vieram em branco).')}
   faInit(cli,m?[m.id]:null,[]);
 }
