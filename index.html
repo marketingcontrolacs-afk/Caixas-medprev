@@ -10532,6 +10532,7 @@ function gtDup(t){if(!t)return;GTBOL=null;
   dupIni((t.tipo==='pagar'?'conta a pagar':'conta a receber')+' “'+(t.pessoa_nome||t.descricao||'')+'”'+(t.vencimento?' de '+dBR(t.vencimento):''));
   return abrirGT(null,t.tipo,{pessoa_nome:t.pessoa_nome,descricao:t.descricao,categoria:t.categoria,valor:+t.valor||null,conta_id:t.conta_id,forma:t.forma,pix_chave:t.pix_chave})}
 async function abrirGT(t,tipo,pre){
+  GT.gc=!t&&pre?.gc?{ofx:pre.gc}:null;   // aberto pelo "+ Lançar" da Conciliação: salva pago e ligado à linha do banco (Carol, 19/11)
   if(t||!pre)GTBOL=null;GT.serieV=null;
   GTR=t;GT.dlg=t?t.tipo:tipo||(GT.tipo==='receber'?'receber':'pagar');const P=dP(),cli=cliAtual();if(!cli)return;
   let pes=[],contas=GFC.lista;
@@ -10642,6 +10643,10 @@ async function abrirGT(t,tipo,pre){
       $('gjParcBox').hidden=!((parseInt($('gt_parcelas').value)||1)>1)};
     $('gj_data').addEventListener('change',()=>dMan=true);$('gj_conta').addEventListener('change',()=>cMan=true);
     ['gt_vencimento','gt_conta_id','gt_parcelas'].forEach(k=>{$(k).addEventListener('change',jp);$(k).addEventListener('input',jp)});jp()}
+  if(GT.gc){const l=GT.gc.ofx,bx=document.createElement('div');bx.className='alerta';bx.style.cssText='margin:0 0 4px;display:block';
+    bx.innerHTML=`<b>Linha do banco:</b> ${esc(histDe(l))} · ${dBR(l.data)} · <b>${fm(Math.abs(+l.valor))}</b><br><span class="note">Preencha como um lançamento normal (fornecedor, categoria, documento, anexos…). Ao salvar, ele entra ${P?'pago':'recebido'} e conciliado com esta linha.</span> <button type="button" class="btn small ghost" data-act="gc_outras">É transferência, baixa de conta em aberto ou vários lançamentos?</button>`;
+    $('gtdBody').prepend(bx);
+    $('gtdFoot').querySelectorAll('[data-act="salvar"]').forEach(b=>{if(b.dataset.conc==='1'){b.classList.add('primary');b.textContent='🔗 Salvar e conciliar'}else b.hidden=true})}
   if(!dlgGT.open)dlgGT.showModal();if(!t)$('gt_pessoa').focus();
   // rateio na categoria (v160) e categoria sugerida pelo fornecedor na conta nova (Carol, 18/11)
   gtRatDesenha((t||pre)?.cat_partes||null);
@@ -10678,6 +10683,8 @@ async function gtAcao(a,b){
   if(a.startsWith('lq_'))return lqAcao(a);
   if(a==='mv_troca')return mvTrocar();
   if(a==='mv_conta')return mvContaTrocar();
+  if(a==='gc_outras'){const l=GT.gc?.ofx;GT.gc=null;dlgGT.close();return l&&abrirGC([l])}
+  if(a==='gc_completo'){const l=GCDLG?.[0];dlgGT.close();return l&&gcLancaCompleto(l)}
   if(a==='gc_salvar')return gcSalvar().catch(e=>{console.error(e);gtErr(v47(e)?v47Msg:e.message||'Não foi possível salvar.')});
   const P=dP(),cli=cliAtual(),t=GTR;
   if(a==='dup')return gtDup(t);
@@ -10741,6 +10748,11 @@ async function gtAcao(a,b){
         const {data:mvs,error:e4}=await sb.from('fin_movimentos').insert(qu.flatMap(x=>dvDivide(jConta,r2(x.valor),jDv,$('gj_forma')?.value||row.forma).map(pt=>({cliente_id:cli.id,conta_id:pt.conta,data:jData,tipo:GT.dlg==='pagar'?'saida':'entrada',valor:r2(pt.valor),juros:0,desconto:0,titulo_id:x.id,
           descricao:row.descricao||(GT.dlg==='pagar'?'Pagamento':'Recebimento')+(x.parcelas>1?` ${x.parcela}/${x.parcelas}`:''),pessoa_nome:row.pessoa_nome,documento:row.documento,categoria:row.categoria,forma:pt.forma||row.forma||null})))).select('*');
         if(e4){console.error(e4);jaErr=true}
+        else if(b?.dataset.conc==='1'&&GT.gc){const o=GT.gc.ofx,ms=mvs||[],m=ms.find(x=>x.conta_id===o.conta_id&&Math.abs(+x.valor-Math.abs(+o.valor))<0.005)||ms.find(x=>x.conta_id===o.conta_id)||ms[0];
+          GT.concR={lig:0,man:0};if(m){const {error:e6}=await sb.from('fin_movimentos').update({ofx_id:o.id,conciliado:true}).eq('id',m.id);if(e6)console.error(e6);else GT.concR={lig:1,man:0}}
+          // linha que está numa tarefa: o lançamento entra, mas a tarefa continua aberta para seguir o curso (ex.: devolução pendente) (Carol, 19/11)
+          const tk=m&&GC.tar?.[o.id];if(tk){const {error:e7}=await sb.from('tarefa_lancamentos').update({mov_id:m.id}).eq('ofx_id',o.id).is('removido_em',null);if(e7)console.error(e7);
+            const {error:e8}=await sb.from('tarefa_comentarios').insert({tarefa_id:tk.tarefa_id,texto:`Lançado na conciliação: ${row.pessoa_nome||''} · ${row.categoria||'sem categoria'} · ${fm(Math.abs(+o.valor))} em ${dBR(o.data)}. A tarefa continua aberta.`,sistema:true,autor:ME.user_id});if(e8)console.error(e8)}}
         else if(b?.dataset.conc==='1'){try{GT.concR=await concLigar(mvs||[])}catch(e){console.error(e);GT.concR={lig:0,man:0}}}
         else if(gb){const c=GFC.lista.find(x=>x.id===jConta);
           const {error:e5}=await sb.from('contas_pagar').update({conferido:true,pago_em:jData,banco:c?.conta_bc||c?.nome||null}).eq('id',gb.bol.id);if(e5)console.error(e5)}}
@@ -10761,7 +10773,7 @@ async function gtAcao(a,b){
     const dids=!t&&GT.dupIds?.length?GT.dupIds:null;GT.dupIds=null;
     if(dids)dupFeito(msg,async()=>{dupChk(await sb.from('fin_movimentos').delete().in('titulo_id',dids));await sb.from('documentos').delete().in('registro_id',dids).then(()=>{},()=>{});
       dupChk(await sb.from('fin_titulos').delete().in('id',dids));GT.key='';renderGT()});else toast(msg)}
-    GT.concR=null;dlgGT.close();GT.key='';renderGT();
+    GT.concR=null;dlgGT.close();GT.key='';if(GT.gc&&VIEW==='gfconc'){GT.gc=null;renderGC()}else renderGT();
   }else if(a==='baixa'){
     const data=$('gb_data').value,conta=$('gb_conta').value,valor=parseMoney($('gb_valor').value),juros=parseMoney($('gb_juros').value)||0,desconto=parseMoney($('gb_desconto').value)||0;
     if(!data)return gtErr('Informe a data.');if(!conta)return gtErr('Escolha a conta. Se não houver, cadastre em Gestão financeira › Contas bancárias.');
@@ -14170,7 +14182,7 @@ function gcDesenha(){
       :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
     const outra=gcOutraPessoa(l,s==='conc'?(GC.soma?.[l.id]||[m]):g?.k==='mov'?[g.mov]:g?.k==='tit'?[g.tit]:g?.k==='rem'?[...(g.ms||[]),...(g.ts||[])]:[]);
     const celO=outra?` <span class="chip c-bad" title="O banco mostra que o dinheiro foi para “${esc(outra.banco)}”, mas o lançamento é de “${esc(outra.sis)}”. Confira se a chave Pix ou a conta do cadastro é mesmo dessa pessoa; se não for, gere uma tarefa e corrija o cadastro.">⚠ Pago para outra pessoa?</span>`:'';
-    const celT=s!=='conc'&&GC.tar?.[l.id]?` <span class="chip c-done" title="Está na tarefa “${esc(GC.tar[l.id].tarefas?.titulo||'')}”">📋 Em tarefa</span>`:'';
+    const celT=GC.tar?.[l.id]?` <span class="chip c-done" title="Está na tarefa “${esc(GC.tar[l.id].tarefas?.titulo||'')}”">📋 Em tarefa</span>`:'';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
       :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> <button type="button" class="btn small" data-gc="liga" title="Escolher os lançamentos do sistema (ou contas em aberto) que formam esta linha do banco">Ligar</button> ${ok('ignora')}Ignorar</button>`;
     // visual em cartões, como no Bom Controle (Carol, 19/11): extrato à esquerda, lançamento do sistema à direita
@@ -14204,7 +14216,7 @@ $('gcfLimpa').onclick=()=>{['gcfData','gcfHist','gcfValor','gcfLanc'].forEach(id
 $('gcHead').addEventListener('change',e=>{if(e.target.id!=='gcTodas')return;const rows=gcFiltradas().filter(l=>gcSit(l)!=='conc');rows.forEach(l=>e.target.checked?GC.sel.add(l.id):GC.sel.delete(l.id));gcDesenha()});
 $('gcBody').addEventListener('change',e=>{if(!e.target.classList.contains('gcck'))return;const id=e.target.closest('tr').dataset.id;e.target.checked?GC.sel.add(id):GC.sel.delete(id);gcDesenha()});
 $('gcBody').addEventListener('click',async e=>{const b=e.target.closest('[data-gc]');if(!b)return;const l=GC.linhas.find(x=>x.id===b.closest('tr').dataset.id),a=b.dataset.gc;
-  if(a==='lanca')return abrirGC([l]);
+  if(a==='lanca')return gcLancaCompleto(l);
   if(a==='liga')return gclAbre(l);
   b.disabled=true;
   try{
@@ -14376,6 +14388,15 @@ $('gcArq').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f|
   $('gcConta').value=c.id;$('gcIni').value=o.ini&&o.ini<=d0?o.ini:d0;$('gcFim').value=o.fim&&o.fim>=d1?o.fim:d1;$('gcFiltro').value=novas.length||soma.length?'pend':'todas';
   renderGC();
 };
+// "+ Lançar" de uma linha abre a tela normal de conta a pagar ou a receber, já preenchida com a linha do banco,
+// com documentos, anexos e todos os campos; salva pago e conciliado com esta linha (Carol, 19/11)
+async function gcLancaCompleto(l){
+  const P=+l.valor<0,cli=cliAtual();let doc=null;
+  if(l.documento)try{doc=(await gfPessoasDe(cli.id,P?'fornecedor':'cliente')).find(p=>soDig(p.documento)===l.documento)||null}catch(e){console.error(e)}
+  GTBOL=null;
+  await abrirGT(null,P?'pagar':'receber',{gc:l,vencimento:l.data,valor:Math.abs(+l.valor),descricao:l.nome||l.memo||'',conta_id:GC.conta.id,
+    categoria:sugerirCat(l.nome||'',l.memo)||'',pessoa_nome:doc?pesNome(doc):''});
+}
 // lançar uma ou várias linhas: lançamento novo, transferência entre contas ou baixa de uma conta em aberto
 async function abrirGC(ls){
   if(!ls.length)return;const tipo=ls[0].valor>0?'entrada':'saida';
@@ -14415,7 +14436,7 @@ async function abrirGC(ls){
   const modo=()=>{const v=$('gc_modo').value;$('gc_titBox').hidden=v!=='tit';if($('gc_somaBox'))$('gc_somaBox').hidden=v!=='soma';$('gc_destBox').hidden=v!=='transf';$('gtdBody').querySelectorAll('[data-novo]').forEach(x=>x.hidden=v!=='novo');
     $('gc_lembraBox').hidden=$('gc_padBox').hidden=$('gc_descBox').hidden=v==='tit'||v==='soma';if(v==='transf'&&!$('gc_desc').value)$('gc_desc').value='Transferência entre contas'};
   $('gc_modo').onchange=modo;modo();
-  $('gtdFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="gc_salvar">Salvar e conciliar</button>`;
+  $('gtdFoot').innerHTML=`<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button>${um?'<button type="button" class="btn" data-act="gc_completo" title="Abre a tela normal de lançamento: documentos, anexos, competência, parcelas">📄 Lançamento completo</button>':''}<button type="button" class="btn primary" data-act="gc_salvar">Salvar e conciliar</button>`;
   dlgGT.showModal();
 }
 async function gcSalvar(){
