@@ -14047,7 +14047,7 @@ async function gcTarefa(ls){
   let tar=ts?.[0];
   if(!tar){const {data,error}=await sb.from('tarefas').insert({cliente_id:cid,titulo:tit,
       descricao:'Linhas do extrato que ninguém soube identificar na conciliação bancária. Descubra do que se trata cada uma (com o cliente, o banco ou o comprovante), lance ou ligue na Gestão financeira › Conciliação bancária e valide aqui.',
-      status:'afazer',prioridade:'media',interna:true,executor:adm.user_id,executor_nome:adm.nome,criado_por:ME.user_id,criado_por_nome:ME.nome}).select('id,titulo').single();
+      status:'afazer',prioridade:'normal',interna:true,executor:adm.user_id,executor_nome:adm.nome,criado_por:ME.user_id,criado_por_nome:ME.nome}).select('id,titulo').single();
     if(error)throw error;tar=data}
   const {error}=await sb.from('tarefa_lancamentos').insert(novos.map(l=>({tarefa_id:tar.id,cliente_id:cid,ofx_id:l.id,criado_por:ME.user_id,
     resumo:`${dBR(l.data)} · ${GC.conta.nome} · ${histDe(l)} · ${fm(l.valor)}${obs.trim()?' · '+obs.trim():''}`})));if(error)throw error;

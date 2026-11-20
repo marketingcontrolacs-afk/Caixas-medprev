@@ -2,6 +2,8 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 22:25 · conta 2 · `fix/conciliacao-tarefa-prioridade`:** "Gerar tarefa" dava erro porque a prioridade 'media' não existe. Os valores aceitos em `tarefas.prioridade` são baixa, normal, alta e urgente. Corrigido para 'normal'.
+
 - **19/11/2026 22:20 · conta 2 · branch `fix/conciliacao-transferencia-entre-contas`**
   - **Conciliação:** reconhece transferência entre contas da empresa (`GC.outras`, sugestão `k:'transf'`), e o Ligar mostra lançamentos de outras contas, com os de valor igual primeiro.
   - **Novo `docs/financeiro/REGRAS.md`:** reúne as regras e os casos reais do financeiro (conciliação, remessa, repasse, rotina). **Leia antes de mexer nessas telas.**
