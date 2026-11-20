@@ -13969,11 +13969,26 @@ function gcSugestoes(){
     // remessa de pagamentos: a soma dos pagamentos da remessa (mesma conta, pagamento até 3 dias da linha) bate com o total do banco
     if(tipo==='saida'){const rm=gcRemessaDe(l,usadosM,usadosT);if(rm){rm.ms.forEach(x=>usadosM.add(x.id));rm.ts.forEach(x=>usadosT.add(x.id));
       GC.sug[l.id]={k:'rem',...rm,txt:`Remessa nº ${rm.rem.nsa} (${rm.n} ${rm.n===1?'pagamento':'pagamentos'}): ${rm.nomes.slice(0,6).join(', ')}${rm.nomes.length>6?` e mais ${rm.nomes.length-6}`:''}`};continue}}
+    // linha somada pelo extrato (vários Pix do mesmo dia com o mesmo histórico): cada valor da soma é um lançamento
+    // já feito ou uma conta em aberto (ex.: repasses já pagos no Contas a pagar). Sugere ligar todos nesta linha (Carol, 19/11)
+    {const sm=gcSomaDe(l,usadosM,usadosT);if(sm){sm.ms.forEach(x=>usadosM.add(x.id));sm.ts.forEach(x=>usadosT.add(x.id));
+      GC.sug[l.id]={k:'rem',rem:null,...sm,txt:`${sm.n} ${sm.ms.length===sm.n?'já lançados':'lançamentos'}: ${sm.nomes.slice(0,6).join(', ')}${sm.nomes.length>6?` e mais ${sm.nomes.length-6}`:''}`};continue}}
     const r=GC.regras.filter(x=>x.tipo===tipo&&l.padrao&&l.padrao.includes(x.padrao)).sort((a,b)=>b.padrao.length-a.padrao.length)[0];
     if(r)GC.sug[l.id]={k:'regra',regra:r,txt:r.conta_destino?`Transferência ${tipo==='saida'?'para':'de'} ${contaNome(r.conta_destino)||'outra conta'}`:[r.descricao,r.categoria].filter(Boolean).join(' · ')||'Lançamento da regra'};
   }
 }
 // pagamentos de uma remessa que somam a linha do banco: cada um é o lançamento já pago (sem conciliar) ou a conta em aberto
+function gcSomaDe(l,usM,usT){
+  const its=Array.isArray(l.itens)?l.itens:[];if((+l.qtd||its.length)<2||its.length<2)return null;
+  const tipo=l.valor>0?'entrada':'saida',ms=[],ts=[],pegM=new Set(),pegT=new Set(),perto=d=>Math.abs(difDias(d,l.data));
+  for(const i of its){const v=Math.abs(+i.v);
+    const m=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&!usM.has(x.id)&&!pegM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&perto(x.data)<=3).sort((a,b)=>perto(a.data)-perto(b.data))[0];
+    if(m){ms.push(m);pegM.add(m.id);continue}
+    const t=GC.tits.filter(x=>!usT.has(x.id)&&!pegT.has(x.id)&&x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(r2(x.valor-(GC.pago[x.id]||0))-v)<0.005&&perto(x.vencimento)<=10).sort((a,b)=>perto(a.vencimento)-perto(b.vencimento))[0];
+    if(t){ts.push(t);pegT.add(t.id);continue}
+    return null}
+  const nomes=[...ms.map(m=>m.pessoa_nome||m.descricao||''),...ts.map(t=>t.pessoa_nome||t.descricao||'')].filter(Boolean);
+  return {ms,ts,n:ms.length+ts.length,nomes}}
 function gcRemessaDe(l,usM,usT){const v=Math.abs(l.valor);
   for(const r of GC.rems||[]){const its=r.itens;if(!its.length)continue;
     const d=its.map(i=>i.data_pagamento).filter(Boolean).sort()[0]||String(r.gerado_em).slice(0,10);if(Math.abs(difDias(d,l.data))>3)continue;
