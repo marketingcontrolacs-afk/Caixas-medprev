@@ -35,3 +35,6 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
 
 ## Cadastro único (fornecedores/clientes)
 1. **Duplicados "… - Mpa"** vindos do Bom Controle: os de mesmo nome foram juntados ao cadastro completo em 19/11; a cópia dos apagados está em `fin_pessoas_mescladas`. Com CNPJ/CPF diferente (filial), não juntar.
+
+- **Ligar a lançamento já conciliado (Carol, 19/11):** no 🔗 Ligar, "Mostrar também os já conciliados" lista os lançamentos já ligados a outra linha. Trocar de linha pede confirmação e a linha antiga volta a ficar pendente. Lançamento de mesmo valor aparece em qualquer data (±60 dias do período).
+- **Linha em tarefa (Carol, 19/11):** dá para lançar ou ligar a linha mesmo com a tarefa aberta; a tarefa continua aberta (ex.: devolução pendente de quem recebeu errado).
