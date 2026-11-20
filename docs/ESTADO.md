@@ -2,6 +2,8 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 00:45 · conta 2 · `feat/conciliacao-visual-cartoes`:** a Conciliação bancária ficou em cartões lado a lado: o extrato do banco à esquerda (borda vermelha na saída, verde na entrada) e o lançamento do sistema à direita (verde se conciliada, amarelo se sugestão, tracejado se sem lançamento), com um ícone de ligação no meio. O estilo é próprio, só inspirado no Bom Controle. Mesmas ações e filtros, inclusive o Ligar.
+
 - **20/11/2026 00:30 · conta 2 · branch `fix/conciliacao-casar-pelo-nome`**
   - **Problema:** com vários pagamentos de mesmo valor no mesmo dia, a conciliação ligava os lançamentos às linhas trocadas, porque olhava só o valor e a data. Casos na MPA PB: Pandolfo × MR Cardiologia, Fanchin × Emme, Cleverson × Gpmed, Schmidt × Dallstella, Nono × Pozenato e outros.
   - **Correção nos dados:** os 12 vínculos trocados foram corrigidos direto no banco.
