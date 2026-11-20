@@ -2,6 +2,10 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 02:25 · conta 2 · `feat/botao-atualizar`:** botão **⟳ Atualizar** no alto, em todas as telas (ao lado de Sair). Busca de novo os dados da tela aberta sem limpar os filtros e a busca digitados (zera os caches `GT.key`, `GFKEY`, `PESLISTA`, `GFP`, `GFPT`, `GFC`, `PR`, `NFP` e chama `openView()`).
+  - **Dados (pedido da Carol):** estornados (apagados) os lançamentos de R$ 500 da Emme (relatório 13/11) e da MR Cardiologia (relatório 19/11), que estavam com datas trocadas. As contas voltaram a ficar em aberto e as linhas do banco (Emme 12/11, MR 19/11) ficaram pendentes na conciliação, para ela refazer. **Regra:** quando a Carol pedir para estornar, não corrigir nem criar lançamento; só desfazer.
+  - O pagamento do Milton (06/11) foi lançado pela própria Carol e ficou, sem conciliação.
+
 - **20/11/2026 00:45 · conta 2 · `feat/conciliacao-visual-cartoes`:** a Conciliação bancária ficou em cartões lado a lado: o extrato do banco à esquerda (borda vermelha na saída, verde na entrada) e o lançamento do sistema à direita (verde se conciliada, amarelo se sugestão, tracejado se sem lançamento), com um ícone de ligação no meio. O estilo é próprio, só inspirado no Bom Controle. Mesmas ações e filtros, inclusive o Ligar.
 
 - **20/11/2026 00:30 · conta 2 · branch `fix/conciliacao-casar-pelo-nome`**

@@ -360,6 +360,9 @@ header.top .topin{padding-block:12px}
 .who{color:rgba(255,255,255,.72)}.who b{color:#fff}
 header.top #btnSair{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.28);color:#fff}
 header.top #btnSair:hover{background:rgba(255,255,255,.2)}
+header.top #btnAtualiza{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.28);color:#fff;margin-right:6px}
+header.top #btnAtualiza:hover{background:rgba(255,255,255,.2)}
+header.top #btnAtualiza:disabled{opacity:.6}
 .ctxbar>span{color:rgba(255,255,255,.75)}
 .ctxbar select{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.28);color:#fff;border-radius:10px}
 .ctxbar select:hover{background:rgba(255,255,255,.16)}
@@ -579,7 +582,7 @@ dialog[open]#dlgNov{display:flex;flex-direction:column}#dlgNov .db{flex:1 1 auto
   header.top .topin{gap:8px 10px;padding-block:8px}
   .logo img{height:28px}.logo .chip-logo{padding:3px 7px;border-radius:8px}.logo small{display:none}
   .who{font-size:11px;line-height:1.2}.who b{font-size:12.5px}
-  header.top #btnSair{padding:4px 10px}
+  header.top #btnSair,header.top #btnAtualiza{padding:4px 10px}
   .ctxbar{order:9;flex:1 1 100%;max-width:none}.ctxbar>span{display:none}.ctxbar select{padding:6px 10px;font-size:14px}
   /* módulos: pílulas menores numa linha que corre para o lado */
   .mods{gap:2px;padding-block:4px}
@@ -747,6 +750,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     <span class="spacer"></span>
     <nav class="topmods" id="topmods" aria-label="Controlacs, Configurações e Ajuda" hidden></nav>
     <div class="who" id="who" hidden></div>
+    <button class="btn small" id="btnAtualiza" hidden title="Busca de novo os dados desta tela, sem perder os filtros que você digitou">⟳ Atualizar</button>
     <button class="btn small" id="btnSair" hidden>Sair</button>
   </div>
   <div class="modrow" id="modrow" hidden>
@@ -3014,7 +3018,7 @@ function soVerBanner(){$('soVerBanner').hidden=!VIEW||podeExec(VIEW)||telaSemEmp
 function show(view){
   ['loading','loginForm','viewPend','app'].forEach(v=>$(v).hidden=v!==view);document.body.classList.toggle('lg',view==='loginForm'||view==='viewPend');$('modrow').hidden=view!=='app';if(view!=='app')megaFecha();
   if(view==='loginForm')lgPrepara();
-  const logged=view!=='loginForm'&&view!=='loading';$('btnSair').hidden=!logged;$('who').hidden=!logged;
+  const logged=view!=='loginForm'&&view!=='loading';$('btnSair').hidden=!logged;$('btnAtualiza').hidden=!logged;$('who').hidden=!logged;
 }
 async function boot(){
   const {data:{session}}=await sb.auth.getSession();
@@ -3066,6 +3070,18 @@ $('loginForm').addEventListener('submit',async e=>{
   lgGuarda($('lgEmail').value.trim(),$('lgSenha').value);
   boot();
 });
+// Botão Atualizar no alto: busca de novo os dados da tela aberta e mantém os filtros e a busca
+// digitados (Carol, 19/11). Zera só as listas guardadas em memória para não reaproveitar dados antigos.
+$('btnAtualiza').onclick=()=>{
+  const b=$('btnAtualiza'),y=scrollY;b.disabled=true;
+  try{
+    if(typeof GT!=='undefined')GT.key='';GFKEY='';PESLISTA=null;
+    if(typeof GFP!=='undefined')GFP.key='';if(typeof GFPT!=='undefined')GFPT.cid=null;if(typeof GFC!=='undefined')GFC.cid='';
+    if(typeof PR!=='undefined')PR.key='';if(typeof NFP!=='undefined')NFP.key='';
+    openView();toast('Tela atualizada');
+  }catch(e){console.error(e);toast('Não foi possível atualizar')}
+  setTimeout(()=>{scrollTo(0,y);b.disabled=false},700);
+};
 $('btnSair').onclick=async()=>{SAINDO=true;await sb.auth.signOut();location.reload()};
 // Sessão expirada (Carol, 13/11: as férias "sumiram" porque o login tinha vencido e o banco devolveu tudo vazio).
 // Ao voltar para a aba e a cada 2 minutos confere o login; se venceu e não renova, volta para a tela de entrar com o aviso,
