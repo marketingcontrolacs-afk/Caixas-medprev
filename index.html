@@ -1840,6 +1840,17 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <div class="db" id="bolBody"></div>
   <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="trazer">Trazer os marcados</button></div>
 </dialog>
+<!-- conciliação: ligar uma linha do banco a vários lançamentos do sistema (Carol, 19/11) -->
+<dialog id="dlgGCL" style="max-width:980px;width:96vw">
+  <form method="dialog" novalidate>
+    <div class="dh"><h2>Ligar a lançamentos do sistema</h2></div>
+    <div class="db"><p class="note" id="gclLinha" style="margin:0"></p>
+      <div class="row" style="gap:8px;margin:10px 0;flex-wrap:wrap"><input id="gclBusca" placeholder="Buscar nome, descrição ou valor" style="max-width:320px"><label class="note" style="display:inline-flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="gclLonge" style="width:auto"> Mostrar datas mais distantes</label></div>
+      <div class="tablebox" style="margin:0;max-height:48vh;overflow:auto"><table><thead><tr><th></th><th>Data</th><th class="l">Lançamento no sistema</th><th>Valor</th></tr></thead><tbody id="gclBody"></tbody></table></div>
+      <p id="gclTot" style="margin:10px 0 0;font-weight:600"></p><p class="err" id="gclErr" hidden></p></div>
+    <div class="df"><span class="spacer"></span><button type="button" class="btn ghost" id="gclFecha">Fechar</button><button type="button" class="btn primary" id="gclOk" disabled>Conciliar</button></div>
+  </form>
+</dialog>
 <dialog id="dlgGF">
   <form id="gfForm" novalidate>
     <div class="dh"><h2 id="gfTitle"></h2></div>
@@ -13978,6 +13989,35 @@ function gcSugestoes(){
   }
 }
 // pagamentos de uma remessa que somam a linha do banco: cada um é o lançamento já pago (sem conciliar) ou a conta em aberto
+// Ligar (Carol, 19/11): a pessoa escolhe os lançamentos do sistema e as contas em aberto que formam a linha do banco
+// (ex.: o banco somou 4 Pix numa linha). Quando a soma bate, concilia tudo nesta linha, como a remessa (ofx_soma).
+const GCL={l:null,sel:new Set()};
+function gclCands(){const l=GCL.l,tipo=l.valor>0?'entrada':'saida',lim=$('gclLonge').checked?60:15,q=$('gclBusca').value.trim().toLowerCase(),usados=new Set();
+  GC.linhas.forEach(x=>{if(x.id!==l.id&&GC.sug[x.id]?.k==='mov')usados.add(GC.sug[x.id].mov.id)});
+  const ms=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&x.tipo===tipo&&Math.abs(difDias(x.data,l.data))<=lim).map(x=>({k:'m',id:x.id,o:x,data:x.data,valor:+x.valor,txt:[x.pessoa_nome,x.descricao,x.categoria].filter(Boolean).join(' · ')||'lançamento',obs:usados.has(x.id)?'sugerido em outra linha':''}));
+  const ts=GC.tits.filter(x=>x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(difDias(x.vencimento,l.data))<=lim*2).map(x=>({k:'t',id:x.id,o:x,data:x.vencimento,valor:r2(x.valor-(GC.pago[x.id]||0)),txt:(x.tipo==='pagar'?'Conta a pagar: ':'Conta a receber: ')+[x.pessoa_nome,x.descricao].filter(Boolean).join(' · '),obs:'em aberto · venc.'}));
+  return [...ms,...ts].filter(c=>!q||c.txt.toLowerCase().includes(q)||fm(c.valor).replace(/[^\d,]/g,'').includes(q.replace(/[^\d,]/g,'')||'§'))
+    .sort((a,b)=>(GCL.sel.has(b.k+b.id)-GCL.sel.has(a.k+a.id))||Math.abs(difDias(a.data,l.data))-Math.abs(difDias(b.data,l.data))||b.valor-a.valor)}
+function gclDesenha(){const l=GCL.l,v=Math.abs(+l.valor),cs=gclCands();
+  $('gclBody').innerHTML=cs.map(c=>`<tr><td><input type="checkbox" data-gcl="${c.k+c.id}" style="width:auto"${GCL.sel.has(c.k+c.id)?' checked':''}></td><td>${dBR(c.data)}</td><td class="l" style="white-space:normal">${esc(c.txt)}${c.obs?` <span class="muted">${esc(c.obs)}${c.k==='t'?' '+dBR(c.data):''}</span>`:''}</td><td>${fm(c.valor)}</td></tr>`).join('')
+    ||'<tr><td></td><td class="l muted" colspan="3">Nenhum lançamento sem conciliação perto desta data. Marque “Mostrar datas mais distantes” ou use Lançar.</td></tr>';
+  const tot=gclSoma(),falta=r2(v-tot),ok=GCL.sel.size&&Math.abs(falta)<0.005;
+  $('gclTot').innerHTML=`Selecionados: ${GCL.sel.size} · ${fm(tot)} de ${fm(v)} · `+(ok?'<span class="pos">a soma bate ✓</span>':`<span class="neg">${falta>0?'faltam':'passou'} ${fm(Math.abs(falta))}</span>`);
+  $('gclOk').disabled=!ok}
+GCL.mapa=()=>{const m=new Map();GC.movs.forEach(x=>m.set('m'+x.id,{k:'m',o:x,valor:+x.valor}));GC.tits.forEach(x=>m.set('t'+x.id,{k:'t',o:x,valor:r2(x.valor-(GC.pago[x.id]||0))}));return m};
+function gclSoma(){const m=GCL.mapa();return r2([...GCL.sel].reduce((a,k)=>a+(m.get(k)?.valor||0),0))}
+function gclAbre(l){GCL.l=l;GCL.sel=new Set();$('gclBusca').value='';$('gclLonge').checked=false;$('gclErr').hidden=true;
+  $('gclLinha').innerHTML=`Banco: <b>${dBR(l.data)}</b> · ${esc(histDe(l))} · <b class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</b>${l.qtd>1?`<br>O banco somou ${l.qtd} lançamentos: ${(l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + ')}`:''}<br>Marque os lançamentos do sistema (ou as contas em aberto) que formam esta linha. Quando a soma bater, clique em Conciliar.`;
+  gclDesenha();$('dlgGCL').showModal()}
+$('gclBody').addEventListener('change',e=>{const k=e.target.dataset.gcl;if(!k)return;e.target.checked?GCL.sel.add(k):GCL.sel.delete(k);gclDesenha()});
+$('gclBusca').oninput=gclDesenha;$('gclLonge').onchange=gclDesenha;$('gclFecha').onclick=()=>$('dlgGCL').close();
+$('gclOk').onclick=async()=>{const l=GCL.l,m=GCL.mapa(),it=[...GCL.sel].map(k=>m.get(k)).filter(Boolean);
+  const ms=it.filter(x=>x.k==='m').map(x=>x.o),ts=it.filter(x=>x.k==='t').map(x=>x.o);
+  // linhas que tinham estes lançamentos como sugestão deixam de ter
+  GC.linhas.forEach(x=>{const g=GC.sug[x.id];if(x.id!==l.id&&g&&(g.mov&&ms.includes(g.mov)||g.tit&&ts.includes(g.tit)||(g.ms||[]).some(y=>ms.includes(y))||(g.ts||[]).some(y=>ts.includes(y))))delete GC.sug[x.id]});
+  GC.sug[l.id]={k:'rem',rem:null,ms,ts,n:it.length,nomes:[],txt:''};
+  $('gclOk').disabled=true;try{await gcAprovar([l]);$('dlgGCL').close();renderGC()}
+  catch(err){console.error(err);delete GC.sug[l.id];$('gclErr').textContent=err.message||'Não foi possível conciliar.';$('gclErr').hidden=false;$('gclOk').disabled=false}};
 function gcSomaDe(l,usM,usT){
   const its=Array.isArray(l.itens)?l.itens:[];if((+l.qtd||its.length)<2||its.length<2)return null;
   const tipo=l.valor>0?'entrada':'saida',ms=[],ts=[],pegM=new Set(),pegT=new Set(),perto=d=>Math.abs(difDias(d,l.data));
@@ -14024,7 +14064,7 @@ function gcDesenha(){
       :s==='ign'?'<span class="chip c-none">Ignorada</span>'
       :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
-      :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> ${ok('ignora')}Ignorar</button>`;
+      :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> <button type="button" class="btn small" data-gc="liga" title="Escolher os lançamentos do sistema (ou contas em aberto) que formam esta linha do banco">Ligar</button> ${ok('ignora')}Ignorar</button>`;
     return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
     ||`<tr><td></td><td class="l muted" colspan="5">${GC.linhas.length?'Nada neste filtro.':'Nenhuma linha do banco neste período. Use “Importar OFX”.'}</td></tr>`;
   const n=s=>GC.linhas.filter(l=>gcSit(l)===s).length,E=r2(GC.linhas.filter(l=>l.valor>0).reduce((x,l)=>x+(+l.valor),0)),S=r2(GC.linhas.filter(l=>l.valor<0).reduce((x,l)=>x-l.valor,0));
@@ -14050,6 +14090,7 @@ $('gcHead').addEventListener('change',e=>{if(e.target.id!=='gcTodas')return;cons
 $('gcBody').addEventListener('change',e=>{if(!e.target.classList.contains('gcck'))return;const id=e.target.closest('tr').dataset.id;e.target.checked?GC.sel.add(id):GC.sel.delete(id);gcDesenha()});
 $('gcBody').addEventListener('click',async e=>{const b=e.target.closest('[data-gc]');if(!b)return;const l=GC.linhas.find(x=>x.id===b.closest('tr').dataset.id),a=b.dataset.gc;
   if(a==='lanca')return abrirGC([l]);
+  if(a==='liga')return gclAbre(l);
   b.disabled=true;
   try{
     if(a==='aprova'){const rem=GC.sug[l.id]?.k==='rem';await gcAprovar([l]);if(rem){b.disabled=false;return renderGC()}}   // remessa: recarrega a tela (contas pagas saem das sugestões)
@@ -14098,7 +14139,7 @@ async function gcAprovar(ls){
     else if(g.k==='rem'){   // remessa: liga os pagamentos já lançados e dá baixa nas contas em aberto, todos nesta linha do banco
       const ids=g.ms.map(x=>x.id);if(ids.length){const {error}=await sb.from('fin_movimentos').update({ofx_soma:l.id,conciliado:true}).in('id',ids);if(error)throw error}
       for(const t of g.ts){const falta=r2(t.valor-(GC.pago[t.id]||0));
-        novos.push(...await pernasFatura(t,{...gcMov({...l,qtd:1,valor:-falta},{titulo_id:t.id,descricao:t.descricao||'Pagamento',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria}),ofx_id:null,ofx_soma:l.id}));
+        novos.push(...await pernasFatura(t,{...gcMov({...l,qtd:1,valor:l.valor<0?-falta:falta},{titulo_id:t.id,descricao:t.descricao||'Pagamento',pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria}),ofx_id:null,ofx_soma:l.id}));
         if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}}
     else{const r=g.regra;usos[r.id]=(usos[r.id]||0)+1;
       if(r.conta_destino){const tid=crypto.randomUUID(),base={descricao:r.descricao||'Transferência entre contas',transf_id:tid};
