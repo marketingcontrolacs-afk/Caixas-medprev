@@ -36,3 +36,7 @@ Os detalhes de uso estão em `INSTRUCOES.md`.
 - `admissao/{token}/{arquivo}`: documentos que o colaborador envia pelo formulário.
 - `admissao/{token}/retorno/{arquivo}`: o que o colaborador devolve (ASO, comprovante da conta salário…).
 - `admissao/{token}/equipe/{arquivo}`: o que o RH envia ao colaborador (guia, carta…).
+
+
+## 20/11/2026: quem é cliente
+`sol_eh_cliente(cli)`: perfil operador com `cliente_id = cli` **ou** qualquer linha em `acessos` dessa empresa. `sol_ve_tudo_cliente(cli)`: o mesmo, mas só para o tipo `cliente` (gestor). O colaborador vê só os chamados que abriu. Migration `sol_cliente_por_acesso_empresa`.

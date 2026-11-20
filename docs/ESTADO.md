@@ -2,6 +2,14 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 00:10 · conta 2 · banco**
+  - **Correção:** migration `sol_cliente_por_acesso_empresa`. `sol_eh_cliente` e `sol_ve_tudo_cliente` exigiam `acessos.modulo='solicitacoes'`, que não existe na regra do `acessos`, e o cliente com acesso por módulo não conseguia abrir chamado.
+    - Agora quem tem qualquer acesso à empresa abre chamados.
+    - O usuário tipo cliente (gestor) vê todos os da empresa; o colaborador vê só os que abriu.
+  - **Ambiente de teste:**
+    - "Empresa Teste" cadastrada no módulo Controlacs (`ctl_clientes`), com CNPJ fictício.
+    - Usuário de teste carol_santosp@outlook.com, renomeado "Gestor Teste (Empresa Teste)", com acesso aos módulos financeiros, de RH e tarefas da Empresa Teste.
+
 - **19/11/2026 23:55 · conta 2 · `feat/chamados-editar-mensagem`:** quem escreveu pode **editar** a própria mensagem na conversa da tarefa. Fica marcada como "editada". Banco: migration `tarefa_comentarios_editar` (coluna `editado_em` e política `op_editar`, só o autor e nunca mensagem do sistema).
 
 - **19/11/2026 23:45 · conta 2 · branch `feat/conciliacao-transf-extratos`**
