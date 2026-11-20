@@ -1112,7 +1112,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
       <label class="f" data-rnf>Situação<select id="rnSitF"><option value="">Todas</option><option value="falta">Falta pagar</option><option value="sem">Sem empresa (sem conta a pagar)</option><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="pago">Pagos</option><option value="conciliado">Conciliados</option></select></label>
       <label class="f" data-rnf>Chave Pix<select id="rnPixF" title="Filtra pelo cadastro do parceiro na empresa escolhida"><option value="">Todos</option><option value="com">Com chave Pix cadastrada</option><option value="sem">Sem chave Pix cadastrada</option></select></label>
       <label class="f" data-rnf>Empresa<select id="rnEmpF"></select></label>
-      <input id="rnBusca" data-rnf placeholder="Buscar parceiro ou protocolo" style="max-width:240px">
+      <input id="rnBusca" data-rnf placeholder="Buscar em qualquer coluna: parceiro, valor, Pix, empresa…" style="max-width:340px" title="Procura no parceiro, CPF/CNPJ, guias, valor, valor da NF, nota fiscal, conta e Pix, Pagar em, situação e protocolo">
     </div>
     <div id="rnTilesTg" hidden style="display:flex;justify-content:flex-end;margin-top:10px"><button type="button" class="btn small ghost" id="rnTilesBtn" title="Mostra ou esconde os quadros de valores do relatório"></button></div>
     <div class="tiles" id="rnTiles"></div>
@@ -18114,8 +18114,24 @@ function rnFiltrados(){
       if(k==='semEmp'&&it.empresa_id||k==='semConta'&&rnTemConta(p())||k==='semPix'&&p()?.pix_chave||k==='alt'&&!rnAlt(it))return false}
     if(P.length===1&&(P[0]==='com')!==!!p()?.pix_chave)return false;
     if(E.length&&!E.some(k=>k==='-'?!it.empresa_id:it.empresa_id===k))return false;
-    return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)});
+    return !qd||rnChave(it.nome).includes(q)||(it.protocolo||'').includes(qd)||rnBuscaTudo(it,qd)});
 }
+// busca em todas as colunas do repasse (Carol, 19/11): parceiro, CPF/CNPJ, guias, valor, valor da NF, nota fiscal,
+// conta e Pix, Pagar em, situação e protocolo. Valor pode ser digitado como 17020, 17.020 ou 17.020,00.
+function rnBuscaTudo(it,qd){
+  const nz=x=>String(x??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),q=nz(qd).replace(/\s+/g,' ');
+  const p=rnParc(it,it.empresa_id),nf=rnNf(it),st=rnStatus(it),t=it.titulo_id&&RN.tits[it.titulo_id],sit=RNSIT[rnSitDe(it)];
+  const txt=nz([it.nome,it.protocolo,nf?.cpf_cnpj,p?.cpf_cnpj,p?.nome,p?.titular,p?.pix_chave,p?.pix_tipo,p?.banco,
+    p?rnConta(p).replace(/<[^>]*>/g,' '):'parceiro não cadastrado',it.guias,sit&&sit[0],
+    it.empresa_id?rnEmpNome(it.empresa_id):'sem empresa falta escolher',RNST[st]&&RNST[st][0],
+    rnPago(it)?'já pago':it.empresa_id&&it.titulo_id?'já separado':'',t?.vencimento&&dBR(t.vencimento),t?.data&&dBR(t.data)].filter(x=>x!=null&&x!=='').join(' | ')).replace(/\s+/g,' ');
+  if(txt.includes(q))return true;
+  // valores: 17020 / 17.020 / 17.020,00 / R$ 17.020,00
+  const qv=qd.replace(/r\$|\s/gi,'');
+  if(/^\d[\d.]*(,\d{0,2})?$/.test(qv)){const qn=qv.replace(/\./g,'');
+    return [it.valor,t?.valor,rnVNF(it),it.bruto].some(v=>v!=null&&fm(+v).replace(/[^\d,]/g,'').startsWith(qn))}
+  // CPF/CNPJ, chave Pix ou conta digitados só com números
+  const qdig=soDig(qd);return qdig.length>=4&&soDig(txt).includes(qdig)}
 // boleto no repasse (Carol, 19/11): opcional, para o parceiro que recebe por boleto; vai na remessa como boleto
 function rnBolHtml(t,it){if(!t&&(!it||it.titulo_id))return '';
   // boleto guardado no repasse, ainda sem conta a pagar (Carol, 19/11; v165): não vai para a remessa até ela mandar

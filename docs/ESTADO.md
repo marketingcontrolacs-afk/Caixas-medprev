@@ -2,6 +2,10 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 21:10 · conta 2 · branch `feat/repasse-busca-todas-colunas`**
+  - Parceiros MP › Repasse: a busca procura em **todas as colunas** (`rnBuscaTudo`): parceiro, CPF/CNPJ, guias, valor, valor da NF, nota fiscal, conta e Pix, Pagar em, situação e protocolo.
+  - O valor pode ser digitado como 17020, 17.020 ou 17.020,00.
+
 - **19/11/2026 20:55 · conta 2 · branch `feat/conciliacao-total-selecao`**
   - Conciliação bancária: a barra "N linhas selecionadas" agora mostra o **total** das linhas marcadas. Se forem só saídas ou só entradas, mostra o total delas; se forem as duas, mostra o saldo, com entradas e saídas separadas.
 
