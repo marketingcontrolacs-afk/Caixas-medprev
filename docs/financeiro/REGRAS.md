@@ -38,3 +38,5 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
 
 - **Ligar a lançamento já conciliado (Carol, 19/11):** no 🔗 Ligar, "Mostrar também os já conciliados" lista os lançamentos já ligados a outra linha. Trocar de linha pede confirmação e a linha antiga volta a ficar pendente. Lançamento de mesmo valor aparece em qualquer data (±60 dias do período).
 - **Linha em tarefa (Carol, 19/11):** dá para lançar ou ligar a linha mesmo com a tarefa aberta; a tarefa continua aberta (ex.: devolução pendente de quem recebeu errado).
+
+- **Sem lançamento avulso (Carol, 20/11):** todo lançamento novo entra pela conta a pagar ou a receber (pago na hora com "$ Salvar quitado"). A única exceção é a transferência entre contas. Os antigos sem conta (histórico do Bom Controle) ficam como estão e abrem como Pagamento ou Recebimento.
