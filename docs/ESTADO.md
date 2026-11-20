@@ -2,6 +2,11 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 22:00 · conta 2 · branch `fix/conciliacao-linha-somada`**
+  - **Problema:** na conciliação bancária, quando o extrato soma vários Pix do mesmo dia com o mesmo histórico numa linha só (`fin_ofx.qtd > 1`, `itens` com os valores), a linha aparecia "Sem lançamento", mesmo com cada Pix já lançado ou pago no Contas a pagar. Isso abria o risco de lançar de novo. Caso: Platano em 05/11, MPA PB, 4 Pix somando R$ 7.317,44.
+  - **Correção:** novo `gcSomaDe`: cada valor de `itens` procura um lançamento ainda não conciliado (mesmo valor, até 3 dias) ou uma conta em aberto (até 10 dias).
+    - Se todos baterem, vira sugestão do tipo `rem`: ao aprovar, liga os lançamentos com `ofx_soma` e dá baixa nas contas.
+
 - **19/11/2026 21:10 · conta 2 · branch `feat/repasse-busca-todas-colunas`**
   - Parceiros MP › Repasse: a busca procura em **todas as colunas** (`rnBuscaTudo`): parceiro, CPF/CNPJ, guias, valor, valor da NF, nota fiscal, conta e Pix, Pagar em, situação e protocolo.
   - O valor pode ser digitado como 17020, 17.020 ou 17.020,00.
