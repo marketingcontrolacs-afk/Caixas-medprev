@@ -2,6 +2,8 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 03:25 · conta 2 · `feat/avulso-igual-conta`:** o Lançamento avulso ficou na mesma ordem da conta a pagar e a receber (Fornecedor ou Cliente, Descrição, Documento, Categoria, Tipo, Data, Valor) e ganhou **Forma de pagamento** (`fin_movimentos.forma`). Com isso, as três entradas de lançamento usam o mesmo desenho: conta a pagar/receber, avulso e o "+ Lançar" da Conciliação (que já abre a conta a pagar/receber). Rodapé igual: Apagar, Duplicar, Fechar, Salvar.
+
 - **20/11/2026 03:10 · conta 2 · `feat/desconciliar-rapido`:** na Movimentação financeira e nas Contas a pagar e a receber, clicar no ícone 🔗 da situação (ou na etiqueta "✓ Conciliado") desconcilia direto, só com a mensagem de confirmação, sem abrir o lançamento. Se não estiver conciliado, o mesmo ícone concilia com o extrato já importado. **Regra (Carol):** ações rápidas, sem abrir tela.
 
 - **20/11/2026 02:50 · conta 2 · `fix/avulso-desconciliar`:** o **Lançamento avulso** (lançamento sem conta a pagar ou receber, ex.: restituição importada do Bom Controle) agora mostra se está conciliado, com **Desconciliar** ou **🔗 Conciliar**, como a conta a pagar e a receber (`gxConcBox`, ações `av_desconc` e `av_conc`). **Pendente:** a Carol pediu que a tela de lançamento seja igual em todos os lugares (conta a pagar/receber × avulso × conciliação); hoje são três telas diferentes.
