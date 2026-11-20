@@ -2,6 +2,10 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 22:20 · conta 2 · branch `fix/conciliacao-transferencia-entre-contas`**
+  - **Conciliação:** reconhece transferência entre contas da empresa (`GC.outras`, sugestão `k:'transf'`), e o Ligar mostra lançamentos de outras contas, com os de valor igual primeiro.
+  - **Novo `docs/financeiro/REGRAS.md`:** reúne as regras e os casos reais do financeiro (conciliação, remessa, repasse, rotina). **Leia antes de mexer nessas telas.**
+
 - **19/11/2026 22:20 · conta 2 · branch `feat/conciliacao-gerar-tarefa`**
   - **Banco:** migration `tarefa_lancamentos_ofx_id`, nova coluna `tarefa_lancamentos.ofx_id` (FK para `fin_ofx`, `on delete set null`).
   - **Conciliação bancária:** selecione linhas e use **📋 Gerar tarefa** (`gcTarefa`, só para o escritório).

@@ -19,6 +19,9 @@ Este arquivo é lido pelo Claude em **qualquer conta** que abrir este repositór
 3. Evite que as duas contas mexam no `index.html` ao mesmo tempo. Se precisar, combine pelo `docs/ESTADO.md`.
 4. Mudança no banco: aplique pelo Supabase (migration com nome descritivo) e registre em `docs/` o que mudou. **Não** versione o SQL.
 
+## Regras já decididas
+- **Financeiro (conciliação, remessa, repasse, rotina diária):** `docs/financeiro/REGRAS.md`. Leia antes de mexer nessas telas.
+
 ## Módulos em construção
 - **Solicitações + Admissão** (portal de chamados dos clientes, conversa, documentos, admissão com link para o novo colaborador, guia do ASO e ficha para a contabilidade).
   - **Especificação completa:** `docs/solicitacoes/INSTRUCOES.md`
