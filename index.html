@@ -13924,6 +13924,9 @@ async function renderGC(recarrega=true){
       // linhas que estão numa tarefa para descobrir do que se trata (Carol, 19/11)
       GC.tar={};try{for(let i=0;i<l.length;i+=200){const {data:tl}=await sb.from('tarefa_lancamentos').select('ofx_id,tarefa_id,validado_em,tarefas(titulo,status,arquivada)').in('ofx_id',l.slice(i,i+200).map(x=>x.id)).is('removido_em',null);
         (tl||[]).forEach(x=>{if(!x.validado_em&&x.tarefas&&x.tarefas.status!=='concluida'&&!x.tarefas.arquivada)GC.tar[x.ofx_id]=x})}}catch(e){console.error(e)}
+      // transferência entre contas da empresa (Carol, 19/11): a saída/entrada pode já estar lançada na outra conta como avulsa
+      // (ex.: Pix do PagBank para o Inter lançado só no PagBank). Carrega os lançamentos das outras contas ainda sem par.
+      GC.outras=[];try{GC.outras=(await todas(()=>sb.from('fin_movimentos').select('id,conta_id,cliente_id,data,tipo,valor,descricao,pessoa_nome,categoria,titulo_id,transf_id').eq('cliente_id',c.cliente_id).neq('conta_id',c.id).is('transf_id',null).is('titulo_id',null).gte('data',de).lte('data',ate)))||[]}catch(e){console.error(e)}
       GC.linhas=l;GC.movs=m;GC.regras=rg;GC.pago={};mt.forEach(x=>GC.pago[x.titulo_id]=r2((GC.pago[x.titulo_id]||0)+abat(x)));
       GC.tits=t.filter(x=>r2(x.valor-(GC.pago[x.id]||0))>0.004);GC.sel.clear();
       // remessas de pagamento desta conta: o banco mostra a remessa numa linha só com o total (Carol, 13/11)
@@ -13973,7 +13976,7 @@ function gcSugestoes(){
   // uma linha do banco que é a soma de vários lançamentos do sistema (ex.: remessa de repasses) (Carol, 13/11)
   GC.soma={};GC.movs.forEach(m=>{if(m.ofx_soma&&m.conciliado)(GC.soma[m.ofx_soma]||=[]).push(m)});
   Object.entries(GC.soma).forEach(([id,ms])=>{if(!GC.conc[id])GC.conc[id]=ms[0]});
-  const usadosM=new Set(),usadosT=new Set();
+  const usadosM=new Set(),usadosT=new Set(),usadosO=new Set();
   for(const l of GC.linhas){if(GC.conc[l.id]||l.ignorado)continue;
     const tipo=l.valor>0?'entrada':'saida',v=Math.abs(l.valor),perto=(a,b)=>Math.abs(difDias(a,l.data))-Math.abs(difDias(b,l.data));
     const m=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&!usadosM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
@@ -13987,6 +13990,9 @@ function gcSugestoes(){
     // já feito ou uma conta em aberto (ex.: repasses já pagos no Contas a pagar). Sugere ligar todos nesta linha (Carol, 19/11)
     {const sm=gcSomaDe(l,usadosM,usadosT);if(sm){sm.ms.forEach(x=>usadosM.add(x.id));sm.ts.forEach(x=>usadosT.add(x.id));
       GC.sug[l.id]={k:'rem',rem:null,...sm,txt:`${sm.n} ${sm.ms.length===sm.n?'já lançados':'lançamentos'}: ${sm.nomes.slice(0,6).join(', ')}${sm.nomes.length>6?` e mais ${sm.nomes.length-6}`:''}`};continue}}
+    // transferência: o mesmo valor saiu (ou entrou) em outra conta da empresa até 3 dias antes ou depois, lançado sem par
+    {const o=(GC.outras||[]).filter(x=>!usadosO.has(x.id)&&x.tipo!==tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
+      if(o){usadosO.add(o.id);GC.sug[l.id]={k:'transf',mov:o,txt:`Transferência ${tipo==='entrada'?'de':'para'} ${contaNome(o.conta_id)||'outra conta'} (${dBR(o.data)}${o.descricao?' · '+o.descricao:''})`};continue}}
     const r=GC.regras.filter(x=>x.tipo===tipo&&l.padrao&&l.padrao.includes(x.padrao)).sort((a,b)=>b.padrao.length-a.padrao.length)[0];
     if(r)GC.sug[l.id]={k:'regra',regra:r,txt:r.conta_destino?`Transferência ${tipo==='saida'?'para':'de'} ${contaNome(r.conta_destino)||'outra conta'}`:[r.descricao,r.categoria].filter(Boolean).join(' · ')||'Lançamento da regra'};
   }
@@ -13999,15 +14005,18 @@ function gclCands(){const l=GCL.l,tipo=l.valor>0?'entrada':'saida',lim=$('gclLon
   GC.linhas.forEach(x=>{if(x.id!==l.id&&GC.sug[x.id]?.k==='mov')usados.add(GC.sug[x.id].mov.id)});
   const ms=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&x.tipo===tipo&&Math.abs(difDias(x.data,l.data))<=lim).map(x=>({k:'m',id:x.id,o:x,data:x.data,valor:+x.valor,txt:[x.pessoa_nome,x.descricao,x.categoria].filter(Boolean).join(' · ')||'lançamento',obs:usados.has(x.id)?'sugerido em outra linha':''}));
   const ts=GC.tits.filter(x=>x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(difDias(x.vencimento,l.data))<=lim*2).map(x=>({k:'t',id:x.id,o:x,data:x.vencimento,valor:r2(x.valor-(GC.pago[x.id]||0)),txt:(x.tipo==='pagar'?'Conta a pagar: ':'Conta a receber: ')+[x.pessoa_nome,x.descricao].filter(Boolean).join(' · '),obs:'em aberto · venc.'}));
-  return [...ms,...ts].filter(c=>!q||c.txt.toLowerCase().includes(q)||fm(c.valor).replace(/[^\d,]/g,'').includes(q.replace(/[^\d,]/g,'')||'§'))
-    .sort((a,b)=>(GCL.sel.has(b.k+b.id)-GCL.sel.has(a.k+a.id))||Math.abs(difDias(a.data,l.data))-Math.abs(difDias(b.data,l.data))||b.valor-a.valor)}
+  // lançamento sem par em outra conta da empresa (ex.: Pix do PagBank para o Inter): liga como transferência (Carol, 19/11)
+  const os=(GC.outras||[]).filter(x=>x.tipo!==tipo&&Math.abs(difDias(x.data,l.data))<=lim).map(x=>({k:'o',id:x.id,o:x,data:x.data,valor:+x.valor,txt:`Transferência ${tipo==='entrada'?'de':'para'} ${contaNome(x.conta_id)||'outra conta'}: ${[x.pessoa_nome,x.descricao].filter(Boolean).join(' · ')||'lançamento'}`,obs:'outra conta'}));
+  const V=Math.abs(+l.valor);
+  return [...ms,...ts,...os].filter(c=>!q||c.txt.toLowerCase().includes(q)||fm(c.valor).replace(/[^\d,]/g,'').includes(q.replace(/[^\d,]/g,'')||'§'))
+    .sort((a,b)=>(GCL.sel.has(b.k+b.id)-GCL.sel.has(a.k+a.id))||((Math.abs(b.valor-V)<0.005)-(Math.abs(a.valor-V)<0.005))||((b.valor<=V)-(a.valor<=V))||Math.abs(difDias(a.data,l.data))-Math.abs(difDias(b.data,l.data))||b.valor-a.valor)}
 function gclDesenha(){const l=GCL.l,v=Math.abs(+l.valor),cs=gclCands();
   $('gclBody').innerHTML=cs.map(c=>`<tr><td><input type="checkbox" data-gcl="${c.k+c.id}" style="width:auto"${GCL.sel.has(c.k+c.id)?' checked':''}></td><td>${dBR(c.data)}</td><td class="l" style="white-space:normal">${esc(c.txt)}${c.obs?` <span class="muted">${esc(c.obs)}${c.k==='t'?' '+dBR(c.data):''}</span>`:''}</td><td>${fm(c.valor)}</td></tr>`).join('')
     ||'<tr><td></td><td class="l muted" colspan="3">Nenhum lançamento sem conciliação perto desta data. Marque “Mostrar datas mais distantes” ou use Lançar.</td></tr>';
   const tot=gclSoma(),falta=r2(v-tot),ok=GCL.sel.size&&Math.abs(falta)<0.005;
   $('gclTot').innerHTML=`Selecionados: ${GCL.sel.size} · ${fm(tot)} de ${fm(v)} · `+(ok?'<span class="pos">a soma bate ✓</span>':`<span class="neg">${falta>0?'faltam':'passou'} ${fm(Math.abs(falta))}</span>`);
   $('gclOk').disabled=!ok}
-GCL.mapa=()=>{const m=new Map();GC.movs.forEach(x=>m.set('m'+x.id,{k:'m',o:x,valor:+x.valor}));GC.tits.forEach(x=>m.set('t'+x.id,{k:'t',o:x,valor:r2(x.valor-(GC.pago[x.id]||0))}));return m};
+GCL.mapa=()=>{const m=new Map();(GC.outras||[]).forEach(x=>m.set('o'+x.id,{k:'o',o:x,valor:+x.valor}));GC.movs.forEach(x=>m.set('m'+x.id,{k:'m',o:x,valor:+x.valor}));GC.tits.forEach(x=>m.set('t'+x.id,{k:'t',o:x,valor:r2(x.valor-(GC.pago[x.id]||0))}));return m};
 function gclSoma(){const m=GCL.mapa();return r2([...GCL.sel].reduce((a,k)=>a+(m.get(k)?.valor||0),0))}
 function gclAbre(l){GCL.l=l;GCL.sel=new Set();$('gclBusca').value='';$('gclLonge').checked=false;$('gclErr').hidden=true;
   $('gclLinha').innerHTML=`Banco: <b>${dBR(l.data)}</b> · ${esc(histDe(l))} · <b class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</b>${l.qtd>1?`<br>O banco somou ${l.qtd} lançamentos: ${(l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + ')}`:''}<br>Marque os lançamentos do sistema (ou as contas em aberto) que formam esta linha. Quando a soma bater, clique em Conciliar.`;
@@ -14015,6 +14024,10 @@ function gclAbre(l){GCL.l=l;GCL.sel=new Set();$('gclBusca').value='';$('gclLonge
 $('gclBody').addEventListener('change',e=>{const k=e.target.dataset.gcl;if(!k)return;e.target.checked?GCL.sel.add(k):GCL.sel.delete(k);gclDesenha()});
 $('gclBusca').oninput=gclDesenha;$('gclLonge').onchange=gclDesenha;$('gclFecha').onclick=()=>$('dlgGCL').close();
 $('gclOk').onclick=async()=>{const l=GCL.l,m=GCL.mapa(),it=[...GCL.sel].map(k=>m.get(k)).filter(Boolean);
+  const os=it.filter(x=>x.k==='o');
+  if(os.length&&it.length>1){$('gclErr').textContent='A transferência de outra conta é ligada sozinha: marque só ela (o valor tem que ser o mesmo da linha do banco).';$('gclErr').hidden=false;return}
+  if(os.length){GC.sug[l.id]={k:'transf',mov:os[0].o,txt:''};$('gclOk').disabled=true;
+    try{await gcAprovar([l]);$('dlgGCL').close();renderGC()}catch(err){console.error(err);delete GC.sug[l.id];$('gclErr').textContent=err.message||'Não foi possível conciliar.';$('gclErr').hidden=false;$('gclOk').disabled=false}return}
   const ms=it.filter(x=>x.k==='m').map(x=>x.o),ts=it.filter(x=>x.k==='t').map(x=>x.o);
   // linhas que tinham estes lançamentos como sugestão deixam de ter
   GC.linhas.forEach(x=>{const g=GC.sug[x.id];if(x.id!==l.id&&g&&(g.mov&&ms.includes(g.mov)||g.tit&&ts.includes(g.tit)||(g.ms||[]).some(y=>ms.includes(y))||(g.ts||[]).some(y=>ts.includes(y))))delete GC.sug[x.id]});
@@ -14160,6 +14173,11 @@ async function gcAprovar(ls){
     if(g.k==='mov'){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',g.mov.id);if(error)throw error;n++}
     else if(g.k==='tit'){const t=g.tit;novos.push(...await pernasFatura(t,gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})));
       if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}
+    else if(g.k==='transf'){   // liga como transferência: lança nesta conta e marca o lançamento da outra conta como a outra perna
+      const tid=crypto.randomUUID();const {error}=await sb.from('fin_movimentos').update({transf_id:tid,categoria:null,validar:null}).eq('id',g.mov.id);if(error)throw error;
+      // o aviso “a validar” e o item de tarefa desse lançamento ficam resolvidos (achou a outra conta)
+      {const {error:e2}=await sb.from('tarefa_lancamentos').update({validado_em:new Date().toISOString(),validado_por:ME.user_id}).eq('mov_id',g.mov.id).is('validado_em',null);if(e2)console.error(e2)}
+      novos.push(gcMov(l,{descricao:'Transferência entre contas',transf_id:tid}));GC.outras=(GC.outras||[]).filter(x=>x.id!==g.mov.id)}
     else if(g.k==='rem'){   // remessa: liga os pagamentos já lançados e dá baixa nas contas em aberto, todos nesta linha do banco
       const ids=g.ms.map(x=>x.id);if(ids.length){const {error}=await sb.from('fin_movimentos').update({ofx_soma:l.id,conciliado:true}).in('id',ids);if(error)throw error}
       for(const t of g.ts){const falta=r2(t.valor-(GC.pago[t.id]||0));
