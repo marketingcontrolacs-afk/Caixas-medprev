@@ -2,6 +2,13 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 22:10 · conta 2 · branch `feat/conciliacao-ligar-varios`**
+  - Conciliação bancária: cada linha do banco ganhou o botão **Ligar** (diálogo `dlgGCL`, funções `gclAbre`, `gclDesenha` e outras).
+    - Mostra os lançamentos do sistema ainda não conciliados (mesmo tipo, até 15 dias; ou 60 com "datas mais distantes") e as contas em aberto, com caixa de seleção, busca e total.
+    - Quando a soma bate com a linha, concilia como a remessa (`k:'rem'`, `ofx_soma`) e dá baixa nas contas.
+  - No caminho `rem` do `gcAprovar`, a conta a receber agora entra com o valor positivo.
+  - **Pendente:** várias linhas do banco para um lançamento já existente (o contrário) ainda não dá. Hoje existe só o "Lançar juntas", que cria um lançamento novo.
+
 - **19/11/2026 22:00 · conta 2 · branch `fix/conciliacao-linha-somada`**
   - **Problema:** na conciliação bancária, quando o extrato soma vários Pix do mesmo dia com o mesmo histórico numa linha só (`fin_ofx.qtd > 1`, `itens` com os valores), a linha aparecia "Sem lançamento", mesmo com cada Pix já lançado ou pago no Contas a pagar. Isso abria o risco de lançar de novo. Caso: Platano em 05/11, MPA PB, 4 Pix somando R$ 7.317,44.
   - **Correção:** novo `gcSomaDe`: cada valor de `itens` procura um lançamento ainda não conciliado (mesmo valor, até 3 dias) ou uma conta em aberto (até 10 dias).
