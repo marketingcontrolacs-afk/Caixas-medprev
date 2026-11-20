@@ -22,6 +22,9 @@ Este arquivo é lido pelo Claude em **qualquer conta** que abrir este repositór
 ## Regras já decididas
 - **Financeiro (conciliação, remessa, repasse, rotina diária):** `docs/financeiro/REGRAS.md`. Leia antes de mexer nessas telas.
 
+## Chamados
+- Tarefas e Solicitações ficam no mesmo quadro, **Chamados** (Comunicação › Chamados), com 5 colunas. Detalhes em `docs/ESTADO.md` (19/11).
+
 ## Módulos em construção
 - **Solicitações + Admissão** (portal de chamados dos clientes, conversa, documentos, admissão com link para o novo colaborador, guia do ASO e ficha para a contabilidade).
   - **Especificação completa:** `docs/solicitacoes/INSTRUCOES.md`

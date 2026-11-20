@@ -305,6 +305,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 .kchips{display:flex;gap:4px;flex-wrap:wrap}.kchips .chip{font-size:11px;padding:2px 7px}
 /* CRM da Controlacs (Carol, 15/11): funil com 7 etapas, follow-ups, histórico e propostas */
 .kanban.crmfunil{grid-template-columns:repeat(7,minmax(184px,1fr))}
+.kanban.kch{grid-template-columns:repeat(5,minmax(220px,1fr))}   /* Chamados: 5 colunas (Carol, 19/11) */
 .crmsoma{font-size:12px;color:var(--muted);margin:-4px 4px 2px}
 #crmBar{flex-wrap:wrap;align-items:flex-end}#dlgCrm{width:min(860px,calc(100vw - 32px))}#crmBar[hidden]{display:none}#crmMaisF{display:none}@media (max-width:700px){#crmMaisF{display:inline-flex}#crmBar:not(.aberto) .crmf{display:none!important}}.crmlix{display:flex;align-items:center;gap:6px;font-size:14px;padding:0 4px 10px;white-space:nowrap}.crmlix input{width:auto}
 .crmvis{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}.crmvis button{border:0;background:var(--surface);color:var(--muted);font:600 13px var(--body);padding:8px 12px;cursor:pointer}
@@ -317,7 +318,7 @@ nav.side{display:grid;gap:3px;position:sticky;top:84px}
 #crmUndo{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;display:flex;gap:12px;align-items:center;background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:12px;box-shadow:var(--sh1);max-width:calc(100vw - 32px)}
 #crmUndo[hidden]{display:none}#crmUndo .btn{background:var(--surface);color:var(--ink)}
 @media (max-width:900px){.kanban.crmfunil{grid-template-columns:repeat(7,minmax(78vw,1fr))}.crmit{grid-template-columns:1fr auto}.crmit>span:first-child{grid-column:1/-1}}
-@media (max-width:900px){.kanban{grid-template-columns:repeat(4,minmax(78vw,1fr));scroll-snap-type:x mandatory}.kcol{scroll-snap-align:start}}
+@media (max-width:900px){.kanban{grid-template-columns:repeat(4,minmax(78vw,1fr));scroll-snap-type:x mandatory}.kanban.kch{grid-template-columns:repeat(5,minmax(78vw,1fr))}.kcol{scroll-snap-align:start}}
 .conv{display:grid;gap:8px;max-height:46vh;overflow:auto;padding-right:2px}
 .msg{border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:grid;gap:3px;font-size:14px}
 .msg .q{font-size:12px;color:var(--muted)}.msg .x{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -1380,17 +1381,17 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <!-- TAREFAS E RECADOS (Kanban) -->
   <section id="viewTar" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
-      <div><h1>Tarefas e recados</h1><p class="sub" id="tSub"></p></div>
-      <button class="btn primary" id="tNova">+ Nova tarefa</button>
+      <div><h1>Chamados</h1><p class="sub" id="tSub"></p></div>
+      <div class="row" style="gap:8px"><button class="btn" id="tNova">+ Tarefa interna</button><button class="btn primary" id="tNovoCh" type="button">+ Novo chamado</button></div>
     </div>
     <div class="alerta" id="tAlerta" hidden></div>
     <details class="card plist" id="tParc" hidden><summary id="tParcSum"></summary><div class="pl" id="tParcList"></div></details>
     <div class="toolbar">
-      <input id="tBusca" placeholder="Buscar tarefa" style="max-width:240px">
+      <input id="tBusca" placeholder="Buscar chamado ou tarefa" style="max-width:240px">
       <label class="f" id="tRespBox">Responsável<select id="tResp"></select></label>
       <label class="f">Concluídas<select id="tConc"><option value="30">Últimos 30 dias</option><option value="tudo">Todas</option><option value="nao">Esconder</option></select></label>
     </div>
-    <div class="kanban" id="tBoard"></div>
+    <div class="kanban kch" id="tBoard"></div>
     <p class="note" id="tNote"></p>
   </section>
 
@@ -2253,9 +2254,9 @@ const NAV=[
   {k:'docs',t:'Documentos',g:'Recursos humanos',s:'Cadastros',ok:()=>temAcesso('colab')},
   // o escritório vê os repasses no grupo Escritório; o cliente, no Financeiro
   {k:'avisos',t:'Avisos e notícias',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
-  {k:'tarefas',t:'Tarefas e recados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')},
+  {k:'tarefas',t:'Chamados',g:'Comunicação',s:'Mensagens',ok:()=>temAcesso('tarefas')||ehEsc()||ACESSOS.length>0||!!ME?.cliente_id},
   // pedidos dos clientes ao escritório, com conversa e admissão de colaboradores (Carol, 18/11)
-  {k:'solic',t:'Solicitações',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0||!!ME?.cliente_id},
+  {k:'solic',t:'Solicitações',g:'Comunicação',s:'Mensagens',ok:()=>false},   // entrou nos Chamados (Carol, 19/11); a tela continua para abrir a solicitação
   // planner diário de cada usuário; ninguém vê a agenda de outra pessoa (Carol, 04/11)
   {k:'agenda',t:'Agenda',g:'Comunicação',s:'Mensagens',ok:()=>ehEsc()||ACESSOS.length>0},
   // a equipe pede a criação ou a melhoria de algo e a administradora valida (Carol, 29/10)
@@ -2744,7 +2745,7 @@ function solDesenha(){
   const {s,msgs,anx,ev,adm,env}=SOL.det,t=solTipo(s.tipo_id),c=solCli(s.cliente_id),eq=ehEsc(),fech=['concluida','cancelada'].includes(s.status);
   const dd=s.dados||{},isAdm=solEhAdm(t);
   const acoes=eq?[...(s.responsavel!==ME.user_id&&!fech?[['assumir','Assumir']]:[]),...(!fech?[s.status!=='em_andamento'&&['st:em_andamento','Em andamento'],s.status!=='aguardando_cliente'&&['st:aguardando_cliente','Pedir algo ao cliente'],['st:concluida','Concluir']].filter(Boolean):[['st:em_andamento','Reabrir']])]:[];
-  let h=`<div><button type="button" class="btn small" data-solvolta="1">← Voltar</button></div>
+  let h=`<div><button type="button" class="btn small" data-solvolta="1">← Voltar aos Chamados</button></div>
   <div class="card sol-cab"><div><small>#${s.numero} · ${esc(t?t.nome:'')} · ${esc(c?c.nome:'')}</small><h2>${esc(s.titulo)}</h2>
     <small>Aberta por ${esc(s.criado_por_nome||'—')} em ${solDt(s.criado_em)} · Prazo ${s.prazo?solDt(s.prazo):'—'} · Responsável: ${esc(s.responsavel_nome||'ainda não definido')}</small>
     ${s.descricao?`<p style="margin:8px 0 0;white-space:pre-line">${esc(s.descricao)}</p>`:''}</div><span class="chip sol-st-${s.status}">${SOL_ST[s.status]}</span></div>`;
@@ -2890,7 +2891,7 @@ $('viewSol').addEventListener('click',async e=>{const b=e.target.closest('button
   if(b.id==='solNovaBtn'){SOL.novo={tipo:null};solNova();return}
   if(b.dataset.solf){SOL.filtro=b.dataset.solf;solLista();return}
   if(b.dataset.solabre){SOL.sel=b.dataset.solabre;solDet(SOL.sel);return}
-  if(b.dataset.solvolta){solSair();SOL.sel=null;solLista();return}
+  if(b.dataset.solvolta){solSair();SOL.sel=null;if(SOL.deCh!==false){SOL.deCh=false;SOL.tela='lista';return go('tarefas')}solLista();return}
   if(b.dataset.soltipo){const cli=$('solNCli')?.value;SOL.novo={tipo:b.dataset.soltipo,cli};solNova();return}
   if(b.id==='solNCriar'){solCriar();return}
   if(b.id==='solEnviar'){solEnviar();return}
@@ -14068,7 +14069,7 @@ async function gcTarefa(ls){
     if(obs.trim()){const {error:e3}=await sb.from('tarefa_comentarios').insert({tarefa_id:tar.id,cliente_id:cid,texto:obs.trim(),interno:true,autor_nome:ME.nome});if(e3)console.error(e3)}
     GC.tar[l.id]={tarefa_id:tar.id,tarefas:{titulo:tar.titulo}};n++}
   GC.sel.clear();gcDesenha();
-  toast(`${n} ${n===1?'tarefa criada':'tarefas criadas'} em Tarefas e recados (uma para cada linha)`)}
+  toast(`${n} ${n===1?'tarefa criada':'tarefas criadas'} em Chamados (uma para cada linha)`)}
 function gcSomaDe(l,usM,usT){
   const its=Array.isArray(l.itens)?l.itens:[];if((+l.qtd||its.length)<2||its.length<2)return null;
   const tipo=l.valor>0?'entrada':'saida',ms=[],ts=[],pegM=new Set(),pegT=new Set(),perto=d=>Math.abs(difDias(d,l.data));
@@ -14597,10 +14598,32 @@ dlgRep.addEventListener('click',ev=>{const el=ev.target.closest('[data-act]');if
 // =====================================================================
 // TAREFAS E RECADOS (Kanban com conversa em cada tarefa)
 // =====================================================================
-const TCOLS=[['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando terceiros'],['concluida','Concluída']];
+// Chamados (Carol, 19/11): tarefas e solicitações no mesmo quadro, com a coluna “Nova”
+const TCOLS=[['nova','Nova'],['afazer','A fazer'],['andamento','Em andamento'],['cliente','Aguardando cliente'],['concluida','Concluída']];
 const TPRI={baixa:['c-none','Baixa'],normal:['','Normal'],alta:['c-warn','Alta'],urgente:['c-bad','Urgente']};
 const SEMEMP='00000000-0000-0000-0000-000000000000';   // pasta dos anexos das tarefas sem empresa
-let TAR=[], TNOV={}, TARDLG=null, TEQUIPE=null, TDRAG=null;
+let TAR=[], TNOV={}, TARDLG=null, TEQUIPE=null, TDRAG=null, CHSOL=[], CHSOLNOV={};
+// solicitações dos clientes no quadro de Chamados (Carol, 19/11)
+async function chSolCarrega(v,todas,conc){
+  CHSOL=[];CHSOLNOV={};if(v==='int')return;await solBase();
+  let q=sb.from('sol_solicitacoes').select('id,numero,titulo,status,prioridade,prazo,responsavel,responsavel_nome,criado_por_nome,criado_em,atualizado_em,concluida_em,cliente_id,tipo_id').order('atualizado_em',{ascending:false}).limit(500);
+  if(!todas&&v)q=q.eq('cliente_id',v);else if(todas&&grupoSel())q=q.in('cliente_id',grupoSel().empresas);
+  if(conc==='nao')q=q.not('status','in','(concluida,cancelada)');
+  else if(conc==='30')q=q.or(`status.not.in.(concluida,cancelada),atualizado_em.gte.${new Date(Date.now()-30*864e5).toISOString()}`);
+  const [r,nt]=await Promise.all([q,sb.from('sol_notificacoes').select('solicitacao_id').eq('user_id',ME.user_id).is('lida_em',null)]);
+  if(r.error)throw r.error;CHSOL=r.data||[];(nt.data||[]).forEach(n=>{if(n.solicitacao_id)CHSOLNOV[n.solicitacao_id]=(CHSOLNOV[n.solicitacao_id]||0)+1})}
+const chSolCol=s=>s.status==='aberta'?(s.responsavel?'afazer':'nova'):s.status==='em_andamento'?'andamento':s.status==='aguardando_cliente'?'cliente':'concluida';
+function chSolFiltradas(){const busca=$('tBusca').value.trim().toLowerCase(),RS=msVals('tResp');
+  return CHSOL.filter(s=>(!busca||(`#${s.numero} ${s.titulo} ${SOL.tipos.find(t=>t.id===s.tipo_id)?.nome||''} ${s.criado_por_nome||''}`).toLowerCase().includes(busca))
+    &&(!ehEsc()||!RS.length||RS.some(r=>r==='meus'?s.responsavel===ME.user_id:r==='sem'?!s.responsavel:s.responsavel===r)))}
+function chSolCard(s,todas){
+  const nome=CLIENTES.find(c=>c.id===s.cliente_id)?.nome||'',tipo=SOL.tipos.find(t=>t.id===s.tipo_id)?.nome||'',nv=CHSOLNOV[s.id],aberta=!['concluida','cancelada'].includes(s.status);
+  const late=s.prazo&&aberta&&String(s.prazo).slice(0,10)<TODAY;
+  const chips=[`<span class="chip c-done" title="Pedido aberto pelo cliente">📨 #${s.numero}</span>`,tipo?`<span class="chip c-none">${esc(tipo)}</span>`:'',todas?`<span class="chip c-done">${esc(nome)}</span>`:'',
+    s.status==='cancelada'?'<span class="chip c-none">Cancelada</span>':'',s.prioridade==='urgente'||s.prioridade==='alta'?`<span class="chip c-bad">${s.prioridade==='urgente'?'Urgente':'Alta'}</span>`:''].join('');
+  const meta=[s.prazo?`<span class="${late?'late':''}">📅 ${late?'Atrasada · ':''}${dBR(String(s.prazo).slice(0,10)).slice(0,5)}</span>`:'',s.responsavel_nome?`<span title="Responsável">👤 ${esc(s.responsavel_nome)}</span>`:'',
+    s.criado_por_nome?`<span title="Quem pediu">🙋 ${esc(s.criado_por_nome)}</span>`:'',nv?`<span class="new">● ${nv===1?'1 novidade':nv+' novidades'}</span>`:''].join('');
+  return `<button type="button" class="kcard${nv?' novo':''}" data-sol="${s.id}" draggable="${ehEsc()}">${`<div class="kchips">${chips}</div>`}<div class="t">${esc(s.titulo)}</div>${meta?`<div class="m">${meta}</div>`:''}</button>`}
 const dtBR=s=>new Date(s).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
 const tLanca=t=>t.cliente_id?podeLancar(t.cliente_id,'tarefas'):ehEsc();
 // empresas em que o usuário pode abrir tarefa
@@ -14696,9 +14719,9 @@ $('dlgPend').addEventListener('click',async e=>{
 $('dlgPend').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-id]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tr.click()}});
 async function renderTarefas(){
   const e=ehEsc(),v=escCli.value,todas=v==='*';
-  $('tSub').textContent=e?'Tarefas da equipe e recados com os clientes. Arraste o cartão para mudar de coluna; clique para abrir a conversa.'
-    :'Mande pedidos e recados para a Controlacs e acompanhe o andamento. Clique numa tarefa para ver a conversa.';
-  $('tNova').hidden=!(e||tLancaEm().length);
+  $('tSub').textContent=e?'Pedidos dos clientes e tarefas da equipe num quadro só. Arraste o cartão para mudar de coluna; clique para abrir a conversa e o histórico.'
+    :'Abra um chamado para a Controlacs e acompanhe cada etapa. Clique no cartão para ver a conversa.';
+  $('tNova').hidden=!(e||tLancaEm().length);$('tNova').textContent=e?'+ Tarefa interna':'+ Recado';
   $('tRespBox').hidden=!e;
   const vazio=(t,cl)=>{$('tBoard').innerHTML=`<p class="${cl||'muted'}">${t}</p>`;$('tAlerta').hidden=true;$('tNote').textContent=''};
   if(!v){vazio('Nenhuma empresa liberada para tarefas.');return}
@@ -14711,7 +14734,7 @@ async function renderTarefas(){
   const conc=$('tConc').value;
   if(conc==='nao')q=q.neq('status','concluida');
   else if(conc==='30')q=q.or(`status.neq.concluida,concluida_em.gte.${new Date(Date.now()-30*864e5).toISOString()}`);
-  const [{data,error}]=await Promise.all([q.order('ordem'),tNovidades(),tEquipe(),ehEsc()?dirUsuarios():null]);
+  const [{data,error}]=await Promise.all([q.order('ordem'),tNovidades(),tEquipe(),ehEsc()?dirUsuarios():null,chSolCarrega(v,todas,conc).catch(err=>{console.error(err);CHSOL=[]})]);
   if(error){console.error(error);vazio(error.code==='42P01'||error.code==='PGRST205'||/tarefa/.test(error.message||'')?'Este módulo precisa da atualização v26 do banco. Rode o SQL no Supabase.':'Erro ao carregar. Verifique a internet e tente de novo.','neg');return}
   TAR=data||[];
   // filtro por pessoa: a equipe do escritório e quem já é responsável ou executor nas tarefas
@@ -14747,9 +14770,9 @@ function tCard(t,todas){
 function tDesenha(){
   const todas=escCli.value==='*'||escCli.value==='int',lista=tFiltradas();
   $('tBoard').innerHTML=TCOLS.map(([k,nome])=>{
-    const cs=lista.filter(t=>t.status===k);
+    const cs=lista.filter(t=>t.status===k),ss=chSolFiltradas().filter(x=>chSolCol(x)===k);
     if(k==='concluida')cs.sort((a,b)=>String(b.concluida_em).localeCompare(String(a.concluida_em)));
-    return `<div class="kcol" data-s="${k}"><h3>${nome}<span class="n">${cs.length}</span></h3><div class="klist">${cs.map(t=>tCard(t,todas)).join('')||'<p class="note" style="margin:4px">Nenhuma tarefa.</p>'}</div></div>`;
+    return `<div class="kcol" data-s="${k}"><h3>${nome}<span class="n">${cs.length+ss.length}</span></h3><div class="klist">${ss.map(x=>chSolCard(x,todas)).join('')}${cs.map(t=>tCard(t,todas)).join('')}${cs.length+ss.length?'':'<p class="note" style="margin:4px">Nada aqui.</p>'}</div></div>`;
   }).join('');
   const ab=TAR.filter(t=>t.status!=='concluida'),late=ab.filter(t=>t.prazo&&t.prazo<TODAY).length,
     nov=TAR.filter(t=>TNOV[t.id]).length,cli=ab.filter(t=>t.status==='cliente').length;
@@ -14762,14 +14785,23 @@ function tDesenha(){
 $('tBusca').oninput=()=>{clearTimeout(tDesenha.t);tDesenha.t=setTimeout(tDesenha,200)};
 $('tResp').onchange=tDesenha;$('tConc').onchange=renderTarefas;
 $('tNova').onclick=()=>abrirTarefa(null);
-$('tBoard').addEventListener('click',e=>{const c=e.target.closest('.kcard');if(c)abrirTarefa(TAR.find(t=>t.id===c.dataset.id))});
+$('tNovoCh').onclick=()=>{SOL.tela='nova';SOL.deCh=true;SOL.novo={tipo:null};go('solic')};
+$('tBoard').addEventListener('click',e=>{const c=e.target.closest('.kcard');if(!c)return;if(c.dataset.sol){SOL.sel=c.dataset.sol;SOL.tela='det';SOL.deCh=true;return go('solic')}abrirTarefa(TAR.find(t=>t.id===c.dataset.id))});
 // arrastar entre as colunas (no celular, muda-se a coluna dentro da tarefa)
-$('tBoard').addEventListener('dragstart',e=>{const c=e.target.closest('.kcard');if(!c)return;TDRAG=c.dataset.id;c.classList.add('drag');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',TDRAG)});
+$('tBoard').addEventListener('dragstart',e=>{const c=e.target.closest('.kcard');if(!c)return;TDRAG=c.dataset.sol?'sol:'+c.dataset.sol:c.dataset.id;c.classList.add('drag');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',TDRAG)});
 $('tBoard').addEventListener('dragend',e=>{e.target.closest('.kcard')?.classList.remove('drag');document.querySelectorAll('.kcol.over').forEach(x=>x.classList.remove('over'))});
 $('tBoard').addEventListener('dragover',e=>{const col=e.target.closest('.kcol');if(!col||!TDRAG)return;e.preventDefault();
   document.querySelectorAll('.kcol.over').forEach(x=>x!==col&&x.classList.remove('over'));col.classList.add('over')});
 $('tBoard').addEventListener('drop',async e=>{
   const col=e.target.closest('.kcol');if(!col||!TDRAG)return;e.preventDefault();col.classList.remove('over');
+  if(TDRAG.startsWith('sol:')){const s=CHSOL.find(x=>x.id===TDRAG.slice(4));TDRAG=null;if(!s||!ehEsc())return;const k=col.dataset.s;if(k===chSolCol(s))return;
+    // coluna → situação da solicitação; “A fazer” = aberta com responsável (assume quem arrastou, se ainda não tinha)
+    const up=k==='nova'?{status:'aberta',responsavel:null,responsavel_nome:null}:k==='afazer'?{status:'aberta',...(s.responsavel?{}:{responsavel:ME.user_id,responsavel_nome:ME.nome})}
+      :{status:{andamento:'em_andamento',cliente:'aguardando_cliente',concluida:'concluida'}[k]};
+    const antes={...s};Object.assign(s,up);tDesenha();
+    const {error}=await sb.from('sol_solicitacoes').update(up).eq('id',s.id);
+    if(error){Object.assign(s,antes);tDesenha();fail(error,'Não foi possível mover o chamado');return}
+    toast('Chamado #'+s.numero+' movido para “'+TCOLS.find(c=>c[0]===k)[1]+'”');return}
   const t=TAR.find(x=>x.id===TDRAG);TDRAG=null;if(!t)return;
   // posição: entre os cartões acima e abaixo do ponto em que soltou
   const cards=[...col.querySelectorAll('.kcard')].filter(c=>c.dataset.id!==t.id);
@@ -14881,7 +14913,7 @@ async function tAcao(act,btn){
   try{
     if(act==='salvar'){
       const titulo=$('td_titulo').value.trim();if(!titulo)return tdErr('Informe o título da tarefa.');
-      const r={titulo,descricao:$('td_desc').value.trim()||null,status:$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
+      const r={titulo,descricao:$('td_desc').value.trim()||null,status:!t&&!ehEsc()?'nova':$('td_status').value,prioridade:$('td_pri').value,prazo:$('td_prazo').value||null};
       if(e){r.responsavel=$('td_resp').value||null;r.interna=!!$('td_int')?.checked;if(window.V74)r.executor=$('td_exec').value||null}
       if(e&&$('td_rec')){r.recorrencia=$('td_rec').value||null;r.recorrencia_ate=r.recorrencia&&$('td_recAte').value||null;
         if(r.recorrencia&&!r.prazo)return tdErr('Para a tarefa repetir, informe o prazo da primeira vez.');

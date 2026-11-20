@@ -2,6 +2,18 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 23:30 · conta 2 · branch `feat/chamados`**
+  - **"Chamados":** junta as Tarefas e recados e as Solicitações num quadro só (`viewTar`), com 5 colunas: Nova › A fazer › Em andamento › Aguardando cliente › Concluída.
+  - **Banco:** migration `tarefas_status_nova`; `tarefas.status` aceita 'nova'. O recado criado pelo cliente começa em "Nova".
+  - **Solicitações no quadro:**
+    - As solicitações aparecem como cartões "📨 #nº" (`chSolCarrega`, `chSolCard`, `chSolCol`).
+    - Mapeamento: aberta sem responsável → Nova; aberta com responsável → A fazer; em_andamento → Em andamento; aguardando_cliente → Aguardando cliente; concluida/cancelada → Concluída.
+    - Arrastar muda a situação. "A fazer" assume quem arrastou como responsável.
+    - Clicar abre a solicitação. O "← Voltar aos Chamados" volta ao quadro (`SOL.deCh`).
+    - "+ Novo chamado" abre a nova solicitação (lista de serviços). "+ Tarefa interna", para o escritório, abre a tarefa.
+  - **Menu:** "Tarefas e recados" passou a se chamar "Chamados", e o item "Solicitações" saiu do menu. A tela `solic` continua existindo para abrir a solicitação.
+  - **Pendente:** a conversa da tarefa (`tarefa_comentarios`) e a da solicitação (`sol_mensagens`) continuam em tabelas separadas, cada uma com o seu histórico. Se quiser tudo numa tabela só, é uma migração maior.
+
 - **19/11/2026 23:00 · conta 2 · branch `feat/conciliacao-tarefa-por-linha`**
   - **Gerar tarefa (conciliação):** agora cria **uma tarefa por linha do banco**, com o título "Identificar: dd/mm · quem · valor". A observação vira a 1ª mensagem (interna) da conversa, e o item fica em `tarefa_lancamentos.ofx_id`.
     - A tarefa antiga que juntava duas linhas foi dividida em duas e arquivada.
