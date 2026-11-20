@@ -740,6 +740,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .gcc-lig{display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted,#5b6b70)}
 .gcc-lig.ok{color:#1d7a45}.gcc-lig.sug{color:#9a6200}
 @media (max-width:900px){.gcpar{grid-template-columns:1fr}.gcc-lig{padding:2px 0}}
+#gtBody .stic b:nth-child(2){cursor:pointer}
 </style>
 </head>
 <body>
@@ -9127,7 +9128,7 @@ function optContas(ls,cli){
 }
 const somaMes=(iso,n)=>{const [y,m,d]=iso.split('-').map(Number),u=new Date(y,m-1+n+1,0).getDate();return isoLocal(new Date(y,m-1+n,Math.min(d,u),12))};
 // ícones de pago e conciliado nas listas (Carol, 05/11)
-const stIc=(pg,cc,P=true)=>`<span class="stic"><b class="${pg?'on':''}" title="${pg?(P?'Pago':'Recebido'):(P?'Não pago':'Não recebido')}">$</b><b class="${cc?'on':''}" title="${cc?'Conciliado com o extrato do banco':'Não conciliado'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></b></span>`;
+const stIc=(pg,cc,P=true)=>`<span class="stic"><b class="${pg?'on':''}" title="${pg?(P?'Pago':'Recebido'):(P?'Não pago':'Não recebido')}">$</b><b class="${cc?'on':''}" title="${cc?'Conciliado com o extrato do banco · clique para desconciliar':'Não conciliado · clique para conciliar'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></b></span>`;
 const movConc=m=>!!(m.ofx_id||m.conciliado);
 // conta criada pela conciliação com vários lançamentos do banco somados (Lançar juntas): mostra quantos e deixa detalhar (Carol, 13/11)
 const gtJuntos=t=>t.origem==='ofx'&&+((String(t.descricao||'').match(/\((\d+) lançamentos\)$/)||[])[1]||0);
@@ -9810,6 +9811,22 @@ $('gtHead').addEventListener('change',e=>{if(e.target.id!=='mvTodos')return;(GT.
 $('gtBody').addEventListener('click',e=>{const sj=e.target.closest('[data-gtsoma]');if(sj)return rpjSoma(sj.dataset.gtsoma);
   const gk=e.target.closest('[data-gtgsel]');if(gk){const tr=gk.closest('tr');(GT.tabRows||[]).filter(t=>gtGrupoK(t)===gk.dataset.gtgsel).forEach(t=>gk.checked?GT.sel.add(t.id):GT.sel.delete(t.id));return gtDesenha()}
   const gg=e.target.closest('tr[data-gtgrp]');if(gg){if(e.target.cellIndex===0)return;GT.abreG||=new Set();const k=gg.dataset.gtgrp;GT.abreG.has(k)?GT.abreG.delete(k):GT.abreG.add(k);return gtDesenha()}if(e.target.closest('[data-mvsel],[data-gtsel]')||e.target.querySelector?.('[data-mvsel],[data-gtsel]')&&e.target.tagName==='TD'&&e.target.cellIndex===0){const c=e.target.closest('td')?.querySelector('[data-mvsel],[data-gtsel]');if(c&&e.target!==c){c.checked=!c.checked;c.dispatchEvent(new Event('change',{bubbles:true}))}return}if(e.target.id==='mvMais'){MV.lim+=300;return gtDesenha()}const tr=e.target.closest('tr.click');if(tr)gtAbre(tr)});
+// Conciliar e desconciliar direto na lista, sem abrir o lançamento: clique no ícone 🔗 ou na etiqueta "✓ Conciliado"
+// e confirme na mensagem (Carol, 20/11)
+$('gtBody').addEventListener('click',async e=>{
+  const ic=e.target.closest('.stic b:nth-child(2)'),ch=e.target.closest('.chip');
+  if(!ic&&!(ch&&/Conciliado/.test(ch.textContent)))return;
+  const tr=e.target.closest('tr');if(!tr)return;
+  const mv=tr.dataset.mv,id=tr.dataset.id;let ms=[];
+  if(mv){const [k,x]=[mv.slice(0,1),mv.slice(2)];ms=k==='m'?(GT.todos||[]).filter(m=>m.id===x):(GT.movs[x]||[])}else if(id)ms=GT.movs[id]||[];
+  if(!ms.length)return;e.stopImmediatePropagation();e.preventDefault();
+  const cc=ms.filter(movConc);
+  try{
+    if(cc.length){if(!confirm(`Tem certeza que deseja desconciliar${cc.length>1?' estes '+cc.length+' lançamentos':''}?\n\nContinua ${cc[0].tipo==='entrada'?'recebido':'pago'}; só a ligação com o extrato do banco é desfeita e a linha do banco volta a ficar pendente na Conciliação.`))return;
+      const {error}=await sb.from('fin_movimentos').update({ofx_id:null,ofx_soma:null,conciliado:false}).in('id',cc.map(m=>m.id));if(error)throw error;toast(cc.length>1?cc.length+' lançamentos desconciliados':'Desconciliado')}
+    else{if(!confirm('Conciliar com o extrato do banco já importado? (mesma conta, mesmo valor, até 7 dias)'))return;toast(concTxt(await concLigar(ms)))}
+  }catch(err){return fail(err,'Não foi possível concluir')}
+  GT.key='';renderGT()},true);
 $('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return;const tr=e.target.closest('tr.click');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();gtAbre(tr)}});
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
