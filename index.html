@@ -14911,7 +14911,7 @@ async function tConversa(t){
   if(error){box.innerHTML='<p class="neg">Erro ao carregar a conversa.</p>';return}
   const urls=await signed((data||[]).filter(c=>c.anexo_caminho).map(c=>c.anexo_caminho));
   box.innerHTML=(data||[]).map(c=>c.sistema?`<div class="msg sys">${esc(c.autor_nome||'')} · ${esc(c.texto)} · ${dtBR(c.criado_em)}</div>`
-    :`<div class="msg${c.interno?' int':c.autor===ME.user_id?' mine':''}"><span class="q"><b>${esc(c.autor_nome||'?')}</b> · ${dtBR(c.criado_em)}${c.interno?' · nota interna':''}</span>${c.texto?`<span class="x">${esc(c.texto)}</span>`:''}${c.anexo_caminho?`<a href="${urls[c.anexo_caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(c.anexo_nome||'anexo')}</a>`:''}</div>`).join('')
+    :`<div class="msg${c.interno?' int':c.autor===ME.user_id?' mine':''}" data-cid="${c.id}"><span class="q"><b>${esc(c.autor_nome||'?')}</b> · ${dtBR(c.criado_em)}${c.interno?' · nota interna':''}${c.editado_em?` · <i title="Editada em ${dtBR(c.editado_em)}">editada</i>`:''}${c.autor===ME.user_id&&c.texto?' · <a href="#" data-tdedit="1">Editar</a>':''}</span>${c.texto?`<span class="x">${esc(c.texto)}</span>`:''}${c.anexo_caminho?`<a href="${urls[c.anexo_caminho]||'#'}" target="_blank" rel="noopener">📎 ${esc(c.anexo_nome||'anexo')}</a>`:''}</div>`).join('')
     ||'<p class="note" style="margin:0">Nenhuma mensagem ainda.</p>';
   box.scrollTop=box.scrollHeight;
   // marca como lida
@@ -14919,6 +14919,18 @@ async function tConversa(t){
   if(TNOV[t.id]){delete TNOV[t.id];NAVBADGE.tarefas=Object.keys(TNOV).length;renderNav();if(VIEW==='tarefas')tDesenha()}
 }
 const tdErr=x=>{$('tdErr').textContent=x;$('tdErr').hidden=false};
+// editar a própria mensagem da conversa (Carol, 19/11): fica marcada como “editada”
+$('tdBody').addEventListener('click',async e=>{
+  const ed=e.target.closest('[data-tdedit]'),sv=e.target.closest('[data-tdsalva]'),cc=e.target.closest('[data-tdcanc]');if(!ed&&!sv&&!cc)return;e.preventDefault();
+  const m=e.target.closest('.msg');if(!m)return;const x=m.querySelector('.x');
+  if(ed){if(m.querySelector('textarea'))return;m.dataset.orig=x.textContent;
+    x.innerHTML=`<textarea rows="3" style="width:100%;margin-top:4px">${esc(x.textContent)}</textarea><span class="row" style="gap:6px;margin-top:4px"><button type="button" class="btn small primary" data-tdsalva="1">Salvar</button><button type="button" class="btn small ghost" data-tdcanc="1">Cancelar</button></span>`;
+    x.querySelector('textarea').focus();return}
+  if(cc){x.textContent=m.dataset.orig||'';return}
+  const txt=x.querySelector('textarea').value.trim();if(!txt)return toast('A mensagem não pode ficar vazia.');
+  sv.disabled=true;const {error}=await sb.from('tarefa_comentarios').update({texto:txt,editado_em:new Date().toISOString()}).eq('id',m.dataset.cid);
+  if(error){sv.disabled=false;return fail(error,'Não foi possível salvar a mensagem')}
+  x.textContent=txt;const q=m.querySelector('.q');if(q&&!q.querySelector('i'))q.querySelector('[data-tdedit]')?.insertAdjacentHTML('beforebegin','<i>editada</i> · ');toast('Mensagem editada')});
 $('tdFoot').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b)tAcao(b.dataset.act,b)});
 $('tdBody').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b)tAcao(b.dataset.act,b)});
 async function tAcao(act,btn){

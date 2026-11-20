@@ -2,6 +2,8 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 23:55 · conta 2 · `feat/chamados-editar-mensagem`:** quem escreveu pode **editar** a própria mensagem na conversa da tarefa. Fica marcada como "editada". Banco: migration `tarefa_comentarios_editar` (coluna `editado_em` e política `op_editar`, só o autor e nunca mensagem do sistema).
+
 - **19/11/2026 23:45 · conta 2 · branch `feat/conciliacao-transf-extratos`**
   - **Conciliação:** com os extratos das duas contas importados e nada lançado, a linha ganha a sugestão "Transferência de/para <conta>? No extrato dela há…" (`GC.outrasL`, `k:'transfofx'`).
   - **Regra:** valor igual, sinal contrário, até 3 dias, mesma empresa.
