@@ -723,6 +723,20 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .sol-anx span{display:grid;gap:1px;min-width:0}.sol-anx small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
 .sol-svtab{width:100%;border-collapse:collapse}.sol-svtab th{text-align:left;font-size:12px;color:var(--muted);padding:4px 6px}.sol-svtab td{padding:4px 6px;vertical-align:middle}.sol-svtab input,.sol-svtab select{width:100%}.sol-inativo{opacity:.55}
 .sol-ev{display:grid;gap:1px;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}.sol-ev small{color:var(--muted);font-size:11px}
+
+/* conciliação em cartões (Carol, 19/11) */
+.gcrow>td{padding:6px 8px!important;border:0!important}
+.gcpar{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr);align-items:stretch;gap:0}
+.gcc{display:flex;gap:10px;align-items:flex-start;background:var(--surface,#fff);border:1px solid var(--line,#dce4e1);border-radius:12px;padding:10px 12px;min-height:64px}
+.gcc-ext.sai{border-bottom:3px solid #d26a5c}.gcc-ext.ent{border-bottom:3px solid #3f9a67}
+.gcc-sis.ok{background:#eef8f2;border-color:#bfe3cc}.gcc-sis.sug{background:#fff8e8;border-color:#efd9a2}.gcc-sis.sem{border-style:dashed}.gcc-sis.ign{opacity:.6}
+.gcc-tx{flex:1;min-width:0;white-space:normal;text-align:left}.gcc-h{font-weight:600;font-size:14px;line-height:1.3;word-break:break-word}
+.gcc-m{font-size:13px;color:var(--muted,#5b6b70);margin-top:3px}.gcc-m .sep{opacity:.5;margin:0 4px}
+.gcc-ac{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.gcc-ck{display:flex;align-items:center;padding-top:2px;cursor:pointer}
+.gcc-lig{display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted,#5b6b70)}
+.gcc-lig.ok{color:#1d7a45}.gcc-lig.sug{color:#9a6200}
+@media (max-width:900px){.gcpar{grid-template-columns:1fr}.gcc-lig{padding:2px 0}}
 </style>
 </head>
 <body>
@@ -1013,7 +1027,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     </details>
     <div class="tiles" id="gcTiles"></div>
     <div class="alerta" id="gcBulk" hidden><span id="gcBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small primary" data-gb="lanca">Lançar juntas</button><button type="button" class="btn small" data-gb="aprova">Aprovar sugestões</button><button type="button" class="btn small" data-gb="ignora">Ignorar</button><button type="button" class="btn small" data-gb="tarefa" title="Não sabe do que se trata? Gera uma tarefa para descobrir">📋 Gerar tarefa</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
-    <div class="card tablebox"><table><thead id="gcHead" hidden><tr><th style="width:28px"><input type="checkbox" id="gcTodas" style="width:auto" title="Selecionar todas as linhas do filtro" aria-label="Selecionar todas as linhas do filtro"></th><th>Data</th><th class="l">Histórico do banco</th><th>Valor</th><th class="l">Lançamento no sistema</th><th></th></tr>
+    <div class="card tablebox"><table><thead id="gcHead" hidden><tr><th style="width:28px"><input type="checkbox" id="gcTodas" style="width:auto" title="Selecionar todas as linhas do filtro" aria-label="Selecionar todas as linhas do filtro"></th><th>Data</th><th class="l">Extrato do banco</th><th>Valor</th><th class="l">Lançamento no sistema</th><th></th></tr>
       <tr class="gcfil"><th></th><th><input id="gcfData" placeholder="Filtrar" aria-label="Filtrar pela data" style="width:84px"></th><th class="l"><input id="gcfHist" placeholder="Filtrar histórico" aria-label="Filtrar pelo histórico do banco"></th><th><input id="gcfValor" placeholder="Filtrar" aria-label="Filtrar pelo valor" style="width:96px"></th><th class="l"><input id="gcfLanc" placeholder="Filtrar lançamento" aria-label="Filtrar pelo lançamento no sistema"></th><th><button type="button" class="btn small ghost" id="gcfLimpa" title="Limpar os filtros das colunas">Limpar</button></th></tr></thead><tbody id="gcBody"></tbody></table></div>
     <p class="note" id="gcNote"></p>
   </section>
@@ -14143,7 +14157,14 @@ function gcDesenha(){
     const celT=s!=='conc'&&GC.tar?.[l.id]?` <span class="chip c-done" title="Está na tarefa “${esc(GC.tar[l.id].tarefas?.titulo||'')}”">📋 Em tarefa</span>`:'';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
       :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> <button type="button" class="btn small" data-gc="liga" title="Escolher os lançamentos do sistema (ou contas em aberto) que formam esta linha do banco">Ligar</button> ${ok('ignora')}Ignorar</button>`;
-    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}${celO}${celT}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
+    // visual em cartões, como no Bom Controle (Carol, 19/11): extrato à esquerda, lançamento do sistema à direita
+    const ent=+l.valor>0,cor=s==='conc'?'ok':s==='ign'?'ign':s==='sug'?'sug':'sem';
+    const esq=`<div class="gcc gcc-ext ${ent?'ent':'sai'}"><label class="gcc-ck"><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></label>
+      <div class="gcc-tx"><div class="gcc-h">${esc(histDe(l))}</div><div class="gcc-m">${dBR(l.data)} <span class="sep">|</span> <b class="${ent?'pos':'neg'}">${fm(l.valor)}</b></div>${l.qtd>1?`<span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</div>
+      <div class="gcc-ac">${s==='ign'?`${ok('volta')}Voltar</button>`:s==='conc'?'':`${ok('ignora')}⊘ Ignorar</button>`}</div></div>`;
+    const dir=`<div class="gcc gcc-sis ${cor}"><div class="gcc-tx">${cel}${celO}${celT}</div>
+      <div class="gcc-ac">${s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?'':(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">✓ Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'+ Lançar'}</button> <button type="button" class="btn small" data-gc="liga" title="Escolher os lançamentos do sistema (ou contas em aberto) que formam esta linha do banco">🔗 Ligar</button>`}</div></div>`;
+    return `<tr data-id="${l.id}" class="gcrow"><td colspan="6"><div class="gcpar">${esq}<div class="gcc-lig ${cor}" title="${s==='conc'?'Conciliada':s==='sug'?'Sugestão':s==='ign'?'Ignorada':'Sem lançamento'}">${s==='conc'?'🔗':s==='sug'?'⇢':s==='ign'?'–':'?'}</div>${dir}</div></td></tr>`}).join('')
     ||`<tr><td></td><td class="l muted" colspan="5">${GC.linhas.length?'Nada neste filtro.':'Nenhuma linha do banco neste período. Use “Importar OFX”.'}</td></tr>`;
   const n=s=>GC.linhas.filter(l=>gcSit(l)===s).length,E=r2(GC.linhas.filter(l=>l.valor>0).reduce((x,l)=>x+(+l.valor),0)),S=r2(GC.linhas.filter(l=>l.valor<0).reduce((x,l)=>x-l.valor,0));
   const ini=$('gcIni').value,fim=$('gcFim').value,sis=r2(GC.movs.filter(m=>m.data>=ini&&m.data<=fim).reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)),dif=r2(E-S-sis);
