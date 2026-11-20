@@ -13442,16 +13442,18 @@ async function abrirAvulso(m,pre){
   const cats=plano.filter(x=>x.ativo!==false).map(x=>x.categoria);if((m||pre)?.categoria&&!cats.includes((m||pre).categoria))cats.unshift((m||pre).categoria);
   $('gtdTitle').textContent=(m?'Lançamento avulso':'Novo lançamento avulso')+' · '+c.nome;$('gtdChip').innerHTML='';
   $('gtdBody').innerHTML=`<div class="fields">
+    <!-- mesma ordem da conta a pagar e a receber (Carol, 20/11) -->
+    <label class="f wide" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}" autocomplete="off" data-pesnova>${PESNOVA}<datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
+    <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
+    <label class="f">Documento<input id="ga_documento" value="${v('documento')}" placeholder="Nº da NF ou boleto"></label>
+    ${soloTxt}<label class="f" id="ga_catBox"${tipo==='transf'?' hidden':''}>Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${(m||pre)?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
     <label class="f">Tipo<select id="ga_tipo"${m?' disabled':''}><option value="saida"${tipo==='saida'?' selected':''}>Saída: pagamento (ex.: tarifa)</option><option value="entrada"${tipo==='entrada'?' selected':''}>Entrada</option>${outras.length||m?.transf_id?`<option value="transf"${tipo==='transf'?' selected':''}>${m?.transf_id&&m.tipo==='entrada'?'Entrada: transferência recebida de outra conta':'Saída: transferência para outra conta (desta ou de outra empresa do grupo)'}</option>`:''}</select></label>
     <label class="f" id="ga_destBox"${tipo==='transf'&&!m?'':' hidden'}>Conta de destino<select id="ga_dest">${optContas(outras,cli)}</select></label>
     <label class="f">Data *<input type="date" id="ga_data" value="${m?m.data:pre?'':TODAY}"></label>
     <label class="f">Valor *<input id="ga_valor" class="money" inputmode="decimal" value="${m||pre?.valor?showMoney((m||pre).valor):''}" placeholder="0,00"></label>
-    <label class="f wide">Descrição *<input id="ga_descricao" value="${v('descricao')}" placeholder="Ex.: tarifa de manutenção da conta"></label>
-    ${soloTxt}<label class="f" id="ga_catBox"${tipo==='transf'?' hidden':''}>Categoria<select id="ga_categoria" data-catnova="${tipo==='entrada'?'Receita':'Despesa'}"><option value=""></option>${cats.map(x=>`<option${(m||pre)?.categoria===x?' selected':''}>${esc(x)}</option>`).join('')}${catNovaOpt}</select></label>
-    <label class="f" id="ga_pesBox"${tipo==='transf'?' hidden':''}><span id="ga_pesLab">${tipo==='entrada'?'Cliente':'Fornecedor'}</span><input id="ga_pessoa" list="gaPes" value="${v('pessoa_nome')}" autocomplete="off" data-pesnova>${PESNOVA}<datalist id="gaPes">${pesOpts(pes,tipo==='entrada')}</datalist></label>
-    <label class="f">Documento<input id="ga_documento" value="${v('documento')}"></label>
+    <label class="f" id="ga_formaBox"${tipo==='transf'?' hidden':''}>Forma de pagamento<select id="ga_forma">${formaOpts((m||pre)?.forma||'')}</select></label>
   </div>${deParaTxt}${m?.transf_id?'<p class="note" style="margin:0">Transferência: a correção do valor e da data vale para as duas contas.</p>':''}${m?gxConcBox(m):''}${faHTML(false)}<p class="err" id="gtErr" hidden></p>`;
-  $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf';$('ga_catBox').hidden=t==='transf'};
+  $('ga_tipo').onchange=()=>{const t=$('ga_tipo').value;$('ga_destBox').hidden=t!=='transf';$('ga_pesLab').textContent=t==='entrada'?'Cliente':'Fornecedor';$('ga_pesBox').hidden=t==='transf';$('ga_catBox').hidden=t==='transf';$('ga_formaBox').hidden=t==='transf'};
   $('gtdFoot').innerHTML=`${m?'<button type="button" class="btn ghost" data-act="av_apagar">Apagar</button>'+dupBtn('data-act="av_dup"'):''}<span class="spacer"></span><button type="button" class="btn ghost" data-act="fechar">Fechar</button><button type="button" class="btn primary" data-act="av_salvar">Salvar</button>`;
   dlgGT.showModal();
   if(!m){if(pre?.dest&&$('ga_dest'))$('ga_dest').value=pre.dest;dupMarca($('gtdBody'),['#ga_data','#ga_documento'],'Preencha a data e o nº do documento (vieram em branco).')}
@@ -13479,7 +13481,7 @@ async function gxAcao(a){
     if(ct.tipo==='Caixa / tesouraria'&&(tipo!=='entrada'||m)){const tv=m?.tipo||(tipo==='entrada'?'entrada':'saida'),p=await tesNegativa({tab:'fin_movimentos',conta:c.id,ini:ct.saldo_inicial},m?.id,{data:val('data'),v:(tv==='entrada'?1:-1)*r2(valor)},m?{data:m.data,v:(m.tipo==='entrada'?1:-1)*(+m.valor)}:null);
       if(p&&!confirm(tesNegMsg(p)))return}}
   // transferência não tem categoria (Carol, 05/11)
-  const base={data:val('data'),valor:r2(valor),descricao:val('descricao'),categoria:tipo==='transf'||m?.transf_id?null:val('categoria'),pessoa_nome:val('pessoa'),documento:val('documento')};
+  const base={data:val('data'),valor:r2(valor),descricao:val('descricao'),categoria:tipo==='transf'||m?.transf_id?null:val('categoria'),pessoa_nome:val('pessoa'),documento:val('documento'),...($('ga_forma')?{forma:val('forma')}:{})};
   let error;
   if(m){
     if(m.transf_id){({error}=await sb.from('fin_movimentos').update({data:base.data,valor:base.valor,descricao:base.descricao,documento:base.documento}).eq('transf_id',m.transf_id));
