@@ -3,6 +3,7 @@
 Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: são casos reais que já deram problema.
 
 ## Conciliação bancária
+0. **Mesmo valor no mesmo dia: casar pelo nome.** Vários Pix de mesmo valor no mesmo dia só se ligam ao lançamento que tem o nome de quem recebeu. Caso: R$ 500 Pandolfo × R$ 500 MR Cardiologia, 19/11.
 1. **Linha somada pelo banco.** O banco pode somar numa linha só vários Pix do mesmo dia com o mesmo histórico (`fin_ofx.qtd > 1`, valores em `itens`). Cada valor da soma tem que achar o seu lançamento ou a sua conta em aberto (`gcSomaDe`). Nunca deixar como "Sem lançamento" se os pagamentos já existem, porque a equipe lançaria de novo. Caso: Platano, 05/11, MPA PB.
 2. **Ligar.** Cada linha do banco tem o botão **Ligar**, para escolher à mão os lançamentos do sistema (com caixa de seleção e total) que formam a linha. A lista começa pelos de valor igual e mostra também os lançamentos de outras contas da empresa (transferência).
 3. **Transferência entre contas da empresa.** Se o mesmo valor saiu de uma conta e entrou em outra (até 3 dias), e uma das pernas foi lançada como avulsa, a conciliação sugere "Transferência de/para X".

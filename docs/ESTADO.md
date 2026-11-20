@@ -2,6 +2,13 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 00:30 · conta 2 · branch `fix/conciliacao-casar-pelo-nome`**
+  - **Problema:** com vários pagamentos de mesmo valor no mesmo dia, a conciliação ligava os lançamentos às linhas trocadas, porque olhava só o valor e a data. Casos na MPA PB: Pandolfo × MR Cardiologia, Fanchin × Emme, Cleverson × Gpmed, Schmidt × Dallstella, Nono × Pozenato e outros.
+  - **Correção nos dados:** os 12 vínculos trocados foram corrigidos direto no banco.
+    - O lançamento Emme de 06/11 (R$ 500) ficou desconciliado, para conferir.
+    - A linha da MR Cardiologia de 19/11 (R$ 500) e a do Milton Maccarini de 06/11 (R$ 500) ficaram sem lançamento.
+  - **Regra nova:** `gcSugestoes` tem uma 1ª passada que só liga o lançamento ou a conta cujo nome tem palavra em comum com o nome do banco (`gcNomeBanco`, `gcNomeBate`). Depois vêm as regras de antes.
+
 - **20/11/2026 00:10 · conta 2 · banco**
   - **Correção:** migration `sol_cliente_por_acesso_empresa`. `sol_eh_cliente` e `sol_ve_tudo_cliente` exigiam `acessos.modulo='solicitacoes'`, que não existe na regra do `acessos`, e o cliente com acesso por módulo não conseguia abrir chamado.
     - Agora quem tem qualquer acesso à empresa abre chamados.

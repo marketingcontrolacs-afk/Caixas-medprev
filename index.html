@@ -13986,7 +13986,19 @@ function gcSugestoes(){
   GC.soma={};GC.movs.forEach(m=>{if(m.ofx_soma&&m.conciliado)(GC.soma[m.ofx_soma]||=[]).push(m)});
   Object.entries(GC.soma).forEach(([id,ms])=>{if(!GC.conc[id])GC.conc[id]=ms[0]});
   const usadosM=new Set(),usadosT=new Set(),usadosO=new Set();
+  // 1ª passada (Carol, 19/11): vários pagamentos de mesmo valor no mesmo dia (ex.: R$ 500 Pandolfo e R$ 500 MR Cardiologia)
+  // só se ligam a um lançamento com o NOME de quem recebeu/pagou; senão ficavam trocados entre si
   for(const l of GC.linhas){if(GC.conc[l.id]||l.ignorado)continue;
+    const nb=gcNomeBanco(l);if(!nb)continue;
+    const tipo=l.valor>0?'entrada':'saida',v=Math.abs(l.valor),perto=(a,b)=>Math.abs(difDias(a,l.data))-Math.abs(difDias(b,l.data));
+    const m=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&!usadosM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3&&gcNomeBate(nb,x.pessoa_nome||x.descricao))
+      .sort((a,b)=>gcNomeBate(nb,b.pessoa_nome||b.descricao)-gcNomeBate(nb,a.pessoa_nome||a.descricao)||perto(a.data,b.data))[0];
+    if(m){usadosM.add(m.id);GC.sug[l.id]={k:'mov',mov:m,txt:`Já lançado: ${[m.pessoa_nome,m.descricao].filter(Boolean).join(' · ')||'lançamento'} (${dBR(m.data)})`};continue}
+    const t=GC.tits.filter(x=>!usadosT.has(x.id)&&x.tipo===(tipo==='saida'?'pagar':'receber')&&Math.abs(r2(x.valor-(GC.pago[x.id]||0))-v)<0.005&&Math.abs(difDias(x.vencimento,l.data))<=10&&gcNomeBate(nb,x.pessoa_nome||x.descricao))
+      .sort((a,b)=>gcNomeBate(nb,b.pessoa_nome||b.descricao)-gcNomeBate(nb,a.pessoa_nome||a.descricao)||perto(a.vencimento,b.vencimento))[0];
+    if(t){usadosT.add(t.id);GC.sug[l.id]={k:'tit',tit:t,txt:`${t.tipo==='pagar'?'Pagar':'Receber'}: ${t.pessoa_nome||''}${t.descricao?' · '+t.descricao:''} (venc. ${dBR(t.vencimento)})`}}}
+  // 2ª passada: o resto das regras (valor e data, remessa, soma, transferência, regra lembrada)
+  for(const l of GC.linhas){if(GC.conc[l.id]||l.ignorado||GC.sug[l.id])continue;
     const tipo=l.valor>0?'entrada':'saida',v=Math.abs(l.valor),perto=(a,b)=>Math.abs(difDias(a,l.data))-Math.abs(difDias(b,l.data));
     const m=GC.movs.filter(x=>!x.ofx_id&&!(x.ofx_soma&&x.conciliado)&&!usadosM.has(x.id)&&x.tipo===tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
     if(m){usadosM.add(m.id);GC.sug[l.id]={k:'mov',mov:m,txt:`Já lançado: ${[m.pessoa_nome,m.descricao].filter(Boolean).join(' · ')||'lançamento'} (${dBR(m.data)})`};continue}
@@ -14047,15 +14059,16 @@ $('gclOk').onclick=async()=>{const l=GCL.l,m=GCL.mapa(),it=[...GCL.sel].map(k=>m
   catch(err){console.error(err);delete GC.sug[l.id];$('gclErr').textContent=err.message||'Não foi possível conciliar.';$('gclErr').hidden=false;$('gclOk').disabled=false}};
 // “Pago para outra pessoa?” (Carol, 19/11; caso Fabio Franzoni × Luciane Gava): nas saídas, compara o nome que o banco
 // mostra (quem recebeu) com o fornecedor/parceiro do lançamento. Nenhuma palavra em comum = alerta.
+const GC_PARE=new Set(['ltda','eireli','epp','me','mei','sa','s/a','ss','dr','dra','doutor','doutora','clinica','clinicas','clnica','centro','servicos','medicos','medico','medica','saude','de','da','do','das','dos','e','mpa','laboratorio','laboratorios','lab','instituto','consultorio','pix','ted','pagamento','deb','enviado','recebido']);
+const gcPal=x=>new Set(String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!GC_PARE.has(w)&&!/^\d+$/.test(w)));
+const gcNomeBanco=l=>String(l.nome||((histDe(l).match(/-([^"]+)"/)||[])[1])||'').trim();
+// quantas palavras do nome no banco aparecem no nome do lançamento (0 = nenhuma)
+const gcNomeBate=(nb,nome)=>{const a=gcPal(nb),b=gcPal(nome);let n=0;a.forEach(w=>{if(b.has(w))n++});return n};
 function gcOutraPessoa(l,ms){
   if(!(+l.valor<0))return null;
-  const nb=String(l.nome||((histDe(l).match(/-([^"]+)"/)||[])[1])||'').trim();if(!nb)return null;
-  const pare=new Set(['ltda','eireli','epp','me','mei','sa','s/a','ss','dr','dra','doutor','doutora','clinica','clinicas','centro','servicos','medicos','medico','medica','saude','de','da','do','das','dos','e','mpa','laboratorio','laboratorios','lab','instituto','consultorio','pix','ted']);
-  const pal=x=>new Set(String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!pare.has(w)));
-  const pb=pal(nb);if(!pb.size)return null;
-  for(const m of (ms||[]).filter(Boolean)){const nome=m.pessoa_nome||'';if(!nome)continue;
-    const ps=pal(nome);if(!ps.size)continue;
-    if(![...pb].some(w=>ps.has(w)))return {banco:nb,sis:nome}}
+  const nb=gcNomeBanco(l);if(!nb||!gcPal(nb).size)return null;
+  for(const m of (ms||[]).filter(Boolean)){const nome=m.pessoa_nome||'';if(!nome||!gcPal(nome).size)continue;
+    if(!gcNomeBate(nb,nome))return {banco:nb,sis:nome}}
   return null}
 // Gerar tarefa (Carol, 19/11): linha do banco que ninguém sabe o que é vira item de uma tarefa da empresa,
 // “Conciliação: lançamentos do banco a identificar” (uma tarefa aberta por empresa; as próximas linhas entram nela)
