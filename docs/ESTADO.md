@@ -2,6 +2,12 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **20/11/2026 02:40 · conta 2 · `feat/conciliacao-lancar-completo`**
+  - **"+ Lançar" na Conciliação** (uma linha) abre a tela normal de conta a pagar/receber (`abrirGT` com `pre.gc`), já preenchida com data, valor, descrição, conta e categoria sugerida, com documentos, anexos, competência e parcelas. O botão é "🔗 Salvar e conciliar": entra quitada e ligada **à própria linha do banco** (não usa `concLigar`, que podia pegar outra linha de mesmo valor). Depois volta para a Conciliação (`renderGC`).
+  - Transferência, baixa de conta em aberto e vários lançamentos: botão no aviso da tela abre o diálogo antigo (`abrirGC`); no diálogo antigo, "📄 Lançamento completo" volta para a tela normal. Várias linhas selecionadas continuam no diálogo antigo.
+  - **Regra:** linha que está numa tarefa pode ser lançada, mas a tarefa **continua aberta** (ex.: pago à pessoa errada, devolução pendente). O lançamento é ligado à tarefa (`tarefa_lancamentos.mov_id`) e entra um comentário na conversa. O chip "📋 Em tarefa" aparece mesmo depois de conciliada.
+  - Banco: migrations `tarefa_mudou_status_nova` (o histórico de status não conhecia "Nova") e `tarefa_mudou_security_definer`.
+
 - **20/11/2026 02:25 · conta 2 · `feat/botao-atualizar`:** botão **⟳ Atualizar** no alto, em todas as telas (ao lado de Sair). Busca de novo os dados da tela aberta sem limpar os filtros e a busca digitados (zera os caches `GT.key`, `GFKEY`, `PESLISTA`, `GFP`, `GFPT`, `GFC`, `PR`, `NFP` e chama `openView()`).
   - **Dados (pedido da Carol):** estornados (apagados) os lançamentos de R$ 500 da Emme (relatório 13/11) e da MR Cardiologia (relatório 19/11), que estavam com datas trocadas. As contas voltaram a ficar em aberto e as linhas do banco (Emme 12/11, MR 19/11) ficaram pendentes na conciliação, para ela refazer. **Regra:** quando a Carol pedir para estornar, não corrigir nem criar lançamento; só desfazer.
   - O pagamento do Milton (06/11) foi lançado pela própria Carol e ficou, sem conciliação.
