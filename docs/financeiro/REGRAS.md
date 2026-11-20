@@ -11,6 +11,8 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
 4. **Gerar tarefa.** Linha do banco que ninguém sabe o que é: selecione e use "📋 Gerar tarefa".
    - Entra na tarefa "Conciliação: lançamentos do banco a identificar" da empresa (`tarefa_lancamentos.ofx_id`).
    - A linha mostra "Em tarefa" até validar.
+4b. **Uma tarefa por linha.** Nunca juntar várias linhas numa tarefa só. A observação vira mensagem da conversa.
+4c. **"⚠ Pago para outra pessoa?"** Saída cujo nome no extrato não tem nenhuma palavra em comum com o fornecedor/parceiro do lançamento. Confira se a chave Pix do cadastro é mesmo dessa pessoa. Caso: a chave do Fabio Franzoni era da Luciane Gava.
 5. **Total da seleção.** A barra de seleção mostra o total das linhas marcadas: só saídas, só entradas, ou o saldo.
 6. **Extrato importado vale para todos.** Fica gravado no banco de dados, pendente até conciliar ou ignorar. Importar o mesmo extrato de novo não duplica as linhas (índice único `conta_id, chave`).
 
@@ -28,3 +30,6 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
 1. **Fornecedor é opcional.** Na conferência do Bom Controle, o fornecedor pode ficar em branco (`fornecedor_bc = '-'`).
 2. **"+ Cadastrar" fornecedor** no lançamento do escritório.
 3. **Ler o documento anexado:** em toda saída ou despesa (boletos e notas, cartão, tesouraria, saídas do caixa).
+
+## Cadastro único (fornecedores/clientes)
+1. **Duplicados "… - Mpa"** vindos do Bom Controle: os de mesmo nome foram juntados ao cadastro completo em 19/11; a cópia dos apagados está em `fin_pessoas_mescladas`. Com CNPJ/CPF diferente (filial), não juntar.

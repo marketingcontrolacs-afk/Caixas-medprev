@@ -2,6 +2,15 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 23:00 · conta 2 · branch `feat/conciliacao-tarefa-por-linha`**
+  - **Gerar tarefa (conciliação):** agora cria **uma tarefa por linha do banco**, com o título "Identificar: dd/mm · quem · valor". A observação vira a 1ª mensagem (interna) da conversa, e o item fica em `tarefa_lancamentos.ofx_id`.
+    - A tarefa antiga que juntava duas linhas foi dividida em duas e arquivada.
+  - **Alerta "⚠ Pago para outra pessoa?"** (`gcOutraPessoa`): nas saídas, compara o nome de quem recebeu, no extrato, com o `pessoa_nome` do lançamento. Se não houver nenhuma palavra em comum (fora as genéricas), mostra o alerta. Caso: Fabio Franzoni × Luciane Gava.
+  - **Banco:**
+    - Juntados 26 cadastros duplicados "… - Mpa" com o cadastro de mesmo nome (cópia dos apagados em `fin_pessoas_mescladas`, migration `fin_pessoas_mescladas_backup`).
+    - Ficaram separados, de propósito, 2 pares com CNPJ/CPF diferente: Clínica Santa Bárbara (filial) e Derma Clinn.
+    - O cadastro do Fabio Franzoni ficou sem chave Pix: a chave 46999720024 era da Luciane.
+
 - **19/11/2026 22:25 · conta 2 · `fix/conciliacao-tarefa-prioridade`:** "Gerar tarefa" dava erro porque a prioridade 'media' não existe. Os valores aceitos em `tarefas.prioridade` são baixa, normal, alta e urgente. Corrigido para 'normal'.
 
 - **19/11/2026 22:20 · conta 2 · branch `fix/conciliacao-transferencia-entre-contas`**

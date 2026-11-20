@@ -14034,25 +14034,41 @@ $('gclOk').onclick=async()=>{const l=GCL.l,m=GCL.mapa(),it=[...GCL.sel].map(k=>m
   GC.sug[l.id]={k:'rem',rem:null,ms,ts,n:it.length,nomes:[],txt:''};
   $('gclOk').disabled=true;try{await gcAprovar([l]);$('dlgGCL').close();renderGC()}
   catch(err){console.error(err);delete GC.sug[l.id];$('gclErr').textContent=err.message||'Não foi possível conciliar.';$('gclErr').hidden=false;$('gclOk').disabled=false}};
+// “Pago para outra pessoa?” (Carol, 19/11; caso Fabio Franzoni × Luciane Gava): nas saídas, compara o nome que o banco
+// mostra (quem recebeu) com o fornecedor/parceiro do lançamento. Nenhuma palavra em comum = alerta.
+function gcOutraPessoa(l,ms){
+  if(!(+l.valor<0))return null;
+  const nb=String(l.nome||((histDe(l).match(/-([^"]+)"/)||[])[1])||'').trim();if(!nb)return null;
+  const pare=new Set(['ltda','eireli','epp','me','mei','sa','s/a','ss','dr','dra','doutor','doutora','clinica','clinicas','centro','servicos','medicos','medico','medica','saude','de','da','do','das','dos','e','mpa','laboratorio','laboratorios','lab','instituto','consultorio','pix','ted']);
+  const pal=x=>new Set(String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!pare.has(w)));
+  const pb=pal(nb);if(!pb.size)return null;
+  for(const m of (ms||[]).filter(Boolean)){const nome=m.pessoa_nome||'';if(!nome)continue;
+    const ps=pal(nome);if(!ps.size)continue;
+    if(![...pb].some(w=>ps.has(w)))return {banco:nb,sis:nome}}
+  return null}
 // Gerar tarefa (Carol, 19/11): linha do banco que ninguém sabe o que é vira item de uma tarefa da empresa,
 // “Conciliação: lançamentos do banco a identificar” (uma tarefa aberta por empresa; as próximas linhas entram nela)
 async function gcTarefa(ls){
+  // uma tarefa para CADA linha do banco (Carol, 19/11: não juntar, senão a equipe se perde); a observação vira a 1ª mensagem da conversa
   if(!ehEsc())return toast('Só o escritório gera tarefas.');
   const novos=ls.filter(l=>!GC.tar?.[l.id]);if(!novos.length)return toast('Estas linhas já estão numa tarefa.');
-  const obs=prompt(`Gerar tarefa para descobrir do que se trata ${novos.length===1?'esta linha':'estas '+novos.length+' linhas'} do banco.\n\nObservação (opcional): o que já sabe ou o que precisa perguntar`,'');if(obs===null)return;
-  const cid=GC.conta.cliente_id,tit='Conciliação: lançamentos do banco a identificar';
+  const obs=prompt(`Gerar ${novos.length===1?'uma tarefa':novos.length+' tarefas (uma para cada linha)'} para descobrir do que se trata.\n\nObservação (opcional): o que já sabe ou o que precisa perguntar`,'');if(obs===null)return;
+  const cid=GC.conta.cliente_id;
   let adm=ehAdm()?{user_id:ME.user_id,nome:ME.nome}:null;
   if(!adm){const {data}=await sb.from('perfis').select('user_id,nome').eq('admin',true).limit(1);adm=data?.[0]||{user_id:ME.user_id,nome:ME.nome}}
-  let {data:ts,error:e0}=await sb.from('tarefas').select('id,titulo').eq('cliente_id',cid).eq('titulo',tit).neq('status','concluida').eq('arquivada',false).limit(1);if(e0)throw e0;
-  let tar=ts?.[0];
-  if(!tar){const {data,error}=await sb.from('tarefas').insert({cliente_id:cid,titulo:tit,
-      descricao:'Linhas do extrato que ninguém soube identificar na conciliação bancária. Descubra do que se trata cada uma (com o cliente, o banco ou o comprovante), lance ou ligue na Gestão financeira › Conciliação bancária e valide aqui.',
+  let n=0;
+  for(const l of novos){
+    const quem=(histDe(l).match(/-([^"]+)"/)||[])[1]||histDe(l);
+    const tit=`Identificar: ${dBR(l.data).slice(0,5)} · ${String(quem).trim().slice(0,60)} · ${fm(l.valor)}`;
+    const {data:tar,error}=await sb.from('tarefas').insert({cliente_id:cid,titulo:tit,
+      descricao:`Linha do extrato que ninguém soube identificar na conciliação bancária.\n${dBR(l.data)} · ${GC.conta.nome} · ${histDe(l)} · ${fm(l.valor)}\n\nDescubra do que se trata, lance ou ligue em Gestão financeira › Conciliação bancária e conclua esta tarefa.`,
       status:'afazer',prioridade:'normal',interna:true,executor:adm.user_id,executor_nome:adm.nome,criado_por:ME.user_id,criado_por_nome:ME.nome}).select('id,titulo').single();
-    if(error)throw error;tar=data}
-  const {error}=await sb.from('tarefa_lancamentos').insert(novos.map(l=>({tarefa_id:tar.id,cliente_id:cid,ofx_id:l.id,criado_por:ME.user_id,
-    resumo:`${dBR(l.data)} · ${GC.conta.nome} · ${histDe(l)} · ${fm(l.valor)}${obs.trim()?' · '+obs.trim():''}`})));if(error)throw error;
-  novos.forEach(l=>GC.tar[l.id]={tarefa_id:tar.id,tarefas:{titulo:tit}});GC.sel.clear();gcDesenha();
-  toast(`${novos.length} ${novos.length===1?'linha foi':'linhas foram'} para a tarefa “${tit}”`)}
+    if(error)throw error;
+    const {error:e2}=await sb.from('tarefa_lancamentos').insert({tarefa_id:tar.id,cliente_id:cid,ofx_id:l.id,criado_por:ME.user_id,resumo:`${dBR(l.data)} · ${GC.conta.nome} · ${histDe(l)} · ${fm(l.valor)}`});if(e2)throw e2;
+    if(obs.trim()){const {error:e3}=await sb.from('tarefa_comentarios').insert({tarefa_id:tar.id,cliente_id:cid,texto:obs.trim(),interno:true,autor_nome:ME.nome});if(e3)console.error(e3)}
+    GC.tar[l.id]={tarefa_id:tar.id,tarefas:{titulo:tar.titulo}};n++}
+  GC.sel.clear();gcDesenha();
+  toast(`${n} ${n===1?'tarefa criada':'tarefas criadas'} em Tarefas e recados (uma para cada linha)`)}
 function gcSomaDe(l,usM,usT){
   const its=Array.isArray(l.itens)?l.itens:[];if((+l.qtd||its.length)<2||its.length<2)return null;
   const tipo=l.valor>0?'entrada':'saida',ms=[],ts=[],pegM=new Set(),pegT=new Set(),perto=d=>Math.abs(difDias(d,l.data));
@@ -14098,10 +14114,12 @@ function gcDesenha(){
     const cel=s==='conc'?`<span class="chip c-ok">✓ Conciliada</span> ${m.pessoa_nome&&m.descricao?`<b>${esc(m.pessoa_nome)}</b> · `:''}${esc(m.descricao||m.pessoa_nome||'')}${m.categoria?' '+mu('· '+esc(m.categoria)):''}${(GC.juntoQ?.[m.id]||0)>1?' '+mu(`· lançamento único de ${fm(m.valor)} somando ${GC.juntoQ[m.id]} linhas`):''}${GC.soma?.[l.id]?' '+mu(`· soma de ${GC.soma[l.id].length} lançamentos do sistema (${fm(r2(GC.soma[l.id].reduce((a,x)=>a+(+x.valor),0)))})`):''}`
       :s==='ign'?'<span class="chip c-none">Ignorada</span>'
       :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
+    const outra=gcOutraPessoa(l,s==='conc'?(GC.soma?.[l.id]||[m]):g?.k==='mov'?[g.mov]:g?.k==='tit'?[g.tit]:g?.k==='rem'?[...(g.ms||[]),...(g.ts||[])]:[]);
+    const celO=outra?` <span class="chip c-bad" title="O banco mostra que o dinheiro foi para “${esc(outra.banco)}”, mas o lançamento é de “${esc(outra.sis)}”. Confira se a chave Pix ou a conta do cadastro é mesmo dessa pessoa; se não for, gere uma tarefa e corrija o cadastro.">⚠ Pago para outra pessoa?</span>`:'';
     const celT=s!=='conc'&&GC.tar?.[l.id]?` <span class="chip c-done" title="Está na tarefa “${esc(GC.tar[l.id].tarefas?.titulo||'')}”">📋 Em tarefa</span>`:'';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
       :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> <button type="button" class="btn small" data-gc="liga" title="Escolher os lançamentos do sistema (ou contas em aberto) que formam esta linha do banco">Ligar</button> ${ok('ignora')}Ignorar</button>`;
-    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}${celT}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
+    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}${celO}${celT}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
     ||`<tr><td></td><td class="l muted" colspan="5">${GC.linhas.length?'Nada neste filtro.':'Nenhuma linha do banco neste período. Use “Importar OFX”.'}</td></tr>`;
   const n=s=>GC.linhas.filter(l=>gcSit(l)===s).length,E=r2(GC.linhas.filter(l=>l.valor>0).reduce((x,l)=>x+(+l.valor),0)),S=r2(GC.linhas.filter(l=>l.valor<0).reduce((x,l)=>x-l.valor,0));
   const ini=$('gcIni').value,fim=$('gcFim').value,sis=r2(GC.movs.filter(m=>m.data>=ini&&m.data<=fim).reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)),dif=r2(E-S-sis);
