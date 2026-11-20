@@ -13928,6 +13928,14 @@ async function renderGC(recarrega=true){
       // transferência entre contas da empresa (Carol, 19/11): a saída/entrada pode já estar lançada na outra conta como avulsa
       // (ex.: Pix do PagBank para o Inter lançado só no PagBank). Carrega os lançamentos das outras contas ainda sem par.
       GC.outras=[];try{GC.outras=(await todas(()=>sb.from('fin_movimentos').select('id,conta_id,cliente_id,data,tipo,valor,descricao,pessoa_nome,categoria,titulo_id,transf_id').eq('cliente_id',c.cliente_id).neq('conta_id',c.id).is('transf_id',null).is('titulo_id',null).gte('data',de).lte('data',ate)))||[]}catch(e){console.error(e)}
+      // linhas dos extratos das outras contas da empresa ainda sem lançamento (Carol, 19/11): uma transferência aparece
+      // como saída num banco e entrada no outro; com os dois extratos importados, sugere mesmo sem nada lançado
+      GC.outrasL=[];try{const ol=await todas(()=>sb.from('fin_ofx').select('id,conta_id,cliente_id,data,valor,memo,nome,ignorado').eq('cliente_id',c.cliente_id).neq('conta_id',c.id).eq('ignorado',false).gte('data',de).lte('data',ate));
+        const ids=ol.map(x=>x.id),conc=new Set();
+        for(let i=0;i<ids.length;i+=200){const sl=ids.slice(i,i+200);
+          const [a,b2]=await Promise.all([sb.from('fin_movimentos').select('ofx_id').in('ofx_id',sl),sb.from('fin_movimentos').select('ofx_soma').in('ofx_soma',sl)]);
+          (a.data||[]).forEach(x=>conc.add(x.ofx_id));(b2.data||[]).forEach(x=>conc.add(x.ofx_soma))}
+        GC.outrasL=ol.filter(x=>!conc.has(x.id))}catch(e){console.error(e)}
       GC.linhas=l;GC.movs=m;GC.regras=rg;GC.pago={};mt.forEach(x=>GC.pago[x.titulo_id]=r2((GC.pago[x.titulo_id]||0)+abat(x)));
       GC.tits=t.filter(x=>r2(x.valor-(GC.pago[x.id]||0))>0.004);GC.sel.clear();
       // remessas de pagamento desta conta: o banco mostra a remessa numa linha só com o total (Carol, 13/11)
@@ -13993,6 +14001,8 @@ function gcSugestoes(){
       GC.sug[l.id]={k:'rem',rem:null,...sm,txt:`${sm.n} ${sm.ms.length===sm.n?'já lançados':'lançamentos'}: ${sm.nomes.slice(0,6).join(', ')}${sm.nomes.length>6?` e mais ${sm.nomes.length-6}`:''}`};continue}}
     // transferência: o mesmo valor saiu (ou entrou) em outra conta da empresa até 3 dias antes ou depois, lançado sem par
     {const o=(GC.outras||[]).filter(x=>!usadosO.has(x.id)&&x.tipo!==tipo&&Math.abs(x.valor-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
+      if(!o){const ol=(GC.outrasL||[]).filter(x=>!usadosO.has('L'+x.id)&&Math.sign(+x.valor)===-Math.sign(+l.valor)&&Math.abs(Math.abs(+x.valor)-v)<0.005&&Math.abs(difDias(x.data,l.data))<=3).sort((a,b)=>perto(a.data,b.data))[0];
+        if(ol){usadosO.add('L'+ol.id);GC.sug[l.id]={k:'transfofx',ofx:ol,txt:`Transferência ${tipo==='entrada'?'de':'para'} ${contaNome(ol.conta_id)||'outra conta'}? No extrato dela há ${+ol.valor<0?'uma saída':'uma entrada'} de ${fm(Math.abs(+ol.valor))} em ${dBR(ol.data)}${ol.memo?' · '+String(ol.memo).slice(0,60):''}`};continue}}
       if(o){usadosO.add(o.id);GC.sug[l.id]={k:'transf',mov:o,txt:`Transferência ${tipo==='entrada'?'de':'para'} ${contaNome(o.conta_id)||'outra conta'} (${dBR(o.data)}${o.descricao?' · '+o.descricao:''})`};continue}}
     const r=GC.regras.filter(x=>x.tipo===tipo&&l.padrao&&l.padrao.includes(x.padrao)).sort((a,b)=>b.padrao.length-a.padrao.length)[0];
     if(r)GC.sug[l.id]={k:'regra',regra:r,txt:r.conta_destino?`Transferência ${tipo==='saida'?'para':'de'} ${contaNome(r.conta_destino)||'outra conta'}`:[r.descricao,r.categoria].filter(Boolean).join(' · ')||'Lançamento da regra'};
@@ -14192,6 +14202,11 @@ async function gcAprovar(ls){
     if(g.k==='mov'){const {error}=await sb.from('fin_movimentos').update({ofx_id:l.id,conciliado:true}).eq('id',g.mov.id);if(error)throw error;n++}
     else if(g.k==='tit'){const t=g.tit;novos.push(...await pernasFatura(t,gcMov(l,{titulo_id:t.id,descricao:t.descricao||(t.tipo==='pagar'?'Pagamento':'Recebimento'),pessoa_nome:t.pessoa_nome,documento:t.documento,categoria:t.categoria})));
       if(t.origem_id){const {error}=await sb.from('contas_pagar').update({conferido:true,pago_em:l.data,banco:GC.conta.conta_bc||GC.conta.nome}).eq('id',t.origem_id);if(error)console.error(error)}}
+    else if(g.k==='transfofx'){   // as duas linhas de extrato viram a transferência: lança nas duas contas, já conciliadas
+      const x=g.ofx,tid=crypto.randomUUID();
+      novos.push(gcMov(l,{descricao:'Transferência entre contas',transf_id:tid}),
+        {cliente_id:x.cliente_id,conta_id:x.conta_id,data:x.data,tipo:+x.valor>0?'entrada':'saida',valor:Math.abs(+x.valor),ofx_id:x.id,conciliado:true,descricao:'Transferência entre contas',transf_id:tid});
+      GC.outrasL=(GC.outrasL||[]).filter(y=>y.id!==x.id)}
     else if(g.k==='transf'){   // liga como transferência: lança nesta conta e marca o lançamento da outra conta como a outra perna
       const tid=crypto.randomUUID();const {error}=await sb.from('fin_movimentos').update({transf_id:tid,categoria:null,validar:null}).eq('id',g.mov.id);if(error)throw error;
       // o aviso “a validar” e o item de tarefa desse lançamento ficam resolvidos (achou a outra conta)

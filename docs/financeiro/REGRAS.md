@@ -8,6 +8,7 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
 3. **Transferência entre contas da empresa.** Se o mesmo valor saiu de uma conta e entrou em outra (até 3 dias), e uma das pernas foi lançada como avulsa, a conciliação sugere "Transferência de/para X".
    - Ao aprovar, cria a perna que faltava, liga as duas pelo `transf_id`, limpa o `validar` e valida o item de tarefa desse lançamento.
    - Caso: Pix de R$ 90.000 do PagBank para o Inter em 09/11, MPA PB.
+3b. **Transferência só nos extratos.** Com os extratos das duas contas importados e nada lançado, sugere "Transferência de/para X? No extrato dela há…". Ao aprovar, lança e concilia as duas pontas.
 4. **Gerar tarefa.** Linha do banco que ninguém sabe o que é: selecione e use "📋 Gerar tarefa".
    - Entra na tarefa "Conciliação: lançamentos do banco a identificar" da empresa (`tarefa_lancamentos.ofx_id`).
    - A linha mostra "Em tarefa" até validar.

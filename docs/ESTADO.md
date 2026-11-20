@@ -2,6 +2,11 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 23:45 · conta 2 · branch `feat/conciliacao-transf-extratos`**
+  - **Conciliação:** com os extratos das duas contas importados e nada lançado, a linha ganha a sugestão "Transferência de/para <conta>? No extrato dela há…" (`GC.outrasL`, `k:'transfofx'`).
+  - **Regra:** valor igual, sinal contrário, até 3 dias, mesma empresa.
+  - **Ao aprovar:** cria os dois lançamentos (um em cada conta), já conciliados e ligados pelo mesmo `transf_id`.
+
 - **19/11/2026 23:30 · conta 2 · branch `feat/chamados`**
   - **"Chamados":** junta as Tarefas e recados e as Solicitações num quadro só (`viewTar`), com 5 colunas: Nova › A fazer › Em andamento › Aguardando cliente › Concluída.
   - **Banco:** migration `tarefas_status_nova`; `tarefas.status` aceita 'nova'. O recado criado pelo cliente começa em "Nova".
