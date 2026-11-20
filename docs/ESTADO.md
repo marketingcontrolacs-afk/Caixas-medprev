@@ -2,6 +2,13 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **19/11/2026 22:20 · conta 2 · branch `feat/conciliacao-gerar-tarefa`**
+  - **Banco:** migration `tarefa_lancamentos_ofx_id`, nova coluna `tarefa_lancamentos.ofx_id` (FK para `fin_ofx`, `on delete set null`).
+  - **Conciliação bancária:** selecione linhas e use **📋 Gerar tarefa** (`gcTarefa`, só para o escritório).
+    - As linhas entram na tarefa "Conciliação: lançamentos do banco a identificar" da empresa. É uma tarefa aberta por empresa: se já existir, as linhas entram nela.
+    - Cada item leva data, conta, histórico, valor e a observação.
+    - A linha mostra "📋 Em tarefa" até o item ser validado ou a tarefa concluída.
+
 - **19/11/2026 22:10 · conta 2 · branch `feat/conciliacao-ligar-varios`**
   - Conciliação bancária: cada linha do banco ganhou o botão **Ligar** (diálogo `dlgGCL`, funções `gclAbre`, `gclDesenha` e outras).
     - Mostra os lançamentos do sistema ainda não conciliados (mesmo tipo, até 15 dias; ou 60 com "datas mais distantes") e as contas em aberto, com caixa de seleção, busca e total.

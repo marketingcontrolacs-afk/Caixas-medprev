@@ -1011,7 +1011,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
       <div class="tablebox" style="margin-top:8px;max-height:300px;overflow:auto"><table><thead><tr><th class="l">Arquivo</th><th>Período do extrato</th><th>Saldo do banco</th><th>Linhas</th><th>Importado em</th><th class="l">Situação hoje</th><th></th></tr></thead><tbody id="gcArqBody"></tbody></table></div>
     </details>
     <div class="tiles" id="gcTiles"></div>
-    <div class="alerta" id="gcBulk" hidden><span id="gcBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small primary" data-gb="lanca">Lançar juntas</button><button type="button" class="btn small" data-gb="aprova">Aprovar sugestões</button><button type="button" class="btn small" data-gb="ignora">Ignorar</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="gcBulk" hidden><span id="gcBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small primary" data-gb="lanca">Lançar juntas</button><button type="button" class="btn small" data-gb="aprova">Aprovar sugestões</button><button type="button" class="btn small" data-gb="ignora">Ignorar</button><button type="button" class="btn small" data-gb="tarefa" title="Não sabe do que se trata? Gera uma tarefa para descobrir">📋 Gerar tarefa</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
     <div class="card tablebox"><table><thead id="gcHead" hidden><tr><th style="width:28px"><input type="checkbox" id="gcTodas" style="width:auto" title="Selecionar todas as linhas do filtro" aria-label="Selecionar todas as linhas do filtro"></th><th>Data</th><th class="l">Histórico do banco</th><th>Valor</th><th class="l">Lançamento no sistema</th><th></th></tr>
       <tr class="gcfil"><th></th><th><input id="gcfData" placeholder="Filtrar" aria-label="Filtrar pela data" style="width:84px"></th><th class="l"><input id="gcfHist" placeholder="Filtrar histórico" aria-label="Filtrar pelo histórico do banco"></th><th><input id="gcfValor" placeholder="Filtrar" aria-label="Filtrar pelo valor" style="width:96px"></th><th class="l"><input id="gcfLanc" placeholder="Filtrar lançamento" aria-label="Filtrar pelo lançamento no sistema"></th><th><button type="button" class="btn small ghost" id="gcfLimpa" title="Limpar os filtros das colunas">Limpar</button></th></tr></thead><tbody id="gcBody"></tbody></table></div>
     <p class="note" id="gcNote"></p>
@@ -13921,6 +13921,9 @@ async function renderGC(recarrega=true){
         todas(()=>sb.from('fin_titulos').select('*').eq('cliente_id',cli.id).order('vencimento')),
         todas(()=>sb.from('fin_movimentos').select('titulo_id,valor,juros,desconto').eq('cliente_id',cli.id).not('titulo_id','is',null)),
         todas(()=>sb.from('fin_conc_regras').select('*').eq('cliente_id',cli.id))]);
+      // linhas que estão numa tarefa para descobrir do que se trata (Carol, 19/11)
+      GC.tar={};try{for(let i=0;i<l.length;i+=200){const {data:tl}=await sb.from('tarefa_lancamentos').select('ofx_id,tarefa_id,validado_em,tarefas(titulo,status,arquivada)').in('ofx_id',l.slice(i,i+200).map(x=>x.id)).is('removido_em',null);
+        (tl||[]).forEach(x=>{if(!x.validado_em&&x.tarefas&&x.tarefas.status!=='concluida'&&!x.tarefas.arquivada)GC.tar[x.ofx_id]=x})}}catch(e){console.error(e)}
       GC.linhas=l;GC.movs=m;GC.regras=rg;GC.pago={};mt.forEach(x=>GC.pago[x.titulo_id]=r2((GC.pago[x.titulo_id]||0)+abat(x)));
       GC.tits=t.filter(x=>r2(x.valor-(GC.pago[x.id]||0))>0.004);GC.sel.clear();
       // remessas de pagamento desta conta: o banco mostra a remessa numa linha só com o total (Carol, 13/11)
@@ -14018,6 +14021,25 @@ $('gclOk').onclick=async()=>{const l=GCL.l,m=GCL.mapa(),it=[...GCL.sel].map(k=>m
   GC.sug[l.id]={k:'rem',rem:null,ms,ts,n:it.length,nomes:[],txt:''};
   $('gclOk').disabled=true;try{await gcAprovar([l]);$('dlgGCL').close();renderGC()}
   catch(err){console.error(err);delete GC.sug[l.id];$('gclErr').textContent=err.message||'Não foi possível conciliar.';$('gclErr').hidden=false;$('gclOk').disabled=false}};
+// Gerar tarefa (Carol, 19/11): linha do banco que ninguém sabe o que é vira item de uma tarefa da empresa,
+// “Conciliação: lançamentos do banco a identificar” (uma tarefa aberta por empresa; as próximas linhas entram nela)
+async function gcTarefa(ls){
+  if(!ehEsc())return toast('Só o escritório gera tarefas.');
+  const novos=ls.filter(l=>!GC.tar?.[l.id]);if(!novos.length)return toast('Estas linhas já estão numa tarefa.');
+  const obs=prompt(`Gerar tarefa para descobrir do que se trata ${novos.length===1?'esta linha':'estas '+novos.length+' linhas'} do banco.\n\nObservação (opcional): o que já sabe ou o que precisa perguntar`,'');if(obs===null)return;
+  const cid=GC.conta.cliente_id,tit='Conciliação: lançamentos do banco a identificar';
+  let adm=ehAdm()?{user_id:ME.user_id,nome:ME.nome}:null;
+  if(!adm){const {data}=await sb.from('perfis').select('user_id,nome').eq('admin',true).limit(1);adm=data?.[0]||{user_id:ME.user_id,nome:ME.nome}}
+  let {data:ts,error:e0}=await sb.from('tarefas').select('id,titulo').eq('cliente_id',cid).eq('titulo',tit).neq('status','concluida').eq('arquivada',false).limit(1);if(e0)throw e0;
+  let tar=ts?.[0];
+  if(!tar){const {data,error}=await sb.from('tarefas').insert({cliente_id:cid,titulo:tit,
+      descricao:'Linhas do extrato que ninguém soube identificar na conciliação bancária. Descubra do que se trata cada uma (com o cliente, o banco ou o comprovante), lance ou ligue na Gestão financeira › Conciliação bancária e valide aqui.',
+      status:'afazer',prioridade:'media',interna:true,executor:adm.user_id,executor_nome:adm.nome,criado_por:ME.user_id,criado_por_nome:ME.nome}).select('id,titulo').single();
+    if(error)throw error;tar=data}
+  const {error}=await sb.from('tarefa_lancamentos').insert(novos.map(l=>({tarefa_id:tar.id,cliente_id:cid,ofx_id:l.id,criado_por:ME.user_id,
+    resumo:`${dBR(l.data)} · ${GC.conta.nome} · ${histDe(l)} · ${fm(l.valor)}${obs.trim()?' · '+obs.trim():''}`})));if(error)throw error;
+  novos.forEach(l=>GC.tar[l.id]={tarefa_id:tar.id,tarefas:{titulo:tit}});GC.sel.clear();gcDesenha();
+  toast(`${novos.length} ${novos.length===1?'linha foi':'linhas foram'} para a tarefa “${tit}”`)}
 function gcSomaDe(l,usM,usT){
   const its=Array.isArray(l.itens)?l.itens:[];if((+l.qtd||its.length)<2||its.length<2)return null;
   const tipo=l.valor>0?'entrada':'saida',ms=[],ts=[],pegM=new Set(),pegT=new Set(),perto=d=>Math.abs(difDias(d,l.data));
@@ -14063,9 +14085,10 @@ function gcDesenha(){
     const cel=s==='conc'?`<span class="chip c-ok">✓ Conciliada</span> ${m.pessoa_nome&&m.descricao?`<b>${esc(m.pessoa_nome)}</b> · `:''}${esc(m.descricao||m.pessoa_nome||'')}${m.categoria?' '+mu('· '+esc(m.categoria)):''}${(GC.juntoQ?.[m.id]||0)>1?' '+mu(`· lançamento único de ${fm(m.valor)} somando ${GC.juntoQ[m.id]} linhas`):''}${GC.soma?.[l.id]?' '+mu(`· soma de ${GC.soma[l.id].length} lançamentos do sistema (${fm(r2(GC.soma[l.id].reduce((a,x)=>a+(+x.valor),0)))})`):''}`
       :s==='ign'?'<span class="chip c-none">Ignorada</span>'
       :s==='sug'?`<span class="chip c-warn">Sugestão</span> ${esc(g.txt)}`:'<span class="chip c-bad">Sem lançamento</span>';
+    const celT=s!=='conc'&&GC.tar?.[l.id]?` <span class="chip c-done" title="Está na tarefa “${esc(GC.tar[l.id].tarefas?.titulo||'')}”">📋 Em tarefa</span>`:'';
     const acts=s==='conc'?`${ok('desfaz')}Desfazer</button>`:s==='ign'?`${ok('volta')}Voltar</button>`
       :(s==='sug'?`<button type="button" class="btn small primary" data-gc="aprova">Aprovar</button> `:'')+`${ok('lanca')}${s==='sug'?'Outro':'Lançar'}</button> <button type="button" class="btn small" data-gc="liga" title="Escolher os lançamentos do sistema (ou contas em aberto) que formam esta linha do banco">Ligar</button> ${ok('ignora')}Ignorar</button>`;
-    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
+    return `<tr data-id="${l.id}"><td><input type="checkbox" class="gcck" style="width:auto"${GC.sel.has(l.id)?' checked':''}></td><td>${dBR(l.data)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:360px">${esc(histDe(l))}${l.qtd>1?`<br><span class="chip c-done" title="${esc((l.itens||[]).map(x=>fm(Math.abs(x.v))).join(' + '))}">${fm(Math.abs(l.valor))} = ${l.qtd} lançamentos somados</span>`:''}</td><td class="${l.valor<0?'neg':'pos'}">${fm(l.valor)}</td><td class="l" style="white-space:normal;min-width:200px;max-width:320px">${cel}${celT}</td><td style="white-space:nowrap">${acts}</td></tr>`}).join('')
     ||`<tr><td></td><td class="l muted" colspan="5">${GC.linhas.length?'Nada neste filtro.':'Nenhuma linha do banco neste período. Use “Importar OFX”.'}</td></tr>`;
   const n=s=>GC.linhas.filter(l=>gcSit(l)===s).length,E=r2(GC.linhas.filter(l=>l.valor>0).reduce((x,l)=>x+(+l.valor),0)),S=r2(GC.linhas.filter(l=>l.valor<0).reduce((x,l)=>x-l.valor,0));
   const ini=$('gcIni').value,fim=$('gcFim').value,sis=r2(GC.movs.filter(m=>m.data>=ini&&m.data<=fim).reduce((x,m)=>x+(m.tipo==='entrada'?1:-1)*m.valor,0)),dif=r2(E-S-sis);
@@ -14104,6 +14127,7 @@ $('gcAprovaTodas').onclick=async()=>{const ls=GC.linhas.filter(l=>gcSit(l)==='su
 $('gcBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-gb]');if(!b)return;const ls=GC.linhas.filter(l=>GC.sel.has(l.id)&&gcSit(l)!=='conc');if(!ls.length)return;
   if(b.dataset.gb==='lanca')return abrirGC(ls.filter(l=>gcSit(l)!=='ign'));
   if(b.dataset.gb==='limpa'){GC.sel.clear();return gcDesenha()}
+  if(b.dataset.gb==='tarefa'){b.disabled=true;try{await gcTarefa(ls)}catch(err){fail(err,'Não foi possível gerar a tarefa')}b.disabled=false;return}
   b.disabled=true;
   try{if(b.dataset.gb==='aprova')await gcAprovar(ls.filter(l=>gcSit(l)==='sug'));
     else{const ig=b.dataset.gb==='ignora';for(let i=0;i<ls.length;i+=200){const {error}=await sb.from('fin_ofx').update({ignorado:ig}).in('id',ls.slice(i,i+200).map(l=>l.id));if(error)throw error}}
