@@ -40,3 +40,8 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
 - **Linha em tarefa (Carol, 19/11):** dá para lançar ou ligar a linha mesmo com a tarefa aberta; a tarefa continua aberta (ex.: devolução pendente de quem recebeu errado).
 
 - **Sem lançamento avulso (Carol, 20/11):** todo lançamento novo entra pela conta a pagar ou a receber (pago na hora com "$ Salvar quitado"). A única exceção é a transferência entre contas. Os antigos sem conta (histórico do Bom Controle) ficam como estão e abrem como Pagamento ou Recebimento.
+
+## Checklist do mês (Carol, 21/11)
+1. **O que se repete todo mês** fica em `fin_recorrencias` (uma linha por item e empresa). É a lista que antes ficava nas planilhas "Check List … 2026" do OneDrive; a equipe mantém pelo ✎ e pelo + Novo item na tela.
+2. **Situação** sai das contas a pagar e dos anexos do mês: não lançada, prevista (atualizar com o boleto), boleto sem linha, falta anexo, pronta, paga.
+3. **Se o item não acha a conta que existe**, ajuste as "Palavras para achar a conta" (ex.: "celesc 28924054").
