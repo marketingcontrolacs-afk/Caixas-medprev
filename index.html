@@ -904,7 +904,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   <section id="viewGT" hidden>
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><h1 id="gtTitle"></h1><p class="sub" id="gtSub"></p></div>
-      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtLote" hidden title="Arraste vários boletos, notas, guias e faturas de uma vez: o sistema separa em lançamentos e junta a nota com o boleto do mesmo fornecedor e valor">📥 Importar documentos em lote</button><button class="btn" id="gtRecibos" hidden title="Criar, imprimir e guardar recibos (aluguel, serviço e outros)">🧾 Recibos</button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn" id="gtRepRel" hidden title="Repasses de parceiros pagos e em aberto no período, agrupados pela linha do banco (ex.: remessa)">Relatório de repasses</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button><details class="expdd" id="gtCriar" hidden><summary class="btn primary" title="Lançar na Movimentação financeira, como o Criar do Bom Controle">+ Criar ▾</summary><div class="expmenu"><button type="button" data-cr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-cr="receber">↑ Conta a receber (receita)</button><button type="button" data-cr="transf">⇄ Transferência entre contas</button></div></details></div>
+      <div class="row" style="align-items:flex-end"><span class="btn fotobtn" id="gtBC" hidden title="Envie o arquivo de movimentações exportado do Bom Controle (.xls ou .xlsx). Pode enviar mais de um arquivo (um por conta) de uma vez.">Importar do Bom Controle<input type="file" id="gtBCArq" accept=".xls,.xlsx,.csv" multiple aria-label="Importar a planilha de movimentações do Bom Controle"></span><button class="btn" id="gtImp" hidden></button><button class="btn" id="gtCheck" hidden title="O que se repete todo mês em cada empresa e o que ainda falta: lançar, atualizar com o boleto do mês ou anexar">✅ Checklist do mês</button><button class="btn" id="gtLote" hidden title="Arraste vários boletos, notas, guias e faturas de uma vez: o sistema separa em lançamentos e junta a nota com o boleto do mesmo fornecedor e valor">📥 Importar documentos em lote</button><button class="btn" id="gtRecibos" hidden title="Criar, imprimir e guardar recibos (aluguel, serviço e outros)">🧾 Recibos</button><button class="btn" id="gtRem" hidden>Remessa ao banco</button><button class="btn" id="gtRepRel" hidden title="Repasses de parceiros pagos e em aberto no período, agrupados pela linha do banco (ex.: remessa)">Relatório de repasses</button><button class="btn primary" id="gtNovoR" hidden>+ Nova conta a receber</button><button class="btn primary" id="gtNovo"></button><details class="expdd" id="gtCriar" hidden><summary class="btn primary" title="Lançar na Movimentação financeira, como o Criar do Bom Controle">+ Criar ▾</summary><div class="expmenu"><button type="button" data-cr="pagar">↓ Conta a pagar (despesa)</button><button type="button" data-cr="receber">↑ Conta a receber (receita)</button><button type="button" data-cr="transf">⇄ Transferência entre contas</button></div></details></div>
     </div>
     <div class="alerta" id="mvAviso" hidden></div>
     <div class="tiles" id="gtTiles"></div>
@@ -9183,7 +9183,7 @@ async function renderGT(){
   const lista=M!=='gfinad'&&M!=='gfagenda';
   ['gtFiltroBox','gtIniBox','gtFimBox'].forEach(id=>$(id).hidden=!lista);$('gtFiltroBox').hidden=!lista||M==='gfmov';
   document.querySelectorAll('.mvf').forEach(x=>x.hidden=M!=='gfmov'&&!(x.classList.contains('gtf')&&(M==='gfpagar'||M==='gfrec')));(pt=>{if(pt?.classList.contains('per'))pt.firstElementChild.textContent=['gfmov','gfpagar','gfrec'].includes(M)?'Período':'Vencimento'})($('gtIniBox').previousElementSibling);$('gtMesBox').hidden=M!=='gfagenda';$('gtCal').hidden=M!=='gfagenda';
-  $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';$('gtLote').hidden=$('gtRecibos').hidden=!cli||tod||M!=='gfpagar';$('gtRepRel').hidden=!cli||M!=='gfpagar';
+  $('gtNovo').hidden=!cli||tod;$('gtNovoR').hidden=!cli||tod||tipo!=='mov';$('gtImp').hidden=true;$('gtRem').hidden=!cli||tod||M!=='gfpagar';$('gtLote').hidden=$('gtRecibos').hidden=!cli||tod||M!=='gfpagar';$('gtRepRel').hidden=!cli||M!=='gfpagar';$('gtCheck').hidden=!cli||M!=='gfpagar';
   $('gtBC').hidden=!cli||tod||M!=='gfmov'||!ehEsc();   // importar do Bom Controle (Carol, 03/11)
   // modelo do Bom Controle (Carol, 15/11): "+ Criar" na Movimentação (conta a pagar, a receber, transferência, lançamento na conta),
   // "Data por", filtro de empresas em Todas as empresas e os totais Saídas/Entradas/Resultado/Saldo hoje
@@ -9841,6 +9841,7 @@ $('gtBody').addEventListener('keydown',e=>{if(e.target.matches?.('input'))return
 $('gtNovo').onclick=()=>abrirGT(null,GT.tipo==='receber'?'receber':'pagar');
 $('gtNovoR').onclick=()=>abrirGT(null,'receber');
 $('gtRem').onclick=()=>{RM.so=null;go('gfremessa')};
+$('gtCheck').onclick=()=>ckAbre().catch(e=>fail(e,'Não foi possível abrir o checklist'));
 $('gtLote').onclick=()=>ltAbre().catch(e=>fail(e,'Não foi possível abrir a importação'));
 $('gtRecibos').onclick=()=>rcAbre().catch(e=>fail(e,'Não foi possível abrir os recibos'));
 // ---------- Anexos dos lançamentos da Gestão financeira (Carol, 04/11; v94) ----------
@@ -10355,6 +10356,122 @@ async function ltCriar(){
     if(feitos.novos.length){const {error}=await sb.from('fin_titulos').delete().in('id',feitos.novos);if(error)throw error}
     if(feitos.arqs.length)await sb.storage.from('anexos').remove(feitos.arqs).catch(()=>{});
     toast('Importação desfeita');GT.key='';renderGT()})}
+// ===== CHECKLIST DO MÊS (Carol, 21/11) =====
+// O que se repete todo mês em cada empresa (fin_recorrencias; começou com as planilhas "Check List … 2026" do OneDrive) e a situação
+// no mês escolhido: lançada, atualizada com o boleto do mês, com anexo e paga. A conta do mês é achada pelas palavras do item
+// (ou da descrição) no fornecedor, descrição, categoria e documento das contas a pagar; cada conta vale para um item só.
+let CK=null;
+const CK_STOP=new Set('de da do das dos e em no na para com sem deb debito auto automatico pgto pagamento boleto dia cada envia metade sala nova un cnpj ref parc lj'.split(' '));
+const CK_CURTAS=['oi','das','iss','tim','vr','nf','sms','pix','tv','inss','fgts'];
+const CK_SIN={luz:['energia','celesc','copel'],energia:['energia','celesc','copel'],eletrica:['energia','celesc','copel'],agua:['agua','sanepar','casan','saneamento','samae'],
+  salario:['salario','folha'],salarios:['salario','folha'],folha:['folha','salario'],contabilidade:['contabil','contabilidade'],das:['das','simples'],iss:['iss','issqn'],
+  royalties:['royalties','medprev'],vivo:['vivo','telefonica'],cartao:['cartao','fatura'],viasoft:['viasoft','vsb'],via:['viasoft','vsb'],soft:['viasoft','vsb'],ponto:['ponto','solides']};
+function ckGrupos(r){
+  const ws=pessoaChave(r.palavras||r.descricao).split(' ').filter(w=>w&&!CK_STOP.has(w)&&!/^\d/.test(w)&&(w.length>=3||CK_CURTAS.includes(w)));
+  return [...new Set(ws)].map(w=>CK_SIN[w]||[w])}
+// a palavra do item bate com o começo de uma palavra da conta ("copel" não pega "Scopel"; curtas, só a palavra inteira)
+const ckBate=(g,ws)=>g.some(w=>ws.some(x=>w.length>=4?x.startsWith(w):x===w));
+function ckCasa(recs,tits,mes){
+  const pares=[],ult=new Date(+mes.slice(0,4),+mes.slice(5,7),0).getDate();
+  for(const r of recs){const gs=ckGrupos(r);if(!gs.length)continue;
+    // vencimento perto do dia do item (até 10 dias: fim de semana, feriado, FGTS pago antes); item sem dia: qualquer dia do mês
+    const esp=r.dia?dObj(mes+'-'+pad(Math.min(r.dia,ult))):null;
+    for(const t of tits){if(t.cliente_id!==r.cliente_id)continue;
+      const dd=esp?Math.round(Math.abs(dObj(t.vencimento)-esp)/864e5):(t.vencimento.slice(0,7)===mes?0:99);if(dd>10)continue;
+      const ws=pessoaChave([t.pessoa_nome,t.descricao,t.categoria,t.documento].filter(Boolean).join(' ')).split(' '),bat=gs.map(g=>ckBate(g,ws)),n=bat.filter(Boolean).length;
+      // item de 1 ou 2 palavras: todas batem; mais palavras: a 1ª (a principal: Aluguel, Maxcore, Celesc…) ou a maioria
+      if(!n||(gs.length<=2?n<gs.length:!(bat[0]||n/gs.length>=0.5)))continue;
+      pares.push({r,t,s:n/gs.length,n,d:dd,tit:t.mov?0:1})}}
+  pares.sort((a,b)=>b.s-a.s||b.n-a.n||b.tit-a.tit||a.d-b.d);const uR=new Set,uT=new Set,m=new Map;
+  for(const p of pares){if(uR.has(p.r.id)||uT.has(p.t.id))continue;uR.add(p.r.id);uT.add(p.t.id);m.set(p.r.id,p.t)}
+  return m}
+function ckSit(r){
+  if(!r.ativo)return {k:'inat',txt:'Desativado',c:'c-none'};
+  const t=CK.casa.get(r.id);if(!t)return {k:'falta',txt:'Não lançada',c:'c-bad'};
+  if(t.mov)return {k:'ok',txt:'Paga (lançamento sem conta a pagar)',c:'c-ok',t};
+  const pg=CK.pago.has(t.id),an=CK.anx.has(t.id),semLinha=(t.forma||'')==='Boleto'&&!t.linha_digitavel;
+  if(pg)return an?{k:'ok',txt:'Paga',c:'c-ok',t}:{k:'anexo',txt:'Paga, sem anexo',c:'c-warn',t};
+  if(t.previsto)return {k:'atual',txt:'Prevista: atualizar com o boleto do mês',c:'c-warn',t};
+  if(semLinha)return {k:'atual',txt:'Boleto sem linha digitável',c:'c-warn',t};
+  if(!an)return {k:'anexo',txt:'Falta anexar o boleto ou a nota',c:'c-warn',t};
+  return {k:'ok',txt:'Pronta para pagar',c:'c-ok',t}}
+function ckDialogo(){if($('dlgCheck'))return;
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="dlgCheck" style="width:min(1240px,calc(100vw - 32px))"><div class="dh"><h2 id="ckTitle">Checklist do mês</h2></div>
+    <div class="db"><div class="row" style="align-items:flex-end"><label class="f" style="width:170px">Mês<input type="month" id="ckMes"></label>
+      <label class="f" style="width:230px">Mostrar<select id="ckFiltro"><option value="pend">Só o que falta (pendências)</option><option value="tudo">Tudo</option><option value="inat">Também os desativados</option></select></label>
+      <span class="spacer"></span><button type="button" class="btn" data-ck="novo">+ Novo item</button><button type="button" class="btn" data-ck="recarrega" title="Buscar de novo (depois de lançar ou anexar)">⟳ Atualizar</button></div>
+      <div class="tiles" id="ckTiles" style="margin-top:4px"></div><div id="ckBody"></div></div>
+    <div class="df"><span class="note" style="margin:0;text-align:left;flex:1">A conta do mês é achada pelas palavras do item no fornecedor, descrição e categoria. Se não achar uma conta que existe, edite o item (✎) e ajuste as palavras.</span><button type="button" class="btn" data-ck="fechar">Fechar</button></div></dialog>`);
+  const d=$('dlgCheck');
+  d.addEventListener('change',e=>{if(e.target.id==='ckMes'&&e.target.value){CK.mes=e.target.value;ckCarrega().catch(er=>fail(er,'Não foi possível carregar o checklist'))}
+    if(e.target.id==='ckFiltro'){CK.filtro=e.target.value;ckDesenha()}});
+  d.addEventListener('click',async e=>{const b=e.target.closest('[data-ck]');if(!b)return;const a=b.dataset.ck,r=CK.recs.find(x=>x.id===b.dataset.id);
+    if(a==='fechar')return d.close();
+    if(a==='recarrega')return ckCarrega().catch(er=>fail(er,'Não foi possível carregar o checklist'));
+    if(a==='novo'){CK.ed='novo';CK.filtro=CK.filtro==='pend'?'tudo':CK.filtro;$('ckFiltro').value=CK.filtro;return ckDesenha()}
+    if(a==='editar'){CK.ed=r.id;return ckDesenha()}
+    if(a==='cancelar'){CK.ed=null;return ckDesenha()}
+    if(a==='salvar')return ckSalva(b).catch(er=>fail(er,'Não foi possível salvar o item'));
+    if(a==='abrir'){const t=CK.tits.find(x=>x.id===b.dataset.t);if(!t)return;const full=GT.lista.find(x=>x.id===t.id);
+      if(!full||!CK.cli)return toast('Abra a empresa em Contas a pagar para editar esta conta.');return abrirGT(full,'pagar')}});
+  return d}
+async function ckAbre(){const cli=escCli.value==='*'?null:cliAtual();
+  CK={cli,mes:TODAY.slice(0,7),filtro:'pend',ed:null,recs:[],tits:[],anx:new Set,pago:new Set,casa:new Map};ckDialogo();
+  $('ckTitle').textContent='Checklist do mês · '+(cli?cli.nome:'todas as empresas');$('ckMes').value=CK.mes;$('ckFiltro').value=CK.filtro;
+  $('dlgCheck').showModal();await ckCarrega()}
+async function ckCarrega(){
+  const ids=CK.cli?[CK.cli.id]:empresasDe(VIEW).map(c=>c.id).filter(id=>id&&id!=='*');CK.ids=ids;
+  const ini=CK.mes+'-01',fim=isoLocal(new Date(+CK.mes.slice(0,4),+CK.mes.slice(5,7),0)),de=isoLocal(new Date(dObj(ini).getTime()-10*864e5)),ate=isoLocal(new Date(dObj(fim).getTime()+10*864e5));
+  $('ckBody').innerHTML='<p class="note">Carregando…</p>';$('ckTiles').innerHTML='';
+  const [recs,tits]=await Promise.all([todas(()=>sb.from('fin_recorrencias').select('*').in('cliente_id',ids).order('dia',{nullsFirst:false}).order('descricao')),
+    // repasses de parceiro (restituições) não entram no checklist
+    todas(()=>sb.from('fin_titulos').select('id,cliente_id,pessoa_nome,descricao,categoria,documento,vencimento,valor,forma,linha_digitavel,previsto').eq('tipo','pagar').in('cliente_id',ids).gte('vencimento',de).lte('vencimento',ate).or('origem.is.null,origem.neq.repasse'))]);
+  const tids=tits.map(t=>t.id),anx=new Set,pago=new Set;
+  for(let i=0;i<tids.length;i+=150){const c=tids.slice(i,i+150);
+    const [dd,mm]=await Promise.all([sb.from('documentos').select('registro_id').eq('modulo','financeiro').in('registro_id',c),sb.from('fin_movimentos').select('titulo_id').in('titulo_id',c)]);
+    (dd.data||[]).forEach(x=>anx.add(x.registro_id));(mm.data||[]).forEach(x=>pago.add(x.titulo_id))}
+  // pagamentos lançados direto no banco, sem conta a pagar (ex.: importados do Bom Controle): também contam como pagos
+  const movs=await todas(()=>sb.from('fin_movimentos').select('id,cliente_id,data,valor,pessoa_nome,descricao,categoria,documento').eq('tipo','saida').is('titulo_id',null).is('transf_id',null).in('cliente_id',ids).gte('data',de).lte('data',ate)).catch(()=>[]);
+  tits.push(...movs.map(m=>({...m,id:'m:'+m.id,vencimento:m.data,mov:true})));
+  Object.assign(CK,{recs,tits,anx,pago,casa:ckCasa(recs.filter(r=>r.ativo),tits,CK.mes)});ckDesenha()}
+function ckHist(r,mi,sit){ // meses de 2026 da planilha antiga (x = teve); o mês escolhido mostra a situação de agora
+  const h=String(r.historico||''),ano=+CK.mes.slice(0,4);
+  return `<span style="display:inline-flex;gap:2px">${MESES.map((m,i)=>{const atual=i===mi,tem=ano===2026&&h[i]==='x';
+    const bg=atual?(sit.k==='ok'?'var(--ok)':sit.k==='falta'?'var(--bad)':sit.k==='inat'?'var(--line)':'var(--warn)'):tem?'var(--brand-soft)':'var(--sunk)';
+    return `<span title="${m}${atual?': '+esc(sit.txt):tem?': teve':''}" style="width:14px;height:14px;border-radius:3px;font-size:9px;line-height:14px;text-align:center;background:${bg};color:${atual?'#fff':'var(--muted)'}">${m[0]}</span>`}).join('')}</span>`}
+function ckForm(r){const nome=id=>CLIENTES.find(c=>c.id===id)?.nome||'';
+  return `<tr><td colspan="6" class="l" style="background:var(--sunk)"><div class="row" style="align-items:flex-end;gap:8px">
+    ${r?'':CK.cli?'':`<label class="f" style="width:200px">Empresa<select id="ckfCli">${CK.ids.map(id=>`<option value="${id}">${esc(nome(id))}</option>`).join('')}</select></label>`}
+    <label class="f" style="width:70px">Dia<input id="ckfDia" type="number" min="1" max="31" value="${r?.dia??''}"></label>
+    <label class="f" style="flex:1;min-width:180px">Descrição<input id="ckfDesc" value="${esc(r?.descricao||'')}" placeholder="Ex.: Celesc sala 03"></label>
+    <label class="f" style="flex:1;min-width:180px">Como chega / observação<input id="ckfObs" value="${esc(r?.observacao||'')}" placeholder="Ex.: E-mail da Vanessa; débito automático"></label>
+    <label class="f" style="flex:1;min-width:180px" title="Palavras que aparecem no fornecedor, na descrição ou na categoria da conta lançada. Em branco: usa a descrição.">Palavras para achar a conta<input id="ckfPal" value="${esc(r?.palavras||'')}" placeholder="Ex.: celesc 28924054"></label>
+    <label class="f" style="flex-direction:row;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ckfAtivo" style="width:auto"${!r||r.ativo?' checked':''}> Ativo</label>
+    <button type="button" class="btn primary small" data-ck="salvar" data-id="${r?.id||''}">Salvar</button><button type="button" class="btn small ghost" data-ck="cancelar">Cancelar</button></div></td></tr>`}
+async function ckSalva(b){
+  const desc=$('ckfDesc').value.trim();if(!desc)return alert('Informe a descrição.');
+  const dia=parseInt($('ckfDia').value)||null;if(dia&&(dia<1||dia>31))return alert('Dia entre 1 e 31.');
+  const row={dia,descricao:desc,observacao:$('ckfObs').value.trim()||null,palavras:$('ckfPal').value.trim()||null,ativo:$('ckfAtivo').checked};
+  const id=b.dataset.id;let error;
+  if(id)({error}=await sb.from('fin_recorrencias').update(row).eq('id',id));
+  else({error}=await sb.from('fin_recorrencias').insert({...row,cliente_id:CK.cli?.id||$('ckfCli').value}));
+  if(error)throw error;CK.ed=null;toast('Item salvo');await ckCarrega()}
+function ckDesenha(){
+  const mi=+CK.mes.slice(5,7)-1,nome=id=>CLIENTES.find(c=>c.id===id)?.nome||'',f=CK.filtro;
+  const its=CK.recs.map(r=>({r,s:ckSit(r)}));
+  const cont=k=>its.filter(x=>x.s.k===k).length;
+  $('ckTiles').innerHTML=[['falta','Não lançadas','c-bad'],['atual','Atualizar com o boleto','c-warn'],['anexo','Falta anexo','c-warn'],['ok','Prontas ou pagas','c-ok']]
+    .map(([k,t])=>`<div class="card tile"><div class="k">${t}</div><div class="v">${cont(k)}</div></div>`).join('');
+  const vis=its.filter(x=>f==='inat'||x.s.k!=='inat').filter(x=>f!=='pend'||['falta','atual','anexo'].includes(x.s.k)||CK.ed===x.r.id);
+  const grupos=[...new Set(vis.map(x=>x.r.cliente_id))];
+  const linha=({r,s})=>CK.ed===r.id?ckForm(r):`<tr${r.ativo?'':' style="opacity:.55"'}><td>${r.dia??'—'}</td>
+    <td class="l"><b>${esc(r.descricao)}</b>${r.observacao?`<div class="d2">${esc(r.observacao)}</div>`:''}</td>
+    <td class="l">${s.t?.mov?`${esc(s.t.pessoa_nome||s.t.descricao||'')}<br><span class="muted">pago em ${dBR(s.t.vencimento)} · ${fm(s.t.valor)}</span>`:s.t?`<button type="button" class="btn small ghost" style="text-align:left;white-space:normal" data-ck="abrir" data-t="${s.t.id}" title="Abrir a conta a pagar">${esc(s.t.pessoa_nome||'')}<br><span class="muted">venc. ${dBR(s.t.vencimento)} · ${fm(s.t.valor)}</span></button>`:'<span class="muted">—</span>'}</td>
+    <td class="l"><span class="chip ${s.c}">${esc(s.txt)}</span></td><td>${ckHist(r,mi,s)}</td>
+    <td><button type="button" class="btn small ghost" data-ck="editar" data-id="${r.id}" title="Editar o item (dia, descrição, palavras, ativo)">✎</button></td></tr>`;
+  const corpo=grupos.map(g=>`${grupos.length>1||!CK.cli?`<tr class="rngrp"><td colspan="6" class="l"><b>${esc(nome(g))}</b></td></tr>`:''}${vis.filter(x=>x.r.cliente_id===g).map(linha).join('')}`).join('');
+  $('ckBody').innerHTML=`<div class="tablebox" style="max-height:none;margin-top:8px"><table class="nosort"><thead><tr><th>Dia</th><th class="l">Item</th><th class="l">Conta lançada no mês</th><th class="l">Situação</th><th>Meses</th><th></th></tr></thead>
+    <tbody>${CK.ed==='novo'?ckForm(null):''}${corpo||`<tr><td colspan="6" class="l muted">${f==='pend'?'Nada pendente neste mês. 🎉':'Nenhum item.'}</td></tr>`}</tbody></table></div>`}
 // ===== Recibos: criar, imprimir e guardar (aluguel, serviço e outros) (Carol, 18/11; v160) =====
 // Contas a pagar › 🧾 Recibos: lista com busca e filtro em todas as colunas, + Novo recibo, ⧉ Duplicar (ex.: o aluguel do mês
 // seguinte), Imprimir (2 vias para assinar) e Excluir com Desfazer. Na conta aberta, "🧾 Gerar recibo" já vem preenchido.

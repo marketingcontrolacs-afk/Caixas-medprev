@@ -2,6 +2,12 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **21/11/2026 10:10 · Claude (chat contas a pagar) · `feat/checklist-mes`:** **✅ Checklist do mês** em Contas a pagar (pedido da Carol).
+  - **Banco:** migration `fin_recorrencias_checklist` (tabela `fin_recorrencias`: empresa, dia, descrição, observação, palavras, historico, ativo; RLS igual à de `fin_titulos`). Preenchida com as 3 planilhas "Check List … 2026" do OneDrive (243 itens, 212 ativos; `historico` = jan..dez de 2026, x = teve).
+  - **Tela:** escolhe o mês e mostra, por empresa, cada item com a conta do mês e a situação: Não lançada · Prevista (atualizar com o boleto) · Boleto sem linha digitável · Falta anexo · Pronta · Paga. Pagamento lançado direto no banco (sem conta a pagar) conta como pago. Filtro "Só o que falta", + Novo item e ✎ para editar (dia, descrição, como chega, palavras, ativo).
+  - **Como acha a conta (`ckCasa`):** palavras do item (ou da descrição) no fornecedor, descrição, categoria e documento; começo de palavra ("copel" não pega "Scopel"); item de até 2 palavras precisa de todas; vencimento até 10 dias do dia do item; repasses de restituição ficam de fora; cada conta vale para um item só. Em novembro achou 111 de 212.
+  - **Pendente:** Oliveira, Campos Souto e MAR quase não têm lançamentos de novembro no ERP, por isso aparecem como "Não lançada".
+
 - **21/11/2026 09:30 · Claude (chat contas a pagar) · `feat/vencimento-dia-util`:** na conta a pagar (pedido da Carol):
   - **Vencimento em dia útil:** se o vencimento cai em sábado, domingo ou feriado (tabela `feriados`: nacionais + UF/município da empresa), aparece um aviso embaixo do campo com o botão "Usar dd/mm", e ao salvar pergunta se ajusta. A regra é **postergar** para o próximo dia útil; **INSS e FGTS antecipam** (categoria ou descrição com INSS/FGTS). As parcelas seguintes e o "esta e as próximas" já saem ajustados. Funções `ferVenc`, `vencMotivo`, `vencUtil`, `vencAntecipa`.
   - **Débito automático:** salvar com a forma "Débito automático" marca `sem_remessa`, e a conta não aparece no Envio de remessa. No banco, as contas em aberto que já eram débito automático foram marcadas também.
