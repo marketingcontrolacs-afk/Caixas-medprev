@@ -2,6 +2,11 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **21/11/2026 09:30 · Claude (chat contas a pagar) · `feat/vencimento-dia-util`:** na conta a pagar (pedido da Carol):
+  - **Vencimento em dia útil:** se o vencimento cai em sábado, domingo ou feriado (tabela `feriados`: nacionais + UF/município da empresa), aparece um aviso embaixo do campo com o botão "Usar dd/mm", e ao salvar pergunta se ajusta. A regra é **postergar** para o próximo dia útil; **INSS e FGTS antecipam** (categoria ou descrição com INSS/FGTS). As parcelas seguintes e o "esta e as próximas" já saem ajustados. Funções `ferVenc`, `vencMotivo`, `vencUtil`, `vencAntecipa`.
+  - **Débito automático:** salvar com a forma "Débito automático" marca `sem_remessa`, e a conta não aparece no Envio de remessa. No banco, as contas em aberto que já eram débito automático foram marcadas também.
+  - **Pendente:** os feriados municipais e estaduais dos clientes ainda não estão na tabela `feriados` (só os 20 nacionais de 2026–2027).
+
 - **20/11/2026 03:40 · conta 2 · `feat/sem-avulso`:** **acabou o "lançamento avulso"** (decisão da Carol). (1) O nome sumiu: o lançamento antigo sem conta a pagar/receber abre como **Pagamento**, **Recebimento** ou **Transferência**. (2) Tudo que é novo entra pela conta a pagar ou a receber (com "$ Salvar quitado"); à parte só a transferência entre contas. "+ Criar" da Movimentação e do Extrato da conta: Conta a pagar, Conta a receber, Transferência. Duplicar um pagamento antigo abre uma conta a pagar nova. `renderGT` volta para a Conciliação ou o Extrato quando o diálogo foi aberto lá. (3) Os ~84 mil lançamentos antigos (histórico do Bom Controle) ficam como estão.
   - **Pendente para 20/11 de manhã:** conferir a Tesouraria da MPA de Pato Branco (as meninas disseram que o saldo está errado).
 

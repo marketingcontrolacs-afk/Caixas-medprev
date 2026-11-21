@@ -9076,6 +9076,14 @@ let GTR=null,GFC={cid:'',lista:[]},GFP={key:'',lista:[]};
 const GTFORMAS=['Boleto','Pix','Transferência','Débito automático','Cartão','Dinheiro'];
 const gtP=()=>GT.tipo==='pagar';
 const dP=()=>GT.dlg==='pagar';   // o diálogo aberto é de conta a pagar (na movimentação, depende da conta)
+// VENCIMENTO EM DIA ÚTIL (Carol, 21/11): conta a pagar com vencimento em sábado, domingo ou feriado vai para o próximo dia útil;
+// INSS e FGTS são o contrário: antecipam para o dia útil anterior. Feriados: tabela feriados (nacionais + os da UF/município da empresa).
+let FERVENC=null;
+async function ferVenc(cli){if(!FERVENC){try{const {data,error}=await sb.from('feriados').select('data,nome,uf,municipio');FERVENC=error?[]:(data||[])}catch(e){console.error(e);FERVENC=[]}}
+  return new Map(FERVENC.filter(x=>!x.uf||x.uf===cli?.uf&&(!x.municipio||x.municipio===cli?.municipio)).map(x=>[x.data,x.nome||'feriado']))}
+const vencAntecipa=(...tx)=>/\b(inss|fgts)\b/i.test(tx.filter(Boolean).join(' '));
+function vencMotivo(s,fer){if(!s)return '';const w=dObj(s).getDay();return fer?.has(s)?'feriado ('+fer.get(s)+')':w===0?'domingo':w===6?'sábado':''}
+function vencUtil(s,fer,ant){const d=dObj(s);for(let i=0;i<20&&vencMotivo(isoLocal(d),fer);i++)d.setDate(d.getDate()+(ant?-1:1));return isoLocal(d)}
 const abat=m=>r2(m.valor-(+m.juros||0)+(+m.desconto||0));   // quanto o movimento abate do título
 // mesma regra do banco (v58): sem acento, maiúsculas, pontuação e LTDA/ME/EPP/EIRELI/SA no fim
 const pessoaChave=t=>(t||'').toLowerCase().replace(/&/g,' e ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/( (ltda|me|epp|eireli|sa|s a|mei))+$/,'');
@@ -10674,6 +10682,14 @@ async function abrirGT(t,tipo,pre){
   // competência já vem preenchida pela categoria e pelo vencimento; quem digitar manda (Carol, 13/11)
   {const cp=$('gt_competencia');if(cp&&!cp.disabled){const sug=()=>{if(cp.value&&cp.dataset.auto!=='1')return;const v=compSugerida($('gt_categoria')?.value,$('gt_vencimento')?.value,GT.lista,t?.id);if(v){cp.value=v;cp.dataset.auto='1'}};
     cp.addEventListener('input',()=>{cp.dataset.auto=''});['gt_categoria','gt_vencimento'].forEach(k=>$(k)?.addEventListener('change',sug));sug()}}
+  // aviso de vencimento fora de dia útil, com botão para ajustar (Carol, 21/11)
+  if(P&&$('gt_vencimento')){const vi=$('gt_vencimento'),av=document.createElement('div');av.className='note';av.style.cssText='color:#b45309;margin-top:4px';av.hidden=true;
+    vi.closest('label').after(av);
+    const ck=async()=>{const fer=await ferVenc(cli),s=vi.value,mot=vencMotivo(s,fer);if(!mot){av.hidden=true;return}
+      const ant=vencAntecipa($('gt_categoria')?.value,$('gt_descricao')?.value),nv=vencUtil(s,fer,ant);
+      av.innerHTML=`⚠ ${dBR(s)} cai em ${esc(mot)}. ${ant?'INSS e FGTS antecipam para o dia útil anterior':'Conta a pagar é postergada para o próximo dia útil'}: <b>${dBR(nv)}</b>. <button type="button" class="btn small">Usar ${dBR(nv)}</button>`;
+      av.querySelector('button').onclick=()=>{vi.value=nv;vi.dispatchEvent(new Event('change'))};av.hidden=false};
+    ['change','input'].forEach(e=>vi.addEventListener(e,ck));['gt_categoria','gt_descricao'].forEach(k=>$(k)?.addEventListener('change',ck));ck()}
   if($('gtJunto')){const mids=movs.map(m=>m.id),q=[ofxIds.length?`id.in.(${ofxIds.join(',')})`:'',`junto_mov.in.(${mids.join(',')})`].filter(Boolean).join(',');
     sb.from('fin_ofx').select('id,data,valor,memo,nome,qtd,itens,junto_mov').or(q).order('data').order('valor').then(({data,error})=>{const b=$('gtJuntoBody');if(!b)return;if(error){console.error(error);b.textContent='Não foi possível carregar os lançamentos do banco.';return}
       const ls=(data||[]).filter(l=>ofxIds.includes(l.id)||mids.includes(l.junto_mov)),n=ls.reduce((a,l)=>a+(l.qtd>1?l.qtd:1),0);$('gtJunto').hidden=n<2;
@@ -10720,6 +10736,15 @@ async function gtAcao(a,b){
       competencia:val('competencia')?val('competencia')+'-01':null,vencimento:val('vencimento'),conta_id:val('conta_id'),forma:val('forma'),
       linha_digitavel:P?(val('linha_digitavel')||'').replace(/\D/g,'')||null:null,pix_chave:P?val('pix_chave')||p?.pix_chave||null:null,obs:val('obs')};
     if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
+    // débito automático não vai na remessa (Carol, 21/11)
+    if(P&&row.forma==='Débito automático')row.sem_remessa=true;
+    // vencimento em dia útil (Carol, 21/11): pergunta antes de salvar; as próximas parcelas já saem ajustadas
+    const vBase=row.vencimento,vAnt=P&&vencAntecipa(row.categoria,row.descricao),FV=P?await ferVenc(cli):null;
+    if(P){const mot=vencMotivo(row.vencimento,FV);
+      if(mot){const nv=vencUtil(row.vencimento,FV,vAnt);
+        if(!confirm(`O vencimento ${dBR(row.vencimento)} cai em ${mot}.\n\n${vAnt?'INSS e FGTS antecipam para o dia útil anterior':'Conta a pagar é postergada para o próximo dia útil'}: ${dBR(nv)}.\n\nOK: salvar com ${dBR(nv)}\nCancelar: voltar e corrigir`))return gtErr(`Vencimento em ${mot}. Use ${dBR(nv)}.`);
+        row.vencimento=nv;$('gt_vencimento').value=nv}}
+    const vMes=k=>FV?vencUtil(somaMes(vBase,k),FV,vAnt):somaMes(vBase,k);
     // rateio na categoria (v160): a categoria principal é a da maior parte
     {const rt=gtRatLe(valor);if(rt.erro)return gtErr(rt.erro);
       if(rt.partes||t?.cat_partes){if(!await v160ok())return gtErr(v160Msg);row.cat_partes=rt.partes;if(rt.partes)row.categoria=rt.principal}}
@@ -10737,7 +10762,7 @@ async function gtAcao(a,b){
         const mVenc=muda('vencimento'),mComp=muda('competencia');
         const prox=GT.lista.filter(x=>x.grupo_id===t.grupo_id&&x.parcela>t.parcela&&!(GT.movs[x.id]||[]).length);
         for(const x of prox){const k=x.parcela-t.parcela,u={...ch};
-          if(mVenc)u.vencimento=somaMes(row.vencimento,k);if(mComp)u.competencia=row.competencia?somaMes(row.competencia,k):null;
+          if(mVenc)u.vencimento=vMes(k);if(mComp)u.competencia=row.competencia?somaMes(row.competencia,k):null;
           if(!Object.keys(u).length)break;
           ({error}=await sb.from('fin_titulos').update(u).eq('id',x.id));if(error)break}
         if(!error)GT.proxOk=prox.length}
@@ -10748,7 +10773,7 @@ async function gtAcao(a,b){
       const n=Math.max(1,Math.min(120,parseInt($('gt_parcelas').value)||1)),tot=$('gt_vparc').value==='total';
       const base=tot?Math.floor(valor/n*100)/100:valor,grupo=n>1?crypto.randomUUID():null;
       const rows=[...Array(n).keys()].map(i=>({...row,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
-        vencimento:somaMes(row.vencimento,i),competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
+        vencimento:i?vMes(i):row.vencimento,competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
       if(row.cat_partes)rows.forEach(r=>r.cat_partes=partesEscala(row.cat_partes,r.valor));
       if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
       jaPago=b?.dataset.quit==='1';const jData=$('gj_data')?.value,jConta=$('gj_conta')?.value,jTodas=n>1&&$('gj_parc')?.value==='todas';
