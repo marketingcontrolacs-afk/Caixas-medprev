@@ -935,7 +935,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
     <div class="cal" id="gtCal" hidden></div>
     <div class="card tablebox"><table><thead id="gtHead"></thead><tbody id="gtBody"></tbody><tfoot id="gtFoot"></tfoot></table><div class="gtpag" id="gtPag" hidden></div></div>
     <div class="alerta" id="mvBulk" hidden style="margin-top:12px"><span id="mvBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-mb="valida" hidden>Marcar como validado</button><button type="button" class="btn small" data-mb="quitar">$ Quitar</button><button type="button" class="btn small" data-mb="estornar">Estornar</button><button type="button" class="btn small" data-mb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-mb="desconc">Desconciliar</button><button type="button" class="btn small" data-mb="cat">Trocar categoria</button><button type="button" class="btn small" data-mb="conta">Trocar conta</button><button type="button" class="btn small" data-mb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small" data-mb="tarefa" title="Gera uma tarefa ligada a estes lançamentos para conferir e validar">📋 Gerar tarefa para conferir</button><button type="button" class="btn small ghost" data-mb="limpa">Limpar seleção</button></span></div>
-    <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
+    <div class="alerta" id="gtBulk" hidden style="margin-top:12px"><span id="gtBulkTxt"></span><span class="row" style="gap:8px"><button type="button" class="btn small" data-gb="remessa" title="Manda as contas marcadas (em aberto) para o Envio de remessa. Nada vai para a remessa sem passar por aqui.">📤 Enviar para a remessa</button><button type="button" class="btn small" data-gb="quitar">$ Quitar</button><button type="button" class="btn small" data-gb="estornar">Estornar</button><button type="button" class="btn small" data-gb="conc">🔗 Conciliar</button><button type="button" class="btn small" data-gb="desconc">Desconciliar</button><button type="button" class="btn small" data-gb="excluir" style="color:var(--bad)">Excluir</button><button type="button" class="btn small ghost" data-gb="limpa">Limpar seleção</button></span></div>
     <p class="note" id="gtNote"></p>
   </section>
 
@@ -6877,7 +6877,7 @@ $('adGerar').onclick=async()=>{
     const {data:ex,error:e0}=await sb.from('folha_lancamentos').select('*').eq('cliente_id',cli.id).eq('competencia',comp).eq('funcionario_id',f.id).eq('coluna','adiantamento');if(e0)throw e0;
     const subs=(ex||[]).filter(l=>(l.descricao||'').startsWith(ADTO)&&!/\(recibo/.test(l.descricao||''));
     const cat=await adtoCategoria(cli);
-    ({data:tit}=await sb.from('fin_titulos').insert({cliente_id:cli.id,tipo:'pagar',pessoa_nome:f.nome,descricao:`Adiantamento salarial · folha ${mesTxt(ym)}`,categoria:cat,cat_revisar:!cat,
+    ({data:tit}=await sb.from('fin_titulos').insert({sem_remessa:true,cliente_id:cli.id,tipo:'pagar',pessoa_nome:f.nome,descricao:`Adiantamento salarial · folha ${mesTxt(ym)}`,categoria:cat,cat_revisar:!cat,
       competencia:comp,vencimento:dt,valor:v,parcela:1,parcelas:1,origem:'adiantamento',obs:['Recibo de adiantamento salarial',obs].filter(Boolean).join(' · ')}).select('id').single().then(r=>{if(r.error)throw r.error;return r}));
     ({data:lanc}=await sb.from('folha_lancamentos').insert({cliente_id:cli.id,competencia:comp,funcionario_id:f.id,coluna:'adiantamento',data:dt,quantidade:v,descricao:`${ADTO} (recibo de ${dBR(dt)})`}).select('id').single().then(r=>{if(r.error)throw r.error;return r}));
     const E=docEmp(cli);if(!E.cidade){E.cidade=cli.municipio||'';E.uf=E.uf||cli.uf||''}const D={emp:E,f:{nome:f.nome,cpf:f.cpf||'',cargo:f.cargo||''},valor:v,data_pgto:dt,competencia:ym,obs,titulo_id:tit.id,lanc_id:lanc.id,substituidos:subs.map(({id,...r})=>r)};
@@ -9443,12 +9443,25 @@ function gtBulk(){
   const ls=gtSelRows(),ab=ls.filter(t=>gtFalta(t)>0.004).length,pg=ls.filter(t=>(GT.movs[t.id]||[]).length).length,cc=ls.filter(t=>(GT.movs[t.id]||[]).some(movConc)).length;
   $('gtBulkTxt').innerHTML=`<b>${n} ${n===1?'conta selecionada':'contas selecionadas'}</b> · valor <b>${fm(r2(ls.reduce((a,t)=>a+(+t.valor),0)))}</b> · ${ab} em aberto · ${pg} ${pg===1?'paga ou recebida':'pagas ou recebidas'}${cc?` · ${cc} ${cc===1?'conciliada':'conciliadas'}`:''}`;
   const bt=k=>$('gtBulk').querySelector(`[data-gb="${k}"]`);
+  // REMESSA SÓ COM O QUE A CAROL ENVIAR (21/11): nada entra sozinho; só contas a pagar em aberto, fora de arquivo enviado
+  {const rb=bt('remessa');rb.hidden=GT.modo!=='gfpagar';const pode=ls.filter(t=>t.tipo==='pagar'&&gtFalta(t)>0.004&&t.sem_remessa&&!(GT.rem?.[t.id]&&!['excluido','recusado'].includes(GT.rem[t.id].status)));
+    rb.disabled=!pode.length;const na=ls.filter(t=>t.tipo==='pagar'&&!t.sem_remessa&&gtFalta(t)>0.004).length;if(na)$('gtBulkTxt').innerHTML+=` · ${na} já na remessa`}
   bt('quitar').disabled=!ab;bt('estornar').disabled=!pg;bt('desconc').disabled=!cc;bt('conc').disabled=!ls.some(t=>(GT.movs[t.id]||[]).some(m=>!movConc(m)));bt('excluir').disabled=!ls.some(t=>!(GT.movs[t.id]||[]).length);
 }
 $('gtBulk').addEventListener('click',async e=>{const b=e.target.closest('[data-gb]');if(!b||b.disabled)return;const a=b.dataset.gb;
   if(a==='limpa'){GT.sel.clear();return gtDesenha()}
   if(a==='quitar')return gtLoteQuitar();
+  if(a==='remessa')return gtEnviaRemessa().catch(err=>fail(err,'Não foi possível enviar para a remessa'));
   b.disabled=true;try{await gtLote(a)}catch(err){fail(err,'Não foi possível concluir')}finally{b.disabled=false}});
+async function gtEnviaRemessa(){
+  const ls=gtSelRows().filter(t=>t.tipo==='pagar'&&gtFalta(t)>0.004&&t.sem_remessa&&!(GT.rem?.[t.id]&&!['excluido','recusado'].includes(GT.rem[t.id].status)));if(!ls.length)return;
+  const tot=r2(ls.reduce((s,t)=>s+gtFalta(t),0));
+  if(!confirm(`Enviar ${ls.length} ${ls.length===1?'conta':'contas'} (${fm(tot)}) para a remessa?\n\n${ls.slice(0,12).map(t=>'• '+(t.pessoa_nome||'')+' · '+dBR(t.vencimento)+' · '+fm(gtFalta(t))).join('\n')}${ls.length>12?`\n… e mais ${ls.length-12}`:''}\n\nElas aparecem no Envio de remessa para gerar o arquivo. As outras continuam fora.`))return;
+  const ids=ls.map(t=>t.id);for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:false}).in('id',ids.slice(i,i+200));if(error)throw error}
+  ls.forEach(t=>t.sem_remessa=false);GT.sel.clear();gtDesenha();
+  toastDesfazer(`${ls.length} ${ls.length===1?'conta enviada':'contas enviadas'} para a remessa`,async()=>{
+    for(let i=0;i<ids.length;i+=200){const {error}=await sb.from('fin_titulos').update({sem_remessa:true}).in('id',ids.slice(i,i+200));if(error)throw error}
+    ls.forEach(t=>t.sem_remessa=true);gtDesenha();toast('Desfeito: saíram da remessa')})}
 // estornar, desconciliar e excluir as contas selecionadas
 async function gtLote(a,lsIn){
   const ls=lsIn||gtSelRows(),movsDe=t=>GT.movs[t.id]||[];
@@ -10339,7 +10352,7 @@ async function ltCriar(){
         const antes=Object.fromEntries(Object.keys(upd).map(k=>[k,t[k]??null]));
         const {error}=await sb.from('fin_titulos').update(upd).eq('id',t.id);if(error)throw error;feitos.alterados.push({id:t.id,antes});id=t.id}
       else{
-        const row={cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||x.forn,descricao:x.descricao||null,documento:x.numero||null,categoria:x.categoria||null,
+        const row={sem_remessa:true,cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||x.forn,descricao:x.descricao||null,documento:x.numero||null,categoria:x.categoria||null,
           competencia:x.competencia?x.competencia+'-01':null,vencimento:vencUtil(x.venc,FV,vencAntecipa(x.categoria,x.descricao)),valor:x.valor,parcela:1,parcelas:1,grupo_id:null,conta_id:null,
           forma:x.linha?'Boleto':x.pix?'Pix':null,linha_digitavel:x.linha?soDig(x.linha):null,pix_chave:x.pix?p?.pix_chave||null:null,obs:x.chave?`Chave da nota: ${x.chave}`:null};
         if(partes)row.cat_partes=partes;
@@ -10425,7 +10438,7 @@ async function ckCarrega(){
   $('ckBody').innerHTML='<p class="note">Carregando…</p>';$('ckTiles').innerHTML='';
   const [recs,tits]=await Promise.all([todas(()=>sb.from('fin_recorrencias').select('*').in('cliente_id',ids).order('dia',{nullsFirst:false}).order('descricao')),
     // repasses de parceiro (restituições) não entram no checklist
-    todas(()=>sb.from('fin_titulos').select('id,cliente_id,pessoa_nome,descricao,categoria,documento,vencimento,valor,forma,linha_digitavel,previsto').eq('tipo','pagar').in('cliente_id',ids).gte('vencimento',de).lte('vencimento',ate).or('origem.is.null,origem.neq.repasse'))]);
+    todas(()=>sb.from('fin_titulos').select('id,cliente_id,pessoa_nome,descricao,categoria,documento,vencimento,valor,forma,linha_digitavel,previsto').eq('tipo','pagar').in('cliente_id',ids).gte('vencimento',de).lte('vencimento',ate).or('origem.is.null,origem.neq.repasse').or('categoria.is.null,categoria.neq.Restituições'))]);   // repasse e Restituições são à parte (Carol, 21/11)
   const tids=tits.map(t=>t.id),anx=new Set,pago=new Set;
   for(let i=0;i<tids.length;i+=150){const c=tids.slice(i,i+150);
     const [dd,mm]=await Promise.all([sb.from('documentos').select('registro_id').eq('modulo','financeiro').in('registro_id',c),sb.from('fin_movimentos').select('titulo_id').in('titulo_id',c)]);
@@ -10912,7 +10925,7 @@ async function gtAcao(a,b){
     else{
       const n=Math.max(1,Math.min(120,parseInt($('gt_parcelas').value)||1)),tot=$('gt_vparc').value==='total';
       const base=tot?Math.floor(valor/n*100)/100:valor,grupo=n>1?crypto.randomUUID():null;
-      const rows=[...Array(n).keys()].map(i=>({...row,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
+      const rows=[...Array(n).keys()].map(i=>({...row,sem_remessa:true,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
         vencimento:i?vMes(i):row.vencimento,competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
       if(row.cat_partes)rows.forEach(r=>r.cat_partes=partesEscala(row.cat_partes,r.valor));
       if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
@@ -11404,7 +11417,7 @@ function rmDesenha(){
   const ab0=GT.lista.filter(t=>falta(t)>0.004&&(so?so.ids.has(t.id):!ate||t.vencimento<=ate)),ab=ab0.filter(t=>!t.sem_remessa||RM.tirados);
   // TIRADOS À VISTA (Carol, 19/11: "tirei e não aparece para enviar de novo"): aviso com quantos estão fora da lista e botões para ver e trazer todos de volta
   const tir=ab0.filter(t=>t.sem_remessa);RM.tirLista=tir;
-  if($('rmTir')){$('rmTir').hidden=!tir.length||RM.tirados;$('rmTir').innerHTML=tir.length?`<b>${tir.length} ${tir.length===1?'pagamento foi tirado':'pagamentos foram tirados'} da remessa (${fm(r2(tir.reduce((a,t)=>a+falta(t),0)))}) e não ${tir.length===1?'aparece':'aparecem'} na lista.</b><span>${esc(tir.slice(0,4).map(t=>t.pessoa_nome||t.descricao||'').join(', '))}${tir.length>4?' e mais '+(tir.length-4):''}</span><div class="row" style="gap:8px"><button type="button" class="btn small primary" data-act="rm_trazTodos">↩ Trazer ${tir.length===1?'de volta':'todos de volta'} para a remessa</button><button type="button" class="btn small ghost" data-act="rm_verTir">Ver quais são</button></div>`:''}
+  if($('rmTir')){$('rmTir').hidden=!tir.length||RM.tirados;$('rmTir').innerHTML=tir.length?`<b>Aqui só aparece o que foi enviado para a remessa.</b><span>${tir.length} ${tir.length===1?'conta a pagar em aberto não foi enviada':'contas a pagar em aberto não foram enviadas'} (${fm(r2(tir.reduce((a,t)=>a+falta(t),0)))}). Para mandar, marque em Contas a pagar e use “📤 Enviar para a remessa”.</span><div class="row" style="gap:8px"><button type="button" class="btn small ghost" data-act="rm_verTir">Ver quais são</button></div>`:''}   // remessa só com o que a Carol enviar (21/11): sem "trazer todos de volta"
   const bk=bancoDe(GFC.lista.find(c=>c.id===RM.conta)),sant=bk==='santander';
   RM.lista=ab.map(t=>{const p=pes.find(x=>x.id===t.pessoa_id),it=GT.rem[t.id],ja=it&&(it.status==='enviado'||it.status==='agendado');
     let f=rmForma(t,p,RM.pref?.[t.id]||RM.padrao);if(sant&&f.forma==='boleto'&&!soDig(rmDoc(p)))f={erro:'boleto sem CNPJ/CPF do fornecedor no cadastro (o Santander exige)'};
@@ -19215,7 +19228,8 @@ async function rnCriaTitulos(ls,venc,cont){
     // repasse de parceiro é sempre na categoria Restituições (Carol, 04/11): antes caía em "Repasse de Cartões"
     const cat=plano.find(c=>chave(c.categoria)===chave('Restituições'))?.categoria||'Restituições';
     for(const it of l){const p=rnParc(it,id),pe=p&&RN.pes.find(x=>x.parceiro_id===p.id&&(!x.cliente_id||x.cliente_id===id));
-      const row={cliente_id:id,tipo:'pagar',pessoa_id:pe?.id||null,pessoa_nome:pe?.nome||p?.nome_global||p?.nome||it.nome.trim(),
+      // conta do repasse nasce fora da remessa: só vai quando a Carol enviar (21/11)
+      const row={sem_remessa:true,cliente_id:id,tipo:'pagar',pessoa_id:pe?.id||null,pessoa_nome:pe?.nome||p?.nome_global||p?.nome||it.nome.trim(),
         descricao:`Repasse de parceiro (restituição)${it.guias?` · ${it.guias} ${it.guias===1?'guia':'guias'}`:''} · relatório ${dBR(RN.lote.data_relatorio)}`,
         documento:it.protocolo,categoria:cat,competencia:venc.slice(0,8)+'01',vencimento:venc,valor:0,parcela:1,parcelas:1,
         forma:p?.pix_chave?'Pix':p?.conta?'Transferência':null,pix_chave:p?.pix_chave||null,origem:'repasse',
