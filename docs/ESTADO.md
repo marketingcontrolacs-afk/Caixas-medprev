@@ -2,12 +2,17 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **21/11/2026 10:55 · Claude (chat contas a pagar) · `docs/estado-tesouraria-pb-21-11`:** **Tesouraria MPA PB igual à planilha** (Planilha Tesouraria - PB.xlsx, saldo 19/11 = R$ 59.943,27). Sem mudança no código.
+  - A diferença de R$ 32.400,00 eram 5 transferências criadas em 18/11 que não estão na planilha: Palmas→PB 13.050 (22/01/2025) e saques do Sicredi PB 16.000 + 1.000 (08/01/2026), 350 (21/01) e 2.000 (07/07). Os registros da `tesouraria` foram apagados (o espelho saiu junto). Os saques ficaram no Sicredi PB como saída sem categoria e "PENDENTE".
+  - **Regra (Carol):** a retirada da tesouraria de Palmas que vai para PB é "depositada" por transferência do banco de PB para o Sicredi Palmas, às vezes dias depois e somando mais de uma retirada. A saída da tesouraria de Palmas liga com a transferência recebida no Sicredi Palmas. Os 13.050 foram religados assim; o PIX do Sicredi PB ficou pendente (o dinheiro não entrou na planilha de PB).
+  - **Chamados abertos para a Carol (17), com sugestão do Claude em cada um:** Maria (R$ 32.400 sem destino), 12.435 em dobro (23/01 e 12/02/2026), débitos automáticos sem comprovante, Claro de Lages, Pix da Cris, Santander Biguaçu/Palhoça, pagamentos da Oliveira e anexos de 23/11, fatura Inter, rateio, feriados municipais e confirmação de que o ERP no ar tem os PRs #301–#303.
+
 - **21/11/2026 10:30 · Claude (chat contas a pagar) · `feat/remessa-so-enviada`:** **remessa só com o que a Carol enviar** (regra em `docs/financeiro/REGRAS.md`).
   - Contas a pagar › barra da seleção: **📤 Enviar para a remessa** (`gtEnviaRemessa`, com Desfazer). Os inserts de conta a pagar (lançamento, lote, repasse `rnCriaTitulos`, adiantamento) gravam `sem_remessa: true`.
   - Envio de remessa: saiu o "↩ Trazer todos de volta"; o aviso explica a regra.
   - **Dados:** ~230 contas em aberto que estavam na remessa sem terem sido enviadas foram tiradas (`sem_remessa = true`); as que estão em arquivo enviado ficaram.
   - Checklist do mês também ignora a categoria Restituições.
-  - **Pendente:** migration `fin_titulos_remessa_so_quando_enviar` (default `true` + trigger no insert) não foi aplicada: o Supabase pediu confirmação e ela expirou.
+  - **Banco (aplicado em 21/11 pelo SQL direto, não está no histórico de migrations):** `fin_titulos.sem_remessa` com default `true` e trigger `fin_titulos_nasce_fora_remessa` (before insert) que força `sem_remessa = true`. Toda conta a pagar nasce fora da remessa.
 
 - **21/11/2026 10:10 · Claude (chat contas a pagar) · `feat/checklist-mes`:** **✅ Checklist do mês** em Contas a pagar (pedido da Carol).
   - **Banco:** migration `fin_recorrencias_checklist` (tabela `fin_recorrencias`: empresa, dia, descrição, observação, palavras, historico, ativo; RLS igual à de `fin_titulos`). Preenchida com as 3 planilhas "Check List … 2026" do OneDrive (243 itens, 212 ativos; `historico` = jan..dez de 2026, x = teve).
