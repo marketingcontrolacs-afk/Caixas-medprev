@@ -9076,6 +9076,14 @@ let GTR=null,GFC={cid:'',lista:[]},GFP={key:'',lista:[]};
 const GTFORMAS=['Boleto','Pix','Transferência','Débito automático','Cartão','Dinheiro'];
 const gtP=()=>GT.tipo==='pagar';
 const dP=()=>GT.dlg==='pagar';   // o diálogo aberto é de conta a pagar (na movimentação, depende da conta)
+// VENCIMENTO EM DIA ÚTIL (Carol, 21/11): conta a pagar com vencimento em sábado, domingo ou feriado vai para o próximo dia útil;
+// INSS e FGTS são o contrário: antecipam para o dia útil anterior. Feriados: tabela feriados (nacionais + os da UF/município da empresa).
+let FERVENC=null;
+async function ferVenc(cli){if(!FERVENC){try{const {data,error}=await sb.from('feriados').select('data,nome,uf,municipio');FERVENC=error?[]:(data||[])}catch(e){console.error(e);FERVENC=[]}}
+  return new Map(FERVENC.filter(x=>!x.uf||x.uf===cli?.uf&&(!x.municipio||x.municipio===cli?.municipio)).map(x=>[x.data,x.nome||'feriado']))}
+const vencAntecipa=(...tx)=>/\b(inss|fgts)\b/i.test(tx.filter(Boolean).join(' '));
+function vencMotivo(s,fer){if(!s)return '';const w=dObj(s).getDay();return fer?.has(s)?'feriado ('+fer.get(s)+')':w===0?'domingo':w===6?'sábado':''}
+function vencUtil(s,fer,ant){const d=dObj(s);for(let i=0;i<20&&vencMotivo(isoLocal(d),fer);i++)d.setDate(d.getDate()+(ant?-1:1));return isoLocal(d)}
 const abat=m=>r2(m.valor-(+m.juros||0)+(+m.desconto||0));   // quanto o movimento abate do título
 // mesma regra do banco (v58): sem acento, maiúsculas, pontuação e LTDA/ME/EPP/EIRELI/SA no fim
 const pessoaChave=t=>(t||'').toLowerCase().replace(/&/g,' e ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/( (ltda|me|epp|eireli|sa|s a|mei))+$/,'');
@@ -10181,6 +10189,11 @@ async function pdfAbre(buf,nome){
 // lançamento só, sugere a categoria (guia pelo código, conta recorrente pelo histórico) e mostra se já existe conta lançada
 // (prevista ou recorrente) para ligar. Nada é gravado antes de "Criar os lançamentos marcados", e tudo tem Desfazer.
 const LT_CATS=['Boleto ou fatura','Comprovante','Nota fiscal','Outros'];let LT=null;
+// ANEXAR DA PASTA (Carol, 21/11): escolhe a pasta do mês e o sistema anexa cada arquivo à conta já lançada (pela linha digitável,
+// pelo nº da nota ou pelo fornecedor). Arquivos dentro de subpastas de banco, Tesouraria, Remessa etc. já foram pagos e ficam de fora;
+// arquivo que não achou conta lançada vem desmarcado (pode ser de outra empresa da mesma pasta).
+const LT_PAGO=/^(sicredi|santander|inter|ita[uú]|bradesco|caixa|bb|banco do brasil|pagbank|pagseguro|xp|nubank|sicoob|tesouraria|comprovantes?|dep[oó]sito|cart[aã]o.*|nfs?|remessa.*|retorno.*|arquivos de remessa|restitui.*)$/i;
+const ltPasta=f=>{const ps=String(f.webkitRelativePath||'').split('/').slice(1,-1);return ps.some(x=>LT_PAGO.test(x.trim()))};
 function ltDialogo(){if($('dlgLote'))return $('dlgLote');
   document.head.insertAdjacentHTML('beforeend','<style>.ltTab td{vertical-align:top}.ltTab .mt4{margin-top:4px}.ltTab td>div.lt1{display:block;margin-top:4px}.ltTab td>div.lt1:first-child{margin-top:0}.ltTab .chip{display:inline-block;margin-top:4px;white-space:normal}</style>');
   document.body.insertAdjacentHTML('beforeend',`<dialog id="dlgLote" style="width:min(1320px,calc(100vw - 32px))"><div class="dh"><h2 id="ltTitle">Importar boletos, notas e guias em lote</h2></div>
@@ -10202,12 +10215,13 @@ function ltDialogo(){if($('dlgLote'))return $('dlgLote');
   d.addEventListener('dragover',e=>{if(!e.target.closest('#ltDrop'))return;e.preventDefault();drop().style.borderColor='var(--accent, #0b6b5c)'});
   d.addEventListener('dragleave',e=>{if(e.target.closest('#ltDrop'))drop().style.borderColor=''});
   d.addEventListener('drop',e=>{if(!e.target.closest('#ltDrop'))return;e.preventDefault();drop().style.borderColor='';ltLe([...e.dataTransfer.files])});
-  d.addEventListener('change',e=>{if(e.target.id==='ltArq'){ltLe([...e.target.files]);e.target.value=''}});
+  d.addEventListener('change',e=>{if(e.target.id==='ltArq'||e.target.id==='ltPasta'){ltLe([...e.target.files]);e.target.value=''}});
   return d}
 async function ltAbre(){
   const cli=cliAtual();if(!cli||cli.id==='*')return toast('Escolha uma empresa para importar os documentos.');
-  ltDialogo();LT={cli,it:[],pes:[],plano:[],lendo:0};
-  try{[LT.pes,LT.plano]=await Promise.all([gfPessoasDe(cli.id,'fornecedor'),planoDe(cli)])}catch(e){console.error(e)}
+  ltDialogo();LT={cli,it:[],pes:[],plano:[],lendo:0,docs:[]};
+  try{[LT.pes,LT.plano,LT.docs]=await Promise.all([gfPessoasDe(cli.id,'fornecedor'),planoDe(cli),
+    todas(()=>sb.from('documentos').select('registro_id,nome_arquivo').eq('cliente_id',cli.id).eq('modulo','financeiro')).catch(()=>[])])}catch(e){console.error(e)}
   await guiasCarrega();
   $('ltTitle').textContent='Importar boletos, notas e guias em lote · '+cli.nome;ltDesenha();$('dlgLote').showModal()}
 // lê um arquivo e devolve o item da lista (um lançamento)
@@ -10229,11 +10243,15 @@ async function ltItem(f){
     guia:r.guia||null,bol:r.bol||null,pix:!!r.pix,chave:xml&&r.nfe?r.nfe.chave:'',texto:(r.texto||'').slice(0,3000),origem:r.origem,ehNota:cat==='Nota fiscal'&&!r.bol,ehBol:!!r.bol||cat==='Boleto ou fatura'};
   return {...base,files:[f],cats:[cat],partes:[{f,cat,base}],ok:true}}
 async function ltLe(files){
-  if(!LT||!files.length)return;const fs=files.filter(f=>/pdf|image|xml/i.test(f.type||'')||/\.(pdf|xml|jpe?g|png|webp)$/i.test(f.name||''));
+  if(!LT||!files.length)return;const daPasta=files.some(f=>f.webkitRelativePath);
+  const pagos=daPasta?files.filter(ltPasta):[];if(pagos.length)files=files.filter(f=>!ltPasta(f));
+  const fs=files.filter(f=>/pdf|image|xml/i.test(f.type||'')||/\.(pdf|xml|jpe?g|png|webp)$/i.test(f.name||''));
+  if(pagos.length)toast(`${pagos.length} arquivo${pagos.length>1?'s':''} em subpastas de banco, Tesouraria ou remessa (já pagos) ficaram de fora.`);
   if(fs.length<files.length)toast('Alguns arquivos foram ignorados: envie PDF, foto ou XML.');
+  if(!fs.length&&daPasta)return toast('Nenhum arquivo solto (a pagar) nesta pasta.');
   LT.lendo+=fs.length;ltDesenha();
   for(const f of fs){let x;try{x=await ltItem(f)}catch(e){console.error(e);x={files:[f],cats:['Outros'],erro:e?.senha?'PDF com senha: não consegui abrir.':'Não consegui ler este arquivo.',ok:false,partes:[]}}
-    LT.lendo--;if(!x.erro)ltJunta(x);else LT.it.push(x);ltDesenha()}
+    if(daPasta)x.daPasta=true;LT.lendo--;if(!x.erro)ltJunta(x);else LT.it.push(x);ltDesenha()}
   await Promise.all(LT.it.map(x=>x.sugFeita||x.erro?null:ltSug(x)));ltDesenha()}
 // nota + boleto: mesmo fornecedor (CNPJ ou nome) e mesmo valor (ou o valor de uma das duplicatas da nota) viram um lançamento só
 function ltJunta(x){
@@ -10241,7 +10259,7 @@ function ltJunta(x){
   const par=LT.it.find(y=>!y.erro&&y.files.length===1&&(x.ehNota&&!y.ehNota&&y.ehBol||y.ehNota&&!x.ehNota&&x.ehBol)&&mesmoF(x,y)&&x.valor>0&&y.valor>0&&Math.abs(x.valor-y.valor)<0.01);
   if(!par){LT.it.push(x);return}
   const [bol,nf]=x.ehNota?[par,x]:[x,par];
-  Object.assign(par,{...bol,files:[bol.files[0],nf.files[0]],cats:[bol.cats[0],nf.cats[0]],partes:[...bol.partes,...nf.partes],juntou:true,ok:true,
+  Object.assign(par,{...bol,daPasta:x.daPasta||par.daPasta,files:[bol.files[0],nf.files[0]],cats:[bol.cats[0],nf.cats[0]],partes:[...bol.partes,...nf.partes],juntou:true,ok:true,
     numero:nf.numero||bol.numero,descricao:bol.descricao||nf.descricao,competencia:nf.competencia||bol.competencia,doc:bol.doc||nf.doc,forn:bol.forn||nf.forn,chave:nf.chave||bol.chave,texto:bol.texto+' '+nf.texto,sugFeita:false})}
 async function ltSug(x){x.sugFeita=true;
   const s=await catSugere({cli:LT.cli,pessoa:x.forn,texto:[x.descricao,x.texto].join(' '),valor:x.valor,guia:x.guia}).catch(()=>null);
@@ -10249,6 +10267,12 @@ async function ltSug(x){x.sugFeita=true;
   if(s?.desc&&!x.descricao)x.descricao=s.desc;
   // conta já lançada (prevista ou recorrente) do mesmo fornecedor, perto do vencimento
   const livres=bolAbertas().filter(t=>t.cliente_id===LT.cli.id&&!LT.it.some(y=>y!==x&&y.dest===t.id));
+  // a conta já tem esta linha digitável (lançada antes do arquivo): é a mesma conta, só anexa (Carol, 21/11)
+  const lin=soDig(x.linha||''),barra=soDig(x.bol?.barra||'');
+  const pelaLinha=lin?livres.find(t=>t.linha_digitavel&&[lin,barra].includes(soDig(t.linha_digitavel))):null;
+  const nNum=soDig(x.numero||'').replace(/^0+/,''),pelaNota=!pelaLinha&&nNum.length>=3?livres.find(t=>t.documento&&soDig(t.documento).replace(/^0+/,'')===nNum&&(!x.valor||Math.abs(t.valor-x.valor)<0.01||!x.forn||bolMesmo(t,{pessoa_nome:x.forn}))):null;
+  if(pelaLinha||pelaNota){const t=pelaLinha||pelaNota;x.dest=t.id;x.sugT=t.id;x.sugComo=pelaLinha?'pela linha digitável':'pelo nº da nota';x.mesma=!!pelaLinha;
+    if(!x.forn)x.forn=t.pessoa_nome||'';return}
   const p=LT.pes.find(p=>pessoaChave(pesNome(p))===pessoaChave(x.forn)||pessoaChave(p.nome)===pessoaChave(x.forn));
   let sg=x.forn&&x.venc?bolSugere({pessoa_id:p?.id||null,pessoa_nome:p?.nome||x.forn,vencimento:x.venc,valor:x.valor,descricao:x.descricao},livres):null;
   // achou pelas palavras, mas a conta é de OUTRO fornecedor (ex.: dois recibos de aluguel de locadores diferentes): não junta
@@ -10259,14 +10283,17 @@ async function ltSug(x){x.sugFeita=true;
   if(x.bol){const td=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null,an=mesAnterior({id:null,cliente_id:LT.cli.id,tipo:'pagar',pessoa_nome:x.forn,vencimento:somaMes(TODAY,1)});
     x.susp=bolConfere(x.bol,td?.valor||an?.valor);x.ant=an;
     if(x.susp){const n=textoNota(x.texto||''),f5=bolFora(x.bol);x.ok=false;x.valor=f5?.valor||n.valor||null;x.venc=f5?.venc||n.venc||'';x.linha='';x.bol=null}}}
-function ltConta(){const n=LT.it.filter(x=>x.ok&&!x.erro).length;$('ltCriar').disabled=!n||LT.lendo>0;$('ltCriar').textContent=n?`Criar os ${n} lançamentos marcados`:'Criar os lançamentos marcados';
+function ltConta(){LT.it.forEach(x=>{if(x.daPasta&&x.dest&&!x.pastaVisto){x.pastaVisto=true;if(x.dest==='nova')x.ok=false}});const n=LT.it.filter(x=>x.ok&&!x.erro).length;$('ltCriar').disabled=!n||LT.lendo>0;$('ltCriar').textContent=n?`Criar os ${n} lançamentos marcados`:'Criar os lançamentos marcados';
   $('ltNote').textContent=LT.lendo?`Lendo ${LT.lendo} arquivo${LT.lendo>1?'s':''}…`:`${LT.it.length} lançamento${LT.it.length===1?'':'s'} na lista`}
+// mesmo nome que o uploadAnexo grava (foto vira .jpg)
+const ltNomeArq=f=>{const n=f.name||'arquivo';return /^image\//.test(f.type||'')?n.replace(/\.[^.]+$/,'')+'.jpg':n};
 function ltDesenha(){
   if(!LT)return;const cats=[...new Set(LT.plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')==='Despesa').map(c=>c.categoria).concat(LT.plano.filter(c=>c.ativo!==false&&(c.tipo||'Despesa')!=='Despesa').map(c=>c.categoria)))];
   const livres=bolAbertas().filter(t=>t.cliente_id===LT.cli.id);
   const opC=c=>`<option value=""></option>`+[...cats,...(c&&!cats.includes(c)?[c]:[])].map(x=>`<option${x===c?' selected':''}>${esc(x)}</option>`).join('')+(typeof catNovaOpt==='string'?catNovaOpt:'');
   const linhas=LT.it.map((x,i)=>{
-    const arqs=x.files.map((f,j)=>`<div>📎 <span class="chip">${esc(x.cats[j]||'')}</span> ${esc(f.name||'')}</div>`).join('');
+    const jaTem=f=>x.dest&&x.dest!=='nova'&&(LT.docs||[]).some(d=>d.registro_id===x.dest&&d.nome_arquivo===ltNomeArq(f));
+    const arqs=x.files.map((f,j)=>`<div>📎 <span class="chip">${esc(x.cats[j]||'')}</span> ${esc(f.webkitRelativePath||f.name||'')}${jaTem(f)?' <span class="chip c-done">já anexado</span>':''}</div>`).join('');
     if(x.erro)return `<tr><td></td><td class="l">${arqs}</td><td class="l neg" colspan="5">${esc(x.erro)}</td><td><button type="button" class="btn small ghost" data-lt="tira" data-i="${i}" aria-label="Tirar da lista">✕</button></td></tr>`;
     const sem=LT.pes.length&&x.forn&&!LT.pes.some(p=>pessoaChave(pesNome(p))===pessoaChave(x.forn)||pessoaChave(p.nome)===pessoaChave(x.forn));
     const t=x.dest&&x.dest!=='nova'?GT.lista.find(y=>y.id===x.dest):null;
@@ -10280,12 +10307,13 @@ function ltDesenha(){
       <td><div class="lt1"><input data-i="${i}" data-k="numero" value="${esc(x.numero||'')}" placeholder="Nº doc." aria-label="Documento" ${st}></div><div class="lt1"><input type="month" data-i="${i}" data-k="competencia" value="${esc(x.competencia||'')}" aria-label="Competência" ${st}></div></td>
       <td class="l"><select data-i="${i}" data-k="categoria" data-catnova="Despesa" aria-label="Categoria" ${st}>${opC(x.categoria||'')}</select>${x.catPartes?`<span class="chip c-done" title="${esc(x.catPartes.map(p=>p.categoria+' '+fm(p.valor)).join(' · '))}">➗ ${x.catPartes.length} categorias</span><div class="note" style="margin:0">${x.catPartes.map(p=>esc(p.categoria)+' '+fm(p.valor)).join('<br>')}</div>`:''}${x.catComo&&x.categoria?`<div class="note" style="margin:0">${x.catFraca?'⚠ ':''}${esc(x.catComo)}</div>`:''}</td>
       <td class="l"><select data-i="${i}" data-k="dest" aria-label="Lançar como" ${st}><option value="nova">Conta nova</option>${outras.length?`<optgroup label="Conta já lançada (prevista ou recorrente)">${outras.map(y=>bolOpt(y,{})).join('')}</optgroup>`:''}</select>
-        ${t?`<span class="chip c-done">Vai para a conta já lançada${x.sugComo&&x.dest===x.sugT?' (achei '+esc(x.sugComo)+')':''}</span>${x.valor&&Math.abs(t.valor-x.valor)>0.004?`<span class="chip c-warn">Valor lançado ${fm(t.valor)} passa a ${fm(x.valor)}</span>`:''}`:''}
+        ${t?`<span class="chip c-done">${x.mesma&&x.dest===x.sugT?'Só anexa na conta já lançada':'Vai para a conta já lançada'}${x.sugComo&&x.dest===x.sugT?' (achei '+esc(x.sugComo)+')':''}</span>${x.valor&&Math.abs(t.valor-x.valor)>0.004?`<span class="chip c-warn">Valor lançado ${fm(t.valor)} passa a ${fm(x.valor)}</span>`:''}`:''}
         ${x.repetido?`<span class="chip c-bad">Boleto já lançado: ${esc(x.repetido)}</span>`:''}${x.susp?`<span class="chip c-bad">Linha digitável não confere: ${esc(x.susp)}</span>`:''}${x.bol?.corrigida?'<span class="chip c-warn" title="O boleto veio com o vencimento da linha digitável fora do padrão dos bancos; o sistema usou a linha certa, igual à do DDA">Linha digitável corrigida: confira com o DDA</span>':''}${x.ant&&x.valor&&Math.abs(x.ant.valor-x.valor)>0.004?`<div class="note" style="margin:2px 0 0">${esc(mesAntTxt(x.ant))}</div>`:''}${!x.valor||!x.venc?'<span class="chip c-warn">falta '+[!x.valor?'valor':'',!x.venc?'vencimento':''].filter(Boolean).join(' e ')+'</span>':''}</td>
       <td><button type="button" class="btn small ghost" data-lt="tira" data-i="${i}" aria-label="Tirar da lista">✕</button></td></tr>`}).join('');
   $('ltBody').innerHTML=`<label id="ltDrop" style="border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;cursor:pointer;display:block">
       <b>Arraste aqui os boletos, notas fiscais, guias (DARF, INSS, FGTS, DAS), faturas e recibos</b><br><span class="muted">ou clique para escolher vários arquivos (PDF, foto ou XML da nota). A nota e o boleto do mesmo fornecedor com o mesmo valor viram um lançamento só.</span>
       <input type="file" id="ltArq" accept="${ACCEPT},.xml,text/xml,application/xml" multiple hidden></label>
+    <div style="margin-top:6px;text-align:center"><span class="btn fotobtn" title="Escolha a pasta do mês (ex.: Pagamentos › Novembro › empresa). Os arquivos soltos (a pagar) são anexados às contas já lançadas; os que estão em subpastas de banco, Tesouraria ou remessa (já pagos) ficam de fora.">📁 Anexar da pasta<input type="file" id="ltPasta" webkitdirectory multiple aria-label="Escolher a pasta do mês"></span></div>
     ${LT.it.length?`<div class="tablebox" style="max-height:none;margin-top:10px"><table class="nosort ltTab" style="table-layout:fixed;width:100%"><colgroup><col style="width:34px"><col style="width:17%"><col style="width:20%"><col style="width:13%"><col style="width:13%"><col style="width:16%"><col><col style="width:40px"></colgroup><thead><tr><th></th><th class="l">Arquivos</th><th class="l">Fornecedor e descrição</th><th>Vencimento e valor</th><th>Nº e competência</th><th class="l">Categoria</th><th class="l">Lançar como</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`:''}
     <datalist id="ltPesList">${LT.pes.map(p=>`<option value="${esc(pesNome(p))}">`).join('')}</datalist>`;
   ltConta()}
@@ -10294,21 +10322,24 @@ async function ltCriar(){
   const falta=sel.find(x=>(x.dest==='nova'||!x.dest)&&(!x.forn||!x.venc||!(x.valor>0)));
   if(falta)return alert(`Complete o fornecedor, o vencimento e o valor de “${falta.files[0].name}” (ou desmarque).`);
   const v160=await v160ok();if(sel.some(x=>x.catPartes)&&!v160&&!confirm(v160Msg+'\n\nCriar assim mesmo, só com a categoria principal?'))return;
-  $('ltCriar').disabled=true;const feitos={novos:[],alterados:[],docs:[],arqs:[]};let n=0;
+  $('ltCriar').disabled=true;const feitos={novos:[],alterados:[],docs:[],arqs:[]};let n=0;const FV=await ferVenc(cli);
   try{
     for(const x of sel){
       const p=LT.pes.find(p=>pessoaChave(pesNome(p))===pessoaChave(x.forn)||pessoaChave(p.nome)===pessoaChave(x.forn));
-      const ups=[];for(const [j,f] of x.files.entries()){if(/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||''))continue;const up=await uploadAnexo(f,cli.id,'financeiro');feitos.arqs.push(up.caminho);ups.push({...up,categoria:x.cats[j]})}
+      const ups=[];for(const [j,f] of x.files.entries()){if(/xml/i.test(f.type||'')||/\.xml$/i.test(f.name||''))continue;
+        if(x.dest&&x.dest!=='nova'&&(LT.docs||[]).some(d=>d.registro_id===x.dest&&d.nome_arquivo===ltNomeArq(f)))continue;const up=await uploadAnexo(f,cli.id,'financeiro');feitos.arqs.push(up.caminho);ups.push({...up,categoria:x.cats[j]})}
       let id;const partes=v160&&x.catPartes?partesEscala(x.catPartes,x.valor):null;
       if(x.dest&&x.dest!=='nova'){
-        const t=GT.lista.find(y=>y.id===x.dest);const upd={valor:x.valor||t.valor,vencimento:x.venc||t.vencimento,previsto:false};
+        const t=GT.lista.find(y=>y.id===x.dest),vAnt=vencAntecipa(t.categoria,t.descricao,x.descricao),vv=x.venc?vencUtil(x.venc,FV,vAnt):t.vencimento;
+        // a conta já tem a linha deste boleto: o vencimento já lançado (ajustado ao dia útil) fica (Carol, 21/11)
+        const upd={valor:x.valor||t.valor,vencimento:x.mesma?t.vencimento:vv,previsto:false};
         if(x.linha)upd.linha_digitavel=soDig(x.linha);if(x.numero)upd.documento=x.numero;if(!t.descricao||/^previsto:/i.test(t.descricao))upd.descricao=x.descricao||t.descricao;
         if(!t.categoria&&x.categoria)upd.categoria=x.categoria;if(x.competencia&&!t.competencia)upd.competencia=x.competencia+'-01';if(partes&&!t.cat_partes)upd.cat_partes=partes;
         const antes=Object.fromEntries(Object.keys(upd).map(k=>[k,t[k]??null]));
         const {error}=await sb.from('fin_titulos').update(upd).eq('id',t.id);if(error)throw error;feitos.alterados.push({id:t.id,antes});id=t.id}
       else{
         const row={cliente_id:cli.id,tipo:'pagar',pessoa_id:p?.id||null,pessoa_nome:p?.nome||x.forn,descricao:x.descricao||null,documento:x.numero||null,categoria:x.categoria||null,
-          competencia:x.competencia?x.competencia+'-01':null,vencimento:x.venc,valor:x.valor,parcela:1,parcelas:1,grupo_id:null,conta_id:null,
+          competencia:x.competencia?x.competencia+'-01':null,vencimento:vencUtil(x.venc,FV,vencAntecipa(x.categoria,x.descricao)),valor:x.valor,parcela:1,parcelas:1,grupo_id:null,conta_id:null,
           forma:x.linha?'Boleto':x.pix?'Pix':null,linha_digitavel:x.linha?soDig(x.linha):null,pix_chave:x.pix?p?.pix_chave||null:null,obs:x.chave?`Chave da nota: ${x.chave}`:null};
         if(partes)row.cat_partes=partes;
         const {data,error}=await sb.from('fin_titulos').insert(row).select('id').single();if(error)throw error;feitos.novos.push(data.id);id=data.id}
@@ -10674,6 +10705,14 @@ async function abrirGT(t,tipo,pre){
   // competência já vem preenchida pela categoria e pelo vencimento; quem digitar manda (Carol, 13/11)
   {const cp=$('gt_competencia');if(cp&&!cp.disabled){const sug=()=>{if(cp.value&&cp.dataset.auto!=='1')return;const v=compSugerida($('gt_categoria')?.value,$('gt_vencimento')?.value,GT.lista,t?.id);if(v){cp.value=v;cp.dataset.auto='1'}};
     cp.addEventListener('input',()=>{cp.dataset.auto=''});['gt_categoria','gt_vencimento'].forEach(k=>$(k)?.addEventListener('change',sug));sug()}}
+  // aviso de vencimento fora de dia útil, com botão para ajustar (Carol, 21/11)
+  if(P&&$('gt_vencimento')){const vi=$('gt_vencimento'),av=document.createElement('div');av.className='note';av.style.cssText='color:#b45309;margin-top:4px';av.hidden=true;
+    vi.closest('label').after(av);
+    const ck=async()=>{const fer=await ferVenc(cli),s=vi.value,mot=vencMotivo(s,fer);if(!mot){av.hidden=true;return}
+      const ant=vencAntecipa($('gt_categoria')?.value,$('gt_descricao')?.value),nv=vencUtil(s,fer,ant);
+      av.innerHTML=`⚠ ${dBR(s)} cai em ${esc(mot)}. ${ant?'INSS e FGTS antecipam para o dia útil anterior':'Conta a pagar é postergada para o próximo dia útil'}: <b>${dBR(nv)}</b>. <button type="button" class="btn small">Usar ${dBR(nv)}</button>`;
+      av.querySelector('button').onclick=()=>{vi.value=nv;vi.dispatchEvent(new Event('change'))};av.hidden=false};
+    ['change','input'].forEach(e=>vi.addEventListener(e,ck));['gt_categoria','gt_descricao'].forEach(k=>$(k)?.addEventListener('change',ck));ck()}
   if($('gtJunto')){const mids=movs.map(m=>m.id),q=[ofxIds.length?`id.in.(${ofxIds.join(',')})`:'',`junto_mov.in.(${mids.join(',')})`].filter(Boolean).join(',');
     sb.from('fin_ofx').select('id,data,valor,memo,nome,qtd,itens,junto_mov').or(q).order('data').order('valor').then(({data,error})=>{const b=$('gtJuntoBody');if(!b)return;if(error){console.error(error);b.textContent='Não foi possível carregar os lançamentos do banco.';return}
       const ls=(data||[]).filter(l=>ofxIds.includes(l.id)||mids.includes(l.junto_mov)),n=ls.reduce((a,l)=>a+(l.qtd>1?l.qtd:1),0);$('gtJunto').hidden=n<2;
@@ -10720,6 +10759,15 @@ async function gtAcao(a,b){
       competencia:val('competencia')?val('competencia')+'-01':null,vencimento:val('vencimento'),conta_id:val('conta_id'),forma:val('forma'),
       linha_digitavel:P?(val('linha_digitavel')||'').replace(/\D/g,'')||null:null,pix_chave:P?val('pix_chave')||p?.pix_chave||null:null,obs:val('obs')};
     if(t?.previsto&&($('gt_prevok')?.checked||row.linha_digitavel&&row.linha_digitavel!==t.linha_digitavel))row.previsto=false;
+    // débito automático não vai na remessa (Carol, 21/11)
+    if(P&&row.forma==='Débito automático')row.sem_remessa=true;
+    // vencimento em dia útil (Carol, 21/11): pergunta antes de salvar; as próximas parcelas já saem ajustadas
+    const vBase=row.vencimento,vAnt=P&&vencAntecipa(row.categoria,row.descricao),FV=P?await ferVenc(cli):null;
+    if(P){const mot=vencMotivo(row.vencimento,FV);
+      if(mot){const nv=vencUtil(row.vencimento,FV,vAnt);
+        if(!confirm(`O vencimento ${dBR(row.vencimento)} cai em ${mot}.\n\n${vAnt?'INSS e FGTS antecipam para o dia útil anterior':'Conta a pagar é postergada para o próximo dia útil'}: ${dBR(nv)}.\n\nOK: salvar com ${dBR(nv)}\nCancelar: voltar e corrigir`))return gtErr(`Vencimento em ${mot}. Use ${dBR(nv)}.`);
+        row.vencimento=nv;$('gt_vencimento').value=nv}}
+    const vMes=k=>FV?vencUtil(somaMes(vBase,k),FV,vAnt):somaMes(vBase,k);
     // rateio na categoria (v160): a categoria principal é a da maior parte
     {const rt=gtRatLe(valor);if(rt.erro)return gtErr(rt.erro);
       if(rt.partes||t?.cat_partes){if(!await v160ok())return gtErr(v160Msg);row.cat_partes=rt.partes;if(rt.partes)row.categoria=rt.principal}}
@@ -10737,7 +10785,7 @@ async function gtAcao(a,b){
         const mVenc=muda('vencimento'),mComp=muda('competencia');
         const prox=GT.lista.filter(x=>x.grupo_id===t.grupo_id&&x.parcela>t.parcela&&!(GT.movs[x.id]||[]).length);
         for(const x of prox){const k=x.parcela-t.parcela,u={...ch};
-          if(mVenc)u.vencimento=somaMes(row.vencimento,k);if(mComp)u.competencia=row.competencia?somaMes(row.competencia,k):null;
+          if(mVenc)u.vencimento=vMes(k);if(mComp)u.competencia=row.competencia?somaMes(row.competencia,k):null;
           if(!Object.keys(u).length)break;
           ({error}=await sb.from('fin_titulos').update(u).eq('id',x.id));if(error)break}
         if(!error)GT.proxOk=prox.length}
@@ -10748,7 +10796,7 @@ async function gtAcao(a,b){
       const n=Math.max(1,Math.min(120,parseInt($('gt_parcelas').value)||1)),tot=$('gt_vparc').value==='total';
       const base=tot?Math.floor(valor/n*100)/100:valor,grupo=n>1?crypto.randomUUID():null;
       const rows=[...Array(n).keys()].map(i=>({...row,cliente_id:cli.id,tipo:GT.dlg,valor:tot&&i===n-1?r2(valor-base*(n-1)):base,parcela:i+1,parcelas:n,grupo_id:grupo,
-        vencimento:somaMes(row.vencimento,i),competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
+        vencimento:i?vMes(i):row.vencimento,competencia:row.competencia&&n>1?somaMes(row.competencia,i):row.competencia}));
       if(row.cat_partes)rows.forEach(r=>r.cat_partes=partesEscala(row.cat_partes,r.valor));
       if(rows.some(r=>!(r.valor>0)))return gtErr('Valor pequeno demais para tantas parcelas.');
       jaPago=b?.dataset.quit==='1';const jData=$('gj_data')?.value,jConta=$('gj_conta')?.value,jTodas=n>1&&$('gj_parc')?.value==='todas';
