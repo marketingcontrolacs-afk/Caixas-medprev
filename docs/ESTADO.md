@@ -2,6 +2,13 @@
 
 Cada sessão acrescenta uma linha no topo: **data · conta · o que mudou · o que ficou pendente**.
 
+- **21/11/2026 10:30 · Claude (chat contas a pagar) · `feat/remessa-so-enviada`:** **remessa só com o que a Carol enviar** (regra em `docs/financeiro/REGRAS.md`).
+  - Contas a pagar › barra da seleção: **📤 Enviar para a remessa** (`gtEnviaRemessa`, com Desfazer). Os inserts de conta a pagar (lançamento, lote, repasse `rnCriaTitulos`, adiantamento) gravam `sem_remessa: true`.
+  - Envio de remessa: saiu o "↩ Trazer todos de volta"; o aviso explica a regra.
+  - **Dados:** ~230 contas em aberto que estavam na remessa sem terem sido enviadas foram tiradas (`sem_remessa = true`); as que estão em arquivo enviado ficaram.
+  - Checklist do mês também ignora a categoria Restituições.
+  - **Pendente:** migration `fin_titulos_remessa_so_quando_enviar` (default `true` + trigger no insert) não foi aplicada: o Supabase pediu confirmação e ela expirou.
+
 - **21/11/2026 10:10 · Claude (chat contas a pagar) · `feat/checklist-mes`:** **✅ Checklist do mês** em Contas a pagar (pedido da Carol).
   - **Banco:** migration `fin_recorrencias_checklist` (tabela `fin_recorrencias`: empresa, dia, descrição, observação, palavras, historico, ativo; RLS igual à de `fin_titulos`). Preenchida com as 3 planilhas "Check List … 2026" do OneDrive (243 itens, 212 ativos; `historico` = jan..dez de 2026, x = teve).
   - **Tela:** escolhe o mês e mostra, por empresa, cada item com a conta do mês e a situação: Não lançada · Prevista (atualizar com o boleto) · Boleto sem linha digitável · Falta anexo · Pronta · Paga. Pagamento lançado direto no banco (sem conta a pagar) conta como pago. Filtro "Só o que falta", + Novo item e ✎ para editar (dia, descrição, como chega, palavras, ativo).

@@ -25,6 +25,12 @@ Antes de mexer na Conciliação bancária, na Remessa ou no Repasse, leia isto: 
    - Caso: Sicredi da MPA Pato Branco nunca tinha aceitado arquivo, e esperava o nº 1.
 2. **Conta bancária lenta ao salvar.** O trigger `fin_contas_ligar_tes_upd` só refaz a tesouraria quando o nome, o `conta_bc`, o tipo ou o "ativo" mudam (migration `fin_contas_ligar_tes_so_quando_muda`).
 
+## Remessa: só o que a Carol enviar (21/11)
+1. **Nada entra na remessa sozinho.** Toda conta a pagar nasce fora da remessa (`sem_remessa = true`), inclusive as criadas pelo Repasse, pelo lote e pelo adiantamento. Ela entra só pelo botão **📤 Enviar para a remessa** (Contas a pagar, contas marcadas).
+2. **Por quê:** pagamentos feitos à mão (ex.: restituições da Oliveira SJ) apareciam no Envio de remessa e corriam o risco de ir no arquivo e ser pagos duas vezes.
+3. **Não reintroduzir** botão que traga de volta para a remessa em massa ("Trazer todos de volta"). Voltar um por um, na lista dos tirados, continua valendo.
+4. **Repasse e categoria Restituições** são um processo à parte: rotinas de contas a pagar (datas, baixas, checklist) não mexem neles.
+
 ## Repasse
 1. **A busca procura em todas as colunas:** parceiro, CPF/CNPJ, guias, valor, valor da NF, nota fiscal, conta e Pix, Pagar em, situação e protocolo.
 
